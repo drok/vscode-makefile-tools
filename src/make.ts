@@ -756,8 +756,47 @@ async function parseTargets(progress: vscode.Progress<{}>, cancel: vscode.Cancel
         progress.report({ increment: 1, message: status + ((recursive) ? "(recursive)" : "") });
     };
 
+    // Avoid pushing targets that are automake internal-use targets,
+    // or not build targets (eg dist-*)
+    let automake_intermediate_targts: string[] = [
+        "^cscopelist$",
+        "^distclean$",
+        // "^dist$",
+        "^ID$",
+        "^GTAGS$",
+        "^TAGS$",
+        "^CTAGS$",
+        "^tags$",
+        "^ctags$",
+        "^cscope$",
+        "^cscope.files$",
+        "^installdirs$",
+        "^installcheck$",
+        "^distcleancheck$",
+        "^distuninstallcheck$",
+        "^distcheck$",
+        "^mostlyclean$",
+        "^maintainer-clean-generic$",
+        "^mostlyclean-generic$",
+        "^clean-cscope$",
+        "^clean$",
+        "^distdir$",
+        "^am--refresh$",
+        "^stamp-h1$",
+        "^dist-",
+        "^uninstall-",
+        "^install-",
+        "^maintainter-",
+        "^distclean-",
+        "-am$",
+        "-recursive$",
+        "Makefile.in$",
+    ];
+    var automake_patterns = new RegExp(automake_intermediate_targts.join('|'));
+
     let onFoundTarget: any = (target: string): void => {
-        targets.push(target);
+        if (!automake_patterns.test(target))
+            targets.push(target);
     };
 
     let retc: number = await parser.parseTargets(cancel, dryRunOutput, onStatus, onFoundTarget);
