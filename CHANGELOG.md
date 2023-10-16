@@ -4,6 +4,7 @@
 Improvements:
 - Add support for a post configure script. [#391](https://github.com/microsoft/vscode-makefile-tools/issues/391)
 - Add support for post-configure and pre-configure script arguments, both globally and per configuration. [#151](https://github.com/microsoft/vscode-makefile-tools/issues/151)
+- Avoid relativizing paths in the project outline. [#519](https://github.com/microsoft/vscode-makefile-tools/pull/519) [@drok sponsored by @Mergesium](https://github.com/drok)
 
 ## 0.7.0
 Improvements:
