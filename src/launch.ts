@@ -40,7 +40,7 @@ export class Launcher implements vscode.Disposable {
 
     // Command property accessible from launch.json:
     // calls getLaunchTargetPath after triggering a build of the current target,
-    // if makefile.buildBeforeLaunch allows it.
+    // if autotools.buildBeforeLaunch allows it.
     public async launchTargetPath(): Promise<string> {
         if (configuration.getBuildBeforeLaunch()) {
             await make.buildTarget(make.TriggeredBy.launch, configuration.getCurrentTarget() || "");
@@ -73,7 +73,7 @@ export class Launcher implements vscode.Disposable {
 
     // Command property accessible from launch.json:
     // calls getLaunchTargetFileName after triggering a build of the current target,
-    // if makefile.buildBeforeLaunch allows it.
+    // if autotools.buildBeforeLaunch allows it.
     public async launchTargetFileName(): Promise<string> {
         if (configuration.getBuildBeforeLaunch()) {
             await make.buildTarget(make.TriggeredBy.launch, configuration.getCurrentTarget() || "");
@@ -162,7 +162,7 @@ export class Launcher implements vscode.Disposable {
             }
         }
 
-        // Properties defined by makefile.launchConfigurations override makefile.defaultLaunchConfiguration
+        // Properties defined by autotools.launchConfigurations override autotools.defaultLaunchConfiguration
         // and they both override the guessed values.
         let defaultLaunchConfiguration: configuration.DefaultLaunchConfiguration | undefined = configuration.getDefaultLaunchConfiguration();
         let miMode: string | undefined = currentLaunchConfiguration.MIMode || defaultLaunchConfiguration?.MIMode || guessMiMode;
