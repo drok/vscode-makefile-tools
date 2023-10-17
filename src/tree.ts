@@ -105,11 +105,11 @@ export class LaunchTargetNode extends BaseNode {
             item.collapsibleState = vscode.TreeItemCollapsibleState.None;
             item.tooltip = localize("launch.target.currently.selected.for.debug.run.in.terminal",
                                     "The launch target currently selected for debug and run in terminal.\n{0}", this._toolTip);
-            // enablement in makefile.outline.setLaunchConfiguration is not
+            // enablement in autotools.outline.setLaunchConfiguration is not
             // disabling this TreeItem
             item.command = {
-                command: "makefile.outline.setLaunchConfiguration",
-                title: "%makefile-tools.command.makefile.setLaunchConfiguration.title%"
+                command: "autotools.outline.setLaunchConfiguration",
+                title: "%autotools.command.makefile.setLaunchConfiguration.title%"
             };
             item.contextValue = [
                 `nodeType=launchTarget`,
@@ -142,7 +142,7 @@ export class ConfigurationNode extends BaseNode {
         try {
             const item: vscode.TreeItem = new vscode.TreeItem(this._name);
             item.collapsibleState = vscode.TreeItemCollapsibleState.None;
-            item.tooltip = "The makefile configuration currently selected from settings ('makefile.configurations').";
+            item.tooltip = "The makefile configuration currently selected from settings ('autotools.configurations').";
             item.contextValue = [
                 `nodeType=configuration`,
             ].join(',');
