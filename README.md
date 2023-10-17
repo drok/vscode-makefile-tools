@@ -1,7 +1,9 @@
-# VS Code Makefile Tools
+# VS Code Makefile Tools (Mergesium edition)
 
-This extension provides IntelliSense configurations to the VS Code C/C++ Extension for Makefile projects.
+This extension allows Intellisense to import configuration from Makefile projects.
 It also provides convenient commands to build, debug, and run your targets.
+
+It is a fork of [Microsoft's extension of the same name](https://github.com/microsoft/vscode-makefile-tools), and includes several [Mergesium customizations](#mergesium-customizations) that may or may not be accepted for upstream inclusion. It should be considered a technology preview, showcasing Mergesium's vision; an easy way to try out proposed improvements. Being released by a different author, the versioning is restarted at 0.1.0 (corresponds to Microsoft's 0.7.0 release). Mergesium release numbers are not comparable or even related to Microsoft release numbers.
 
 # Getting Started
 
@@ -97,6 +99,20 @@ provided by the bot. You will only need to do this once across all repos using o
 This project has adopted the [Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct/).
 For more information see the [Code of Conduct FAQ](https://opensource.microsoft.com/codeofconduct/faq/) or
 contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additional questions or comments.
+
+## Mergesium Customizations
+
+This initial release contains no customizations. It should be a functionally identical copy of the ms-vscode.makefile-tools 0.7.0; the purpose is to iron out the release process pipeline.
+
+### Wish list
+Most of the customizations below are already implemented, but none are included in this initial release.
+* compatible with autotools (ie, fixes the infinite dry-run bug)
+* compatible with out-of-tree build configurations
+* (Optionally) save dry-run results in the builddir for easy detection of configuration changes
+* Change terminology to conventional autotools terms (workspace = srcdir, makeDirectory = builddir, "configure" = "import to Intellisense", etc); the current terms cause unnecessay confusion to experienced autotools users.
+* sandbox make invocations to avoid accidental fork-bombing (https://github.com/microsoft/vscode-makefile-tools/issues/505)
+* streamline extension configuration. Some of the options don't make sense, or are ambiguous (eg, does the "makeDirectory" setting override makeArgs "-C &lt;dir&gt;" ?)
+* Correct debug/run invocation of targets that use libtool (so libtool projects can be seamlessly debugged in vscode - currently they require much scriptology)
 
 ## Data and telemetry
 

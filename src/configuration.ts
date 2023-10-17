@@ -20,14 +20,14 @@ let statusBar: ui.UI = ui.getUI();
 
 // Each different scenario of building the same makefile, in the same environment, represents a configuration.
 // Example: "make BUILD_TYPE=Debug" and "make BUILD_TYPE=Release" can be the debug and release configurations.
-// The user can save several different such configurations in makefile.configurations setting,
+// The user can save several different such configurations in autotools.configurations setting,
 // from which one can be picked via this extension and saved in settings.
 
 // Priority rules for where is the Makefile Tools extension parsing the needed information from:
-//    1. makefile.configurations.buildLog setting
-//    2. makefile.buildLog setting
-//    3. makefile.configurations.makePath, makefile.configurations.makeArgs
-//    4. makefile.makePath and default args
+//    1. autotools.configurations.buildLog setting
+//    2. autotools.buildLog setting
+//    3. autotools.configurations.makePath, autotools.configurations.makeArgs
+//    4. autotools.makePath and default args
 //    5. default make tool and args
 
 export interface MakefileConfiguration {
@@ -63,7 +63,7 @@ export interface MakefileConfiguration {
     // since different tools may use different arguments for the same behavior
 }
 
-// Last configuration name picked from the set defined in makefile.configurations setting.
+// Last configuration name picked from the set defined in autotools.configurations setting.
 // Saved into the workspace state. Also reflected in the configuration status bar button.
 // If no particular current configuration is defined in settings, set to 'Default'.
 let currentMakefileConfiguration: string;
@@ -88,7 +88,7 @@ export function readCurrentMakefileConfiguration(): void {
     statusBar.setConfiguration(currentMakefileConfiguration);
 }
 
-// as described in makefile.panel.visibility
+// as described in autotools.panel.visibility
 type MakefilePanelVisibility = {
     debug: boolean;
     run: boolean;
@@ -104,15 +104,15 @@ type MakefilePanelVisibilityDescription = {
 
 // To add an optional feature (one that can be enabled/disabled based
 // on a property stored in settings.json):
-// * define property under makefile.panel.visibility in package.json
+// * define property under autotools.panel.visibility in package.json
 // * initialize here the default values
 // * if the feature controls the UI via enablement,
 // *    make sure enablement is handled in package.json, you are done
 // * if not, then add code to check Feature state wherever is needed.
 class MakefilePanelVisibilityDescriptions {
     features: MakefilePanelVisibilityDescription[] = [
-        { propertyName: "debug", enablement: "makefile:localDebugFeature", default: true, value: false },
-        { propertyName: "run", enablement: "makefile:localRunFeature", default: true, value: false }
+        { propertyName: "debug", enablement: "autotools:localDebugFeature", default: true, value: false },
+        { propertyName: "run", enablement: "autotools:localRunFeature", default: true, value: false }
     ];
 }
 
@@ -186,7 +186,7 @@ export function setMakePath(path: string): void { makePath = path; }
 
 // Read the path (full or directory only) of the make tool if defined in settings.
 // It represents a default to look for if no other path is already included
-// in "makefile.configurations.makePath".
+// in "autotools.configurations.makePath".
 async function readMakePath(): Promise<void> {
     makePath = await util.getExpandedSetting<string>("makePath");
     if (!makePath) {
@@ -199,8 +199,8 @@ export function getMakefilePath(): string | undefined { return makefilePath; }
 export function setMakefilePath(path: string): void { makefilePath = path; }
 // Read the full path to the makefile if defined in settings.
 // It represents a default to look for if no other makefile is already provided
-// in makefile.configurations.makefilePath.
-// TODO: validate and integrate with "-f [Makefile]" passed in makefile.configurations.makeArgs.
+// in autotools.configurations.makefilePath.
+// TODO: validate and integrate with "-f [Makefile]" passed in autotools.configurations.makeArgs.
 async function readMakefilePath(): Promise<void> {
     makefilePath = await util.getExpandedSetting<string>("makefilePath");
     if (!makefilePath) {
@@ -215,8 +215,8 @@ export function getMakeDirectory(): string | undefined { return makeDirectory; }
 export function setMakeDirectory(dir: string): void { makeDirectory = dir; }
 // Read the make working directory path if defined in settings.
 // It represents a default to look for if no other makeDirectory is already provided
-// in makefile.configurations.makeDirectory.
-// TODO: validate and integrate with "-C [DIR_PATH]" passed in makefile.configurations.makeArgs.
+// in autotools.configurations.makeDirectory.
+// TODO: validate and integrate with "-C [DIR_PATH]" passed in autotools.configurations.makeArgs.
 async function readMakeDirectory(): Promise<void> {
     makeDirectory = await util.getExpandedSetting<string>("makeDirectory");
     if (!makeDirectory) {
@@ -480,7 +480,7 @@ export function setDryrunSwitches(switches: string[]): void { dryrunSwitches = s
 //   --print-data-base: to generate verbose log output that can be parsed to identify all the makefile targets
 // Some code bases have various issues with the above make parameters: infrastructure (not build) errors,
 // infinite reconfiguration loops, resulting in the extension being unusable.
-// To work around this, the setting makefile.dryrunSwitches is providing a way to skip over the problematic make arguments,
+// To work around this, the setting autotools.dryrunSwitches is providing a way to skip over the problematic make arguments,
 // even if this results in not ideal behavior: less information available to be parsed, which leads to incomplete IntelliSense or missing targets.
 export async function readDryrunSwitches(): Promise<void> {
     dryrunSwitches = await util.getExpandedSetting<string[]>("dryrunSwitches");
@@ -513,7 +513,7 @@ let launchConfigurations: LaunchConfiguration[] = [];
 export function getLaunchConfigurations(): LaunchConfiguration[] { return launchConfigurations; }
 export function setLaunchConfigurations(configurations: LaunchConfiguration[]): void { launchConfigurations = configurations; }
 
-// Read launch configurations defined by the user in settings: makefile.launchConfigurations[]
+// Read launch configurations defined by the user in settings: autotools.launchConfigurations[]
 async function readLaunchConfigurations(): Promise<void> {
    launchConfigurations = await util.getExpandedSetting<LaunchConfiguration[]>("launchConfigurations") || [];
 }
@@ -590,11 +590,11 @@ async function readCurrentLaunchConfiguration(): Promise<void> {
     } else {
         // A null launch configuration after a non empty launch configuration string name
         // means that the name stored in the project state does not match any of the entries in settings.
-        // This typically happens after the user modifies manually "makefile.launchConfigurations"
+        // This typically happens after the user modifies manually "autotools.launchConfigurations"
         // in the .vscode/settings.json, specifically the entry that corresponds to the current launch configuration.
         // Make sure to unset the launch configuration in this scenario.
         if (currentLaunchConfigurationName !== undefined && currentLaunchConfigurationName !== "") {
-            logger.message(`Launch configuration "${currentLaunchConfigurationName}" is no longer defined in settings "makefile.launchConfigurations".`);
+            logger.message(`Launch configuration "${currentLaunchConfigurationName}" is no longer defined in settings "autotools.launchConfigurations".`);
             await setLaunchConfigurationByName("");
         } else {
             logger.message("No current launch configuration is set in the workspace state.");
@@ -614,7 +614,7 @@ export interface DefaultLaunchConfiguration {
 
 let defaultLaunchConfiguration: DefaultLaunchConfiguration | undefined;
 export function getDefaultLaunchConfiguration(): DefaultLaunchConfiguration | undefined { return defaultLaunchConfiguration; }
-// No setter needed. Currently only the user can define makefile.defaultLaunchConfiguration
+// No setter needed. Currently only the user can define autotools.defaultLaunchConfiguration
 
 export async function readDefaultLaunchConfiguration(): Promise<void> {
     defaultLaunchConfiguration = await util.getExpandedSetting<DefaultLaunchConfiguration>("defaultLaunchConfiguration");
@@ -668,7 +668,7 @@ function getMakefileConfiguration(configuration: string | undefined): MakefileCo
 }
 
 // Helper to find in the array of MakefileConfiguration which command/args correspond to a configuration name.
-// Higher level settings (like makefile.makePath, makefile.makefilePath or makefile.makeDirectory)
+// Higher level settings (like autotools.makePath, autotools.makefilePath or autotools.makeDirectory)
 // also have an additional effect on the final command.
 export async function getCommandForConfiguration(configuration: string | undefined): Promise<void> {
     let makefileConfiguration: MakefileConfiguration | undefined = getMakefileConfiguration(configuration);
@@ -678,12 +678,12 @@ export async function getCommandForConfiguration(configuration: string | undefin
 
     configurationMakeArgs = [];
 
-    // Name of the make tool can be defined as makePath in makefile.configurations or as makefile.makePath.
+    // Name of the make tool can be defined as makePath in autotools.configurations or as autotools.makePath.
     // When none defined, default to "make".
     configurationMakeCommand = makeParsedPathConfigurations?.base || makeParsedPathSettings?.base || "make";
     let configurationMakeCommandExtension: string | undefined = makeParsedPathConfigurations?.ext || makeParsedPathSettings?.ext;
 
-    // Prepend the directory path, if defined in either makefile.configurations or makefile.makePath (first has priority).
+    // Prepend the directory path, if defined in either autotools.configurations or autotools.makePath (first has priority).
     let configurationCommandPath: string = makeParsedPathConfigurations?.dir || makeParsedPathSettings?.dir || "";
     configurationMakeCommand = path.join(configurationCommandPath, configurationMakeCommand);
 
@@ -698,7 +698,7 @@ export async function getCommandForConfiguration(configuration: string | undefin
     }
 
     // Add the makefile path via the -f make switch.
-    // makefile.configurations.makefilePath overwrites makefile.makefilePath.
+    // autotools.configurations.makefilePath overwrites autotools.makefilePath.
     configurationMakefile = makefileConfiguration?.makefilePath ? util.resolvePathToRoot(makefileConfiguration?.makefilePath) : makefilePath;
     if (configurationMakefile) {
         // check if the makefile path is a directory. If so, try adding `Makefile` or `makefile`
@@ -723,14 +723,14 @@ export async function getCommandForConfiguration(configuration: string | undefin
     }
 
     // Add the working directory path via the -C switch.
-    // makefile.configurations.makeDirectory overwrites makefile.makeDirectory.
+    // autotools.configurations.makeDirectory overwrites autotools.makeDirectory.
     let makeDirectoryUsed: string | undefined = makefileConfiguration?.makeDirectory ? util.resolvePathToRoot(makefileConfiguration?.makeDirectory) : makeDirectory;
     if (makeDirectoryUsed) {
         configurationMakeArgs.push("-C");
         configurationMakeArgs.push(`${makeDirectoryUsed}`);
     }
 
-    // Make sure we append "makefile.configurations[].makeArgs" last, in case the developer wants to overwrite any arguments that the extension
+    // Make sure we append "autotools.configurations[].makeArgs" last, in case the developer wants to overwrite any arguments that the extension
     // deduces from the settings. Additionally, for -f/-C, resolve path to root.
     if (makefileConfiguration?.makeArgs) {
        let prevArg: string = "";
@@ -776,14 +776,14 @@ export async function getCommandForConfiguration(configuration: string | undefin
     if (!buildLogContent) {
         if ((!makeParsedPathSettings || makeParsedPathSettings.name === "") &&
             (!makeParsedPathConfigurations || makeParsedPathConfigurations.name === "")) {
-            logger.message("Could not find any make tool file name in makefile.configurations.makePath, nor in makefile.makePath. Assuming make.");
+            logger.message("Could not find any make tool file name in autotools.configurations.makePath, nor in autotools.makePath. Assuming make.");
         }
 
         // If configuration command has a path (absolute or relative), check if it exists on disk and error if not.
         // If no path is given to the make tool, search all paths in the environment and error if make is not on the path.
         if (configurationCommandPath  !== "") {
            if (!util.checkFileExistsSync(configurationMakeCommand)) {
-              logger.message("Make was not found on disk at the location provided via makefile.makePath or makefile.configurations[].makePath.");
+              logger.message("Make was not found on disk at the location provided via autotools.makePath or autotools.configurations[].makePath.");
 
               // How often location settings don't work (maybe because not yet expanding variables)?
               const telemetryProperties: telemetry.Properties = {
@@ -808,8 +808,8 @@ export async function getCommandForConfiguration(configuration: string | undefin
 
         if (!util.checkFileExistsSync(configurationMakefile)) {
             logger.message("The makefile entry point was not found. " +
-                "Make sure it exists at the location defined by makefile.makefilePath, makefile.configurations[].makefilePath, " +
-                "makefile.makeDirectory, makefile.configurations[].makeDirectory" +
+                "Make sure it exists at the location defined by autotools.makefilePath, autotools.configurations[].makefilePath, " +
+                "autotools.makeDirectory, autotools.configurations[].makeDirectory" +
                 "or in the root of the workspace.");
 
             // we may need more advanced ability to process settings
@@ -874,7 +874,7 @@ export function setMakefileConfigurations(configurations: MakefileConfiguration[
 export async function readMakefileConfigurations(): Promise<void> {
     // We need to read "makefile.configurations" unexpanded first, because we may write back into these settings
     // in case we indentify "name" missing. We'll expand later, see end of function.
-    let workspaceConfiguration: vscode.WorkspaceConfiguration = vscode.workspace.getConfiguration("makefile");
+    let workspaceConfiguration: vscode.WorkspaceConfiguration = vscode.workspace.getConfiguration("autotools");
     makefileConfigurations = workspaceConfiguration.get<MakefileConfiguration[]>("configurations") || [];
     let detectedUnnamedConfigurations: boolean = false;
     let unnamedConfigurationId: number = 0;
@@ -918,7 +918,7 @@ export async function readMakefileConfigurations(): Promise<void> {
         return k.name;
     }));
     if (makefileConfigurationNames.length > 0) {
-        logger.message("Found the following configurations defined in makefile.configurations setting: " + makefileConfigurationNames.join(";"));
+        logger.message("Found the following configurations defined in autotools.configurations setting: " + makefileConfigurationNames.join(";"));
     }
 
     // Verify if the current makefile configuration (check against the expanded values)
@@ -1115,7 +1115,7 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
             case "cpp":
                 // If configureDirty is already set from a previous VSCode session,
                 // at workspace load this event (onDidChangeActiveTextEditor) is triggered automatically
-                // and if makefile.configureOnOpen is true, there is a race between two configure operations,
+                // and if autotools.configureOnOpen is true, there is a race between two configure operations,
                 // one of which being unnecessary. If configureOnOpen is false, there is no race
                 // but still we don't want to override the behavior desired by the user.
                 // Additionally, if anything dirtied the configure state during a (pre)configure or build,
@@ -1143,7 +1143,7 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
     // Modifying any makefile should trigger an IntelliSense config provider update,
     // so make the dirty state true.
     // TODO: limit to makefiles relevant to this project, instead of any random makefile anywhere.
-    //       We can't listen only to the makefile pointed to by makefile.makefilePath or makefile.makeDirectory,
+    //       We can't listen only to the makefile pointed to by autotools.makefilePath or autotools.makeDirectory,
     //       because that is only the entry point and can refer to other relevant makefiles.
     // TODO: don't trigger an update for any dummy save, verify how the content changed.
     vscode.workspace.onDidSaveTextDocument(e => {
@@ -1162,7 +1162,7 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
             // Avoid unnecessary updates (for example, when settings are modified via the extension quickPick).
             let telemetryProperties: telemetry.Properties | null = {};
             let updatedSettingsSubkeys: string[] = [];
-            const keyRoot: string = "makefile";
+            const keyRoot: string = "autotools";
             let subKey: string = "launchConfigurations";
 
             let updatedLaunchConfigurations : LaunchConfiguration[] | undefined = await util.getExpandedSetting<LaunchConfiguration[]>(subKey);
@@ -1286,7 +1286,7 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
             let oldConfigurationCachePath = configurationCachePath;
             await readConfigurationCachePath();
             if (oldConfigurationCachePath !== configurationCachePath) {
-                // A change in makefile.configurationCachePath should trigger an IntelliSense update
+                // A change in autotools.configurationCachePath should trigger an IntelliSense update
                 // only if the extension is not currently reading from a build log.
                 extension.getState().configureDirty = extension.getState().configureDirty ||
                                                       !buildLog || !util.checkFileExistsSync(buildLog);
@@ -1311,7 +1311,7 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
                 updatedMakefilePath = util.resolvePathToRoot(updatedMakefilePath);
             }
             if (updatedMakefilePath !== makefilePath) {
-                // A change in makefile.makefilePath should trigger an IntelliSense update
+                // A change in autotools.makefilePath should trigger an IntelliSense update
                 // only if the extension is not currently reading from a build log.
                 extension.getState().configureDirty = extension.getState().configureDirty ||
                                                       !buildLog || !util.checkFileExistsSync(buildLog);
@@ -1325,7 +1325,7 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
                 updatedMakeDirectory = util.resolvePathToRoot(updatedMakeDirectory);
             }
             if (updatedMakeDirectory !== makeDirectory) {
-                // A change in makefile.makeDirectory should trigger an IntelliSense update
+                // A change in autotools.makeDirectory should trigger an IntelliSense update
                 // only if the extension is not currently reading from a build log.
                 extension.getState().configureDirty = extension.getState().configureDirty ||
                                                       !buildLog || !util.checkFileExistsSync(buildLog);
@@ -1346,7 +1346,7 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
             subKey = "dryrunSwitches";
             let updatedDryrunSwitches : string[] | undefined = await util.getExpandedSetting<string[]>(subKey);
             if (!util.areEqual(updatedDryrunSwitches, dryrunSwitches)) {
-                // A change in makefile.dryrunSwitches should trigger an IntelliSense update
+                // A change in autotools.dryrunSwitches should trigger an IntelliSense update
                 // only if the extension is not currently reading from a build log.
                 extension.getState().configureDirty = extension.getState().configureDirty ||
                                                       !buildLog || !util.checkFileExistsSync(buildLog);
@@ -1454,7 +1454,7 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
 
             // Report all the settings changes detected by now.
             // TODO: to avoid unnecessary telemetry processing, evaluate whether the changes done
-            // in the object makefile.launchConfigurations and makefile.configurations
+            // in the object autotools.launchConfigurations and autotools.configurations
             // apply exactly to the current launch configuration, since we don't collect and aggregate
             // information from all the array yet.
             updatedSettingsSubkeys.forEach(async (subKey) => {
@@ -1507,14 +1507,14 @@ export function prepareConfigurationsQuickPick(): string[] {
     }));
 
     if (items.length === 0) {
-        logger.message("No configurations defined in makefile.configurations setting.");
+        logger.message("No configurations defined in autotools.configurations setting.");
         items.push("Default");
     }
 
     return items;
 }
 
-// Fill a drop-down with all the configuration names defined by the user in makefile.configurations setting.
+// Fill a drop-down with all the configuration names defined by the user in autotools.configurations setting.
 // Triggers a cpptools configuration provider update after selection.
 export async function setNewConfiguration(): Promise<void> {
     // Cannot set a new makefile configuration if the project is currently building or (pre-)configuring.
@@ -1541,11 +1541,11 @@ export async function setNewConfiguration(): Promise<void> {
         }
 
         // Refresh telemetry for this new makefile configuration
-        // (this will find the corresponding item in the makefile.configurations array
+        // (this will find the corresponding item in the autotools.configurations array
         // and report all the relevant settings of that object).
         // Because of this, the event name is still "settingsChanged", even if
         // we're doing a state change now.
-        let keyRoot: string = "makefile";
+        let keyRoot: string = "autotools";
         let subKey: string = "configurations";
         let key: string = keyRoot + "." + subKey;
         let workspaceConfiguration: vscode.WorkspaceConfiguration = vscode.workspace.getConfiguration(keyRoot);
@@ -1660,13 +1660,13 @@ export async function setLaunchConfigurationByName(launchConfigurationName: stri
         if (currentLaunchConfiguration) {
             // Read again all launch configurations from settings, so that we push this incoming into that array as well
             // because we want to persist the original unexpanded content of launch configurations.
-            let workspaceConfiguration: vscode.WorkspaceConfiguration = vscode.workspace.getConfiguration("makefile");
+            let workspaceConfiguration: vscode.WorkspaceConfiguration = vscode.workspace.getConfiguration("autotools");
             let launchConfigAsInSettings: LaunchConfiguration[] = workspaceConfiguration.get<LaunchConfiguration[]>("launchConfigurations") || [];
             launchConfigAsInSettings.push(currentLaunchConfiguration);
             // Push into the processed 'in-memory' launch configurations array as well.
             launchConfigurations.push(currentLaunchConfiguration);
             await workspaceConfiguration.update("launchConfigurations", launchConfigAsInSettings);
-            logger.message(`Inserting a new entry for ${launchConfigurationName} in the array of makefile.launchConfigurations. ` +
+            logger.message(`Inserting a new entry for ${launchConfigurationName} in the array of autotools.launchConfigurations. ` +
                            "You may define any additional debug properties for it in settings.");
         }
     }
@@ -1685,7 +1685,7 @@ export async function setLaunchConfigurationByName(launchConfigurationName: stri
         statusBar.setLaunchConfiguration("No launch configuration set");
     }
 
-    // Refresh settings, they may reference variables or commands reading launch targets commands: ${command:makefile.getLaunchTargetPath} and others...
+    // Refresh settings, they may reference variables or commands reading launch targets commands: ${command:autotools.getLaunchTargetPath} and others...
     logger.message("Re-reading settings after launch target change.");
     await initFromSettings();
     await extension._projectOutlineProvider.updateLaunchTarget(launchConfigurationName);
@@ -1700,7 +1700,7 @@ export async function selectLaunchConfiguration(): Promise<void> {
         return;
     }
 
-    // warn about an out of date configure state and configure if makefile.configureAfterCommand allows.
+    // warn about an out of date configure state and configure if autotools.configureAfterCommand allows.
     if (extension.getState().configureDirty ||
         // The configure state might not be dirty from the last session but if the project is set to skip
         // configure on open and no configure happened yet we still must warn.
@@ -1717,7 +1717,7 @@ export async function selectLaunchConfiguration(): Promise<void> {
     // TODO: create a quick pick with description and details for items
     // to better view the long targets commands
 
-    // In the quick pick, include also any makefile.launchConfigurations entries,
+    // In the quick pick, include also any autotools.launchConfigurations entries,
     // as long as they exist on disk and without allowing duplicates.
     let launchTargetsNames: string[] = [...launchTargets];
     launchConfigurations.forEach(launchConfiguration => {
@@ -1744,11 +1744,11 @@ export async function selectLaunchConfiguration(): Promise<void> {
             await setLaunchConfigurationByName(chosen);
 
             // Refresh telemetry for this new launch configuration
-            // (this will find the corresponding item in the makefile.launchConfigurations array
+            // (this will find the corresponding item in the autotools.launchConfigurations array
             // and report all the relevant settings of that object).
             // Because of this, the event name is still "settingsChanged", even if
             // we're doing a state change now.
-            let keyRoot: string = "makefile";
+            let keyRoot: string = "autotools";
             let subKey: string = "launchConfigurations";
             let key: string = keyRoot + "." + subKey;
             let workspaceConfiguration: vscode.WorkspaceConfiguration = vscode.workspace.getConfiguration(keyRoot);
