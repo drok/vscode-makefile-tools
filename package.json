@@ -1,7 +1,7 @@
 {
     "name": "autotools",
     "displayName": "Autotools Integration",
-    "description": "Import autotools configuration into C/C++ IntelliSense. This is the Mergesium edition of Microsoft's autotools extension. It includes Mergesium customizations that have not yet been accepted by Microsoft for inclusion in its release",
+    "description": "Import autotools configuration into C/C++ IntelliSense",
     "version": "0.1.0",
     "publisher": "mergesium",
     "preview": true,

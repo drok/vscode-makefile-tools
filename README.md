@@ -3,7 +3,9 @@
 This extension allows Intellisense to import configuration from Makefile projects.
 It also provides convenient commands to build, debug, and run your targets.
 
-It is a fork of [Microsoft's extension of the same name](https://github.com/microsoft/vscode-makefile-tools), and includes several [Mergesium customizations](#mergesium-customizations) that may or may not be accepted for upstream inclusion. It should be considered a technology preview, showcasing Mergesium's vision; an easy way to try out proposed improvements. Being released by a different author, the versioning is restarted at 0.1.0 (corresponds to Microsoft's 0.7.0 release). Mergesium release numbers are not comparable or even related to Microsoft release numbers.
+It is a fork of [Microsoft's extension of the same name](https://github.com/microsoft/vscode-makefile-tools), and includes several [Mergesium customizations](#differences-from-makefile-tools). Mergesium offers these improvements to Microsoft as pull requests, but they may or may not be accepted for upstream inclusion. It should be considered a technology preview, showcasing Mergesium's vision; an easy way to try out the proposed improvements.
+
+Autotools is the main build system used at Mergesium, and thus we need this extension to be as useful to us as possible. We eat the dogfood we make. If you're already familiar with vscode-makefile-tools, you can skip to [Differences from makefile-tools](#differences-from-makefile-tools).
 
 # Getting Started
 
@@ -81,39 +83,47 @@ A more in-depth troubleshooting guide can be found here: [docs/troubleshooting.m
 # Feedback and Suggestions
 
 We'd love to hear what you think! If you are having trouble with the extension, please
-[open an issue](https://github.com/microsoft/vscode-makefile-tools/issues/new).
+[open an issue](https://github.com/Mergesium/vscode-makefile-tools/issues/new).
 
 You can also leave us a rating on the VS Code Marketplace and let us know what you like about the extension
 or would like to see improved.
 
 # Contributing
 
-This project welcomes contributions and suggestions.  Most contributions require you to agree to a
-Contributor License Agreement (CLA) declaring that you have the right to, and actually do, grant us
-the rights to use your contribution. For details, visit https://cla.microsoft.com.
+(Note: this section needs work)
 
-When you submit a pull request, a CLA-bot will automatically determine whether you need to provide
-a CLA and decorate the PR appropriately (e.g., label, comment). Simply follow the instructions
-provided by the bot. You will only need to do this once across all repos using our CLA.
+This project welcomes contributions and suggestions. The upsteam (Microsoft) has a
+Contributor License Agreement (CLA) management plan, which is not practical for a small company like Mergesium.
+If you contribute directly to us, we will not forward it to Microsoft. If you want it included in the upstream project, contribute it directly there. You can of course, submit it to both Mergesium and Microsoft if you choose.
 
 This project has adopted the [Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct/).
 For more information see the [Code of Conduct FAQ](https://opensource.microsoft.com/codeofconduct/faq/) or
 contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additional questions or comments.
 
-## Mergesium Customizations
-
-This initial release contains no customizations. It should be a functionally identical copy of the ms-vscode.makefile-tools 0.7.0; the purpose is to iron out the release process pipeline.
-
-### Wish list
-Most of the customizations below are already implemented, but none are included in this initial release.
+## Differences from makefile-tools
 * compatible with autotools (ie, fixes the infinite dry-run bug)
 * compatible with out-of-tree build configurations
-* (Optionally) save dry-run results in the builddir for easy detection of configuration changes
-* Change terminology to conventional autotools terms (workspace = srcdir, makeDirectory = builddir, "configure" = "import to Intellisense", etc); the current terms cause unnecessay confusion to experienced autotools users.
-* sandbox make invocations to avoid accidental fork-bombing (https://github.com/microsoft/vscode-makefile-tools/issues/505)
-* streamline extension configuration. Some of the options don't make sense, or are ambiguous (eg, does the "makeDirectory" setting override makeArgs "-C &lt;dir&gt;" ?)
-* Correct debug/run invocation of targets that use libtool (so libtool projects can be seamlessly debugged in vscode - currently they require much scriptology)
+  * allows multiple configurations to be built from the same source, in different object directories
+* (Optionally) save dry-run results in the builddir
+  * allows easy detection of configuration changes (if you store .vscode/${currentTarget}.dryrun.log in git)
+  * also allows saving the dry-run to be skipped, saving disk space if you don't need this generated output.
+* Uses terminology that is more intuitive to experienced autotools users:
+  * "srcdir" instead of "workspace"
+  * "builddir" instead of "makeDirectory"
+  * "import to Intellisense" instead of "configure" (ie, "configure" does not mean running the configure script, but it means to extract the configuration data from the generated Makefile)
+* streamlined configuration
+  * each "Build Configuration" comprises of a build dir and an optional makeArgs setting. No more inheriting from the "Default" configuration, which makes no sense.
+  * removes the "buildLog" which was a workaround for the infinite dry-run bug, but it causes more grief than it solves.
+
+## From Mergesium's TODO list:
+
+* sandbox mode to avoid accidental fork-bombing (https://github.com/microsoft/vscode-makefile-tools/issues/505)
+* libtool compatibility (so libtool projects can be seamlessly debugged in vscode - currently they require much scriptology)
+* ability to configure most freshly cloned well-formed autotools projects. This may require
+  * exposing the configurable options in the gui, and
+  * detecting the right way to bootstrap it (./configure, ./autoreconf -vi, something else?)
+* Do you have suggestions? -> [open an Issue](https://github.com/drok/vscode-makefile-tools/issues)
 
 ## Data and telemetry
 
-This extension collects usage data and sends it to Microsoft to help improve our products and services. Collection of telemetry is controlled via the same setting provided by Visual Studio Code: `"telemetry.enableTelemetry"`. Read our [privacy statement](https://privacy.microsoft.com/en-us/privacystatement) to learn more.
+This extension collects usage data and sends it to Microsoft to help improve their products and services. Collection of telemetry is controlled via the same setting provided by Visual Studio Code: `"telemetry.enableTelemetry"`. Read their [privacy statement](https://privacy.microsoft.com/en-us/privacystatement) to learn more.
