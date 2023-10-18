@@ -52,7 +52,7 @@
 	"autotools.configuration.makefile.makefilePath.description": "프로젝트의 메이크파일 경로",
 	"autotools.configuration.makefile.buildLog.description": "시험 실행을 바이패스하기 위해 읽은 빌드 로그의 경로",
 	"autotools.configuration.makefile.extensionOutputFolder.description": "확장에서 생성된 다양한 출력 파일의 경로입니다. 기본값은 VS Code 작업 영역 저장소 위치입니다.",
-	"autotools.configuration.makefile.extensionLog.description": "메이크파일 출력 채널의 모든 콘텐츠를 저장하는 출력 파일의 경로입니다. 기본값은 'makefile.extensionOutputFolder' 설정의 값입니다.",
+	"autotools.configuration.makefile.extensionLog.description": "메이크파일 출력 채널의 모든 콘텐츠를 저장하는 출력 파일의 경로입니다.",
 	"autotools.configuration.makefile.configurationCachePath.description": "마지막 시험 실행 make 명령의 출력을 저장하는 캐시 파일의 경로입니다. 설정을 해제하면 이름이 'configurationCache.log'인 파일이 'makefile.extensionOutputFolder' 설정에서 지정한 경로에 저장됩니다.",
 	"autotools.configuration.makefile.dryrunSwitches.description": "시험 실행 make 호출에 전달할 인수",
 	"autotools.configuration.makefile.additionalCompilerNames.description": "알려진 확장 목록에서 추가할 컴파일러 도구의 이름",

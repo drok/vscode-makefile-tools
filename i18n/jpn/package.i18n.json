@@ -52,7 +52,7 @@
 	"autotools.configuration.makefile.makefilePath.description": "プロジェクトのメイクファイルへのパス",
 	"autotools.configuration.makefile.buildLog.description": "ドライランをバイパスするために読み取られたビルド ログへのパス",
 	"autotools.configuration.makefile.extensionOutputFolder.description": "拡張機能によって生成されるさまざまな出力ファイルへのパス。既定値は、VS Code ワークスペースの保存場所です。",
-	"autotools.configuration.makefile.extensionLog.description": "メイクファイル出力チャネルのすべてのコンテンツを格納する出力ファイルへのパス。既定値は 'makefile.extensionOutputFolder' 設定の値です。",
+	"autotools.configuration.makefile.extensionLog.description": "メイクファイル出力チャネルのすべてのコンテンツを格納する出力ファイルへのパス。",
 	"autotools.configuration.makefile.configurationCachePath.description": "最後の dry-run make コマンドの出力を格納するキャッシュ ファイルへのパス。設定を解除すると、'configurationCache.log' という名前のファイルが 'makefile.extensionOutputFolder' 設定で指定されたパスに格納されます。",
 	"autotools.configuration.makefile.dryrunSwitches.description": "ドライラン make 呼び出しに渡す引数",
 	"autotools.configuration.makefile.additionalCompilerNames.description": "拡張機能の既知のリストに追加するコンパイラ ツールの名前",

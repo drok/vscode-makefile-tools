@@ -52,7 +52,7 @@
 	"autotools.configuration.makefile.makefilePath.description": "Ruta de acceso al archivo Make del proyecto",
 	"autotools.configuration.makefile.buildLog.description": "Ruta de acceso al registro de compilación que se lee para omitir un simulacro",
 	"autotools.configuration.makefile.extensionOutputFolder.description": "La ruta a varios archivos de salida producidos por la extensión. Por defecto es la ubicación de almacenamiento del área de trabajo de VS Code.",
-	"autotools.configuration.makefile.extensionLog.description": "La ruta a un archivo de salida que almacena todo el contenido del canal de salida Makefile. Por defecto es el valor del parámetro 'makefile.extensionOutputFolder'.",
+	"autotools.configuration.makefile.extensionLog.description": "La ruta a un archivo de salida que almacena todo el contenido del canal de salida Makefile.",
 	"autotools.configuration.makefile.configurationCachePath.description": "La ruta a un archivo de caché que almacena la salida del último comando make de ejecución en seco. Si no se establece, se almacena un archivo llamado 'configurationCache.log' en la ruta especificada por el parámetro 'makefile.extensionOutputFolder'.",
 	"autotools.configuration.makefile.dryrunSwitches.description": "Argumentos que se van a pasar a la invocación de simulacro de make",
 	"autotools.configuration.makefile.additionalCompilerNames.description": "Nombres de las herramientas del compilador que se van a agregar a la lista conocida de extensiones",

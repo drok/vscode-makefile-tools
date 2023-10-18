@@ -781,7 +781,7 @@ export async function expandVariablesInSetting(settingId: string, settingVal: st
             toStr = userHome();
             telemetryProperties.pattern =  result[2];
         } else if (result[2] === "configuration") {
-            toStr = configuration.getCurrentMakefileConfiguration();
+            toStr = configuration.getCurrentMakefileConfiguration().name;
             telemetryProperties.pattern =  result[2];
         } else if (result[2] === "buildTarget") {
             toStr = configuration.getCurrentTarget() || "";

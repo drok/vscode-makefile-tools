@@ -241,7 +241,7 @@ export async function buildTarget(triggeredBy: TriggeredBy, target: string, clea
     }
 
     // Prepare a notification popup
-    let config: string | undefined = configuration.getCurrentMakefileConfiguration();
+    let config: string | undefined = configuration.getCurrentMakefileConfiguration().name;
     let configAndTarget: string = config;
     if (target) {
         target = target.trimLeft();
@@ -389,13 +389,9 @@ export async function doBuildTarget(progress: vscode.Progress<{}>, target: strin
 // Represents the content of the provided autotools.buildLog or a fresh output of make --dry-run
 // (which is also written into autotools.configurationCachePath).
 let parseContent: string | undefined;
-export function getParseContent(): string | undefined { return parseContent; }
-export function setParseContent(content: string): void { parseContent = content; }
 
 // The source file of parseContent (build log or configuration dryrun cache).
 let parseFile: string | undefined;
-export function getParseFile(): string | undefined { return parseFile; }
-export function setParseFile(file: string): void { parseFile = file; }
 
 // Targets need to parse a dryrun make invocation that does not include a target name
 // (other than default empty "" or the standard "all"), otherwise it would produce
@@ -422,7 +418,8 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
     // we can afford to invoke make -pRrq (very quick even on large projects).
     // We make sure to give the regression tests suite a build log that already contains
     // targets information because we want to avoid invoking make for now.
-    let buildLog: string | undefined = configuration.getConfigurationBuildLog();
+    let buildLog: string | undefined = configuration.getCurrentMakefileConfiguration().buildLog;
+
     if (buildLog && (!forTargets || process.env['MAKEFILE_TOOLS_TESTING'] === '1')) {
         parseContent = util.readFile(buildLog);
         if (parseContent) {
@@ -494,18 +491,19 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
     logger.message(`'${configuration.getConfigurationMakeCommand()} ${makeArgs.join(" ")}'`);
 
     try {
-        let dryrunFile : string = forTargets ? "./targets.log" : "./dryrun.log";
-        let extensionOutputFolder: string | undefined = configuration.getExtensionOutputFolder();
-        if (extensionOutputFolder) {
-            dryrunFile = path.join(extensionOutputFolder, dryrunFile);
-        }
-        dryrunFile = util.resolvePathToRoot(dryrunFile);
-        logger.message(`Writing the dry-run output: ${dryrunFile}`);
-
         const lineEnding: string = (process.platform === "win32" && process.env.MSYSTEM === undefined) ? "\r\n" : "\n";
+        let keepDryRuns: boolean = configuration.getKeepDryRuns();
+        let dryrunFile : string = forTargets ? "./targets.log" : configuration.getCurrentTarget() + ".dryrun.log";
+        if (keepDryRuns) {
+            let cachePath: string | undefined = configuration.getConfigurationCachePath();
+            if (cachePath) {
+                dryrunFile = path.join(cachePath, dryrunFile);
+            }
+            dryrunFile = util.resolvePathToRoot(dryrunFile);
+            logger.message(`Writing the dry-run output: ${dryrunFile}`);
 
-        util.writeFile(dryrunFile, `${configuration.getConfigurationMakeCommand()} ${makeArgs.join(" ")}${lineEnding}`);
-
+            util.writeFile(dryrunFile, `${configuration.getConfigurationMakeCommand()} ${makeArgs.join(" ")}${lineEnding}`);
+        }
         let completeOutput: string = "";
         let stderrStr: string = "";
         let heartBeat: number = Date.now();
@@ -513,7 +511,9 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
         let stdout: any = (result: string): void => {
             const appendStr: string = `${result} ${lineEnding}`;
             completeOutput += appendStr;
-            fs.appendFileSync(dryrunFile, appendStr);
+            if (keepDryRuns) {
+                fs.appendFileSync(dryrunFile, appendStr);
+            }
 
             progress.report({
               increment: 1,
@@ -536,7 +536,9 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
             if (process.env['MAKEFILE_TOOLS_TESTING'] !== '1') {
                appendStr += lineEnding;
             }
-            fs.appendFileSync(dryrunFile, appendStr);
+            if (keepDryRuns) {
+                fs.appendFileSync(dryrunFile, appendStr);
+            }
             stderrStr += appendStr;
 
             // Sometimes there is useful information coming via the stderr
@@ -552,7 +554,9 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
                 vscode.window.showWarningMessage("Dryrun timeout. See Makefile Tools Output Channel for details.");
                 logger.message("Dryrun timeout. Verify that the make command works properly " +
                 "in your development terminal (it could wait for stdin).");
-                logger.message(`Double check the dryrun output log: ${dryrunFile}`);
+                if (keepDryRuns) {
+                    logger.message(`Double check the dryrun output log: ${dryrunFile}`);
+                }
 
                 // It's enough to show this warning popup once.
                 clearInterval(timeout);
@@ -565,7 +569,7 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
         let elapsedTime: number = util.elapsedTimeSince(startTime);
         logger.message(`Generating dry-run elapsed time: ${elapsedTime}`);
 
-        parseFile = dryrunFile;
+        parseFile = keepDryRuns ? dryrunFile : (dryrunFile + " (not saved)");
         parseContent = completeOutput;
 
         // The error codes returned by the targets invocation (make -pRrq) mean something else
@@ -1015,15 +1019,13 @@ export async function configure(triggeredBy: TriggeredBy, updateTargets: boolean
   }
 
   // Identify for telemetry whether this configure will read configuration constructs from cache.
-  let readCache: boolean = false;
   let configurationCachePath: string | undefined =
     configuration.getConfigurationCachePath();
-  if (
-    configurationCachePath &&
-    util.checkFileExistsSync(configurationCachePath)
-  ) {
-    readCache = true;
-  }
+  let configurationCache: string | undefined =
+    configurationCachePath ?
+        path.join(configurationCachePath, configuration.getCurrentTarget() + ".cache") : undefined;
+  let readCache: boolean = configurationCache ?
+    util.checkFileExistsSync(configurationCache) : false;
 
   let compileCommandsPath: string | undefined =
     configuration.getCompileCommandsPath();
@@ -1133,12 +1135,13 @@ export async function configure(triggeredBy: TriggeredBy, updateTargets: boolean
       // Rewrite the configuration cache according to the last updates of the internal arrays,
       // but not if the configure was cancelled and not while running regression tests.
       if (
-        configurationCachePath &&
+        configuration.getKeepConfigurationCache() &&
+        configurationCache &&
         retc !== ConfigureBuildReturnCodeTypes.cancelled &&
         process.env["MAKEFILE_TOOLS_TESTING"] !== "1"
       ) {
         util.writeFile(
-          configurationCachePath,
+          configurationCache,
           JSON.stringify(ConfigurationCache)
         );
       }
@@ -1483,12 +1486,13 @@ export async function loadConfigurationFromCache(progress: vscode.Progress<{}>, 
 
     await util.scheduleAsyncTask(async () => {await extension.registerCppToolsProvider(); });
     let cachePath: string | undefined = configuration.getConfigurationCachePath();
-    if (cachePath) {
-        let content: string | undefined = util.readFile(cachePath);
+    if (configuration.getKeepConfigurationCache() && cachePath) {
+        let cacheFile: string = path.join(cachePath, configuration.getCurrentTarget() + ".cache");
+        let content: string | undefined = util.readFile(cacheFile);
         if (content) {
             try {
                 progress.report({ increment: 1, message: localize("make.configure.cache", "Configuring from cache") });
-                logger.message(`Configuring from cache: ${cachePath}`);
+                logger.message(`Configuring from cache: ${cacheFile}`);
                 let configurationCache: ConfigurationCache = {
                     buildTargets: [],
                     launchTargets: [],

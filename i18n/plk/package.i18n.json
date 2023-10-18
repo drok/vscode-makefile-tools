@@ -52,7 +52,7 @@
 	"autotools.configuration.makefile.makefilePath.description": "Ścieżka do pliku reguł programu make projektu",
 	"autotools.configuration.makefile.buildLog.description": "Ścieżka do dziennika kompilacji, który jest odczytywany, aby obejść przebieg próbny",
 	"autotools.configuration.makefile.extensionOutputFolder.description": "Ścieżka do różnych plików wyjściowych utworzonych przez rozszerzenie. Domyślnie jest to lokalizacja magazynu obszaru roboczego programu VS Code.",
-	"autotools.configuration.makefile.extensionLog.description": "Ścieżka do pliku wyjściowego przechowującego całą zawartość z kanału wyjściowego pliku reguł programu make. Domyślnie przyjmuje wartość ustawienia „makefile.extensionOutputFolder”.",
+	"autotools.configuration.makefile.extensionLog.description": "Ścieżka do pliku wyjściowego przechowującego całą zawartość z kanału wyjściowego pliku reguł programu make.",
 	"autotools.configuration.makefile.configurationCachePath.description": "Ścieżka do pliku pamięci podręcznej przechowującego dane wyjściowe ostatniego polecenia programu make dotyczącego testowego uruchomienia. Gdy ta opcja jest nieskonfigurowana, plik o nazwie „configurationCache.log” jest przechowywany w ścieżce określonej przez ustawienie „makefile.extensionOutputFolder”.",
 	"autotools.configuration.makefile.dryrunSwitches.description": "Argumenty do przekazania do przywołania przebiegu próbnego make",
 	"autotools.configuration.makefile.additionalCompilerNames.description": "Nazwy narzędzi kompilatora do dodania do listy znanych rozszerzeń",

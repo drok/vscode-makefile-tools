@@ -52,7 +52,7 @@
 	"autotools.configuration.makefile.makefilePath.description": "Cesta k souboru pravidel projektu",
 	"autotools.configuration.makefile.buildLog.description": "Cesta k protokolu o sestavení, která se přečte, aby se obešlo zkušební spuštění",
 	"autotools.configuration.makefile.extensionOutputFolder.description": "Cesta k různým výstupním souborům vytvořeným rozšířením. Výchozí nastavení je umístění úložiště pracovního prostoru VS Code.",
-	"autotools.configuration.makefile.extensionLog.description": "Cesta k výstupnímu souboru, do které se ukládá veškerý obsah z výstupního kanálu Souboru pravidel. Výchozí hodnota je nastavení makefile.extensionOutputFolder.",
+	"autotools.configuration.makefile.extensionLog.description": "Cesta k výstupnímu souboru, do které se ukládá veškerý obsah z výstupního kanálu Souboru pravidel.",
 	"autotools.configuration.makefile.configurationCachePath.description": "Cesta k souboru mezipaměti, do které se ukládá výstup posledního make příkazu dry-run Při zrušení nastavení se soubor s názvem configurationCache.log uloží na cestu určenou nastavením makefile.extensionOutputFolder.",
 	"autotools.configuration.makefile.dryrunSwitches.description": "Argumenty, které se mají předat při zkušebním volání maku",
 	"autotools.configuration.makefile.additionalCompilerNames.description": "Názvy kompilačních nástrojů, které se mají přidat na seznam známých rozšíření",

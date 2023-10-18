@@ -52,7 +52,7 @@
 	"autotools.configuration.makefile.makefilePath.description": "Le chemin vers le makefile du projet",
 	"autotools.configuration.makefile.buildLog.description": "Le chemin d’accès au journal de génération qui est lu pour contourner un essai à blanc",
 	"autotools.configuration.makefile.extensionOutputFolder.description": "Le chemin d'accès aux différents fichiers de sortie produits par l'extension. Par défaut, l'emplacement de stockage de l'espace de travail VS Code.",
-	"autotools.configuration.makefile.extensionLog.description": "Le chemin d'accès à un fichier de sortie stockant tout le contenu du canal de sortie Makefile. Par défaut, la valeur du paramètre 'makefile.extensionOutputFolder'.",
+	"autotools.configuration.makefile.extensionLog.description": "Le chemin d'accès à un fichier de sortie stockant tout le contenu du canal de sortie Makefile.",
 	"autotools.configuration.makefile.configurationCachePath.description": "Le chemin d'accès à un fichier cache stockant la sortie de la dernière commande de fabrication à sec. Lorsqu'il n'est pas défini, un fichier nommé 'configurationCache.log' est stocké dans le chemin spécifié par le paramètre 'makefile.extensionOutputFolder'.",
 	"autotools.configuration.makefile.dryrunSwitches.description": "Les arguments à passer à l’épreuve font invocation",
 	"autotools.configuration.makefile.additionalCompilerNames.description": "Noms des outils de compilation à ajouter à la liste des extensions connues",

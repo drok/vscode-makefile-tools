@@ -52,7 +52,7 @@
 	"autotools.configuration.makefile.makefilePath.description": "Projenin derleme görevleri dosyasına giden yolu",
 	"autotools.configuration.makefile.buildLog.description": "Provayı atlamak için okunan derleme günlüğüne giden yol",
 	"autotools.configuration.makefile.extensionOutputFolder.description": "Uzantı tarafından üretilen çeşitli çıkış dosyalarının yolu. Varsayılan olarak VS Code çalışma alanı depolama konumunu alır.",
-	"autotools.configuration.makefile.extensionLog.description": "Derleme Görevleri Dosyası çıkış kanalından tüm içeriği depolayan bir çıkış dosyasının yolu. Varsayılan olarak 'makefile.extensionOutputFolder' ayarının değerini alır.",
+	"autotools.configuration.makefile.extensionLog.description": "Derleme Görevleri Dosyası çıkış kanalından tüm içeriği depolayan bir çıkış dosyasının yolu.",
 	"autotools.configuration.makefile.configurationCachePath.description": "Son prova make komutunun çıkışını depolayan önbellek dosyasının yolu. Ayar kaldırıldığında, 'makefile.extensionOutputFolder' ayarı tarafından belirtilen yolda 'configurationCache.log' adlı bir dosya depolanır.",
 	"autotools.configuration.makefile.dryrunSwitches.description": "Prova make çağrısına geçirilecek bağımsız değişkenler",
 	"autotools.configuration.makefile.additionalCompilerNames.description": "Bilinen uzantı listesine eklenecek derleyici araçlarının adları",

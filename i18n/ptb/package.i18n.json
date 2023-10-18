@@ -52,7 +52,7 @@
 	"autotools.configuration.makefile.makefilePath.description": "O caminho para o makefile do projeto",
 	"autotools.configuration.makefile.buildLog.description": "O caminho para o log de build que está pronto para ignorar uma simulação",
 	"autotools.configuration.makefile.extensionOutputFolder.description": "O caminho para vários arquivos de saída produzidos pela extensão. O padrão é o local VS Code de armazenamento do workspace.",
-	"autotools.configuration.makefile.extensionLog.description": "O caminho para um arquivo de saída que armazena todo o conteúdo do canal de saída makefile. O padrão é o valor da configuração 'makefile.extensionOutputFolder'.",
+	"autotools.configuration.makefile.extensionLog.description": "O caminho para um arquivo de saída que armazena todo o conteúdo do canal de saída makefile.",
 	"autotools.configuration.makefile.configurationCachePath.description": "O caminho para um arquivo de cache que armazena a saída do último comando make de simulação. Quando não definido, um arquivo chamado 'configurationCache.log' é armazenado no caminho especificado pela configuração 'makefile.extensionOutputFolder'.",
 	"autotools.configuration.makefile.dryrunSwitches.description": "Argumentos a serem passados para a invocação do make de simulação",
 	"autotools.configuration.makefile.additionalCompilerNames.description": "Nomes de ferramentas do compilador a serem adicionados na lista de extensões conhecidas",

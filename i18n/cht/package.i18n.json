@@ -52,7 +52,7 @@
 	"autotools.configuration.makefile.makefilePath.description": "專案之 Makefile 的路徑",
 	"autotools.configuration.makefile.buildLog.description": "要讀取以略過試執行之組建記錄檔的路徑",
 	"autotools.configuration.makefile.extensionOutputFolder.description": "延伸模組所產生之各種輸出檔案的路徑。預設為 VS Code 工作區儲存位置。",
-	"autotools.configuration.makefile.extensionLog.description": "從 Makefile 輸出通道儲存所有內容的輸出檔案路徑。預設為 'makefile.extensionOutputFolder' 設定的值。",
+	"autotools.configuration.makefile.extensionLog.description": "從 Makefile 輸出通道儲存所有內容的輸出檔案路徑。",
 	"autotools.configuration.makefile.configurationCachePath.description": "儲存最後試執行 Make 命令之輸出的快取檔案路徑。取消設定時，名為 'configurationCache.log' 的檔案會儲存在 'makefile.extensionOutputFolder' 設定所指定的路徑中。",
 	"autotools.configuration.makefile.dryrunSwitches.description": "要傳遞至試執行 Make 引動過程的引數",
 	"autotools.configuration.makefile.additionalCompilerNames.description": "要新增至延伸模組已知清單的編譯器工具名稱",

@@ -37,44 +37,7 @@
         "Other"
     ],
     "activationEvents": [
-        "onCommand:autotools.setBuildConfiguration",
-        "onCommand:autotools.getConfiguration",
-        "onCommand:autotools.setBuildTarget",
-        "onCommand:autotools.getBuildTarget",
-        "onCommand:autotools.buildTarget",
-        "onCommand:autotools.buildCleanTarget",
-        "onCommand:autotools.buildAll",
-        "onCommand:autotools.buildCleanAll",
-        "onCommand:autotools.setLaunchConfiguration",
-        "onCommand:autotools.launchDebug",
-        "onCommand:autotools.launchRun",
-        "onCommand:autotools.launchTargetPath",
-        "onCommand:autotools.getLaunchTargetPath",
-        "onCommand:autotools.launchTargetFileName",
-        "onCommand:autotools.getLaunchTargetFileName",
-        "onCommand:autotools.getLaunchTargetDirectory",
-        "onCommand:autotools.getLaunchTargetArgs",
-        "onCommand:autotools.getLaunchTargetArgsConcat",
-        "onCommand:autotools.makeBaseDirectory",
-        "onCommand:autotools.configure",
-        "onCommand:autotools.cleanConfigure",
-        "onCommand:autotools.preConfigure",
-        "onCommand:autotools.postConfigure",
-        "onCommand:autotools.outline.setBuildConfiguration",
-        "onCommand:autotools.outline.setBuildTarget",
-        "onCommand:autotools.outline.buildTarget",
-        "onCommand:autotools.outline.buildCleanTarget",
-        "onCommand:autotools.outline.setLaunchConfiguration",
-        "onCommand:autotools.outline.launchDebug",
-        "onCommand:autotools.outline.launchRun",
-        "onCommand:autotools.outline.configure",
-        "onCommand:autotools.outline.cleanConfigure",
-        "onCommand:autotools.outline.preConfigure",
-        "onCommand:autotools.outline.postConfigure",
-        "onCommand:autotools.resetState",
-        "workspaceContains:**/makefile",
-        "workspaceContains:**/Makefile",
-        "workspaceContains:**/GNUmakefile"
+        "*"
     ],
     "main": "./out/src/extension.js",
     "contributes": {
@@ -421,12 +384,6 @@
                     "default": "",
                     "scope": "resource"
                 },
-                "autotools.configurationCachePath": {
-                    "type": "string",
-                    "description": "%autotools.configuration.makefile.configurationCachePath.description%",
-                    "default": "",
-                    "scope": "resource"
-                },
                 "autotools.dryrunSwitches": {
                     "type": "array",
                     "default": [
@@ -438,6 +395,18 @@
                     "items": {
                         "type": "string"
                     },
+                    "scope": "resource"
+                },
+                "autotools.keepDryRuns": {
+                    "type": "boolean",
+                    "markdownDescription": "%autotools.configuration.makefile.keepDryRuns.markdownDescription%",
+                    "default": false,
+                    "scope": "resource"
+                },
+                "autotools.keepConfigurationCache": {
+                    "type": "boolean",
+                    "markdownDescription": "%autotools.configuration.makefile.keepConfigurationCache.markdownDescription%",
+                    "default": false,
                     "scope": "resource"
                 },
                 "autotools.additionalCompilerNames": {
@@ -607,10 +576,6 @@
                     "when": "autotools:localRunFeature"
                 },
                 {
-                    "command": "autotools.setBuildConfiguration",
-                    "when": "autotools:fullFeatureSet"
-                },
-                {
                     "command": "autotools.setBuildTarget",
                     "when": "autotools:fullFeatureSet"
                 },
@@ -718,7 +683,7 @@
                 },
                 {
                     "command": "autotools.outline.setBuildConfiguration",
-                    "when": "autotools:fullFeatureSet && view == autotools.outline && viewItem =~ /nodeType=configuration/",
+                    "when": "view == autotools.outline && viewItem =~ /nodeType=configuration/",
                     "group": "inline@1"
                 },
                 {

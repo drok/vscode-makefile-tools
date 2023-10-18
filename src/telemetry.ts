@@ -117,7 +117,7 @@ function filterSetting(value: any, key: string, defaultValue: string) : string {
 function activeArrayItem(setting: string, key: string): number {
     if (key === "autotools.configurations") {
         let makefileConfigurations: configuration.MakefileConfiguration[] = configuration.getMakefileConfigurations();
-        let currentMakefileConfigurationName: string | undefined = configuration.getCurrentMakefileConfiguration();
+        let currentMakefileConfigurationName: string | undefined = configuration.getCurrentMakefileConfiguration().name;
         if (!currentMakefileConfigurationName) {
             return -1;
         }

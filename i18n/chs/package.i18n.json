@@ -52,7 +52,7 @@
 	"autotools.configuration.makefile.makefilePath.description": "项目的生成文件的路径",
 	"autotools.configuration.makefile.buildLog.description": "为绕过试运行而读取的生成日志的路径",
 	"autotools.configuration.makefile.extensionOutputFolder.description": "扩展生成的各种输出文件的路径。默认为 VS Code 工作区存储位置。",
-	"autotools.configuration.makefile.extensionLog.description": "存储生成文件输出通道中所有内容的输出文件的路径。默认为“makefile.extensionOutputFolder”设置的值。",
+	"autotools.configuration.makefile.extensionLog.description": "存储生成文件输出通道中所有内容的输出文件的路径。",
 	"autotools.configuration.makefile.configurationCachePath.description": "存储最后一个试运行生成命令输出的缓存文件的路径。取消设置时，名为“configurationCache.log”的文件存储在“makefile.extensionOutputFolder”设置指定的路径中。",
 	"autotools.configuration.makefile.dryrunSwitches.description": "要传递给干运行 make 调用的参数",
 	"autotools.configuration.makefile.additionalCompilerNames.description": "要添加到扩展已知列表的编译器工具的名称",

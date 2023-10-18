@@ -406,7 +406,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }));
 
     context.subscriptions.push(vscode.commands.registerCommand('autotools.outline.openBuildLogSetting', async () => {
-        await openSettings("autotools.buildLog");
+        await vscode.commands.executeCommand('workbench.action.openWorkspaceSettingsFile', { revealSetting: { key: 'autotools.configurations', edit: true }});
     }));
 
     context.subscriptions.push(vscode.commands.registerCommand('autotools.outline.openBuildLogFile', async () => {

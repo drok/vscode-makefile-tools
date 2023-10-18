@@ -52,7 +52,7 @@
 	"autotools.configuration.makefile.makefilePath.description": "Путь к файлу makefile проекта",
 	"autotools.configuration.makefile.buildLog.description": "Путь к журналу сборки, который считывается для обхода пробного запуска",
 	"autotools.configuration.makefile.extensionOutputFolder.description": "Путь к различным выходным файлам, созданным расширением. По умолчанию используется расположение хранилища рабочей области VS Code.",
-	"autotools.configuration.makefile.extensionLog.description": "Путь к выходному файлу, в котором будет храниться все содержимое из выходного канала файла makefile. По умолчанию используется значение параметра \"makefile.extensionOutputFolder\".",
+	"autotools.configuration.makefile.extensionLog.description": "Путь к выходному файлу, в котором будет храниться все содержимое из выходного канала файла makefile.",
 	"autotools.configuration.makefile.configurationCachePath.description": "Путь к файлу кэша, в котором будут храниться выходные данные последней пробной команды make. Если этот параметр не задан, файл с именем \"configurationCache.log\" хранится по пути, указанному параметром \"makefile.extensionOutputFolder\".",
 	"autotools.configuration.makefile.dryrunSwitches.description": "Аргументы для перехода к пробному вызову make",
 	"autotools.configuration.makefile.additionalCompilerNames.description": "Имена средств компилятора, которые будут добавлены в список известных расширений",
