@@ -194,35 +194,37 @@ async function readMakePath(): Promise<void> {
     }
 }
 
-let makefilePath: string | undefined;
-export function getMakefilePath(): string | undefined { return makefilePath; }
-export function setMakefilePath(path: string): void { makefilePath = path; }
+let makefilePath: string = "Makefile";
+export function getMakefilePath(): string { return makefilePath; }
+export function setMakefilePath(path: string = "Makefile"): void { makefilePath = path; }
 // Read the full path to the makefile if defined in settings.
 // It represents a default to look for if no other makefile is already provided
 // in autotools.configurations.makefilePath.
 // TODO: validate and integrate with "-f [Makefile]" passed in autotools.configurations.makeArgs.
 async function readMakefilePath(): Promise<void> {
-    makefilePath = await util.getExpandedSetting<string>("makefilePath");
-    if (!makefilePath) {
+    let makefilePathSetting: string | undefined = await util.getExpandedSetting<string>("makefilePath");
+    if (!makefilePathSetting) {
         logger.message("No path to the makefile is defined in the settings file.");
+        setMakefilePath();
     } else {
-        makefilePath = util.resolvePathToRoot(makefilePath);
+        setMakefilePath(makefilePathSetting);
     }
 }
 
 let makeDirectory: string | undefined;
 export function getMakeDirectory(): string | undefined { return makeDirectory; }
-export function setMakeDirectory(dir: string): void { makeDirectory = dir; }
+export function setMakeDirectory(dir: string = ''): void { makeDirectory = dir; }
 // Read the make working directory path if defined in settings.
 // It represents a default to look for if no other makeDirectory is already provided
 // in autotools.configurations.makeDirectory.
 // TODO: validate and integrate with "-C [DIR_PATH]" passed in autotools.configurations.makeArgs.
 async function readMakeDirectory(): Promise<void> {
-    makeDirectory = await util.getExpandedSetting<string>("makeDirectory");
-    if (!makeDirectory) {
+    let makeDirectorySetting: string | undefined = await util.getExpandedSetting<string>("makeDirectory");
+    if (!makeDirectorySetting) {
         logger.message("No folder path to the makefile is defined in the settings file.");
+        setMakeDirectory();
     } else {
-      makeDirectory = util.resolvePathToRoot(makeDirectory);
+        setMakeDirectory(makeDirectorySetting);
     }
 }
 
@@ -806,7 +808,7 @@ export async function getCommandForConfiguration(configuration: string | undefin
             }
         }
 
-        if (!util.checkFileExistsSync(configurationMakefile)) {
+        if (!util.checkFileExistsSync(util.resolvePathToRoot(configurationMakefile))) {
             logger.message("The makefile entry point was not found. " +
                 "Make sure it exists at the location defined by autotools.makefilePath, autotools.configurations[].makefilePath, " +
                 "autotools.makeDirectory, autotools.configurations[].makeDirectory" +
@@ -936,24 +938,22 @@ export async function readMakefileConfigurations(): Promise<void> {
 // Last target picked from the set of targets that are run by the makefiles
 // when building for the current configuration.
 // Saved into the settings storage. Also reflected in the configuration status bar button
-let currentTarget: string | undefined;
-export function getCurrentTarget(): string | undefined { return currentTarget; }
-export function setCurrentTarget(target: string | undefined): void { currentTarget = target; }
+// Assume the well-known "all" target for the default goal
+let currentTarget: string = "all";
+export function getCurrentTarget(): string { return currentTarget; }
+// Set the current target, or 'all' if none was given
+export function setCurrentTarget(target: string = "all"): void { currentTarget = target; }
 
 // Read current target from workspace state, update status bar item
 function readCurrentTarget(): void {
     let buildTarget : string | undefined = extension.getState().buildTarget;
+    setCurrentTarget(buildTarget);
     if (!buildTarget) {
-        logger.message("No target defined in the workspace state. Assuming 'Default'.");
-        statusBar.setTarget("Default");
-        // If no particular target is defined in settings, use 'Default' for the button
-        // but keep the variable empty, to not append it to the make command.
-        currentTarget = "";
+        logger.message(`No target defined in the workspace state. Assuming '${currentTarget}'.`);
     } else {
-        currentTarget = buildTarget;
         logger.message(`Reading current build target "${currentTarget}" from the workspace state.`);
-        statusBar.setTarget(currentTarget);
     }
+    statusBar.setTarget(currentTarget);
 }
 
 let configureOnOpen: boolean | undefined;
@@ -1307,9 +1307,6 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
 
             subKey = "makefilePath";
             let updatedMakefilePath : string | undefined = await util.getExpandedSetting<string>(subKey);
-            if (updatedMakefilePath) {
-                updatedMakefilePath = util.resolvePathToRoot(updatedMakefilePath);
-            }
             if (updatedMakefilePath !== makefilePath) {
                 // A change in autotools.makefilePath should trigger an IntelliSense update
                 // only if the extension is not currently reading from a build log.
@@ -1321,9 +1318,6 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
 
             subKey = "makeDirectory";
             let updatedMakeDirectory : string | undefined = await util.getExpandedSetting<string>(subKey);
-            if (updatedMakeDirectory) {
-                updatedMakeDirectory = util.resolvePathToRoot(updatedMakeDirectory);
-            }
             if (updatedMakeDirectory !== makeDirectory) {
                 // A change in autotools.makeDirectory should trigger an IntelliSense update
                 // only if the extension is not currently reading from a build log.

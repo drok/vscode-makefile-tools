@@ -23,7 +23,7 @@
    "autotools.configuration.makefile.makePath.description": "The path to the make tool",
    "autotools.configuration.makefile.configurations.description": "The user defined makefile configurations",
    "autotools.configuration.makefile.configurations.name.description": "The name of the makefile configuration",
-   "autotools.configuration.makefile.configurations.makefilePath.description": "File path to the makefile",
+   "autotools.configuration.makefile.configurations.makefilePath.description": "File path to the makefile. Defaults to 'Makefile'",
    "autotools.configuration.makefile.configurations.makePath.description": "File path to the make command",
    "autotools.configuration.makefile.configurations.makeDirectory.description": "Folder path passed to make via the -C switch",
    "autotools.configuration.makefile.configurations.makeArgs.description": "Arguments to pass to the make command",
