@@ -1483,7 +1483,9 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
                     logger.message(e.message);
                 }
             });
-
+            if (extension.getState().configureDirty) {
+                await make.configure(make.TriggeredBy.configureAfterConfigurationChange);
+            }
             if (telemetryProperties && util.hasProperties(telemetryProperties)) {
                 telemetry.logEvent("settingsChanged", telemetryProperties);
             }
