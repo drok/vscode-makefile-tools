@@ -407,7 +407,6 @@ export function setParseFile(file: string): void { parseFile = file; }
 // by building the current target).
 export async function generateParseContent(progress: vscode.Progress<{}>,
                                            cancel: vscode.CancellationToken,
-                                           forTargets: boolean = false,
                                            recursive: boolean = false): Promise<ConfigureSubphaseStatus> {
     if (cancel.isCancellationRequested) {
         return {
@@ -415,6 +414,11 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
             elapsed: 0
         };
     }
+
+    const makefilePath :string | undefined = configuration.getConfigurationMakefile();
+    if (!makefilePath)
+        // Without a makefile, this function should never be called. This is a runtime error (a bug).
+        throw new Error("No makefile found.");
 
     let startTime: number = Date.now();
 
@@ -427,7 +431,7 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
     // We make sure to give the regression tests suite a build log that already contains
     // targets information because we want to avoid invoking make for now.
     let buildLog: string | undefined = configuration.getConfigurationBuildLog();
-    if (buildLog && (!forTargets || process.env['MAKEFILE_TOOLS_TESTING'] === '1')) {
+    if (buildLog && process.env['MAKEFILE_TOOLS_TESTING'] === '1') {
         parseContent = util.readFile(buildLog);
         if (parseContent) {
             parseFile = buildLog;
@@ -439,12 +443,10 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
     }
 
     const dryRunString = localize("make.generating.dryrun", "Generating dry-run output");
-    const forTargetsString = localize("make.generating.forTargets", "(for targets specifically)");
     progress.report({
         increment: 1, message: dryRunString +
             ((recursive) ? ` ${recursiveString}` : "") +
-            ((forTargets) ? ` ${forTargetsString}` : "" +
-                "...")
+                "..."
     });
 
     // Continue with the make dryrun invocation
@@ -452,13 +454,9 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
 
     // Prepend the target to the arguments given in the makefile.configurations object,
     // unless we want to parse for the full set of available targets.
-    if (forTargets) {
-        makeArgs.push("all");
-    } else {
-        let currentTarget: string | undefined = configuration.getCurrentTarget();
-        if (currentTarget) {
-            makeArgs.push(currentTarget);
-        }
+    let currentTarget: string | undefined = configuration.getCurrentTarget();
+    if (currentTarget) {
+        makeArgs.push(currentTarget);
     }
 
     // Include all the make arguments defined in makefile.configurations.makeArgs
@@ -475,34 +473,39 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
     // If we are analyzing compiler/linker commands for IntelliSense and launch targets,
     // we use --dry-run and anything from makefile.dryrunSwitches.
     const dryrunSwitches: string[] | undefined = configuration.getDryrunSwitches();
-    if (forTargets) {
-        makeArgs.push("--print-data-base");
-        makeArgs.push("--no-builtin-variables");
-        makeArgs.push("--no-builtin-rules");
-        makeArgs.push("--question");
-        logger.messageNoCR("Generating targets information with command: ");
-    } else {
-        makeArgs.push("--dry-run");
+    // rejecting GNU make's builtin variables and rules because automake
+    // generates implicit rules to cover all the targets. It does not rely
+    // on builtins
+    makeArgs.push("--print-data-base");
+    makeArgs.push("--no-builtin-variables");
+    makeArgs.push("--no-builtin-rules");
 
-        // If this is not a clean configure, remove --always-make from the arguments list.
-        // We need to have --always-make in makefile.dryrunSwitches and remove it for not clean configure
-        // (as opposed to not having --always-make in makefile.dryrunSwitches and adding it for clean configure)
-        // because we want to avoid having 2 dryrun switches settings (one for clean and one for not clean configure)
-        // and also because the user needs to be able to remove --always-make from any make --dry-run invocation,
-        // if it causes trouble.
-        dryrunSwitches?.forEach(sw => {
-            if (getConfigureIsClean() || (sw !== "--always-make" && sw !== "-B")) {
-                makeArgs.push(sw);
-            }
-        });
+    makeArgs.push("--dry-run");
+    makeArgs.push(`--assume-old=${makefilePath}`);
+    makeArgs.push(makefilePath);
+    makeArgs.push("AM_MAKEFLAGS=--assume-old=Makefile Makefile");
 
-        logger.messageNoCR(`Generating ${getConfigureIsInBackground() ? "in the background a new " : ""}configuration cache with command: `);
-    }
+    // If this is not a clean configure, remove --always-make from the arguments list.
+    // We need to have --always-make in autotools.dryrunSwitches and remove it for not clean configure
+    // (as opposed to not having --always-make in autotools.dryrunSwitches and adding it for clean configure)
+    // because we want to avoid having 2 dryrun switches settings (one for clean and one for not clean configure)
+    // and also because the user needs to be able to remove --always-make from any make --dry-run invocation,
+    // if it causes trouble.
+    dryrunSwitches?.forEach(sw => {
+        if (getConfigureIsClean() || (sw !== "--always-make" && sw !== "-B")) {
+            makeArgs.push(sw);
+        }
+    });
+
+    // Append the target to the arguments given in the makefile.configurations object
+    makeArgs.push(configuration.getCurrentTarget() || "all");
+
+    logger.messageNoCR(`Generating ${getConfigureIsInBackground() ? "in the background a new " : ""}configuration cache with command: `);
 
     logger.message(`'${configuration.getConfigurationMakeCommand()} ${makeArgs.join(" ")}'`);
 
     try {
-        let dryrunFile : string = forTargets ? "./targets.log" : "./dryrun.log";
+        let dryrunFile : string = "./dryrun.log";
         let extensionOutputFolder: string | undefined = configuration.getExtensionOutputFolder();
         if (extensionOutputFolder) {
             dryrunFile = path.join(extensionOutputFolder, dryrunFile);
@@ -528,7 +531,7 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
               message:
                 dryRunString +
                 (recursive ? ` ${recursiveString}` : "") +
-                (forTargets ? ` ${forTargetsString}` : "" + "..."),
+                "...",
             });
                                                     
 
@@ -580,7 +583,7 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
         // (for example if targets are out of date). We can ignore the return code for this
         // because it "can't fail". It represents only display of database and no targets are actually run.
         // try syntax error
-        if (result.returnCode !== ConfigureBuildReturnCodeTypes.success && !forTargets) {
+        if (result.returnCode !== ConfigureBuildReturnCodeTypes.success) {
             logger.message("The make dry-run command failed.");
             logger.message("IntelliSense may work only partially or not at all.");
             logger.message(stderrStr);
@@ -1565,7 +1568,7 @@ export async function doConfigure(progress: vscode.Progress<{}>, cancel: vscode.
 
     // This generates the dryrun output (saving it on disk) or reads an alternative build log.
     // Timings for this sub-phase happen inside.
-    subphaseStats.generateParseContent = await generateParseContent(progress, cancel, false, recursiveDoConfigure);
+    subphaseStats.generateParseContent = await generateParseContent(progress, cancel, recursiveDoConfigure);
     if (subphaseStats.generateParseContent.retc === ConfigureBuildReturnCodeTypes.cancelled) {
         return subphaseStats;
     }
@@ -1621,11 +1624,6 @@ export async function doConfigure(progress: vscode.Progress<{}>, cancel: vscode.
     let buildTargets: string[] = configuration.getBuildTargets();
     if (updateTargets || buildTargets.length === 0 ||
         (buildTargets.length === 1 && buildTargets[0] === "all")) {
-        logger.message("Generating parse content for build targets.");
-        subphaseStats.dryrunTargets = await generateParseContent(progress, cancel, true, recursiveDoConfigure);
-        if (subphaseStats.dryrunTargets.retc === ConfigureBuildReturnCodeTypes.cancelled) {
-            return subphaseStats;
-        }
 
         logger.message(`Parsing for build targets from: "${parseFile}"`);
         subphaseStats.parseTargets = await parseTargets(progress, cancel, parseContent || "", recursiveDoConfigure);
