@@ -220,10 +220,6 @@
                                 "type": "string",
                                 "description": "%makefile-tools.configuration.makefile.configurations.name.description%"
                             },
-                            "makePath": {
-                                "type": "string",
-                                "description": "%makefile-tools.configuration.makefile.configurations.makePath.description%"
-                            },
                             "makeDirectory": {
                               "type": "string",
                               "description": "%makefile-tools.configuration.makefile.configurations.makeDirectory.description%"
@@ -705,11 +701,6 @@
                 {
                     "command": "makefile.outline.openMakefileFile",
                     "when": "view == makefile.outline && viewItem =~ /nodeType=makefilePathInfo/ && makefile.makefileFilePresent",
-                    "group": "inline@1"
-                },
-                {
-                    "command": "makefile.outline.openMakePathSetting",
-                    "when": "view == makefile.outline && viewItem =~ /nodeType=makePathInfo/",
                     "group": "inline@1"
                 },
                 {

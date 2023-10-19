@@ -22,7 +22,6 @@
    "makefile-tools.configuration.makefile.makePath.description": "The path to the make tool",
    "makefile-tools.configuration.makefile.configurations.description": "The user defined makefile configurations",
    "makefile-tools.configuration.makefile.configurations.name.description": "The name of the makefile configuration",
-   "makefile-tools.configuration.makefile.configurations.makePath.description": "File path to the make command",
    "makefile-tools.configuration.makefile.configurations.makeDirectory.description": "Folder path passed to make via the -C switch",
    "makefile-tools.configuration.makefile.configurations.makeArgs.description": "Arguments to pass to the make command",
    "makefile-tools.configuration.makefile.configurations.problemMatchers.description": "Problem matcher names to use when building the current target",

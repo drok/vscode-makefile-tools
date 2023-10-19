@@ -188,7 +188,7 @@ export function prepareBuildTarget(target: string): string[] {
 
     makeArgs = makeArgs.concat(configuration.getConfigurationMakeArgs());
 
-    logger.message(`Building target "${target}" with command: '${configuration.getConfigurationMakeCommand()} ${makeArgs.join(" ")}'`);
+    logger.message(`Building target "${target}" with command: '${configuration.getMakePath()} ${makeArgs.join(" ")}'`);
     return makeArgs;
 }
 
@@ -338,7 +338,7 @@ export async function doBuildTarget(progress: vscode.Progress<{}>, target: strin
     try {
         const quotingStlye: vscode.ShellQuoting = vscode.ShellQuoting.Strong;
         const quotingStyleName: string = "Strong";
-        let myTaskCommand: vscode.ShellQuotedString = {value: configuration.getConfigurationMakeCommand(), quoting: quotingStlye};
+        let myTaskCommand: vscode.ShellQuotedString = {value: configuration.getMakePath(), quoting: quotingStlye};
         let myTaskArgs: vscode.ShellQuotedString[] = makeArgs.map(arg => {
             return {value: arg, quoting: quotingStlye};
         });
@@ -492,7 +492,7 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
         logger.messageNoCR(`Generating ${getConfigureIsInBackground() ? "in the background a new " : ""}configuration cache with command: `);
     }
 
-    logger.message(`'${configuration.getConfigurationMakeCommand()} ${makeArgs.join(" ")}'`);
+    logger.message(`'${configuration.getMakePath()} ${makeArgs.join(" ")}'`);
 
     try {
         const lineEnding: string = (process.platform === "win32" && process.env.MSYSTEM === undefined) ? "\r\n" : "\n";
@@ -506,7 +506,7 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
             dryrunFile = util.resolvePathToRoot(dryrunFile);
             logger.message(`Writing the dry-run output: ${dryrunFile}`);
 
-            util.writeFile(dryrunFile, `${configuration.getConfigurationMakeCommand()} ${makeArgs.join(" ")}${lineEnding}`);
+            util.writeFile(dryrunFile, `${configuration.getMakePath()} ${makeArgs.join(" ")}${lineEnding}`);
         }
         let completeOutput: string = "";
         let stderrStr: string = "";
@@ -568,7 +568,7 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
         }, 5 * 1000);
 
         // The dry-run analysis should operate on english.
-        const result: util.SpawnProcessResult = await util.spawnChildProcess(configuration.getConfigurationMakeCommand(), makeArgs, util.getWorkspaceRoot(), true, true, stdout, stderr);
+        const result: util.SpawnProcessResult = await util.spawnChildProcess(configuration.getMakePath(), makeArgs, util.getWorkspaceRoot(), true, true, stdout, stderr);
         clearInterval(timeout);
         let elapsedTime: number = util.elapsedTimeSince(startTime);
         logger.message(`Generating dry-run elapsed time: ${elapsedTime}`);
