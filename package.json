@@ -5,7 +5,7 @@
     "version": "0.1.0",
     "publisher": "mergesium",
     "preview": true,
-    "icon": "res/makefile-logo.png",
+    "icon": "res/autotools.png",
     "readme": "README.md",
     "author": {
         "name": "Mergesium Inc."
