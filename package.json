@@ -134,11 +134,6 @@
                 "icon": "$(notebook-edit)"
             },
             {
-               "command": "makefile.outline.openMakefilePathSetting",
-               "title": "%makefile-tools.command.makefile.openMakefilePathSetting.title%",
-               "icon": "$(notebook-edit)"
-            },
-            {
                 "command": "makefile.outline.openMakefileFile",
                 "title": "%makefile-tools.command.makefile.openMakefileFile.title%",
                 "icon": "$(open-preview)"
@@ -224,10 +219,6 @@
                             "name": {
                                 "type": "string",
                                 "description": "%makefile-tools.configuration.makefile.configurations.name.description%"
-                            },
-                            "makefilePath": {
-                                "type": "string",
-                                "description": "%makefile-tools.configuration.makefile.configurations.makefilePath.description%"
                             },
                             "makePath": {
                                 "type": "string",
@@ -359,11 +350,6 @@
                 "makefile.makeDirectory": {
                     "type": "string",
                     "description": "%makefile-tools.configuration.makefile.makeDirectory.description%",
-                    "scope": "resource"
-                },
-                "makefile.makefilePath": {
-                    "type": "string",
-                    "description": "%makefile-tools.configuration.makefile.makefilePath.description%",
                     "scope": "resource"
                 },
                 "makefile.buildLog": {
@@ -715,11 +701,6 @@
                     "command": "makefile.outline.setLaunchConfiguration",
                     "when": "makefile:fullFeatureSet && view == makefile.outline && viewItem =~ /nodeType=launchTarget/",
                     "group": "inline@1"
-                },
-                {
-                    "command": "makefile.outline.openMakefilePathSetting",
-                    "when": "view == makefile.outline && viewItem =~ /nodeType=makefilePathInfo/",
-                    "group": "inline@2"
                 },
                 {
                     "command": "makefile.outline.openMakefileFile",

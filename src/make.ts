@@ -408,6 +408,11 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
         };
     }
 
+    const makefilePath :string | undefined = configuration.getConfigurationMakefile();
+    if (!makefilePath)
+        // Without a makefile, this function should never be called. This is a runtime error (a bug).
+        throw new Error("No makefile found.");
+
     let startTime: number = Date.now();
 
     // Rules for parse content and file:
@@ -464,7 +469,6 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
         makeArgs.push("--question");
         logger.messageNoCR("Generating targets information with command: ");
     } else {
-        const makefilePath :string = configuration.getMakefilePath();
         makeArgs.push("--dry-run");
         makeArgs.push(`--assume-old=${makefilePath}`);
         makeArgs.push(makefilePath);
