@@ -134,11 +134,6 @@
                 "icon": "$(notebook-edit)"
             },
             {
-               "command": "autotools.outline.openMakefilePathSetting",
-               "title": "%autotools.command.makefile.openMakefilePathSetting.title%",
-               "icon": "$(notebook-edit)"
-            },
-            {
                 "command": "autotools.outline.openMakefileFile",
                 "title": "%autotools.command.makefile.openMakefileFile.title%",
                 "icon": "$(open-preview)"
@@ -224,14 +219,6 @@
                             "name": {
                                 "type": "string",
                                 "description": "%autotools.configuration.makefile.configurations.name.description%"
-                            },
-                            "makefilePath": {
-                                "type": "string",
-                                "description": "%autotools.configuration.makefile.configurations.makefilePath.description%"
-                            },
-                            "makePath": {
-                                "type": "string",
-                                "description": "%autotools.configuration.makefile.configurations.makePath.description%"
                             },
                             "makeDirectory": {
                               "type": "string",
@@ -359,11 +346,6 @@
                 "autotools.makeDirectory": {
                     "type": "string",
                     "description": "%autotools.configuration.makefile.makeDirectory.description%",
-                    "scope": "resource"
-                },
-                "autotools.makefilePath": {
-                    "type": "string",
-                    "description": "%autotools.configuration.makefile.makefilePath.description%",
                     "scope": "resource"
                 },
                 "autotools.buildLog": {
@@ -717,18 +699,8 @@
                     "group": "inline@1"
                 },
                 {
-                    "command": "autotools.outline.openMakefilePathSetting",
-                    "when": "view == autotools.outline && viewItem =~ /nodeType=makefilePathInfo/",
-                    "group": "inline@2"
-                },
-                {
                     "command": "autotools.outline.openMakefileFile",
                     "when": "view == autotools.outline && viewItem =~ /nodeType=makefilePathInfo/ && makefile.makefileFilePresent",
-                    "group": "inline@1"
-                },
-                {
-                    "command": "autotools.outline.openMakePathSetting",
-                    "when": "view == autotools.outline && viewItem =~ /nodeType=makePathInfo/",
                     "group": "inline@1"
                 },
                 {

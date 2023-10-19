@@ -495,7 +495,6 @@ suite('Fake dryrun parsing', /*async*/() => {
       let tmpConfigurations: configuration.MakefileConfiguration[] = [{
          name: "MyTmpName",
          isDefault: false,
-         makePath: "${env:ProgramFiles(x86)}/${workspaceFolderBasename}/make",
          makeArgs: ["${command:makefile.getLaunchTargetPath}",
                     "${SomeUnsupportedVar}",
                     "try_\\${escape_varexp1}_various_\\${escape_varexp2}_escapes",
