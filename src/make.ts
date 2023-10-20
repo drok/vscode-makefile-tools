@@ -37,6 +37,7 @@ export class BuildTarget {
 }
 
 // Predefined, well known build targets
+export const t_none = new BuildTarget("", "");
 export const t_all = new BuildTarget("", "all");
 export const t_clean = new BuildTarget("", "clean");
 
@@ -1686,7 +1687,7 @@ export async function doConfigure(progress: vscode.Progress<{}>, cancel: vscode.
             // as the caller and its result will be included into the telemetry information reported by that.
             // There can be only one level of recursivity because once the target is reset to empty,
             // it is impossible to get into the state of having a target that is not found in the available list.
-            await configuration.setTargetByName(new BuildTarget("", ""));
+            await configuration.setTargetByName(t_none);
             logger.message("Automatically reconfiguring the project after a build target change.");
             recursiveDoConfigure = true;
 

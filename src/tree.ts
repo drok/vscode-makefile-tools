@@ -6,6 +6,7 @@
 import * as configuration from './configuration';
 import * as path from 'path';
 import * as util from './util';
+import { BuildTarget } from './make';
 import * as vscode from 'vscode';
 import { BuildTarget } from './make';
 
