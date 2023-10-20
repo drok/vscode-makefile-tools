@@ -7,6 +7,7 @@ import * as configuration from './configuration';
 import * as extension from './extension';
 import * as logger from './logger';
 import * as make from './make';
+import { BuildTarget } from './make';
 import * as path from 'path';
 import * as telemetry from './telemetry';
 import * as util from './util';
@@ -217,7 +218,7 @@ export class Launcher implements vscode.Disposable {
         }
 
         if (configuration.getBuildBeforeLaunch()) {
-            let currentBuildTarget: string = configuration.getCurrentTarget() || "";
+            let currentBuildTarget: BuildTarget = configuration.getCurrentTarget();
             logger.message(`Building current target before launch: "${currentBuildTarget}"`);
             let buildSuccess: boolean = (await make.buildTarget(make.TriggeredBy.buildTarget, currentBuildTarget, false)) === make.ConfigureBuildReturnCodeTypes.success;
             if (!buildSuccess) {

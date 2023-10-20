@@ -6,6 +6,7 @@
 // To be removed, hidden for now.
 
 import * as vscode from 'vscode';
+import { BuildTarget } from './make';
 
 let ui: UI;
 
@@ -21,8 +22,8 @@ export class UI {
         this.configurationButton.text = "$(settings) Build configuration: " + configuration;
     }
 
-    public setTarget(target: string): void {
-        this.targetButton.text = "$(tag) Target to build: " + target;
+    public setTarget(target: BuildTarget): void {
+        this.targetButton.text = "$(tag) Target to build: " + target.name + "@" + target.dir;
     }
 
     public setLaunchConfiguration(launchConfigurationStr: string | undefined): void {

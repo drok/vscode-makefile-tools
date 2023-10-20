@@ -7,6 +7,7 @@ import * as configuration from './configuration';
 import * as path from 'path';
 import * as util from './util';
 import * as vscode from 'vscode';
+import { BuildTarget } from './make';
 
 import * as nls from 'vscode-nls';
 import { extension } from './extension';
@@ -24,15 +25,15 @@ abstract class BaseNode {
 }
 
 export class BuildTargetNode extends BaseNode {
-    constructor(targetName: string) {
-        super(`buildTarget:${targetName}`);
-        this._name = targetName;
+    constructor(targetName: BuildTarget) {
+        super(`buildTarget:${targetName.name}@${targetName.dir}`);
+        this._name = targetName.name;
     }
 
     _name: string;
 
-    update(targetName: string): void {
-        this._name = localize("tree.build.target", "Build target: {0}", `[${targetName}]`);
+    update(targetName: BuildTarget): void {
+        this._name = localize("tree.build.target", "Build target: {0}", `[${targetName.name} @ ${targetName.dir}]`);
     }
 
     getChildren(): BaseNode[] {
@@ -262,7 +263,7 @@ export class ProjectOutlineProvider implements vscode.TreeDataProvider<BaseNode>
 
     constructor() {
         this._currentConfigurationItem = new ConfigurationNode(this._unsetString);
-        this._currentBuildTargetItem = new BuildTargetNode(this._unsetString);
+        this._currentBuildTargetItem = new BuildTargetNode(new BuildTarget("", ""));
         this._currentLaunchTargetItem = new LaunchTargetNode(this._unsetString);
         this._currentMakefilePathInfoItem = new MakefilePathInfoNode(this._unsetString, "");
         this._currentMakePathInfoItem = new MakePathInfoNode(this._unsetString, "");
@@ -328,13 +329,13 @@ export class ProjectOutlineProvider implements vscode.TreeDataProvider<BaseNode>
     }
 
     async update(configuration: string | undefined,
-                 buildTarget: string | undefined,
+                 buildTarget: BuildTarget,
                  launchTarget: string | undefined,
                  makefilePathInfo: string | undefined,
                  makePathInfo: string | undefined,
                  buildLogInfo: string | undefined): Promise<void> {
         this._currentConfigurationItem.update(configuration || this._unsetString);
-        this._currentBuildTargetItem.update(buildTarget || this._unsetString);
+        this._currentBuildTargetItem.update(buildTarget);
         await this._currentLaunchTargetItem.update(launchTarget || this._unsetString);
         this._currentMakefilePathInfoItem.update(makefilePathInfo || this._unsetString, this.pathDisplayed(makefilePathInfo, "Makefile", false, true));
         this._currentMakePathInfoItem.update(makePathInfo || this._unsetString, this.pathDisplayed(makePathInfo, "Make", true, false));
@@ -348,7 +349,7 @@ export class ProjectOutlineProvider implements vscode.TreeDataProvider<BaseNode>
         this.updateTree();
     }
 
-    updateBuildTarget(buildTarget: string): void {
+    updateBuildTarget(buildTarget: BuildTarget): void {
         this._currentBuildTargetItem.update(buildTarget);
         this.updateTree();
     }

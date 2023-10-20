@@ -6,13 +6,16 @@
 import {extension} from './extension';
 import * as logger from './logger';
 import * as make from './make';
+import {BuildTarget} from './make';
 import * as ui from './ui';
 import * as util from './util';
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as telemetry from './telemetry';
+import * as multiStep from './multiStepInput';
 
 import * as nls from 'vscode-nls';
+import { dir } from 'console';
 nls.config({ messageFormat: nls.MessageFormat.bundle, bundleFormat: nls.BundleFormat.standalone })();
 const localize: nls.LocalizeFunc = nls.loadMessageBundle();
 
@@ -936,24 +939,22 @@ export async function readMakefileConfigurations(): Promise<void> {
 // Last target picked from the set of targets that are run by the makefiles
 // when building for the current configuration.
 // Saved into the settings storage. Also reflected in the configuration status bar button
-let currentTarget: string | undefined;
-export function getCurrentTarget(): string | undefined { return currentTarget; }
-export function setCurrentTarget(target: string | undefined): void { currentTarget = target; }
+// Assume the well-known "all" target for the default goal
+let currentTarget: make.BuildTarget = make.t_all;
+export function getCurrentTarget(): make.BuildTarget { return currentTarget; }
+// Set the current target, or 'all' if none was given
+export function setCurrentTarget(target: make.BuildTarget = make.t_all): void { currentTarget = target; }
 
 // Read current target from workspace state, update status bar item
 function readCurrentTarget(): void {
-    let buildTarget : string | undefined = extension.getState().buildTarget;
+    let buildTarget : make.BuildTarget | undefined = extension.getState().buildTarget;
+    setCurrentTarget(buildTarget);
     if (!buildTarget) {
-        logger.message("No target defined in the workspace state. Assuming 'Default'.");
-        statusBar.setTarget("Default");
-        // If no particular target is defined in settings, use 'Default' for the button
-        // but keep the variable empty, to not append it to the make command.
-        currentTarget = "";
+        logger.message(`No target defined in the workspace state. Assuming ${currentTarget}.`);
     } else {
-        currentTarget = buildTarget;
         logger.message(`Reading current build target "${currentTarget}" from the workspace state.`);
-        statusBar.setTarget(currentTarget);
     }
+    statusBar.setTarget(currentTarget);
 }
 
 let configureOnOpen: boolean | undefined;
@@ -1089,8 +1090,10 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
 
     await analyzeConfigureParams();
 
+    // FIXME: seems wrong to do || make.t_all; this fn should probably be called
+    // config arg after config is fully loaded.
     await extension._projectOutlineProvider.update(extension.getState().buildConfiguration,
-                                             extension.getState().buildTarget,
+                                             currentTarget,
                                              extension.getState().launchConfiguration,
                                              getConfigurationMakefile(),
                                              getConfigurationMakeCommand(),
@@ -1571,10 +1574,10 @@ export async function setNewConfiguration(): Promise<void> {
     }
 }
 
-export async function setTargetByName(targetName: string) : Promise<void> {
+export async function setTargetByName(targetName: make.BuildTarget) : Promise<void> {
     currentTarget = targetName;
-    let displayTarget: string = targetName ? currentTarget : "Default";
-    statusBar.setTarget(displayTarget);
+    let displayTarget: string = targetName.name ? `${currentTarget.name} @ ${currentTarget.dir}`: "Default";
+    statusBar.setTarget(currentTarget);
     logger.message(`Setting target ${displayTarget}`);
     logger.message("Re-reading settings after target change.");
     // Refresh settings, they may reference variables or commands reading state target var (${buildTarget}).
@@ -1586,7 +1589,7 @@ export async function setTargetByName(targetName: string) : Promise<void> {
 // Fill a drop-down with all the target names run by building the makefile for the current configuration
 // Triggers a cpptools configuration provider update after selection.
 // TODO: change the UI list to multiple selections mode and store an array of current active targets
-export async function selectTarget(): Promise<void> {
+export async function selectTarget(context: vscode.ExtensionContext): Promise<void> {
     // Cannot select a new target if the project is currently building or (pre-)configuring.
     if (make.blockedByOp(make.Operations.changeBuildTarget)) {
         return;
@@ -1621,12 +1624,37 @@ export async function selectTarget(): Promise<void> {
     // "all" from getting lost: make sure the target is not appended to the make invocation
     // whose output is used to parse the targets (as opposed to parsing for IntelliSense or launch targets
     // when the current target must be appended to the make command).
-    if (!buildTargets.includes("all")) {
-        buildTargets.push("all");
+    // FIXME: commit this separately. "all" cannot be forced if the Makefile doesn't mention it.
+    // if (!buildTargets.includes("all")) {
+    //     buildTargets.push("all");
+    // }
+
+//    const options: { [key: string]: (context: ExtensionContext) => Promise<void> } = {
+//            showQuickPick,
+//            showInputBox,
+//            multiStepInput,
+//            quickOpen,
+//        };
+    const quickPick = vscode.window.createQuickPick();
+    //quickPick.items = Object.keys(options).map(label => ({ label }));
+    quickPick.items = Array.from(buildTargets.keys())
+        .map(label => ({ label }));
+    
+    Object.keys(options).map(label => ({ label }));
+    quickPick.onDidChangeSelection(selection => {
+        if (selection[0]) {
+            //options[selection[0].label](context)
+            //    .catch(console.error);
+        }
+    });
+    quickPick.onDidHide(() => quickPick.dispose());
+    quickPick.show();
+
+    const chosen = await multiStep.multiStepInput(context);
+
+    if (chosen instanceof BuildTarget) {
+        return;
     }
-
-    const chosen: string | undefined = await vscode.window.showQuickPick(buildTargets, options);
-
     if (chosen && chosen !== getCurrentTarget()) {
         const telemetryProperties: telemetry.Properties = {
             state: "buildTarget"
@@ -1780,9 +1808,10 @@ export async function selectLaunchConfiguration(): Promise<void> {
 // Currently, this list contains any abstract intermediate target
 // (like any object produced by the compiler from a source code file).
 // TODO: filter only the relevant targets (binaries, libraries, etc...) from this list.
-let buildTargets: string[] = [];
-export function getBuildTargets(): string[] { return buildTargets; }
-export function setBuildTargets(targets: string[]): void { buildTargets = targets; }
+let buildTargets: Map<string, Set<string>> = new Map();
+export function getBuildTargets(dir: string): Iterable<string> { return buildTargets.get(dir)?.values() || []; }
+export function setBuildTargets(targets: Map<string, Set<string>>): void { buildTargets = targets; }
+export function getAllBuildTargets(): Map<string, Set<string>> { return buildTargets; }
 
 // List of all the binaries built by the current project and all the ways
 // they may be invoked (from what cwd, with what arguments).

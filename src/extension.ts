@@ -223,29 +223,34 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         return configuration.getCurrentMakefileConfiguration();
     }));
 
-    context.subscriptions.push(vscode.commands.registerCommand('makefile.setBuildTarget', async () => {
-       await configuration.selectTarget();
+    context.subscriptions.push(vscode.commands.registerCommand('autotools.setBuildTarget', async () => {
+       await configuration.selectTarget(context);
     }));
 
-    context.subscriptions.push(vscode.commands.registerCommand('makefile.getBuildTarget', async () => {
-        telemetry.logEvent("getBuildTarget");
-        return configuration.getCurrentTarget() || "";
+    context.subscriptions.push(vscode.commands.registerCommand('autotools.getBuildTargetName', async () => {
+        telemetry.logEvent("getBuildTargetName");
+        return configuration.getCurrentTarget().name;
     }));
 
-    context.subscriptions.push(vscode.commands.registerCommand('makefile.buildTarget', async () => {
-        await make.buildTarget(make.TriggeredBy.buildTarget, configuration.getCurrentTarget() || "", false);
+    context.subscriptions.push(vscode.commands.registerCommand('autotools.getBuildTargetDir', async () => {
+        telemetry.logEvent("getBuildTargetDir");
+        return configuration.getCurrentTarget().dir;
     }));
 
-    context.subscriptions.push(vscode.commands.registerCommand('makefile.buildCleanTarget', async () => {
-        await make.buildTarget(make.TriggeredBy.buildCleanTarget, configuration.getCurrentTarget() || "", true);
+    context.subscriptions.push(vscode.commands.registerCommand('autotools.buildTarget', async () => {
+        await make.buildTarget(make.TriggeredBy.buildTarget, configuration.getCurrentTarget(), false);
     }));
 
-    context.subscriptions.push(vscode.commands.registerCommand('makefile.buildAll', async () => {
-        await make.buildTarget(make.TriggeredBy.buildAll, "all", false);
+    context.subscriptions.push(vscode.commands.registerCommand('autotools.buildCleanTarget', async () => {
+        await make.buildTarget(make.TriggeredBy.buildCleanTarget, configuration.getCurrentTarget(), true);
     }));
 
-    context.subscriptions.push(vscode.commands.registerCommand('makefile.buildCleanAll', async () => {
-        await make.buildTarget(make.TriggeredBy.buildCleanAll, "all", true);
+    context.subscriptions.push(vscode.commands.registerCommand('autotools.buildAll', async () => {
+        await make.buildTarget(make.TriggeredBy.buildAll, make.t_all, false);
+    }));
+
+    context.subscriptions.push(vscode.commands.registerCommand('autotools.buildCleanAll', async () => {
+        await make.buildTarget(make.TriggeredBy.buildCleanAll, make.t_all, true);
     }));
 
     context.subscriptions.push(vscode.commands.registerCommand('makefile.setLaunchConfiguration', async () => {

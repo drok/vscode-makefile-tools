@@ -4,13 +4,15 @@
 // state.ts
 
 import * as vscode from 'vscode';
+import { BuildTarget } from './make';
 
 // Class for the management of all the workspace state variables
 export class StateManager {
   constructor(readonly extensionContext: vscode.ExtensionContext) {}
 
   private _get<T>(key: string): T | undefined {
-    return this.extensionContext.workspaceState.get<T>(key);
+    let val = this.extensionContext.workspaceState.get<T>(key);
+    return typeof val === "object" && val !== null ? val : undefined;
   }
 
   private _update(key: string, value: any): Thenable<void> {
@@ -27,10 +29,10 @@ export class StateManager {
   }
 
   // The project build target (one of the targets defined in the makefile).
-  get buildTarget(): string | undefined {
-    return this._get<string>('buildTarget');
+  get buildTarget(): BuildTarget | undefined {
+    return this._get<BuildTarget>('buildTarget');
   }
-  set buildTarget(v: string | undefined) {
+  set buildTarget(v: BuildTarget | undefined) {
     this._update('buildTarget', v);
   }
 

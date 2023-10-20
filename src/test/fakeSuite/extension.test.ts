@@ -31,6 +31,7 @@ import * as configuration from '../../configuration';
 import { expect } from 'chai';
 import * as launch from '../../launch';
 import * as make from '../../make';
+import { BuildTarget } from '../../make';
 import * as util from '../../util';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -218,8 +219,9 @@ suite('Fake dryrun parsing', /*async*/() => {
          await configuration.setConfigurationByName("InterestingSmallMakefile_windows_configRelSpeed");
 
          // InterestingSmallMakefile_windows_configRelSpeed constructs a more interesting build command.
-         await configuration.setTargetByName("Execute_Arch3");
-         make.prepareBuildTarget("Execute_Arch3");
+         let Execute_Arch3: BuildTarget = new BuildTarget("", "Execute_Arch3");
+         await configuration.setTargetByName(Execute_Arch3);
+         make.prepareBuildTarget(Execute_Arch3);
 
          extension.getState().reset(false);
          await vscode.workspace.getConfiguration("makefile").update("launchConfigurations", undefined);
@@ -285,8 +287,9 @@ suite('Fake dryrun parsing', /*async*/() => {
             }
          }
 
-         await configuration.setTargetByName("all");
-         make.prepareBuildTarget("all");
+         let all: BuildTarget = make.t_all;
+         await configuration.setTargetByName(all);
+         make.prepareBuildTarget(all);
 
          // Compare the output log with the baseline
          // TODO: incorporate relevant diff snippets into the test log.
@@ -347,8 +350,9 @@ suite('Fake dryrun parsing', /*async*/() => {
             }
          }
 
-         await configuration.setTargetByName("bin/foo.o");
-         make.prepareBuildTarget("bin/foo.o");
+         let foo_o: BuildTarget = new BuildTarget("", "bin/foo.o");
+         await configuration.setTargetByName(foo_o);
+         make.prepareBuildTarget(foo_o);
 
          // Compare the output log with the baseline
          // TODO: incorporate relevant diff snippets into the test log.
@@ -409,8 +413,9 @@ suite('Fake dryrun parsing', /*async*/() => {
             }
          }
 
-         await configuration.setTargetByName("tvmi");
-         make.prepareBuildTarget("tvmi");
+         let tvmi: BuildTarget = new BuildTarget("", "tvmi");
+         await configuration.setTargetByName(tvmi);
+         make.prepareBuildTarget(tvmi);
 
          // Compare the output log with the baseline
          // TODO: incorporate relevant diff snippets into the test log.
@@ -451,7 +456,7 @@ suite('Fake dryrun parsing', /*async*/() => {
       await make.cleanConfigure(make.TriggeredBy.tests);
 
       await configuration.setConfigurationByName("test-make-C");
-      await make.buildTarget(make.TriggeredBy.tests, "all", true);
+      await make.buildTarget(make.TriggeredBy.tests, make.t_all, true);
 
       // Compare the output log with the baseline
       // TODO: incorporate relevant diff snippets into the test log.
@@ -482,7 +487,7 @@ suite('Fake dryrun parsing', /*async*/() => {
 
       configuration.prepareConfigurationsQuickPick();
       await configuration.setConfigurationByName("varexp");
-      await configuration.setTargetByName("all");
+      await configuration.setTargetByName(make.t_all);
 
       // Delete extension log a bit later than other tests. For this one, we only care to capture varexp.
       // All else that happens before, it was covered during the other tests in this suite.

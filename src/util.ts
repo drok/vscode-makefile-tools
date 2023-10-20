@@ -783,8 +783,11 @@ export async function expandVariablesInSetting(settingId: string, settingVal: st
         } else if (result[2] === "configuration") {
             toStr = configuration.getCurrentMakefileConfiguration();
             telemetryProperties.pattern =  result[2];
-        } else if (result[2] === "buildTarget") {
-            toStr = configuration.getCurrentTarget() || "";
+        } else if (result[2] === "buildTargetName") {
+            toStr = configuration.getCurrentTarget().name || "";
+            telemetryProperties.pattern =  result[2];
+        } else if (result[2] === "buildTargetDir") {
+            toStr = configuration.getCurrentTarget().dir || "";
             telemetryProperties.pattern =  result[2];
         } else if (result[4] === "env" && result[5]) {
             toStr = process.env[result[5]] || "";

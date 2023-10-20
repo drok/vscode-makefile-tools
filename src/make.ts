@@ -24,6 +24,22 @@ nls.config({ messageFormat: nls.MessageFormat.bundle, bundleFormat: nls.BundleFo
 const localize: nls.LocalizeFunc = nls.loadMessageBundle();
 const recursiveString = localize("recursive", "(recursive)");
 
+export class BuildTarget {
+    constructor(dir: string, name: string) {
+        this.dir = dir;
+        this.name = name;
+    }
+    public toString = () : string => {
+        return `${this.name} @@ ${this.dir}`;
+    }
+    dir: string;
+    name: string;
+}
+
+// Predefined, well known build targets
+export const t_all = new BuildTarget("", "all");
+export const t_clean = new BuildTarget("", "clean");
+
 let isBuilding: boolean = false;
 export function getIsBuilding(): boolean { return isBuilding; }
 export function setIsBuilding(building: boolean): void {
@@ -181,16 +197,21 @@ async function saveAll(): Promise<boolean>  {
     }
 }
 
-export function prepareBuildTarget(target: string): string[] {
+export function prepareBuildTarget(target: BuildTarget): string[] {
     let makeArgs: string[] = [];
 
     // Prepend the target to the arguments given in the configurations json.
     // If a clean build is desired, "clean" should precede the target.
-    if (target) {
-        makeArgs.push(target);
+    if (target.name) {
+        makeArgs.push(target.name);
     }
 
+    if (target.dir) {
+        makeArgs.push("-C");
+        makeArgs.push(target.dir);
+    }
     makeArgs = makeArgs.concat(configuration.getConfigurationMakeArgs());
+    makeArgs.push(target.name);
 
     logger.message(`Building target "${target}" with command: '${configuration.getConfigurationMakeCommand()} ${makeArgs.join(" ")}'`);
     return makeArgs;
@@ -217,7 +238,7 @@ export function setCurPID(pid: number): void { curPID = pid; }
 
 const makefileBuildTaskName: string = "Makefile Tools Build Task";
 
-export async function buildTarget(triggeredBy: TriggeredBy, target: string, clean: boolean = false): Promise<number> {
+export async function buildTarget(triggeredBy: TriggeredBy, target: BuildTarget, clean: boolean = false): Promise<number> {
     if (blockedByOp(Operations.build)) {
         return ConfigureBuildReturnCodeTypes.blocked;
     }
@@ -247,11 +268,8 @@ export async function buildTarget(triggeredBy: TriggeredBy, target: string, clea
     // Prepare a notification popup
     let config: string | undefined = configuration.getCurrentMakefileConfiguration();
     let configAndTarget: string = config;
-    if (target) {
-        target = target.trimLeft();
-        if (target !== "") {
-            configAndTarget += "/" + target;
-        }
+    if (target.name) {
+        configAndTarget += "/" + target.name + "@" + target.dir;
     }
 
     configAndTarget = `"${configAndTarget}"`;
@@ -292,11 +310,12 @@ export async function buildTarget(triggeredBy: TriggeredBy, target: string, clea
                 let clearOutput: boolean = configuration.getClearOutputBeforeBuild() || false;
 
                 if (clean) {
+                    // FIXME: there may not be a "clean" target
                     // We don't need to track the return code for 'make "clean"'.
                     // We want to proceed with the 'make "target"' step anyway.
                     // The relevant return code for telemetry will be the second one.
                     // If the clean step fails, doBuildTarget will print an error message in the terminal.
-                    await doBuildTarget(progress, "clean", clearOutput);
+                    await doBuildTarget(progress, t_clean, clearOutput);
                 }
 
                 let retc: number = await doBuildTarget(progress, target, clearOutput && !clean);
@@ -310,7 +329,7 @@ export async function buildTarget(triggeredBy: TriggeredBy, target: string, clea
                 let buildElapsedTime: number = util.elapsedTimeSince(buildStartTime);
                 const telemetryProperties: telemetry.Properties = {
                     exitCode: retc?.toString() || "undefined",
-                    target: processTargetForTelemetry(target),
+                    target: processTargetForTelemetry(target.name),
                     triggeredBy: triggeredBy
                 };
                 const telemetryMeasures: telemetry.Measures = {
@@ -337,7 +356,7 @@ export async function buildTarget(triggeredBy: TriggeredBy, target: string, clea
     }
 }
 
-export async function doBuildTarget(progress: vscode.Progress<{}>, target: string, clearTerminalOutput: boolean): Promise<number> {
+export async function doBuildTarget(progress: vscode.Progress<{}>, target: BuildTarget, clearTerminalOutput: boolean): Promise<number> {
     let makeArgs: string[] = prepareBuildTarget(target);
     try {
         const quotingStlye: vscode.ShellQuoting = vscode.ShellQuoting.Strong;
@@ -454,10 +473,14 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
 
     // Prepend the target to the arguments given in the makefile.configurations object,
     // unless we want to parse for the full set of available targets.
-    let currentTarget: string | undefined = configuration.getCurrentTarget();
-    if (currentTarget) {
-        makeArgs.push(currentTarget);
+    let currentTarget: BuildTarget = configuration.getCurrentTarget();
+
+    // FIXME: if current target = make.t_all, dir is empty, make will be done in proj dir
+    if (currentTarget.dir) {
+        makeArgs.push("-C");
+        makeArgs.push(currentTarget.dir);
     }
+    makeArgs.push(currentTarget.name);
 
     // Include all the make arguments defined in makefile.configurations.makeArgs
     makeArgs = makeArgs.concat(configuration.getConfigurationMakeArgs());
@@ -498,7 +521,7 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
     });
 
     // Append the target to the arguments given in the makefile.configurations object
-    makeArgs.push(configuration.getCurrentTarget() || "all");
+    makeArgs.push(configuration.getCurrentTarget().name);
 
     logger.messageNoCR(`Generating ${getConfigureIsInBackground() ? "in the background a new " : ""}configuration cache with command: `);
 
@@ -857,7 +880,7 @@ export async function runPostConfigureScript(progress: vscode.Progress<{}>, scri
 }
 
 interface ConfigurationCache {
-    buildTargets: string[];
+    buildTargets: Map<string, Set<string>> | undefined;
     launchTargets: string[];
     customConfigurationProvider: {
         workspaceBrowse: cpp.WorkspaceBrowseConfiguration;
@@ -870,7 +893,7 @@ interface ConfigurationCache {
 }
 
 function isConfigurationEmpty(configurationCache: ConfigurationCache): boolean {
-    if (configurationCache.buildTargets.length === 0 && configurationCache.launchTargets.length === 0 && configurationCache.customConfigurationProvider.workspaceBrowse.browsePath.length === 0) {
+    if (!configurationCache.buildTargets && configurationCache.launchTargets.length === 0 && configurationCache.customConfigurationProvider.workspaceBrowse.browsePath.length === 0) {
         return true;
     }
     return false;
@@ -1042,15 +1065,7 @@ export async function configure(triggeredBy: TriggeredBy, updateTargets: boolean
   // Identify for telemetry whether:
   //   - this configure will need to double the workload, if it needs to analyze the build targets separately.
   //   - this configure will need to reset the build target to the default, which will need a reconfigure.
-  let processTargetsSeparately: boolean = false;
-  let currentBuildTarget: string | undefined = configuration.getCurrentTarget();
-  let oldBuildTarget: string | undefined = currentBuildTarget;
-  if (!currentBuildTarget || currentBuildTarget === "") {
-    currentBuildTarget = "all";
-  }
-  if (updateTargets && currentBuildTarget !== "all") {
-    processTargetsSeparately = true;
-  }
+  let currentBuildTarget: BuildTarget = configuration.getCurrentTarget();
 
   // Start with the success assumption until later analysis.
   let retc: number = ConfigureBuildReturnCodeTypes.success;
@@ -1131,7 +1146,7 @@ export async function configure(triggeredBy: TriggeredBy, updateTargets: boolean
       .getCppConfigurationProvider()
       .getCustomConfigurationProvider();
     let ConfigurationCache: ConfigurationCache = {
-      buildTargets: configuration.getBuildTargets(),
+      buildTargets: configuration.getAllBuildTargets(),
       launchTargets: configuration.getLaunchTargets(),
       customConfigurationProvider: {
         workspaceBrowse: provider.workspaceBrowse,
@@ -1170,11 +1185,12 @@ export async function configure(triggeredBy: TriggeredBy, updateTargets: boolean
       }
     }
 
-    let newBuildTarget: string | undefined = configuration.getCurrentTarget();
     let configureElapsedTime: number =
       util.elapsedTimeSince(configureStartTime);
     const telemetryMeasures: telemetry.Measures = {
-      numberBuildTargets: configuration.getBuildTargets().length,
+      // FIXME: expensive counting
+      // FIXME: this only counts top_builddir targets
+      numberBuildTargets: Array.from(configuration.getBuildTargets("")).length,
       numberLaunchTargets: configuration.getLaunchTargets().length,
       numberIndexedSourceFiles: provider.fileIndex.size,
       numberMakefileConfigurations:
@@ -1186,8 +1202,6 @@ export async function configure(triggeredBy: TriggeredBy, updateTargets: boolean
       makeDryRun: makeDryRun.toString(),
       readCache: readCache.toString(),
       isClean: getConfigureIsClean().toString(),
-      processTargetsSeparately: processTargetsSeparately.toString(),
-      resetBuildTarget: (oldBuildTarget !== newBuildTarget).toString(),
       triggeredBy: triggeredBy,
     };
 
@@ -1252,7 +1266,7 @@ export async function configure(triggeredBy: TriggeredBy, updateTargets: boolean
       logger.message(`Postconfigure elapsed time: ${postConfigureElapsedTime}`);
     }
 
-    telemetryProperties.buildTarget = processTargetForTelemetry(newBuildTarget);
+    telemetryProperties.buildTarget = processTargetForTelemetry(currentBuildTarget.name);
     telemetry.logEvent("configure", telemetryProperties, telemetryMeasures);
 
     if (retc !== ConfigureBuildReturnCodeTypes.success) {
@@ -1335,37 +1349,49 @@ async function parseTargets(progress: vscode.Progress<{}>, cancel: vscode.Cancel
     }
 
     let startTime: number = Date.now();
-    let targets: string[] = [];
+    let alltargets: Map<string, Set<string>> = new Map();
+    let targetsFound : number = 0;
+    let targets: Set<string> = new Set();
 
     let onStatus: any = (status: string): void => {
         progress.report({ increment: 1, message: `${status}${(recursive) ? recursiveString : ""}` });
     };
 
     let onFoundTarget: any = (target: string): void => {
-        targets.push(target);
+        targets.add(target);
+        targetsFound++;
     };
 
     let retc: number = await makeParser.parseTargets(cancel, dryRunOutput, onStatus, onFoundTarget);
     if (retc === ConfigureBuildReturnCodeTypes.success) {
-        if (targets.length === 0) {
+        if (!targetsFound) {
             logger.message(`No${getConfigureIsClean() ? "" : " new"} build targets have been detected.`);
-        } else {
-            targets = targets.sort();
-            logger.message(`Found the following ${targets.length}${getConfigureIsClean() ? "" : " new"} build targets defined in the makefile: ${targets.join(";")}`);
+        //} else {
+            //targets = targets.sort();
+            //logger.message(`Found the following ${targetsFound}${getConfigureIsClean() ? "" : " new"} build targets defined in the makefile: ${targets.join(";")}`);
         }
 
+        /* FIXME: does incremental dry-running make sense?
         if (getConfigureIsClean()) {
             // If configure is clean, delete any old build targets found previously.
-            configuration.setBuildTargets(targets);
+            configuration.setBuildTargets(alltargets);
         } else {
             // If we're merging with a previous set of build targets,
             // remove duplicates because sometimes, depending how the makefiles are set up,
             // a non --always-make dry-run may still log commands for up to date files.
             // These would be found also in the previous list of build targets.
-            configuration.setBuildTargets(util.sortAndRemoveDuplicates(configuration.getBuildTargets().concat(targets)));
+            configuration.setBuildTargets(alltargets);
         }
+        */
+        configuration.setBuildTargets(alltargets);
 
-        logger.message(`Complete list of build targets: ${configuration.getBuildTargets().join(";")}`);
+        logger.message("Complete list of build targets:");
+        for (const dir of alltargets.keys()) {
+            logger.message(`  in ${dir}:`);
+            for (const target of alltargets.get(dir) || []) {
+                logger.message('    - ${target}');
+            }
+        }
     }
 
     return {
@@ -1462,7 +1488,7 @@ export async function loadConfigurationFromCache(progress: vscode.Progress<{}>, 
                 progress.report({ increment: 1, message: localize("make.configure.cache", "Configuring from cache") });
                 logger.message(`Configuring from cache: ${cachePath}`);
                 let configurationCache: ConfigurationCache = {
-                    buildTargets: [],
+                    buildTargets: undefined,
                     launchTargets: [],
                     customConfigurationProvider: {
                         workspaceBrowse: {
@@ -1471,21 +1497,30 @@ export async function loadConfigurationFromCache(progress: vscode.Progress<{}>, 
                         fileIndex: []
                     }
                 };
-                configurationCache = JSON.parse(content);
+                let json  = JSON.parse(content);
+                configurationCache = json;
 
-                // Trick to get proper URIs after reading from the cache.
-                // At the moment of writing into the cache, the URIs have
-                // the vscode.Uri.file(string) format.
-                // After saving and re-reading, we need the below,
-                // otherwise CppTools doesn't get anything.
+                // Deserialize object.
+                // configurationCache.customConfigurationProvider.fileIndex.uri is converted to vscode.Uri objects
+                // buildTargets is converted to Map
                 await util.scheduleTask(() => {
                     configurationCache.customConfigurationProvider.fileIndex.forEach(i => {
                         i[1].uri = vscode.Uri.file(i[0]);
                     });
+                    let targets : Array<[string, Set<string>]> = new Array();
+                    // If json["buildTargets"] is an array of arrays
+                    if (Array.isArray(json["buildTargets"]) && json["buildTargets"].length && Array.isArray(json["buildTargets"][0])) {
+                        json["buildTargets"]?.forEach((i : [string, Array<string>]) => {
+                            targets.push([i[0], new Set(i[1])]);
+                        });
+                    }
+                    configurationCache.buildTargets = new Map(targets);
                 });
 
+                //configurationCache.buildTargets = new Map(configurationCache.buildTargets);
                 await util.scheduleTask(() => {
-                    configuration.setBuildTargets(configurationCache.buildTargets);
+                    if (configurationCache.buildTargets)
+                        configuration.setBuildTargets(configurationCache.buildTargets);
                     configuration.setLaunchTargets(configurationCache.launchTargets);
                 });
 
@@ -1619,11 +1654,7 @@ export async function doConfigure(progress: vscode.Progress<{}>, cancel: vscode.
 
     // Configure build targets only if necessary:
     // if the caller considers we need a build target update
-    // or if the build target array hasn't been populated by now
-    // or if it contains only 'all' which we push automatically.
-    let buildTargets: string[] = configuration.getBuildTargets();
-    if (updateTargets || buildTargets.length === 0 ||
-        (buildTargets.length === 1 && buildTargets[0] === "all")) {
+    if (updateTargets) {
 
         logger.message(`Parsing for build targets from: "${parseFile}"`);
         subphaseStats.parseTargets = await parseTargets(progress, cancel, parseContent || "", recursiveDoConfigure);
@@ -1634,10 +1665,9 @@ export async function doConfigure(progress: vscode.Progress<{}>, cancel: vscode.
 
         // Verify if the current build target is still part of the list and unset otherwise.
         // By this point, configuration.getBuildTargets() contains a comlete list (old and new).
-        buildTargets = configuration.getBuildTargets();
-        let currentBuildTarget: string | undefined = configuration.getCurrentTarget();
-        if (currentBuildTarget && currentBuildTarget !== "" && currentBuildTarget !== "all" &&
-            !buildTargets.includes(currentBuildTarget)) {
+        let currentBuildTarget: BuildTarget = configuration.getCurrentTarget();
+        if (currentBuildTarget.name &&
+            Array.from(configuration.getBuildTargets(currentBuildTarget.dir)).includes(currentBuildTarget.name)) {
             logger.message(`Current build target ${currentBuildTarget} is no longer present in the available list.` +
                 ` Unsetting the current build target.`);
 
@@ -1656,7 +1686,7 @@ export async function doConfigure(progress: vscode.Progress<{}>, cancel: vscode.
             // as the caller and its result will be included into the telemetry information reported by that.
             // There can be only one level of recursivity because once the target is reset to empty,
             // it is impossible to get into the state of having a target that is not found in the available list.
-            await configuration.setTargetByName("");
+            await configuration.setTargetByName(new BuildTarget("", ""));
             logger.message("Automatically reconfiguring the project after a build target change.");
             recursiveDoConfigure = true;
 
