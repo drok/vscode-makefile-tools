@@ -12,7 +12,11 @@ import * as make from '../make';
 import * as path from 'path';
 import * as util from '../util';
 import * as vscode from 'vscode';
+import {Parser, ParserDisp} from '../parser';
 import {parse} from 'shell-quote';
+// import  from '../extension';
+import { extension } from '../extension';
+import { Making } from './tool';
 
 export interface PreprocessDryRunOutputReturnType {
     retc: number;
@@ -388,6 +392,43 @@ export async function parseLineAsTool(
     );
 }
 
+
+export class Executing implements Parser {
+    // constructor(goal: string) { this.goal = goal; }
+    constructor(currentDir: string) {
+        this.pwd = currentDir;
+    }
+    ingest (line: string) : [ParserDisp, Parser] {
+        if (line == "")
+            return [ParserDisp.Leave, this];
+
+        // doParsingChunk(cmd);
+        let makes = new Making(parseToolCmd(line), this);
+        if (makes.done())
+            this.makes.push(makes);
+        return [ParserDisp.Continue, this];
+    }
+    push(sub: Parser) { return undefined;}
+    // currentdir getter
+    get currentDir(): string { return this.pwd; }
+
+    // goal: string;
+    pwd: string;
+    makes: Making[] = [];
+}
+
+function parseToolCmd(line: string) : Tool {
+    let tool = new Tool(
+        // don't use join and neither paths/filenames processed above if we want to keep the exact text in the makefile
+        // match[1] + match[2],
+        "",
+        "", // toolFullPath,
+        true, // toolFound,
+        parseToolArguments(line)
+    );
+    tool.fullPath = tool.argv.shift() || "";
+    return tool;
+}
 // Parse a command line, removing comments, compound statements (||, &&)
 // redirections, and unescaping shell escape sequences
 function parseToolArguments(args: string): string[] {

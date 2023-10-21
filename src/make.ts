@@ -1612,38 +1612,12 @@ export async function doConfigure(progress: vscode.Progress<{}>, cancel: vscode.
     // to the previous browse paths.
     extension.clearCummulativeBrowsePath();
 
-    let onFoundCustomConfigProviderItem: any = (customConfigProviderItem: CustomConfigProviderItem): void => {
-        // Configurations parsed from dryrun output or build log are saved temporarily in the delta file index
-        extension.buildCustomConfigurationProvider(customConfigProviderItem);
-    };
-
-
-
     // This generates the dryrun output (saving it on disk) or reads an alternative build log.
     // Timings for this sub-phase happen inside.
-    subphaseStats.generateParseContent = await generateParseContent(progress, cancel, recursiveDoConfigure, onFoundCustomConfigProviderItem);
+    subphaseStats.generateParseContent = await generateParseContent(progress, cancel, recursiveDoConfigure);
     if (subphaseStats.generateParseContent.retc === ConfigureBuildReturnCodeTypes.cancelled) {
         return subphaseStats;
     }
-
-    // Configure IntelliSense
-    // Don't override retc1, since make invocations may fail with errors different than cancel
-    // and we still complete the configure process.
-    logger.message("Parsing for IntelliSense.");
-    subphaseStats.parseIntelliSense = await updateProvider(progress, cancel, preprocessedDryrunOutput, recursiveDoConfigure);
-    if (subphaseStats.parseIntelliSense.retc === ConfigureBuildReturnCodeTypes.cancelled) {
-        return subphaseStats;
-    }
-    logger.message(`Parsing for IntelliSense elapsed time: ${subphaseStats.parseIntelliSense.elapsed}`);
-
-    // Configure launch targets as parsed from the makefile
-    // (and not as read from settings via makefile.launchConfigurations).
-    logger.message(`Parsing for launch targets.`);
-    subphaseStats.parseLaunch = await parseLaunchConfigurations(progress, cancel, preprocessedDryrunOutput, recursiveDoConfigure);
-    if (subphaseStats.parseLaunch.retc === ConfigureBuildReturnCodeTypes.cancelled) {
-        return subphaseStats;
-    }
-    logger.message(`Parsing for launch targets elapsed time: ${subphaseStats.parseLaunch.elapsed}`);
 
     // Verify if the current launch configuration is still part of the list and unset otherwise.
     // By this point, configuration.getLaunchTargets() contains a complete list (old and new).
