@@ -183,18 +183,15 @@ async function readFeaturesVisibility(): Promise<void> {
     await updateOptionalFeaturesWithWorkspace();
 }
 
-let makePath: string | undefined;
-export function getMakePath(): string | undefined { return makePath; }
-export function setMakePath(path: string): void { makePath = path; }
+let makePath: string;
+export function getMakePath(): string { return makePath; }
+export function setMakePath(path: string | undefined = "make"): void { makePath = path; }
 
 // Read the path (full or directory only) of the make tool if defined in settings.
 // It represents a default to look for if no other path is already included
 // in "makefile.configurations.makePath".
 async function readMakePath(): Promise<void> {
-    makePath = await util.getExpandedSetting<string>("makePath");
-    if (!makePath) {
-        logger.message("No path to the make tool is defined in the settings file.");
-    }
+    setMakePath(await util.getExpandedSetting<string>("makePath"));
 }
 
 let makefilePath: string | undefined;

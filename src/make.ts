@@ -12,8 +12,10 @@ import * as fs from 'fs';
 import * as logger from './logger';
 import * as shellParser from './parser/shell';
 import * as toolParser from './parser/tool';
-import {CompileCommand} from './parser/tool';
 import * as makeParser from './parser/gnumake';
+import {CompileCommand} from './parser/tool';
+import {Make} from './parser/gnumake';
+import {Parser, ParserDisp} from './parser';
 import * as path from 'path';
 import * as util from './util';
 import * as telemetry from './telemetry';
@@ -507,7 +509,9 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
     makeArgs.push("--dry-run");
     makeArgs.push(`--assume-old=${makefilePath}`);
     makeArgs.push(makefilePath);
-    makeArgs.push("AM_MAKEFLAGS=--assume-old=Makefile Makefile");
+    // stamp-h1 avoids trying to regen config.h (config headers) if configure.ac has changed
+    makeArgs.push("AM_MAKEFLAGS=--assume-old=Makefile --assume-old=stamp-h1 Makefile");
+    makeArgs.push("--assume-old=stamp-h1");
 
     // If this is not a clean configure, remove --always-make from the arguments list.
     // We need to have --always-make in autotools.dryrunSwitches and remove it for not clean configure
@@ -522,7 +526,9 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
     });
 
     // Append the target to the arguments given in the makefile.configurations object
-    makeArgs.push(configuration.getCurrentTarget().name);
+    // makeArgs.push(configuration.getCurrentTarget().name);
+    // TEMPORARY TEST: make all-recursive instead of all to skip checking if config.h is uptodate
+    makeArgs.push("all-recursive");
 
     logger.messageNoCR(`Generating ${getConfigureIsInBackground() ? "in the background a new " : ""}configuration cache with command: `);
 
@@ -542,13 +548,65 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
         util.writeFile(dryrunFile, `${configuration.getConfigurationMakeCommand()} ${makeArgs.join(" ")}${lineEnding}`);
 
         let completeOutput: string = "";
+        let completeErr: string = "";
         let stderrStr: string = "";
         let heartBeat: number = Date.now();
-
+        let parserStack: Parser[] = [new Make("")];
+        let linenumber: number = 0;
         let stdout: any = (result: string): void => {
+            // slice remove the very last newline.
+            // .split makes two lines out of '\n'
+            // this ensures no spurious last line.
+            // because this is stdout, which is line buffered by default,
+            // the last line ends with a newline, unless it is longer than the buffer,
+            // without any newlines. I assume not, but this can happen if the buffer is
+            // very small. It's a cornercase I don't handle, but definately a bug
+            // if stdout buffer is small
+            let lines: string[] = result.slice(0,-1).split(/\r?\n/);
+            try {
+                lines.forEach((s) => {
+                    let parser = parserStack.pop();
+                    linenumber++;
+                    if (parser) {
+                        let [disp, next] = parser.ingest(s);
+                        if (disp == ParserDisp.Continue) {
+                            // if (parser != next)
+    //                            parserStack[parserStack.length - 1].push(parser);
+                            parserStack.push(next);
+                        } else if (disp == ParserDisp.Enter) {
+                            parserStack.push(parser);
+                            parserStack.push(next);
+                        } else {
+                            let next = parserStack[parserStack.length - 1].push(parser);
+                            if (next)  {
+                                if (next != parser && next != parserStack[parserStack.length - 1]) {
+                                    // when subsection which list, this adds a new element to the list
+                                    // and continues parsing.
+                                    parserStack.push(next);
+                                }
+                            } else {
+                                while (!next && parserStack.length) {
+                                    parser = parserStack.pop();
+                                    if (parser && parserStack.length) {
+                                        next = parserStack[parserStack.length - 1].push(parser);
+                                    }
+                                };
+                                if (next && next != parserStack[parserStack.length - 1]) {
+                                    // After a subsection is complete, this allows the parent to continue
+                                    // with a new subsection.
+                                    parserStack.push(next);
+                                } // else parent continues
+                            }
+                        }
+                    }
+                });
+            } catch (e) {
+                logger.message(`Parser error (line ${linenumber}):` + e);
+                parserStack = [];
+            }
             const appendStr: string = `${result} ${lineEnding}`;
             completeOutput += appendStr;
-            fs.appendFileSync(dryrunFile, appendStr);
+            fs.appendFileSync(dryrunFile, result);
 
             progress.report({
               increment: 1,
@@ -571,13 +629,12 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
             if (process.env['MAKEFILE_TOOLS_TESTING'] !== '1') {
                appendStr += lineEnding;
             }
-            fs.appendFileSync(dryrunFile, appendStr);
             stderrStr += appendStr;
 
             // Sometimes there is useful information coming via the stderr
             // (one example is even a bug of the make tool, because it reports
             // "Entering directory" on stderr instead of stdout causing various issues).
-            completeOutput += appendStr;
+            completeErr += result;
         };
 
         const heartBeatTimeout: number = 30; // half minute. TODO: make this a setting
@@ -595,7 +652,16 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
         }, 5 * 1000);
 
         // The dry-run analysis should operate on english.
-        const result: util.SpawnProcessResult = await util.spawnChildProcess(configuration.getConfigurationMakeCommand(), makeArgs, util.getWorkspaceRoot(), true, true, stdout, stderr);
+        const result: util.SpawnProcessResult = await util.spawnChildProcess(configuration.getMakePath(), makeArgs, util.getWorkspaceRoot(), true, true, stdout, stderr);
+        if (completeErr) {
+            fs.appendFileSync(dryrunFile,
+                lineEnding +
+                lineEnding +
+                "*** STDERR ***" +
+                lineEnding +
+                lineEnding +
+                completeErr);
+        }
         clearInterval(timeout);
         let elapsedTime: number = util.elapsedTimeSince(startTime);
         logger.message(`Generating dry-run elapsed time: ${elapsedTime}`);
