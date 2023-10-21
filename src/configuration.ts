@@ -6,7 +6,8 @@
 import {extension} from './extension';
 import * as logger from './logger';
 import * as make from './make';
-import {BuildTarget} from './make';
+import { BuildTarget } from './make';
+import { Goal } from './parser/gnumake';
 import * as ui from './ui';
 import * as util from './util';
 import * as vscode from 'vscode';
@@ -1805,10 +1806,10 @@ export async function selectLaunchConfiguration(): Promise<void> {
 // Currently, this list contains any abstract intermediate target
 // (like any object produced by the compiler from a source code file).
 // TODO: filter only the relevant targets (binaries, libraries, etc...) from this list.
-let buildTargets: Map<string, Set<string>> = new Map();
-export function getBuildTargets(dir: string): Iterable<string> { return buildTargets.get(dir)?.values() || []; }
-export function setBuildTargets(targets: Map<string, Set<string>>): void { buildTargets = targets; }
-export function getAllBuildTargets(): Map<string, Set<string>> { return buildTargets; }
+let buildTargets: Map<string, Goal[]> = new Map();
+export function getBuildTargets(dir: string): Goal[] { return buildTargets.get(dir) || []; }
+export function setBuildTargets(targets: Map<string, Goal[]>): void { buildTargets = targets; }
+export function getAllBuildTargets(): Map<string, Goal[]> { return buildTargets; }
 
 // List of all the binaries built by the current project and all the ways
 // they may be invoked (from what cwd, with what arguments).

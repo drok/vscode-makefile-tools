@@ -12,9 +12,8 @@ import * as fs from 'fs';
 import * as logger from './logger';
 import * as shellParser from './parser/shell';
 import * as toolParser from './parser/tool';
-import * as makeParser from './parser/gnumake';
 import {CompileCommand} from './parser/tool';
-import {Make} from './parser/gnumake';
+import {Make, Goal} from './parser/gnumake';
 import {Parser, ParserDisp} from './parser';
 import * as path from 'path';
 import * as util from './util';
@@ -947,7 +946,7 @@ export async function runPostConfigureScript(progress: vscode.Progress<{}>, scri
 }
 
 interface ConfigurationCache {
-    buildTargets: Map<string, Set<string>> | undefined;
+    buildTargets: Map<string, Goal[]> | undefined;
     launchTargets: string[];
     customConfigurationProvider: {
         workspaceBrowse: cpp.WorkspaceBrowseConfiguration;
@@ -1405,68 +1404,6 @@ async function parseLaunchConfigurations(progress: vscode.Progress<{}>, cancel: 
     };
 }
 
-async function parseTargets(progress: vscode.Progress<{}>, cancel: vscode.CancellationToken,
-                            dryRunOutput: string, recursive: boolean = false): Promise<ConfigureSubphaseStatus> {
-
-    if (cancel.isCancellationRequested) {
-        return {
-            retc: ConfigureBuildReturnCodeTypes.cancelled,
-            elapsed: 0
-        };
-    }
-
-    let startTime: number = Date.now();
-    let alltargets: Map<string, Set<string>> = new Map();
-    let targetsFound : number = 0;
-    let targets: Set<string> = new Set();
-
-    let onStatus: any = (status: string): void => {
-        progress.report({ increment: 1, message: `${status}${(recursive) ? recursiveString : ""}` });
-    };
-
-    let onFoundTarget: any = (target: string): void => {
-        targets.add(target);
-        targetsFound++;
-    };
-
-    let retc: number = await makeParser.parseTargets(cancel, dryRunOutput, onStatus, onFoundTarget);
-    if (retc === ConfigureBuildReturnCodeTypes.success) {
-        if (!targetsFound) {
-            logger.message(`No${getConfigureIsClean() ? "" : " new"} build targets have been detected.`);
-        //} else {
-            //targets = targets.sort();
-            //logger.message(`Found the following ${targetsFound}${getConfigureIsClean() ? "" : " new"} build targets defined in the makefile: ${targets.join(";")}`);
-        }
-
-        /* FIXME: does incremental dry-running make sense?
-        if (getConfigureIsClean()) {
-            // If configure is clean, delete any old build targets found previously.
-            configuration.setBuildTargets(alltargets);
-        } else {
-            // If we're merging with a previous set of build targets,
-            // remove duplicates because sometimes, depending how the makefiles are set up,
-            // a non --always-make dry-run may still log commands for up to date files.
-            // These would be found also in the previous list of build targets.
-            configuration.setBuildTargets(alltargets);
-        }
-        */
-        configuration.setBuildTargets(alltargets);
-
-        logger.message("Complete list of build targets:");
-        for (const dir of alltargets.keys()) {
-            logger.message(`  in ${dir}:`);
-            for (const target of alltargets.get(dir) || []) {
-                logger.message('    - ${target}');
-            }
-        }
-    }
-
-    return {
-        retc,
-        elapsed: util.elapsedTimeSince(startTime)
-    };
-}
-
 async function updateProvider(progress: vscode.Progress<{}>, cancel: vscode.CancellationToken,
                               dryRunOutput: string, recursive: boolean = false): Promise<ConfigureSubphaseStatus> {
     if (cancel.isCancellationRequested) {
@@ -1574,11 +1511,13 @@ export async function loadConfigurationFromCache(progress: vscode.Progress<{}>, 
                     configurationCache.customConfigurationProvider.fileIndex.forEach(i => {
                         i[1].uri = vscode.Uri.file(i[0]);
                     });
-                    let targets : Array<[string, Set<string>]> = new Array();
+                    let targets : Array<[string, Goal[]]> = new Array();
                     // If json["buildTargets"] is an array of arrays
                     if (Array.isArray(json["buildTargets"]) && json["buildTargets"].length && Array.isArray(json["buildTargets"][0])) {
-                        json["buildTargets"]?.forEach((i : [string, Array<string>]) => {
-                            targets.push([i[0], new Set(i[1])]);
+                        json["buildTargets"]?.forEach((i : [string, Goal[]]) => {
+                            targets.push([i[0], i[1].map<Goal>(j =>
+                                Object.assign(new Goal(), j)
+                            )]);
                         });
                     }
                     configurationCache.buildTargets = new Map(targets);
@@ -1668,27 +1607,24 @@ export async function doConfigure(progress: vscode.Progress<{}>, cancel: vscode.
         logger.message("Loading configurations from cache is not necessary.", "Verbose");
     }
 
+    // Empty the cummulative browse path before we start a new parse for custom configuration.
+    // We can empty even if the configure is not clean, because the new browse paths will be appended
+    // to the previous browse paths.
+    extension.clearCummulativeBrowsePath();
+
+    let onFoundCustomConfigProviderItem: any = (customConfigProviderItem: CustomConfigProviderItem): void => {
+        // Configurations parsed from dryrun output or build log are saved temporarily in the delta file index
+        extension.buildCustomConfigurationProvider(customConfigProviderItem);
+    };
+
+
+
     // This generates the dryrun output (saving it on disk) or reads an alternative build log.
     // Timings for this sub-phase happen inside.
-    subphaseStats.generateParseContent = await generateParseContent(progress, cancel, recursiveDoConfigure);
+    subphaseStats.generateParseContent = await generateParseContent(progress, cancel, recursiveDoConfigure, onFoundCustomConfigProviderItem);
     if (subphaseStats.generateParseContent.retc === ConfigureBuildReturnCodeTypes.cancelled) {
         return subphaseStats;
     }
-
-    // Some initial preprocessing required before any parsing is done.
-    logger.message(`Preprocessing: "${parseFile}"`);
-    let preprocessedDryrunOutput: string;
-    let preprocessedDryrunOutputResult: shellParser.PreprocessDryRunOutputReturnType = await preprocessDryRun(progress, cancel, parseContent || "", recursiveDoConfigure);
-    subphaseStats.preprocessParseContent = {
-        retc: preprocessedDryrunOutputResult.retc,
-        elapsed: preprocessedDryrunOutputResult.retc
-    };
-    if (preprocessedDryrunOutputResult.result) {
-        preprocessedDryrunOutput = preprocessedDryrunOutputResult.result;
-    } else {
-        return subphaseStats;
-    }
-    logger.message(`Preprocess elapsed time: ${subphaseStats.preprocessParseContent.elapsed}`);
 
     // Configure IntelliSense
     // Don't override retc1, since make invocations may fail with errors different than cancel
@@ -1722,19 +1658,11 @@ export async function doConfigure(progress: vscode.Progress<{}>, cancel: vscode.
     // Configure build targets only if necessary:
     // if the caller considers we need a build target update
     if (updateTargets) {
-
-        logger.message(`Parsing for build targets from: "${parseFile}"`);
-        subphaseStats.parseTargets = await parseTargets(progress, cancel, parseContent || "", recursiveDoConfigure);
-        if (subphaseStats.parseTargets.retc === ConfigureBuildReturnCodeTypes.cancelled) {
-            return subphaseStats;
-        }
-        logger.message(`Parsing build targets elapsed time: ${subphaseStats.parseTargets.elapsed}`);
-
         // Verify if the current build target is still part of the list and unset otherwise.
         // By this point, configuration.getBuildTargets() contains a comlete list (old and new).
         let currentBuildTarget: BuildTarget = configuration.getCurrentTarget();
         if (currentBuildTarget.name &&
-            Array.from(configuration.getBuildTargets(currentBuildTarget.dir)).includes(currentBuildTarget.name)) {
+            configuration.getBuildTargets(currentBuildTarget.dir).find((n) => n.goal == currentBuildTarget.name)) {
             logger.message(`Current build target ${currentBuildTarget} is no longer present in the available list.` +
                 ` Unsetting the current build target.`);
 

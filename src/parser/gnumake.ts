@@ -11,6 +11,7 @@ import * as logger from '../logger';
 import * as make from '../make';
 import * as util from '../util';
 import * as vscode from 'vscode';
+// import {CustomConfigProviderItem} from '../cpptools';
 import {Parser, ParserDisp, EmptyLine } from '../parser';
 
 const chunkSize: number = 100;
@@ -117,10 +118,10 @@ export class Make implements Parser {
         if (sub instanceof Database) {
             let targets = configuration.getAllBuildTargets();
             if (!targets.has(this.dir)) {
-                let goals = new Set<string>(
-                    sub.goals.filter(g => g.goal).map<string>(g => g.goal || "")
-                );
-                targets.set(this.dir, goals);
+            //    let goals = new Set<string>(
+            //        sub.goals.filter(g => g.goal).map<string>(g => g.goal || "")
+            //    );
+                targets.set(this.dir, sub.goals);
             }
             this.goals = sub.goals;
             return this;

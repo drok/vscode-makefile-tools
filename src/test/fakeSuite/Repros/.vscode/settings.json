@@ -79,5 +79,12 @@
             "makePath": "make",
             "makeArgs": ["PEDANTIC=yes"]
         }
+],
+"autotools.launchConfigurations": [
+    {
+        "cwd": "/home/radu/.vscode-server/extensions/autotools/src/test/fakeSuite/Repros",
+        "binaryPath": "/home/radu/.vscode-server/extensions/autotools/src/test/fakeSuite/Repros/8cc",
+        "binaryArgs": []
+    }
 ]
 }
