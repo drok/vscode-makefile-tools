@@ -6,10 +6,14 @@
 import * as configuration from './configuration';
 import * as cpp from 'vscode-cpptools';
 import * as cpptools from './cpptools';
+import {CustomConfigProviderItem} from './cpptools';
 import {extension} from './extension';
 import * as fs from 'fs';
 import * as logger from './logger';
-import * as parser from './parser';
+import * as shellParser from './parser/shell';
+import * as toolParser from './parser/tool';
+import {CompileCommand} from './parser/tool';
+import * as makeParser from './parser/gnumake';
 import * as path from 'path';
 import * as util from './util';
 import * as telemetry from './telemetry';
@@ -857,7 +861,7 @@ interface ConfigurationCache {
         fileIndex: [string, {
             uri: string | vscode.Uri;
             configuration: cpp.SourceFileConfiguration;
-            compileCommand: parser.CompileCommand;
+            compileCommand: CompileCommand;
         }][];
     };
 }
@@ -1152,7 +1156,7 @@ export async function configure(triggeredBy: TriggeredBy, updateTargets: boolean
         compileCommandsPath &&
         retc !== ConfigureBuildReturnCodeTypes.cancelled
       ) {
-        let compileCommands: parser.CompileCommand[] =
+        let compileCommands: CompileCommand[] =
           ConfigurationCache.customConfigurationProvider.fileIndex.map(
             ([, { compileCommand }]) => compileCommand
           );
@@ -1275,7 +1279,7 @@ async function parseLaunchConfigurations(progress: vscode.Progress<{}>, cancel: 
         launchConfigurations.push(launchConfiguration);
     };
 
-    let retc: number = await parser.parseLaunchConfigurations(cancel, dryRunOutput, onStatus, onFoundLaunchConfiguration);
+    let retc: number = await toolParser.parseLaunchConfigurations(cancel, dryRunOutput, onStatus, onFoundLaunchConfiguration);
     if (retc === ConfigureBuildReturnCodeTypes.success) {
         let launchConfigurationsStr: string[] = [];
         launchConfigurations.forEach(config => {
@@ -1338,7 +1342,7 @@ async function parseTargets(progress: vscode.Progress<{}>, cancel: vscode.Cancel
         targets.push(target);
     };
 
-    let retc: number = await parser.parseTargets(cancel, dryRunOutput, onStatus, onFoundTarget);
+    let retc: number = await makeParser.parseTargets(cancel, dryRunOutput, onStatus, onFoundTarget);
     if (retc === ConfigureBuildReturnCodeTypes.success) {
         if (targets.length === 0) {
             logger.message(`No${getConfigureIsClean() ? "" : " new"} build targets have been detected.`);
@@ -1383,7 +1387,7 @@ async function updateProvider(progress: vscode.Progress<{}>, cancel: vscode.Canc
         progress.report({ increment: 1, message: `${status}${(recursive) ? recursiveString : ""} ...` });
     };
 
-    let onFoundCustomConfigProviderItem: any = (customConfigProviderItem: parser.CustomConfigProviderItem): void => {
+    let onFoundCustomConfigProviderItem: any = (customConfigProviderItem: CustomConfigProviderItem): void => {
         // Configurations parsed from dryrun output or build log are saved temporarily in the delta file index
         extension.buildCustomConfigurationProvider(customConfigProviderItem);
     };
@@ -1392,7 +1396,7 @@ async function updateProvider(progress: vscode.Progress<{}>, cancel: vscode.Canc
     // We can empty even if the configure is not clean, because the new browse paths will be appended
     // to the previous browse paths.
     extension.clearCummulativeBrowsePath();
-    let retc: number = await parser.parseCustomConfigProvider(cancel, dryRunOutput, onStatus, onFoundCustomConfigProviderItem);
+    let retc: number = await toolParser.parseCustomConfigProvider(cancel, dryRunOutput, onStatus, onFoundCustomConfigProviderItem);
     if (retc !== ConfigureBuildReturnCodeTypes.cancelled) {
         // If this configure is clean, overwrite the final file index, otherwise merge with it.
         let provider: cpptools.CustomConfigurationProvider = getDeltaCustomConfigurationProvider();
@@ -1419,7 +1423,7 @@ async function updateProvider(progress: vscode.Progress<{}>, cancel: vscode.Canc
 }
 
 export async function preprocessDryRun(progress: vscode.Progress<{}>, cancel: vscode.CancellationToken,
-                                       dryrunOutput: string, recursive: boolean = false): Promise<parser.PreprocessDryRunOutputReturnType> {
+                                       dryrunOutput: string, recursive: boolean = false): Promise<shellParser.PreprocessDryRunOutputReturnType> {
     if (cancel.isCancellationRequested) {
         return {
             retc: ConfigureBuildReturnCodeTypes.cancelled,
@@ -1432,7 +1436,7 @@ export async function preprocessDryRun(progress: vscode.Progress<{}>, cancel: vs
         progress.report({ increment: 1, message: `${status}${(recursive) ? recursiveString : ""} ...` });
     };
 
-    return parser.preprocessDryRunOutput(cancel, dryrunOutput, onStatus);
+    return shellParser.preprocessDryRunOutput(cancel, dryrunOutput, onStatus);
 }
 
 export async function loadConfigurationFromCache(progress: vscode.Progress<{}>, cancel: vscode.CancellationToken): Promise<ConfigureSubphaseStatus> {
@@ -1569,7 +1573,7 @@ export async function doConfigure(progress: vscode.Progress<{}>, cancel: vscode.
     // Some initial preprocessing required before any parsing is done.
     logger.message(`Preprocessing: "${parseFile}"`);
     let preprocessedDryrunOutput: string;
-    let preprocessedDryrunOutputResult: parser.PreprocessDryRunOutputReturnType = await preprocessDryRun(progress, cancel, parseContent || "", recursiveDoConfigure);
+    let preprocessedDryrunOutputResult: shellParser.PreprocessDryRunOutputReturnType = await preprocessDryRun(progress, cancel, parseContent || "", recursiveDoConfigure);
     subphaseStats.preprocessParseContent = {
         retc: preprocessedDryrunOutputResult.retc,
         elapsed: preprocessedDryrunOutputResult.retc

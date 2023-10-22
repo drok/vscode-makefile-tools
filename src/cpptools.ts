@@ -6,19 +6,33 @@
 import * as configuration from './configuration';
 import * as logger from './logger';
 import * as make from './make';
-import * as parser from './parser';
+import * as toolParser from './parser/tool';
 import * as path from 'path';
 import * as util from './util';
 import * as vscode from 'vscode';
 import * as cpp from 'vscode-cpptools';
 
 export interface SourceFileConfigurationItem extends cpp.SourceFileConfigurationItem {
-    readonly compileCommand: parser.CompileCommand;
+    readonly compileCommand: toolParser.CompileCommand;
 }
 
 export interface CustomConfigurationProvider {
     workspaceBrowse: cpp.WorkspaceBrowseConfiguration;
     fileIndex: Map<string, SourceFileConfigurationItem>;
+}
+
+export interface CustomConfigProviderItem {
+    defines: string[];
+    includes: string[];
+    forcedIncludes: string[];
+    standard?: util.StandardVersion;
+    intelliSenseMode?: util.IntelliSenseMode;
+    compilerFullPath: string;
+    compilerArgs: string[];
+    files: string[];
+    windowsSDKVersion?: string;
+    currentPath: string;
+    line: string;
 }
 
 export class CppConfigurationProvider implements cpp.CustomConfigurationProvider {

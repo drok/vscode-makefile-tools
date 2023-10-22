@@ -9,7 +9,7 @@ import * as launch from './launch';
 import * as fs from 'fs';
 import * as logger from './logger';
 import * as make from './make';
-import * as parser from './parser';
+import * as toolParser from './parser/tool';
 import * as path from 'path';
 import * as state from './state';
 import * as telemetry from './telemetry';
@@ -138,7 +138,7 @@ export class MakefileToolsExtension {
         this.cummulativeBrowsePath = [];
     }
 
-    public buildCustomConfigurationProvider(customConfigProviderItem: parser.CustomConfigProviderItem): void {
+    public buildCustomConfigurationProvider(customConfigProviderItem: toolParser.CustomConfigProviderItem): void {
         this.compilerFullPath = customConfigProviderItem.compilerFullPath;
         let provider: cpptools.CustomConfigurationProvider = make.getDeltaCustomConfigurationProvider();
 
