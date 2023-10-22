@@ -15,6 +15,7 @@ import * as path from 'path';
 import * as util from './util';
 import * as vscode from 'vscode';
 import {parse} from 'shell-quote';
+import { arch } from 'os';
 
 // List of compiler tools plus the most common aliases cc and c++
 // ++ needs to be escaped for the regular expression in parseLineAsTool.
@@ -26,7 +27,13 @@ import {parse} from 'shell-quote';
 // therefore wrongly skipping over compilation lines?
 const compilers: string[] = ["ccache", "clang\\+\\+", "clang-cl", "clang-cpp", "clang", "gcc", "gpp", "cpp", "icc", "cc", "icl", "cl", "g\\+\\+", "c\\+\\+"];
 const linkers: string[] = ["ccache", "ilink", "link", "ld", "ccld", "gcc", "clang\\+\\+", "clang", "cc", "g\\+\\+", "c\\+\\+"];
-const sourceFileExtensions: string[] = ["cpp", "cc", "cxx", "c"];
+// Language detection based on file extension (from GCC manpage)
+// https://gcc.gnu.org/onlinedocs/gcc/Overall-Options.html
+// Include only those extension which must be preprocessed. Those that should
+// not be processed must not have defines interpreted by Intellisense.
+const sourceFileExtensions_c: string[] = [".c", ".h"];
+const sourceFileExtensions_cpp: string[] = [".cc", ".cpp", ".cxx", ".cpp", ".CPP", ".c++", ".C",
+            ".hh", ".H", ".hp", ".hxx", ".hpp", ".HPP", ".h++", ".tcc"];
 
 const chunkSize: number = 100;
 
@@ -255,9 +262,8 @@ interface ToolInvocation {
     // if found at the full path resolved above
     found: boolean;
 
-    // the arguments passed to the tool invocation
-    // define as string so that we deal with the separator properly later, via RegExp
-    arguments: string;
+    // Array of parsed arguments, separated and unescaped from shell escaping
+    argv: string[];
 }
 
 // Helper that parses the given line as a tool invocation.
@@ -365,9 +371,20 @@ async function parseLineAsTool(
         // don't use join and neither paths/filenames processed above if we want to keep the exact text in the makefile
         pathInMakefile: match[1] + match[2],
         fullPath: toolFullPath,
-        arguments: match[match.length - 1],
+        argv: parseToolArguments(match[match.length - 1]),
         found: toolFound
     };
+}
+
+// Parse a command line, removing comments, compound statements (||, &&)
+// redirections, and unescaping shell escape sequences
+function parseToolArguments(args: string): string[] {
+    let parsedCmdLine = parse(args);
+    let numArgs: number = parsedCmdLine.findIndex(v => typeof v !== "string");
+    numArgs = numArgs == -1 ? parsedCmdLine.length : numArgs + 1;
+    let removedOptArg : boolean = true;
+    // TODO: Avoid this song and dance with removing optargs by having Intellisense ignore the args it doesn't care about
+    return (parsedCmdLine.slice(0, numArgs) as string[]);
 }
 
 // Helper to identify anything that looks like a compiler switch in the given command string.
@@ -378,14 +395,11 @@ async function parseLineAsTool(
 // between two consecutive switches we let the shell parse it into arguments via a script invocation
 // (instead of us using other parser helpers in this module) to be in sync with how CppTools
 // expects the compiler arguments to be passed in.
-function parseAnySwitchFromToolArguments(args: string, excludeArgs: string[]): string[] {
-    let parsedCmdLine = parse(args);
-    let numArgs: number = parsedCmdLine.findIndex(v => typeof v !== "string");
-    numArgs = numArgs == -1 ? parsedCmdLine.length : numArgs + 1;
+function filterArgsExcluding(args: string[], unwanted: string[]): string[] {
     let removedOptArg : boolean = true;
     // TODO: Avoid this song and dance with removing optargs by having Intellisense ignore the args it doesn't care about
-    return (parsedCmdLine.slice(0, numArgs) as string[])
-        .filter(arg => !excludeArgs.find(excluded => {
+    return args
+        .filter(arg => !unwanted.find(excluded => {
             // Expect options with required parts have the optarg either attached to the opt
             // or the next word. For excluded opts, remove the opt and the optarg
             if (!removedOptArg) {
@@ -404,159 +418,38 @@ function parseAnySwitchFromToolArguments(args: string, excludeArgs: string[]): s
         }));
 }
 
-// Helper that parses for a particular switch that can occur one or more times
-// in the tool command line (example -I or -D for compiler)
-// and returns an array of the values passed via that switch
-// todo: refactor common parts in parseMultipleSwitchFromToolArguments and parseSingleSwitchFromToolArguments
-// removeSurroundingQuotes: needs to be false when called from parseAnySwitchFromToolArguments,
-// and true otherwise. We need to analyze more scenarios before setting in stone a particular algorithm
-// regarding the decision to remove or not to remove them.
-function parseMultipleSwitchFromToolArguments(args: string, sw: string, removeSurroundingQuotes: boolean = true): string[] {
-    // - '-' or '/' or '--' as switch prefix
-    // - before each switch, we allow only for one or more spaces/tabs OR begining of line,
-    //   to reject a case where a part of a path looks like a switch with its value
-    //    (example: "drive:/dir/Ifolder" taking /Ifolder as include switch).
-    // - can be wrapped by a pair of ', before the switch prefix and after the switch value
-    //    (example: '-DMY_DEFINE=SOMETHING' or '/I drive/folder/subfolder').
-    // - one or none or more spaces/tabs or ':' or '=' between the switch and the value
-    //    (examples): -Ipath, -I path, -I    path, -std=gnu89
-    // - the value can be wrapped by a pair of ", ' or `, even simmetrical combinations ('"..."')
-    //   and should be able to not stop at space when inside the quote characters.
-    //    (examples): -D'MY_DEFINE', -D "MY_DEFINE=SOME_VALUE", -I`drive:/folder with space/subfolder`
-    // - when the switch value contains a '=', the right half can be also quoted by ', ", ` or '"..."'
-    //   and should be able to not stop at space when inside the quote characters.
-    //    (example): -DMY_DEFINE='"SOME_VALUE"'
-
-    function anythingBetweenQuotes(fullyQuoted: boolean): string {
-      // The basic pattern for anything between quotes accepts equally single quote, double quote or back tick.
-      // One pattern that is accepted is to wrap between escaped quotes and allow inside anything (including non-escaped quotes) except escaped quotes.
-      // Another pattern that is accepted is to wrap between non-escaped quotes and allow inside anything (including escaped quotes) except non-escaped quotes.
-      // One problem with the "..." pattern is that a simple "\" (or anything ending with \") will not know if the backslash is part of the inside of quote-quote
-      // or together with the following quote represents a \" and needs to look forward for another ending quote.
-      // If there is another quote somewhere else later in the command line (another -D or a file name wrapped in quotes) everything until that first upcoming quote
-      // will be included.
-      // Example that doesn't work: -DSLASH_DEFINE="\" -DSOME_OTHER_SWITCH "drive:\folder\file.extension"
-      //                            SLASH_DEFINE is equal to '\" -DSOME_OTHER_SWITCH '
-      // Example that works: -DGIT_VERSION=" \" 1.2.3 \" "
-      //                      GIT_VERSION is equal to ' \" 1.2.3 \" '
-      // Unfortunately, we also can't identify this to log in the output channel for later analysis of more makefile switch and quoting user scenarios.
-      // Fortunately, we didn't encounter the last scenario, only the first.
-      function anythingBetweenQuotesBasicPattern(quoteChar: string): string {
-         return '\\\\\\' + quoteChar + "((?!\\\\\\" + quoteChar + ").)*\\\\\\" + quoteChar + "|" +  // \" anything(except \") \"
-                "\\" + quoteChar + "(\\\\\\" + quoteChar + "|[^\\" + quoteChar + "])*?[^\\\\\\" + quoteChar + "]?\\" + quoteChar; // " anything (except ") "
-      }
-
-      // If the switch is fully quoted with ', like ('-DMY_DEFINE="MyValue"'), don't allow single quotes
-      // inside the switch value.
-      // One example of what can be broken if we don't do this: gcc '-DDEF1=' '-DDef2=val2'
-      // in which case DEF1 would be seen as DEF1=' ' instead of empty =
-      let str: string = anythingBetweenQuotesBasicPattern("`") + '|' + anythingBetweenQuotesBasicPattern('"') + (fullyQuoted ? "" : '|' + anythingBetweenQuotesBasicPattern("'"));
-      return str;
-    }
-
-    function mainPattern(fullyQuoted: boolean): string {
-        let pattern: string =
-                            // prefix and switch name
-                            '(' +
-                                  '\\/' + sw + '(:|=|\\s*)|-' + sw + '(:|=|\\s*)|--' + sw + '(:|=|\\s*)' +
-                            ')' +
-                            // switch value
-                            '(' +
-                                anythingBetweenQuotes(fullyQuoted) + '|' +
-                                // not fully quoted switch value scenarios
-                                '(' +
-                                    // the left side (or whole value if no '=' is following)
-                                    '(' +
-                                        '[^\\s=]+' + // not quoted switch value component
-                                    ')' +
-                                    '(' +
-                                        '=' + // separator between switch value left side and right side
-                                        '(' +
-                                            anythingBetweenQuotes(fullyQuoted) + '|' +
-                                            '[^\\s]+' +  // not quoted right side of switch value
-                                                         // equal is actually allowed (example gcc switch: -fmacro-prefix-map=./= )
-                                        ')?' + // right side of '=' is optional, meaning we can define as nothing, like: -DMyDefine=
-                                    ')?' + // = is also optional (simple define)
-                                ')' +
-                            ')';
-
-        return pattern;
-    }
-
-    let regexpStr: string = '(' + '^|\\s+' + ')' + // start of line or any amount of space character
-                            '(' +
-                                '(' + "\\'" + mainPattern(true) + "\\'" + ')' + "|" + // switch if fully quoted
-                                '(' + mainPattern(false) + ')' + // switch if not fully quoted
-                            ')';
-    let regexp: RegExp = RegExp(regexpStr, "mg");
-    let match: RegExpExecArray | null;
-    let results: string[] = [];
-
-    match = regexp.exec(args);
-    while (match) {
-        let matchIndex: number = (match[2].startsWith("'") && match[2].endsWith("'")) ? 8 : 26;
-        let result: string = match[matchIndex];
-        if (result) {
-           if (removeSurroundingQuotes) {
-              result = util.removeSurroundingQuotes(result);
-           }
-            results.push(result);
-        }
-        match = regexp.exec(args);
-    }
-
-    return results;
+// Filter the argv list, keeping only the optargs of the wanted options
+// eg, if argv = -Ione/dir -Iother/dir -DBLAH
+// calling this filter with "I" would return [one/dir, other/dir]
+// ie, just the values of the named arguments.
+function filterArgs(args: string[], wanted: string): string[] {
+    let isOptArg : boolean = false;
+    return args
+        .map(arg => {
+            // Expect options with required parts have the optarg either attached to the opt
+            // or the next word. For excluded opts, remove the opt and the optarg
+            if (isOptArg) {
+                // if the optarg was not attached, this next word is it. remove it outright
+                isOptArg = false;
+                return arg;
+            }
+            isOptArg = ((arg == ("-" + wanted) || (arg == "--" + wanted)));
+            if (isOptArg)
+                return "";
+            if (arg.startsWith("-" + wanted)) return arg.slice(wanted.length + 1);
+            if (arg.startsWith("--" + wanted + "=")) return arg.slice(wanted.length + 3);
+            return "";
+        })
+        .filter(v => v !== "");
 }
 
-// Helper that parses for any switch from a set that can occur one or more times
-// in the tool command line and returns an array of the values passed via all of the identified switches.
-// It is based on parseMultipleSwitchFromToolArguments (extends the regex for more switches
-// and also accepts a switch without a following value, like -m32 or -m64 are different from -arch:arm).
-// This is useful especially when we need the order of these different switches in the command line:
-// for example, when we want to know which switch wins (for cancelling pairs or for overriding switches).
-// Parsing the switches separately wouldn't give us the order information.
-// Also, we don't have yet a function to parse the whole string of arguments into individual arguments,
-// so that we anaylze each switch one by one, thus knowing the order.
-// TODO: review the regexp for parseMultipleSwitchFromToolArguments to make sure all new capabilities
-// are reflected in the regexp here (especially around quoting scenarios and '=').
-// For now it's not critical because parseMultipleSwitchesFromToolArguments is called for target
-// architecture switches which don't have such complex scenarios.
-function parseMultipleSwitchesFromToolArguments(args: string, simpleSwitches: string[], valueSwitches: string[]): string[] {
-    // - '-' or '/' or '--' as switch prefix
-    // - before each switch, we allow only for one or more spaces/tabs OR begining of line,
-    //   to reject a case where a part of a path looks like a switch with its value
-    // - can be wrapped by a pair of ', before the switch prefix and after the switch value
-    // - the value can be wrapped by a pair of "
-    // - one or none or more spaces/tabs between the switch and the value
-    let regexpStr: string = '(^|\\s+)\\\'?(';
-    valueSwitches.forEach(sw => {
-        regexpStr += '\\/' + sw + '(:|=|\\s*)|-' + sw + '(:|=|\\s*)|--' + sw + '(:|=|\\s*)';
-        // Make sure we don't append '|' after the last extension value
-        if (sw !== valueSwitches[valueSwitches.length - 1]) {
-            regexpStr += '|';
-        }
-    });
-    regexpStr += ')(\\".*?\\"|[^\\\'\\s]+)';
-    regexpStr += '|((\\/|-|--)(' + simpleSwitches.join('|') + '))';
-    regexpStr += '\\\'?';
-
-    let regexp: RegExp = RegExp(regexpStr, "mg");
-    let match: RegExpExecArray | null;
-    let results: string[] = [];
-
-    match = regexp.exec(args);
-    while (match) {
-        // If the current match is a simple switch, find it at index 15, otherwise at 12.
-        // In each scenario, only one will have a value while the other is undefined.
-        let result: string = match[12] || match[15];
-        if (result) {
-            result = result.trim();
-            results.push(result);
-        }
-        match = regexp.exec(args);
+// Find a named option argument, return its value
+function findOptArg(args: string[], wanted: string): string | undefined {
+    let index = args.findIndex(arg => arg == ("-" + wanted) || arg == ("--" + wanted));
+    if (index >= 0 && args.length > index + 1) {
+        return args[index + 1];
     }
-
-    return results;
+    return undefined;
 }
 
 // Helper that parses for a particular switch that can occur once in the tool command line,
@@ -606,78 +499,12 @@ function parseSingleSwitchFromToolArguments(args: string, sw: string[]): string 
 // Examples: we call this helper for /c compiler switch or /dll linker switch.
 // TODO: detect sets of switches that cancel each other to return a more
 // accurate result in case of override (example: /TC and /TP)
-function isSwitchPassedInArguments(args: string, sw: string[]): boolean {
+function isSwitchPassedInArguments(args: string[], switches: string[]): boolean {
     // - '-' or '/' or '--' as switch prefix
     // - one or more spaces/tabs after
-    let regexpStr: string = '((\\s+)|^)(\\/|-|--)(' + sw.join("|") + ')((\\s+)|$)';
-    let regexp: RegExp = RegExp(regexpStr, "mg");
-
-    if (regexp.exec(args)) {
-        return true;
-    }
-
-    return false;
-}
-
-// Helper that parses for files (of given extensions) that are given as arguments to a tool
-// TODO: consider non standard extensions (or no extension at all) in the presence of TC/TP.
-// Attention to obj, pdb or exe files tied to /Fo, /Fd and /Fe
-// TODO: consider also ' besides "
-function parseFilesFromToolArguments(args: string, exts: string[]): string[] {
-    // no switch prefix and no association yet with a preceding switch
-    // one or more spaces/tabs before (or beginning of line) and after (or end of line)
-    // with or without quotes surrounding the argument
-    //    - if surrounding quotes, don't allow another quote in between
-    // (todo: handle the scenario when quotes enclose just the directory path, without the file name)
-    let regexpStr: string = '(';
-    exts.forEach(ext => {
-        regexpStr += '\\".[^\\"]*?\\.' + ext + '\\"|';
-        regexpStr += '\\S+\\.' + ext;
-        // Make sure we don't append '|' after the last extension value
-        if (ext !== exts[exts.length - 1]) {
-            regexpStr += '|';
-        }
-    });
-    regexpStr += ')(\\s+|$)';
-
-    let regexp: RegExp = RegExp(regexpStr, "mg");
-    let match: string[] | null;
-    let files: string[] = [];
-
-    match = regexp.exec(args);
-    while (match) {
-        let result: string = match[1];
-
-        // It is quite common to encounter the following pattern:
-        //  `test -f 'sourceFile.c' || echo './'`sourceFile.c
-        // or `test -f 'sourceFile.c' || echo '../../../libwally-core/src/'`sourceFile.c
-        // Until we implement the correct approach (to query live the test command)
-        // we can just ignore it and consider the second option of the OR
-        // (by removing the quotes while preserving the relative path).
-        // This is a short term workaround.
-        let idx: number = args.lastIndexOf(result);
-        let echo: string = "' || echo ";
-        let str: string = args.substring(idx - echo.length, idx);
-        if (str === echo) {
-            // not to use util.removeQuotes because that also removes double quotes "
-            result = result.replace(/\'/mg, "");
-            result = result.replace(/\`/mg, "");
-        }
-
-        if (result) {
-            result = util.removeSurroundingQuotes(result);
-
-            // Debug message to identify easier the scenarios where source files have inner quotes.
-            if (result.includes('"')) {
-                logger.message(`File argument that contains quotes: \`${result}\``, "Debug");
-            }
-
-            files.push(result);
-        }
-        match = regexp.exec(args);
-    }
-
-    return files;
+    return args.
+        some(arg => 
+            switches.some(sw => arg == "/" + sw || arg == "-" + sw || arg == "--" + sw));
 }
 
 // Helper that identifies system commands (cd, cd -, pushd, popd) and make.exe change directory switch (-C)
@@ -830,21 +657,20 @@ export async function parseCustomConfigProvider(cancel: vscode.CancellationToken
 
                 // Exclude switches that are being processed separately (I, FI, include, D, std)
                 // and switches that don't affect IntelliSense but are causing errors.
-                let compilerArgs: string[] = [];
-                compilerArgs = parseAnySwitchFromToolArguments(compilerTool.arguments, ["I", "FI", "include", "D", "std", "MF"]);
+                let compilerArgs = filterArgsExcluding(compilerTool.argv, ["I", "FI", "include", "D", "std", "MF"]);
 
                 // Parse and log the includes, forced includes and the defines
-                let includes: string[] = parseMultipleSwitchFromToolArguments(compilerTool.arguments, 'I');
+                let includes = filterArgs(compilerTool.argv, 'I');
                 includes = await util.makeFullPaths(includes, currentPath);
-                let forcedIncludes: string[] = parseMultipleSwitchFromToolArguments(compilerTool.arguments, 'FI');
-                forcedIncludes = forcedIncludes.concat(parseMultipleSwitchFromToolArguments(compilerTool.arguments, 'include'));
+                let forcedIncludes = filterArgs(compilerTool.argv, 'FI');
+                forcedIncludes = forcedIncludes.concat(filterArgs(compilerTool.argv, 'include'));
                 forcedIncludes = await util.makeFullPaths(forcedIncludes, currentPath);
 
-                let defines: string[] = parseMultipleSwitchFromToolArguments(compilerTool.arguments, 'D');
+                let defines = filterArgs(compilerTool.argv, 'D');
 
                 // Parse the IntelliSense mode
                 // how to deal with aliases and symlinks (CC, C++), which can point to any toolsets
-                let targetArchitecture: util.TargetArchitecture = getTargetArchitecture(compilerTool.arguments);
+                let targetArchitecture: util.TargetArchitecture = getTargetArchitecture(compilerTool.argv);
                 let intelliSenseMode: util.IntelliSenseMode = getIntelliSenseMode(ext.extension.getCppToolsVersion(), compilerFullPath, targetArchitecture);
 
                 // For windows, parse the sdk version
@@ -854,28 +680,38 @@ export async function parseCustomConfigProvider(cancel: vscode.CancellationToken
                 }
 
                 // Parse the source files
-                let files: string[] = parseFilesFromToolArguments(compilerTool.arguments, sourceFileExtensions);
-                files = await util.makeFullPaths(files, currentPath);
+                let file: string = compilerTool.argv[compilerTool.argv.length-1];
+                file = await util.makeFullPath(file, currentPath);
 
-                // The language represented by this compilation command
+                // The language represented by this compilation command (-x is for GCC)
+                let xlanguage = filterArgs(compilerTool.argv, "x");
                 let language: util.Language;
-                let hasC: boolean = files.filter(file => (file.endsWith(".c"))).length > 0;
-                let hasCpp: boolean = files.filter(file => (file.endsWith(".cpp"))).length > 0;
-                if (hasC && !hasCpp) {
-                    language = "c";
-                } else if (hasCpp && !hasC) {
-                    language = "cpp";
-                }
-
+                if (xlanguage.length > 0) {
+                    switch (xlanguage[0]) {
+                        case "c":
+                        case "c-header":
+                            language = "c";
+                            break;
+                        case "c++":
+                        case "c++-header":
+                            language = "cpp";
+                            break;
+                    }
                 // /TP and /TC (for cl.exe only) overwrite the meaning of the source files extensions
-                if (isSwitchPassedInArguments(compilerTool.arguments, ['TP'])) {
+                } else if (isSwitchPassedInArguments(compilerTool.argv, ['TP'])) {
                     language = "cpp";
-                } else if (isSwitchPassedInArguments(compilerTool.arguments, ['TC'])) {
+                } else if (isSwitchPassedInArguments(compilerTool.argv, ['TC'])) {
                     language = "c";
+                } else {
+                    let ext = path.extname(file);
+                    if (sourceFileExtensions_c.includes(ext))
+                        language = "c";
+                    else if (sourceFileExtensions_cpp.includes(ext))
+                        language = "cpp";
                 }
 
                 // Parse the C/C++ standard as given in the compiler command line
-                let standardStr: string | undefined = parseSingleSwitchFromToolArguments(compilerTool.arguments, ["std"]);
+                let standardStr: string | undefined = findOptArg(compilerTool.argv, "std");
 
                 // If the command is compiling the same extension or uses -TC/-TP, send all the source files in one batch.
                 if (language) {
@@ -883,25 +719,8 @@ export async function parseCustomConfigProvider(cancel: vscode.CancellationToken
                     let standard: util.StandardVersion | undefined = parseStandard(ext.extension.getCppToolsVersion(), standardStr, language);
 
                     if (ext.extension) {
-                        onFoundCustomConfigProviderItem({ defines, includes, forcedIncludes, standard, intelliSenseMode, compilerFullPath, compilerArgs, files, windowsSDKVersion, currentPath, line });
+                        onFoundCustomConfigProviderItem({ defines, includes, forcedIncludes, standard, intelliSenseMode, compilerFullPath, compilerArgs, files: [file], windowsSDKVersion, currentPath, line });
                     }
-                } else {
-                    // If the compiler command is mixing c and c++ source files, send a custom configuration for each of the source files separately,
-                    // to be able to accurately validate and calculate the standard based on the correct language.
-                    files.forEach(file => {
-                        if (file.endsWith(".cpp")) {
-                            language = "cpp";
-                        } else if (file.endsWith(".c")) {
-                            language = "c";
-                        }
-
-                        // More standard validation and defaults, in the context of each source file.
-                        let standard: util.StandardVersion | undefined = parseStandard(ext.extension.getCppToolsVersion(), standardStr, language);
-
-                        if (ext.extension) {
-                            onFoundCustomConfigProviderItem({ defines, includes, forcedIncludes, standard, intelliSenseMode, compilerFullPath, compilerArgs, files: [file], windowsSDKVersion, currentPath, line });
-                        }
-                    });
                 }
             } // if (compilerTool) {
 
@@ -923,24 +742,6 @@ export async function parseCustomConfigProvider(cancel: vscode.CancellationToken
     }
 
     return cancel.isCancellationRequested ? make.ConfigureBuildReturnCodeTypes.cancelled : make.ConfigureBuildReturnCodeTypes.success;
-}
-
-// Target binaries arguments special handling
-function filterTargetBinaryArgs(args: string[]): string[] {
-    let processedArgs: string[] = [];
-
-    for (const arg of args) {
-        // Once we encounter a redirection character (pipe, stdout/stderr) remove it,
-        // together with all the arguments that are following,
-        // since they are not real parameters of the binary tool that is analyzed.
-        if (arg === '>' || arg === '1>' || arg === '2>' || arg === '|') {
-            break;
-        }
-
-        processedArgs.push(arg);
-    }
-
-    return processedArgs;
 }
 
 // Parse the output of the make dry-run command in order to provide VS Code debugger
@@ -995,18 +796,19 @@ export async function parseLaunchConfigurations(cancel: vscode.CancellationToken
                     // since a compiler can produce implicitly only an executable.
 
                     if (path.basename(compilerTool.fullPath).startsWith("cl")) {
-                        if (!isSwitchPassedInArguments(compilerTool.arguments, ["c", "P", "E", "EP"])) {
+                        if (!isSwitchPassedInArguments(compilerTool.argv, ["c", "P", "E", "EP"])) {
                             logger.message("Found compiler command:\n" + line, "Verbose");
 
                             // First read the value of the /Fe switch (for cl.exe)
-                            compilerTargetBinary = parseSingleSwitchFromToolArguments(compilerTool.arguments, ["Fe"]);
+                            compilerTargetBinary = findOptArg(compilerTool.argv, "Fe");
 
                             // Then assume first object file base name (defined with /Fo) + exe
                             // The binary is produced in the same folder where the compiling operation takes place,
                             // and not in an eventual different obj path.
                             // Note: /Fo is not allowed on multiple sources compilations so there will be only one if found
+                            // TODO: does autotools have this behaviour?
                             if (!compilerTargetBinary) {
-                                let objFile: string | undefined = parseSingleSwitchFromToolArguments(compilerTool.arguments, ["Fo"]);
+                                let objFile: string | undefined = findOptArg(compilerTool.argv, "Fo");
                                 if (objFile) {
                                     let parsedObjPath: path.ParsedPath = path.parse(objFile);
                                     compilerTargetBinary = parsedObjPath.name + ".exe";
@@ -1020,15 +822,16 @@ export async function parseLaunchConfigurations(cancel: vscode.CancellationToken
                             // Then assume first source file base name + exe.
                             // The binary is produced in the same folder where the compiling operation takes place,
                             // and not in an eventual different source path.
-                            if (!compilerTargetBinary) {
-                                let srcFiles: string[] | undefined = parseFilesFromToolArguments(compilerTool.arguments, sourceFileExtensions);
-                                if (srcFiles.length >= 1) {
-                                    let parsedSourcePath: path.ParsedPath = path.parse(srcFiles[0]);
-                                    compilerTargetBinary = parsedSourcePath.name + ".exe";
-                                    logger.message("The compiler command is not producing a target binary explicitly. Assuming " +
-                                        compilerTargetBinary + " from the first source file passed in", "Verbose");
-                                }
-                            }
+                            // TODO: does autotools have this behaviour?
+                            // if (!compilerTargetBinary) {
+                            //     let srcFiles: string[] | undefined = parseFilesFromToolArguments(compilerTool.arguments, sourceFileExtensions);
+                            //     if (srcFiles.length >= 1) {
+                            //         let parsedSourcePath: path.ParsedPath = path.parse(srcFiles[0]);
+                            //         compilerTargetBinary = parsedSourcePath.name + ".exe";
+                            //         logger.message("The compiler command is not producing a target binary explicitly. Assuming " +
+                            //             compilerTargetBinary + " from the first source file passed in", "Verbose");
+                            //     }
+                            // }
                         }
                     }
 
@@ -1041,13 +844,14 @@ export async function parseLaunchConfigurations(cancel: vscode.CancellationToken
             let linkerTool: ToolInvocation | undefined = await parseLineAsTool(line, linkers, currentPath);
             if (linkerTool) {
                 // TODO: implement launch support for DLLs and LIBs, besides executables.
-                if (!isSwitchPassedInArguments(linkerTool.arguments, ["dll", "lib", "shared"])) {
+                if (!isSwitchPassedInArguments(linkerTool.argv, ["dll", "lib", "shared"])) {
                     // Gcc/Clang tools can also perform linking so don't parse any output binary
                     // if there are switches passed in to cause early stop of compilation: -c, -E, -S
                     // (-o will not point to an executable)
                     // Also, the ld switches -r and -Ur do not produce executables.
-                    if (!isSwitchPassedInArguments(linkerTool.arguments, ["c", "E", "S", "r", "Ur"])) {
-                        linkerTargetBinary = parseSingleSwitchFromToolArguments(linkerTool.arguments, ["out", "o"]);
+                    if (!isSwitchPassedInArguments(linkerTool.argv, ["c", "E", "S", "r", "Ur"])) {
+                        linkerTargetBinary = findOptArg(linkerTool.argv, "o") ||
+                            findOptArg(linkerTool.argv, "out");
                         logger.message("Found linker command: " + line, "Verbose");
 
                         if (!linkerTargetBinary) {
@@ -1056,9 +860,10 @@ export async function parseLaunchConfigurations(cancel: vscode.CancellationToken
                             // The binary is produced in the same folder where the linking operation takes place,
                             // and not in an eventual different obj/lib path.
                             if (process.platform === "win32" && path.basename(linkerTool.fullPath).startsWith("link")) {
-                                let files: string[] = parseFilesFromToolArguments(linkerTool.arguments, ["obj", "lib"]);
-                                if (files.length >= 1) {
-                                    let parsedPath: path.ParsedPath = path.parse(files[0]);
+                                // TODO: does autotools include more than one obj/lib as output?
+                                let file = findOptArg(linkerTool.argv, "obj") || findOptArg(linkerTool.argv, "lib");
+                                if (file) {
+                                    let parsedPath: path.ParsedPath = path.parse(file);
                                     let targetBinaryFromFirstObjLib: string = parsedPath.name + ".exe";
                                     logger.message("The link command is not producing a target binary explicitly. Assuming " +
                                         targetBinaryFromFirstObjLib + " based on first object passed in", "Verbose");
@@ -1226,18 +1031,10 @@ export async function parseLaunchConfigurations(cancel: vscode.CancellationToken
 
                 if (targetBinaryTool) {
                     logger.message("Found binary execution command: " + line, "Verbose");
-                    // Include complete launch configuration: binary, execution path and args
-                    // are known from parsing the dry-run
-                    let splitArgs: string[] = targetBinaryTool.arguments ? parseAnySwitchFromToolArguments(targetBinaryTool.arguments, []) : [];
-                    if (splitArgs.length > 0) {
-                        splitArgs = filterTargetBinaryArgs(splitArgs);
-                    }
-
                     let launchConfiguration: configuration.LaunchConfiguration = {
                         binaryPath: targetBinaryTool.fullPath,
                         cwd: currentPath,
-                        // TODO: consider optionally quoted arguments
-                        binaryArgs: splitArgs
+                        binaryArgs: targetBinaryTool.argv
                     };
 
                     logger.message("Adding launch configuration:\n" + configuration.launchConfigurationToString(launchConfiguration), "Verbose");
@@ -1339,14 +1136,25 @@ function getIntelliSenseMode(cppVersion: cpp.Version | undefined, compilerPath: 
 /**
  * Determine the target architecture from the compiler flags present in the given compilation command.
  */
-function getTargetArchitecture(compilerArgs: string): util.TargetArchitecture {
+function getTargetArchitecture(compilerArgs: string[]): util.TargetArchitecture {
     // Go through all the possible target architecture switches.
     // For each switch, apply a set of rules to identify the target arch.
     // The last switch wins.
-    let possibleArchs: string[] = parseMultipleSwitchesFromToolArguments(compilerArgs, ["m32", "m64"], ["arch", "march", "target"]);
+    // TODO: This ought to work if there are no conflicting switches. But what if there are?
     let targetArch: util.TargetArchitecture; // this starts as undefined
 
-    possibleArchs.forEach(arch => {
+    if (compilerArgs.includes("m32")) {
+        targetArch = "x86";
+    } else if (compilerArgs.includes("m64")) {
+        targetArch = "x64";
+    } else {
+        let archs = filterArgs(compilerArgs, "arch");
+        if (!archs.length)
+            archs = filterArgs(compilerArgs, "march");
+        if (!archs.length)
+            archs = filterArgs(compilerArgs, "target");
+
+        let arch = archs.length ? archs[archs.length-1] : undefined;
         if (arch === "m32") {
             targetArch = "x86";
         } else if (arch === "m64") {
@@ -1369,8 +1177,7 @@ function getTargetArchitecture(compilerArgs: string): util.TargetArchitecture {
                 }
             }
         }
-    });
-
+    }
     return targetArch;
 }
 
