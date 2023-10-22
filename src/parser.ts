@@ -14,6 +14,7 @@ import * as make from './make';
 import * as path from 'path';
 import * as util from './util';
 import * as vscode from 'vscode';
+import {parse} from 'shell-quote';
 
 // List of compiler tools plus the most common aliases cc and c++
 // ++ needs to be escaped for the regular expression in parseLineAsTool.
@@ -377,149 +378,30 @@ async function parseLineAsTool(
 // between two consecutive switches we let the shell parse it into arguments via a script invocation
 // (instead of us using other parser helpers in this module) to be in sync with how CppTools
 // expects the compiler arguments to be passed in.
-async function parseAnySwitchFromToolArguments(args: string, excludeArgs: string[]): Promise<string[]> {
-    // Identify the non value part of the switch: prefix, switch name
-    // and what may separate this from an eventual switch value
-    let switches: string[] = [];
-    let regExpStr: string = "(^|\\s+)(--|-" +
-        // On Win32 allow '/' as switch prefix as well,
-        // otherwise it conflicts with path character
-        (process.platform === "win32" ? "|\\/" : "") +
-        ")([a-zA-Z0-9_]+)";
-    let regexp: RegExp = RegExp(regExpStr, "mg");
-    let match1: RegExpExecArray | null;
-    let match2: RegExpExecArray | null;
-    let index1: number = -1;
-    let index2: number = -1;
-
-    // This contains all the compilation command fragments in between two different consecutive switches
-    // (except the ones we plan to ignore, specified by excludeArgs).
-    // Once this function is done concatenating into compilerArgRegions,
-    // we call the compiler args parsing script once for the whole list of regions
-    // (as opposed to invoking it for each fragment separately).
-    let compilerArgRegions: string = "";
-
-    // With every loop iteration we need 2 switch matches so that we analyze the text
-    // that is between them. If the current match is the last one, then we will analyze
-    // everything until the end of line.
-    match1 = regexp.exec(args);
-
-    // Even if we don't find any arguments that have a switch syntax,
-    // consider the whole command line to parse into arguments
-    // (this case is encountered when we call this helper while we parse launch targets).
-    if (!match1) {
-       compilerArgRegions = args;
-    }
-
-    while (match1) {
-        // Marks the beginning of the current switch (prefix + name).
-        // The exact switch prefix is needed when we call other parser helpers later
-        // and also CppTools expects the compiler arguments to be prefixed
-        // when received from the custom providers.
-        index1 = regexp.lastIndex - match1[0].length;
-
-        // Marks the beginning of the next switch
-        match2 = regexp.exec(args);
-        if (match2) {
-            index2 = regexp.lastIndex - match2[0].length;
-        } else {
-            index2 = args.length;
-        }
-
-        // The substring to analyze for the current switch.
-        // It doesn't help to look beyond the next switch match.
-        let partialArgs: string = args.substring(index1, index2);
-        let swi: string = match1[3];
-        swi = swi.trim();
-
-        // Skip over any switches that we know we don't need
-        let exclude: boolean = false;
-        for (const arg of excludeArgs) {
-            if (swi.startsWith(arg)) {
-                exclude = true;
-                break;
+function parseAnySwitchFromToolArguments(args: string, excludeArgs: string[]): string[] {
+    let parsedCmdLine = parse(args);
+    let numArgs: number = parsedCmdLine.findIndex(v => typeof v !== "string");
+    numArgs = numArgs == -1 ? parsedCmdLine.length : numArgs + 1;
+    let removedOptArg : boolean = true;
+    // TODO: Avoid this song and dance with removing optargs by having Intellisense ignore the args it doesn't care about
+    return (parsedCmdLine.slice(0, numArgs) as string[])
+        .filter(arg => !excludeArgs.find(excluded => {
+            // Expect options with required parts have the optarg either attached to the opt
+            // or the next word. For excluded opts, remove the opt and the optarg
+            if (!removedOptArg) {
+                // if the optarg was not attached, this next word is it. remove it outright
+                removedOptArg = true;
+                return true;
             }
-        }
-
-        if (!exclude) {
-            compilerArgRegions += partialArgs;
-        }
-
-        match1 = match2;
-    }
-
-    let parseCompilerArgsScriptFile: string = util.parseCompilerArgsScriptFile();
-    let parseCompilerArgsScriptContent: string;
-    if (process.platform === "win32") {
-        // There is a potential problem with the windows version of the script:
-        // A fragment like "-sw1,-sw2,-sw3" gets split by comma and a fragment like
-        // "-SwDef=Val" is split by equal. Opened GitHub issue
-        // https://github.com/microsoft/vscode-makefile-tools/issues/149.
-        // These scenarios don't happen on pure windows but can be encountered in classic linux
-        // scenarios run under MSYS/MINGW.
-        // Until a better fix is implemented for 149, use a temporary marker that we replace from and into.
-        compilerArgRegions = compilerArgRegions.replace(/\,/mg, "DONT_USE_COMMA_AS_SEPARATOR");
-        compilerArgRegions = compilerArgRegions.replace(/\=/mg, "DONT_USE_EQUAL_AS_SEPARATOR");
-        parseCompilerArgsScriptContent = `@echo off\r\n`;
-        parseCompilerArgsScriptContent += `for %%i in (%*) do echo %%i \r\n`;
-    } else {
-        parseCompilerArgsScriptContent = `#!/bin/bash \n`;
-        parseCompilerArgsScriptContent += `while (( "$#" )); do \n`;
-        parseCompilerArgsScriptContent += `  echo $1 \n`;
-        parseCompilerArgsScriptContent += `  shift \n`;
-        parseCompilerArgsScriptContent += `done \n`;
-    }
-
-    // Create the script only when not found. The extension makes sure to delete it regularly
-    // (at project load time).
-    if (!util.checkFileExistsSync(parseCompilerArgsScriptFile)) {
-        util.writeFile(parseCompilerArgsScriptFile, parseCompilerArgsScriptContent);
-    }
-
-    let scriptArgs: string[] = [];
-    let runCommand: string;
-    if (process.platform === 'win32') {
-        runCommand = "cmd";
-        scriptArgs.push("/c");
-        scriptArgs.push(`""${parseCompilerArgsScriptFile}" ${compilerArgRegions}"`);
-    } else {
-        runCommand = "/bin/bash";
-        scriptArgs.push("-c");
-        scriptArgs.push(`"source '${parseCompilerArgsScriptFile}' ${compilerArgRegions}"`);
-    }
-
-    try {
-        let stdout: any = (result: string): void => {
-            if (process.platform === 'win32') {
-                // Restore the commas and equals that were hidden from the script invocation.
-                result = result.replace(/DONT_USE_COMMA_AS_SEPARATOR/mg, ",");
-                result = result.replace(/DONT_USE_EQUAL_AS_SEPARATOR/mg, "=");
-            }
-            let results: string[] = result.replace(/\r\n/mg, "\n").split("\n");
-            // In case of concatenated separators, the shell sees different empty arguments
-            // which we can remove (most common is more spaces not being seen as a single space).
-            results.forEach(res => {
-                if (res !== "") {
-                    switches.push(res.trim());
-                }
-            });
-        };
-
-        let stderr: any = (result: string): void => {
-            logger.message(`Error while running the compiler args parser script '${parseCompilerArgsScriptFile}' ` +
-                `for regions ("${compilerArgRegions})": "${result}"`, "Normal");
-        };
-
-        // Running the compiler arguments parsing script can use the system locale.
-        const result: util.SpawnProcessResult = await util.spawnChildProcess(runCommand, scriptArgs, util.getWorkspaceRoot(), false, false, stdout, stderr);
-        if (result.returnCode !== 0) {
-            logger.message(`The compiler args parser script '${parseCompilerArgsScriptFile}' failed with error code ${result.returnCode} for regions (${compilerArgRegions})`, "Normal");
-        }
-    } catch (error) {
-        logger.message(error);
-    }
-
-    return switches;
+            removedOptArg = !((arg == ("-" + excluded) || (arg == "--" + excluded)));
+            if (!removedOptArg)
+                return true;
+            removedOptArg = arg.startsWith("-" + excluded) || arg.startsWith("--" + excluded + "=");
+            if (removedOptArg)
+                return true;
+            removedOptArg = !(arg.startsWith("-" + excluded) || arg.startsWith("--" + excluded));
+            return !removedOptArg;
+        }));
 }
 
 // Helper that parses for a particular switch that can occur one or more times
@@ -949,7 +831,7 @@ export async function parseCustomConfigProvider(cancel: vscode.CancellationToken
                 // Exclude switches that are being processed separately (I, FI, include, D, std)
                 // and switches that don't affect IntelliSense but are causing errors.
                 let compilerArgs: string[] = [];
-                compilerArgs = await parseAnySwitchFromToolArguments(compilerTool.arguments, ["I", "FI", "include", "D", "std", "MF"]);
+                compilerArgs = parseAnySwitchFromToolArguments(compilerTool.arguments, ["I", "FI", "include", "D", "std", "MF"]);
 
                 // Parse and log the includes, forced includes and the defines
                 let includes: string[] = parseMultipleSwitchFromToolArguments(compilerTool.arguments, 'I');
@@ -1346,7 +1228,7 @@ export async function parseLaunchConfigurations(cancel: vscode.CancellationToken
                     logger.message("Found binary execution command: " + line, "Verbose");
                     // Include complete launch configuration: binary, execution path and args
                     // are known from parsing the dry-run
-                    let splitArgs: string[] = targetBinaryTool.arguments ? await parseAnySwitchFromToolArguments(targetBinaryTool.arguments, []) : [];
+                    let splitArgs: string[] = targetBinaryTool.arguments ? parseAnySwitchFromToolArguments(targetBinaryTool.arguments, []) : [];
                     if (splitArgs.length > 0) {
                         splitArgs = filterTargetBinaryArgs(splitArgs);
                     }
