@@ -170,6 +170,39 @@ export interface ToolInvocation {
 
     // Array of parsed arguments, separated and unescaped from shell escaping
     argv: string[];
+
+    // constructor(pathInMakefile : string, fullPath: string, found: boolean, argv: string[]) : ToolInvocation;
+
+    // Helper to identify anything that looks like a compiler switch in the given command string.
+    // The result is passed to IntelliSense custom configuration provider as compilerArgs.
+    // excludeArgs helps with narrowing down the search, when we know for sure that we're not
+    // interested in some switches. For example, -D, -I, -FI, -include, -std are treated separately.
+    // Once we identified what looks to be the switches in the given command line, for each region
+    // between two consecutive switches we let the shell parse it into arguments via a script invocation
+    // (instead of us using other parser helpers in this module) to be in sync with how CppTools
+    // expects the compiler arguments to be passed in.
+    filterArgsExcluding(unwanted: string[]): string[];
+
+    // Filter the argv list, keeping only the optargs of the wanted options
+    // eg, if argv = -Ione/dir -Iother/dir -DBLAH
+    // calling this filter with "I" would return [one/dir, other/dir]
+    // ie, just the values of the named arguments.
+    filterArgs(wanted: string): string[];
+
+    // Helper that answers whether a particular switch is passed to the tool.
+    // When calling this helper, we are not interested in obtaining the
+    // (or there is no) value passed in via the switch.
+    // There must be at least one space/tab before the switch,
+    // so that we don't match a path by mistake.
+    // Same after the switch, in case the given name is a substring
+    // of another switch name. Or have the switch be the last in the command line.
+    // Examples: we call this helper for /c compiler switch or /dll linker switch.
+    // TODO: detect sets of switches that cancel each other to return a more
+    // accurate result in case of override (example: /TC and /TP)
+    hasArg(switches: string[]): boolean;
+
+    // Find a named option argument, return its value
+    getArg(wanted: string): string | undefined;
 }
 
 export class Tool implements ToolInvocation {
@@ -346,13 +379,13 @@ export async function parseLineAsTool(
         return undefined;
     }
 
-    return {
+    return new Tool(
         // don't use join and neither paths/filenames processed above if we want to keep the exact text in the makefile
-        pathInMakefile: match[1] + match[2],
-        fullPath: toolFullPath,
-        argv: parseToolArguments(match[match.length - 1]),
-        found: toolFound
-    };
+        match[1] + match[2],
+        toolFullPath,
+        toolFound,
+        parseToolArguments(match[match.length - 1])
+    );
 }
 
 // Parse a command line, removing comments, compound statements (||, &&)

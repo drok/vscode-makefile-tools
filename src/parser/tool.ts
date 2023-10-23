@@ -186,20 +186,20 @@ export async function parseCustomConfigProvider(cancel: vscode.CancellationToken
 
                 // Exclude switches that are being processed separately (I, FI, include, D, std)
                 // and switches that don't affect IntelliSense but are causing errors.
-                let compilerArgs = shellParser.filterArgsExcluding(compilerTool.argv, ["I", "FI", "include", "D", "std", "MF"]);
+                let compilerArgs = compilerTool.filterArgsExcluding(["I", "FI", "include", "D", "std", "MF"]);
 
                 // Parse and log the includes, forced includes and the defines
-                let includes = shellParser.filterArgs(compilerTool.argv, 'I');
+                let includes = compilerTool.filterArgs('I');
                 includes = await util.makeFullPaths(includes, currentPath);
-                let forcedIncludes = shellParser.filterArgs(compilerTool.argv, 'FI');
-                forcedIncludes = forcedIncludes.concat(shellParser.filterArgs(compilerTool.argv, 'include'));
+                let forcedIncludes = compilerTool.filterArgs('FI');
+                forcedIncludes = forcedIncludes.concat(compilerTool.filterArgs('include'));
                 forcedIncludes = await util.makeFullPaths(forcedIncludes, currentPath);
 
-                let defines = shellParser.filterArgs(compilerTool.argv, 'D');
+                let defines = compilerTool.filterArgs('D');
 
                 // Parse the IntelliSense mode
                 // how to deal with aliases and symlinks (CC, C++), which can point to any toolsets
-                let targetArchitecture: util.TargetArchitecture = getTargetArchitecture(compilerTool.argv);
+                let targetArchitecture: util.TargetArchitecture = getTargetArchitecture(compilerTool);
                 let intelliSenseMode: util.IntelliSenseMode = getIntelliSenseMode(ext.extension.getCppToolsVersion(), compilerFullPath, targetArchitecture);
 
                 // For windows, parse the sdk version
@@ -213,7 +213,7 @@ export async function parseCustomConfigProvider(cancel: vscode.CancellationToken
                 file = await util.makeFullPath(file, currentPath);
 
                 // The language represented by this compilation command (-x is for GCC)
-                let xlanguage = shellParser.filterArgs(compilerTool.argv, "x");
+                let xlanguage = compilerTool.filterArgs("x");
                 let language: util.Language;
                 if (xlanguage.length > 0) {
                     switch (xlanguage[0]) {
@@ -227,9 +227,9 @@ export async function parseCustomConfigProvider(cancel: vscode.CancellationToken
                             break;
                     }
                 // /TP and /TC (for cl.exe only) overwrite the meaning of the source files extensions
-                } else if (shellParser.isSwitchPassedInArguments(compilerTool.argv, ['TP'])) {
+                } else if (compilerTool.hasArg(['TP'])) {
                     language = "cpp";
-                } else if (shellParser.isSwitchPassedInArguments(compilerTool.argv, ['TC'])) {
+                } else if (compilerTool.hasArg(['TC'])) {
                     language = "c";
                 } else {
                     let ext = path.extname(file);
@@ -240,7 +240,7 @@ export async function parseCustomConfigProvider(cancel: vscode.CancellationToken
                 }
 
                 // Parse the C/C++ standard as given in the compiler command line
-                let standardStr: string | undefined = shellParser.findOptArg(compilerTool.argv, "std");
+                let standardStr: string | undefined = compilerTool.getArg("std");
 
                 // If the command is compiling the same extension or uses -TC/-TP, send all the source files in one batch.
                 if (language) {
@@ -325,11 +325,11 @@ export async function parseLaunchConfigurations(cancel: vscode.CancellationToken
                     // since a compiler can produce implicitly only an executable.
 
                     if (path.basename(compilerTool.fullPath).startsWith("cl")) {
-                        if (!shellParser.isSwitchPassedInArguments(compilerTool.argv, ["c", "P", "E", "EP"])) {
+                        if (!compilerTool.hasArg(["c", "P", "E", "EP"])) {
                             logger.message("Found compiler command:\n" + line, "Verbose");
 
                             // First read the value of the /Fe switch (for cl.exe)
-                            compilerTargetBinary = shellParser.findOptArg(compilerTool.argv, "Fe");
+                            compilerTargetBinary = compilerTool.getArg("Fe");
 
                             // Then assume first object file base name (defined with /Fo) + exe
                             // The binary is produced in the same folder where the compiling operation takes place,
@@ -337,7 +337,7 @@ export async function parseLaunchConfigurations(cancel: vscode.CancellationToken
                             // Note: /Fo is not allowed on multiple sources compilations so there will be only one if found
                             // TODO: does autotools have this behaviour?
                             if (!compilerTargetBinary) {
-                                let objFile: string | undefined = shellParser.findOptArg(compilerTool.argv, "Fo");
+                                let objFile: string | undefined = compilerTool.getArg("Fo");
                                 if (objFile) {
                                     let parsedObjPath: path.ParsedPath = path.parse(objFile);
                                     compilerTargetBinary = parsedObjPath.name + ".exe";
@@ -373,14 +373,14 @@ export async function parseLaunchConfigurations(cancel: vscode.CancellationToken
             let linkerTool: shellParser.ToolInvocation | undefined = await shellParser.parseLineAsTool(line, linkers, currentPath);
             if (linkerTool) {
                 // TODO: implement launch support for DLLs and LIBs, besides executables.
-                if (!shellParser.isSwitchPassedInArguments(linkerTool.argv, ["dll", "lib", "shared"])) {
+                if (!linkerTool.hasArg(["dll", "lib", "shared"])) {
                     // Gcc/Clang tools can also perform linking so don't parse any output binary
                     // if there are switches passed in to cause early stop of compilation: -c, -E, -S
                     // (-o will not point to an executable)
                     // Also, the ld switches -r and -Ur do not produce executables.
-                    if (!shellParser.isSwitchPassedInArguments(linkerTool.argv, ["c", "E", "S", "r", "Ur"])) {
-                        linkerTargetBinary = shellParser.findOptArg(linkerTool.argv, "o") ||
-                            shellParser.findOptArg(linkerTool.argv, "out");
+                    if (!linkerTool.hasArg(["c", "E", "S", "r", "Ur"])) {
+                        linkerTargetBinary = linkerTool.getArg("o") ||
+                            linkerTool.getArg("out");
                         logger.message("Found linker command: " + line, "Verbose");
 
                         if (!linkerTargetBinary) {
@@ -390,7 +390,7 @@ export async function parseLaunchConfigurations(cancel: vscode.CancellationToken
                             // and not in an eventual different obj/lib path.
                             if (process.platform === "win32" && path.basename(linkerTool.fullPath).startsWith("link")) {
                                 // TODO: does autotools include more than one obj/lib as output?
-                                let file = shellParser.findOptArg(linkerTool.argv, "obj") || shellParser.findOptArg(linkerTool.argv, "lib");
+                                let file = linkerTool.getArg("obj") || linkerTool.getArg("lib");
                                 if (file) {
                                     let parsedPath: path.ParsedPath = path.parse(file);
                                     let targetBinaryFromFirstObjLib: string = parsedPath.name + ".exe";
@@ -665,25 +665,20 @@ function getIntelliSenseMode(cppVersion: cpp.Version | undefined, compilerPath: 
 /**
  * Determine the target architecture from the compiler flags present in the given compilation command.
  */
-function getTargetArchitecture(compilerArgs: string[]): util.TargetArchitecture {
+function getTargetArchitecture(compiler: shellParser.ToolInvocation): util.TargetArchitecture {
     // Go through all the possible target architecture switches.
     // For each switch, apply a set of rules to identify the target arch.
     // The last switch wins.
     // TODO: This ought to work if there are no conflicting switches. But what if there are?
     let targetArch: util.TargetArchitecture; // this starts as undefined
 
-    if (compilerArgs.includes("m32")) {
+    if (compiler.hasArg(["m32"])) {
         targetArch = "x86";
-    } else if (compilerArgs.includes("m64")) {
+    } else if (compiler.hasArg(["m64"])) {
         targetArch = "x64";
     } else {
-        let archs = shellParser.filterArgs(compilerArgs, "arch");
-        if (!archs.length)
-            archs = shellParser.filterArgs(compilerArgs, "march");
-        if (!archs.length)
-            archs = shellParser.filterArgs(compilerArgs, "target");
+        let arch = compiler.getArg("arch") || compiler.getArg("target") || compiler.getArg("march");
 
-        let arch = archs.length ? archs[archs.length-1] : undefined;
         if (arch === "m32") {
             targetArch = "x86";
         } else if (arch === "m64") {
