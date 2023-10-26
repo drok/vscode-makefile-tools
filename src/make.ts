@@ -537,6 +537,9 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
     makeArgs.push("AM_MAKEFLAGS=--assume-old=Makefile --assume-old=stamp-h1 Makefile");
     makeArgs.push("--assume-old=stamp-h1");
 
+    // FIXME: also assume-old the configuration files listed
+    // ./config.status --help
+
     // If this is not a clean configure, remove --always-make from the arguments list.
     // We need to have --always-make in autotools.dryrunSwitches and remove it for not clean configure
     // (as opposed to not having --always-make in autotools.dryrunSwitches and adding it for clean configure)
