@@ -13,6 +13,7 @@ import * as util from '../util';
 import * as vscode from 'vscode';
 // import {CustomConfigProviderItem} from '../cpptools';
 import {Parser, ParserDisp, EmptyLine } from '../parser';
+import { Executing } from './shell';
 
 const chunkSize: number = 100;
 
@@ -88,30 +89,65 @@ export async function parseTargets(cancel: vscode.CancellationToken, verboseLog:
 }
 
 enum MakeSection {
+    Starting, /* pre Entering directory */
+    Making, /* update target... */
     Copyright, /* # GNU make 4.1 ... */
     Database, /* --print-data-base dump */
-    Trace, /* Execution trace */
+    Padding, /* Extra output I don't care about */
 }
-const EnteringRE = /^# make(?:\[\d+\])?: (Entering|Leaving) directory '(.*)'$/;
-const DatabaseRE = /^# Make data base, printed on (.*)$/;
+const EnteringRE = /^# make(?:\[\d+\])?: Entering directory '(.*)'$/;
+const LeavingRE = /^# make(?:\[\d+\])?: Leaving directory '(.*)'$/;
+const ExecutingRE = /^(.+):(\d+): update target '(.*)' due to: (?:.*)$/;
+const CopyrightRE = /^# GNU Make/;
 export class Make implements Parser {
     constructor(dir: string)
     {
         this.dir = dir;
+
     }
+    static makeArgs(): string[] { return [
+        // take precedence over other parallel executions
+        // specified in makefiles
+        "-j1",
+        "--print-directory",
+    ];};
     ingest (line: string) : [ParserDisp, Parser] {
-        let entering = EnteringRE.exec(line);
-        if (entering) {
-            if (entering[1] == "Entering")
-                return [ParserDisp.Enter, new Make(entering[2])];
-            else
-                return [ParserDisp.Leave, this];
+        switch (this.section) {
+            case MakeSection.Starting:
+                let entering = EnteringRE.exec(line);
+                if (entering) {
+                    this.section = MakeSection.Making;
+                    return [ParserDisp.Enter, new Make(entering[1])];
+                }
+                break;
+            case MakeSection.Database:
+                this.section = MakeSection.Padding;
+                /* intentional fall-through, allows leaving immediately past Database */
+            case MakeSection.Padding:
+                let leaving = LeavingRE.exec(line);
+                if (leaving) {
+                    return [ParserDisp.Leave, this];
+                }
+                break;
+            case MakeSection.Making:
+                let executing = ExecutingRE.exec(line);
+                if (executing) {
+                    return [ParserDisp.Continue, new Executing(this.dir)];
+                }
+                let copyright = CopyrightRE.exec(line);
+                if (copyright) {
+                    this.section = MakeSection.Copyright;
+                    return [ParserDisp.Continue, this];
+                }
+                break;
+            default:
+                let database = DatabaseRE.exec(line);
+                if (database) {
+                    this.section = MakeSection.Database;
+                    return [ParserDisp.Enter, new EmptyLine(new Database())];
+                }
+                break;
         }
-
-        let database = DatabaseRE.exec(line);
-        if (database)
-            return [ParserDisp.Enter, new EmptyLine(new Database())];
-
         return [ParserDisp.Continue, this];
     }
     push(sub: Parser) : Parser | undefined {
@@ -134,13 +170,18 @@ export class Make implements Parser {
         throw new Error(`Unexpected push in Make ${sub}`);
     }
     dir: string;
+    section: MakeSection = MakeSection.Starting;
     goals: Goal[] = [];
     submake: Make[] = [];
 }
 
+const DatabaseRE = /^# Make data base, printed on (.*)$/;
 const FilesRE = /^# Files$/;
 export class Database implements Parser {
     // constructor() { this.goals = []; }
+    static makeArgs(): string[] { return [
+        "--print-data-base",
+    ];};
     ingest (line: string) : [ParserDisp, Parser] {
         let files = FilesRE.exec(line);
         if (files)
@@ -171,6 +212,9 @@ const GoalRe = /^(.*):/;
 const GoalRecipeRe = /^recipe to execute \(from '(.*)', line (\d+)\):/;
 const GoalsEndRe = /^# files hash-table stats:$/;
 export class Goal implements Parser {
+    static makeArgs(): string[] { return [
+        // Nothing. The goals are output when the Database is output
+    ];};
     ingest (line: string) : [ParserDisp, Parser] {
         if (line == "") {
             if (!this.goal)
@@ -240,7 +284,9 @@ export class Goal implements Parser {
 }
 
 export class Recipe implements Parser {
-    // constructor(goal: string) { this.goal = goal; }
+    static makeArgs(): string[] { return [
+        // Nothing. The goals are output when the Database is output
+    ];};
     ingest (line: string) : [ParserDisp, Parser] {
         if (line == "")
             return [ParserDisp.Leave, this];

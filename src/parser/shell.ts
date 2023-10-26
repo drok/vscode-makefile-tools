@@ -395,6 +395,18 @@ export async function parseLineAsTool(
 
 export class Executing implements Parser {
     // constructor(goal: string) { this.goal = goal; }
+    static makeArgs(): string[] { return [
+        // Automake uses the V variable to tell whether commands are output as
+        // executed. See am__v_CC_ definition in Makefiles.
+        // The default value can be set on the configure command line with V={0,1}
+        // or in configure.ac with "AM_SILENT_RULES([yes])"
+        // override whatever the default is.
+        "V=1",
+        // --trace does two things:
+        // - outputs a preamble like "Makefile:388: update target 'main.o' due to: /hom..."
+        //   before shell commands that are executed
+        "--trace",
+    ];};
     constructor(currentDir: string) {
         this.pwd = currentDir;
     }

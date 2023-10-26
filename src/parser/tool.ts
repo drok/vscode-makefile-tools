@@ -40,7 +40,9 @@ const sourceFileExtensions_cpp: string[] = [".cc", ".cpp", ".cxx", ".cpp", ".CPP
 const chunkSize: number = 100;
 
 export class Making implements Parser {
-    // constructor(goal: string) { this.goal = goal; }
+    static makeArgs(): string[] { return [
+        // Nothing
+    ];};
     constructor(tool : ToolInvocation, caller: Executing) {
         /* FIXME: this isCompiler() functionality is a placeholder */
         if(compilers.includes(tool.argv[0]))

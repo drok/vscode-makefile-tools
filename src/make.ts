@@ -11,9 +11,11 @@ import {extension} from './extension';
 import * as fs from 'fs';
 import * as logger from './logger';
 import * as shellParser from './parser/shell';
+import {Executing} from './parser/shell';
 import * as toolParser from './parser/tool';
+import {Making} from './parser/tool';
 import {CompileCommand} from './parser/tool';
-import {Make, Goal} from './parser/gnumake';
+import {Make, Goal, Database} from './parser/gnumake';
 import {Parser, ParserDisp} from './parser';
 import * as path from 'path';
 import * as util from './util';
@@ -504,6 +506,14 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
     makeArgs.push("--print-data-base");
     makeArgs.push("--no-builtin-variables");
     makeArgs.push("--no-builtin-rules");
+
+    makeArgs.push(...Make.makeArgs());
+    makeArgs.push(...Database.makeArgs());
+    makeArgs.push(...Goal.makeArgs());
+    // I don't care about recipes, but they will be printed anyway
+    // makeArgs.push(...Recipe.makeArgs());
+    makeArgs.push(...Making.makeArgs());
+    makeArgs.push(...Executing.makeArgs());
 
     makeArgs.push("--dry-run");
     makeArgs.push(`--assume-old=${makefilePath}`);
