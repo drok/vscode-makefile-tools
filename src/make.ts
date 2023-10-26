@@ -442,6 +442,23 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
     if (!makefilePath)
         // Without a makefile, this function should never be called. This is a runtime error (a bug).
         throw new Error("No makefile found.");
+    // The Makefile Tools implementation stores a resolved absolute path in makefilePath.
+    // The autotools implementation of re-freshing the makefiles assumes a target name of exactly "Makefile"
+    // This means that if the makefile is automake-generated, the given target name must be exactly "Makefile",
+    // not some resolved path, and not a renamed filename.
+    // If the makefile is not automake-generated, it depends on how auto-refresh is implemented. The target name
+    // of the auto-refresh logic must match the name of the file. Whether absolutute or relative, it depends
+    // on the auto-refssh logic.
+    // General auto-refresh logic cannot be supported because of this. Autotools logic only works because
+    // the name of the target ("Makefile") is well known, and even then, only works when the file is not
+    // renamed.
+    // To support arbitrary makefilePath, a make utility that does not auto-update makefiles is needed.
+    // This is the make fork proposed at https://github.com/microsoft/vscode-makefile-tools/pull/500#issuecomment-1743946845
+    // "Is there a better way?"
+    // The parser is implemented to throw "Unexpected reconfig in Make ${this.dir}. This is a bug."
+    // if the --dry-running attempts to reconfigure (ie, entering a possibly infinite loop)
+    // The error is to avoid the infinite loop. Parsing would be unreliable past that point.
+    // throw new Error("BUG: The makefilepath must be the expected target name.");
 
     let startTime: number = Date.now();
 
@@ -503,9 +520,7 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
     // rejecting GNU make's builtin variables and rules because automake
     // generates implicit rules to cover all the targets. It does not rely
     // on builtins
-    makeArgs.push("--print-data-base");
     makeArgs.push("--no-builtin-variables");
-    makeArgs.push("--no-builtin-rules");
 
     makeArgs.push(...Make.makeArgs());
     makeArgs.push(...Database.makeArgs());
@@ -562,7 +577,11 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
         let heartBeat: number = Date.now();
         let parserStack: Parser[] = [new Make("")];
         let linenumber: number = 0;
+        let lineBuffer: string = "";
+
         let stdout: any = (result: string): void => {
+            fs.appendFileSync(dryrunFile, result);
+
             // slice remove the very last newline.
             // .split makes two lines out of '\n'
             // this ensures no spurious last line.
@@ -571,7 +590,22 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
             // without any newlines. I assume not, but this can happen if the buffer is
             // very small. It's a cornercase I don't handle, but definately a bug
             // if stdout buffer is small
-            let lines: string[] = result.slice(0,-1).split(/\r?\n/);
+            let isEOF : Boolean = !result;
+            if (lineBuffer.length) {
+                result = lineBuffer + result;
+                lineBuffer = "";
+            }
+            let lines: string[] = result.split(/\r?\n/);
+            if (result.endsWith("\n")) {
+                // remove last empty line at end of buffer (because the string '\n' is not two lines, but one)
+                lines.pop();
+            } else if (isEOF) {
+                // don't save away the last line, process it now.
+            } else {
+                // If the last line is incomplete, save it away, prepend it to the next
+                // result buffer.
+                lineBuffer = lines.pop() || "";
+            }
             try {
                 lines.forEach((s) => {
                     let parser = parserStack.pop();
@@ -612,10 +646,8 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
             } catch (e) {
                 logger.message(`Parser error (line ${linenumber}):` + e);
                 parserStack = [];
+                throw new Error("Quitting the parse due to " + e);
             }
-            const appendStr: string = `${result} ${lineEnding}`;
-            completeOutput += appendStr;
-            fs.appendFileSync(dryrunFile, result);
 
             progress.report({
               increment: 1,
@@ -660,6 +692,20 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
             }
         }, 5 * 1000);
 
+        // If this configure is clean, overwrite the final file index, otherwise merge with it.
+        let provider: cpptools.CustomConfigurationProvider = getDeltaCustomConfigurationProvider();
+        extension.getCppConfigurationProvider().mergeCustomConfigurationProvider(provider);
+
+        // Empty the 'delta' configurations.
+//        provider.fileIndex.clear();
+//        provider.workspaceBrowse = {
+//            browsePath: [],
+//            compilerArgs: [],
+//            compilerPath: undefined,
+//            standard: undefined,
+//            windowsSdkVersion: undefined
+//        };
+
         // The dry-run analysis should operate on english.
         const result: util.SpawnProcessResult = await util.spawnChildProcess(configuration.getMakePath(), makeArgs, util.getWorkspaceRoot(), true, true, stdout, stderr);
         if (completeErr) {
@@ -694,7 +740,21 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
             if (result.returnCode !== null) {
                 util.reportDryRunError(dryrunFile);
             }
+
+            // Empty the 'delta' configurations.
+            provider.fileIndex.clear();
+            provider.workspaceBrowse = {
+                browsePath: [],
+                compilerArgs: [],
+                compilerPath: undefined,
+                standard: undefined,
+                windowsSdkVersion: undefined
+            };
+            // FIXME: Since dry-running failed, also unlink the configCache file
         }
+
+        setCustomConfigurationProvider(provider);
+        extension.updateCppToolsProvider();
 
         curPID = -1;
         return {
@@ -978,7 +1038,7 @@ function isConfigurationEmpty(configurationCache: ConfigurationCache): boolean {
 interface ConfigureSubphasesStatus {
     loadFromCache?: ConfigureSubphaseStatus;
     generateParseContent?: ConfigureSubphaseStatus;
-    preprocessParseContent?: ConfigureSubphaseStatus;
+    // preprocessParseContent?: ConfigureSubphaseStatus;
     parseIntelliSense?: ConfigureSubphaseStatus;
     parseLaunch?: ConfigureSubphaseStatus;
     dryrunTargets?: ConfigureSubphaseStatus;
@@ -1004,20 +1064,21 @@ function analyzeConfigureSubphases(stats: ConfigureSubphasesStatus): number {
     // Generate parse content is a critical phase. Either if it reads from a build log
     // or invokes make --dry-run, a not found means there's nothing to parse.
     // Same applies for the phase that computes the build targets, which always invokes make.
-    if (stats.generateParseContent?.retc === ConfigureBuildReturnCodeTypes.notFound ||
-        stats.dryrunTargets?.retc === ConfigureBuildReturnCodeTypes.notFound) {
-            // But if a configure was successful from cache, return outOfDate and not failure.
-            return stats.loadFromCache?.retc === ConfigureBuildReturnCodeTypes.success ?
-                ConfigureBuildReturnCodeTypes.outOfDate :
-                ConfigureBuildReturnCodeTypes.notFound;
-    }
-
-    // The outcome of a recursive configure invalidates any other previous returns.
-    if (stats.recursiveConfigure) {
-        return analyzeConfigureSubphases(stats.recursiveConfigure);
-    }
-
-    return ConfigureBuildReturnCodeTypes.success;
+    return stats.generateParseContent ? stats.generateParseContent.retc : ConfigureBuildReturnCodeTypes.notFound;
+//    if (stats.generateParseContent?.retc === ConfigureBuildReturnCodeTypes.notFound ||
+//        stats.dryrunTargets?.retc === ConfigureBuildReturnCodeTypes.notFound) {
+//            // But if a configure was successful from cache, return outOfDate and not failure.
+//            return stats.loadFromCache?.retc === ConfigureBuildReturnCodeTypes.success ?
+//                ConfigureBuildReturnCodeTypes.outOfDate :
+//                ConfigureBuildReturnCodeTypes.notFound;
+//    }
+//
+//    // The outcome of a recursive configure invalidates any other previous returns.
+//    if (stats.recursiveConfigure) {
+//        return analyzeConfigureSubphases(stats.recursiveConfigure);
+//    }
+//
+//    return ConfigureBuildReturnCodeTypes.success;
 }
 
 interface ConfigureSubphaseStatus {
@@ -1205,6 +1266,7 @@ export async function configure(triggeredBy: TriggeredBy, updateTargets: boolean
     }
 
     if (retc === ConfigureBuildReturnCodeTypes.success) {
+    // FIXME: not true. it gets here if --dry-run parsing throws
       logger.message("Configure succeeded.");
     } else {
       logger.message("Configure failed.");
@@ -1259,6 +1321,10 @@ export async function configure(triggeredBy: TriggeredBy, updateTargets: boolean
           JSON.stringify(compileCommands, undefined, 4)
         );
       }
+    } else if (configurationCachePath) {
+        // FIXME: 
+        // util.deleteFileSync(configurationCachePath);
+        logger.message("FIXME: Config is empty. Delete the file.");
     }
 
     let configureElapsedTime: number =

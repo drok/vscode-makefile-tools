@@ -1100,6 +1100,7 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
     // Verify the dirty state of the IntelliSense config provider and update accordingly.
     // The makefile.configureOnEdit setting can be set to false when this behavior is inconvenient.
     vscode.window.onDidChangeActiveTextEditor(async e => {
+        // FIXME: There is no need to reconfigure when focus changes.
         let language: string = "";
         if (e) {
             language = e.document.languageId;

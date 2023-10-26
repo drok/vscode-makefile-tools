@@ -97,51 +97,76 @@ enum MakeSection {
 }
 const EnteringRE = /^# make(?:\[\d+\])?: Entering directory '(.*)'$/;
 const LeavingRE = /^# make(?:\[\d+\])?: Leaving directory '(.*)'$/;
+const NothingRE = /^make(?:\[\d+\])?: Nothing to be done for '(.*)'\.$/;
 const ExecutingRE = /^(.+):(\d+): update target '(.*)' due to: (?:.*)$/;
 const CopyrightRE = /^# GNU Make/;
 export class Make implements Parser {
     constructor(dir: string)
     {
         this.dir = dir;
-
+        this.section = dir ? MakeSection.Making : MakeSection.Starting;
     }
     static makeArgs(): string[] { return [
         // take precedence over other parallel executions
         // specified in makefiles
-        "-j1",
+        "-j1", "--output-sync=recurse",
         "--print-directory",
+        // automake makefiles don't rely on builtin rules, so this makes the evaluation
+        // a little faster, but the user could force custom rules which do rely on
+        // builtin rules. If this is the case, the build be evaluated unexpectedly.
+        // Relying on builtin rules would make the config non-portable, as it would need
+        // GNU make.
+        // TODO: How to tell the user his config is non-portable? Maybe allow a setting
+        // "Allow non-portable config" ?
+        "--no-builtin-rules",
     ];};
     ingest (line: string) : [ParserDisp, Parser] {
         switch (this.section) {
+            case MakeSection.Database:
+                this.section = MakeSection.Padding;
+                /* intentional fall-through, allows leaving immediately past Database */
+            case MakeSection.Padding:
+                let leaving = LeavingRE.test(line);
+                if (leaving) {
+                    return [ParserDisp.Leave, this];
+                }
+                break;
+            case MakeSection.Making:
+                // --assume-old targets are reported as nothing to be done.
+                let nothing = NothingRE.test(line);
+                if (nothing) {
+                    return [ParserDisp.Continue, this];
+                }
+                let copyright = CopyrightRE.test(line);
+                if (copyright) {
+                    this.section = MakeSection.Copyright;
+                    return [ParserDisp.Continue, this];
+                }
+                let executing = ExecutingRE.exec(line);
+                if (executing) {
+                    this.file = executing[3];
+                    if (this.file == "config.status") {
+                        // For some reason, reconfig was triggerred, meaning
+                        // --dry-run was not respected. Abort. this is a bug.
+                        throw new Error(`Unexpected reconfig in Make ${this.dir}. This is a bug.`);
+                    }
+                    return [ParserDisp.Enter, new Executing(this)];
+                }
+                /* intentional fall-through, allows recursing subdirs */
             case MakeSection.Starting:
                 let entering = EnteringRE.exec(line);
                 if (entering) {
                     this.section = MakeSection.Making;
                     return [ParserDisp.Enter, new Make(entering[1])];
                 }
-                break;
-            case MakeSection.Database:
-                this.section = MakeSection.Padding;
-                /* intentional fall-through, allows leaving immediately past Database */
-            case MakeSection.Padding:
-                let leaving = LeavingRE.exec(line);
-                if (leaving) {
-                    return [ParserDisp.Leave, this];
+                // this is for the 2nd and later script lines for a target
+                if (this.section == MakeSection.Making) {
+                    let nextcmd = new Executing(this);
+                    return nextcmd.ingest(line);
                 }
                 break;
-            case MakeSection.Making:
-                let executing = ExecutingRE.exec(line);
-                if (executing) {
-                    return [ParserDisp.Continue, new Executing(this.dir)];
-                }
-                let copyright = CopyrightRE.exec(line);
-                if (copyright) {
-                    this.section = MakeSection.Copyright;
-                    return [ParserDisp.Continue, this];
-                }
-                break;
-            default:
-                let database = DatabaseRE.exec(line);
+            case MakeSection.Copyright:
+                let database = DatabaseRE.test(line);
                 if (database) {
                     this.section = MakeSection.Database;
                     return [ParserDisp.Enter, new EmptyLine(new Database())];
@@ -166,11 +191,23 @@ export class Make implements Parser {
                 throw new Error(`Unexpected push in Make ${sub}`);
             this.submake.push(sub);
             return this;
+        } else if (sub instanceof Executing) {
+            if (sub.makes.length) {
+                // Do something about the collected command lines?
+            }
+            return this; // continue looking for more Executes
         } else if (sub instanceof EmptyLine) { return undefined; }
         throw new Error(`Unexpected push in Make ${sub}`);
     }
+    public getFile(): string | undefined {
+        return this.file;
+    }
+    public getDir(): string {
+        return this.dir;
+    }
     dir: string;
-    section: MakeSection = MakeSection.Starting;
+    section: MakeSection;
+    file: string | undefined;
     goals: Goal[] = [];
     submake: Make[] = [];
 }
@@ -212,6 +249,10 @@ const GoalRe = /^(.*):/;
 const GoalRecipeRe = /^recipe to execute \(from '(.*)', line (\d+)\):/;
 const GoalsEndRe = /^# files hash-table stats:$/;
 export class Goal implements Parser {
+    static readonly Flags = {
+        None: 0,
+        Not_a_target: 1,
+    };
     static makeArgs(): string[] { return [
         // Nothing. The goals are output when the Database is output
     ];};
@@ -226,6 +267,7 @@ export class Goal implements Parser {
                 if (flags) {
                     switch (flags[1]) {
                         case "Not a target":
+                            this.flags |= Goal.Flags.Not_a_target;
                             return [ParserDisp.Continue, this];
                         default:
                             if (GoalsEndRe.test(line))
@@ -281,6 +323,7 @@ export class Goal implements Parser {
         return undefined; /* The end of the Recipe is the end of the Goal */
     }
     goal: string | undefined = undefined;
+    flags: number = Goal.Flags.None;
 }
 
 export class Recipe implements Parser {

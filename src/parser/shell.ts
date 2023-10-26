@@ -17,6 +17,7 @@ import {parse} from 'shell-quote';
 // import  from '../extension';
 import { extension } from '../extension';
 import { Making } from './tool';
+import { Make } from './gnumake';
 
 export interface PreprocessDryRunOutputReturnType {
     retc: number;
@@ -407,26 +408,35 @@ export class Executing implements Parser {
         //   before shell commands that are executed
         "--trace",
     ];};
-    constructor(currentDir: string) {
-        this.pwd = currentDir;
+    constructor(making: Make) {
+        this.make = making;
     }
     ingest (line: string) : [ParserDisp, Parser] {
-        if (line == "")
-            return [ParserDisp.Leave, this];
 
-        // doParsingChunk(cmd);
+        if (line.endsWith("\\")) {
+            this.linebuf += line.slice(0, -1);
+            return [ParserDisp.Continue, this];
+        } else if (this.linebuf) {
+            line = this.linebuf + line;
+            this.linebuf = "";
+        }
         let makes = new Making(parseToolCmd(line), this);
         if (makes.done())
             this.makes.push(makes);
-        return [ParserDisp.Continue, this];
+        return [ParserDisp.Leave, this];
     }
-    push(sub: Parser) { return undefined;}
+    push(sub: Parser) {
+        return undefined;
+    }
     // currentdir getter
-    get currentDir(): string { return this.pwd; }
+    get currentDir(): string { return this.make.getDir(); }
+    get currentTarget(): string { return this.make.getFile() || ""; }
 
     // goal: string;
-    pwd: string;
+    make: Make;
     makes: Making[] = [];
+    // Line buffer for re-joining lines split with backslash
+    linebuf : string = "";
 }
 
 function parseToolCmd(line: string) : Tool {

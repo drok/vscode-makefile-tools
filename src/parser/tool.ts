@@ -39,16 +39,21 @@ const sourceFileExtensions_cpp: string[] = [".cc", ".cpp", ".cxx", ".cpp", ".CPP
 
 const chunkSize: number = 100;
 
+
+const ObjectFileRE = /^.+\.(?:o|obj)$/;
 export class Making implements Parser {
     static makeArgs(): string[] { return [
         // Nothing
     ];};
     constructor(tool : ToolInvocation, caller: Executing) {
         /* FIXME: this isCompiler() functionality is a placeholder */
-        if(compilers.includes(tool.argv[0]))
-            this.handleCompilerCommand(tool, caller.currentDir).then(() => {});
-        else if (linkers.includes(tool.argv[0]))
-            this.handleLinkerCommand(tool, caller.currentDir).then(() => {});
+        if(ObjectFileRE.test(caller.currentTarget)) {
+            if (compilers.includes(path.basename(tool.fullPath)))
+                 this.handleCompilerCommand(tool, caller.currentDir).then(() => {});
+        } else {
+            if (linkers.includes(path.basename(tool.fullPath)))
+                this.handleLinkerCommand(tool, caller.currentDir).then(() => {});
+        }
     }
     ingest (line: string) : [ParserDisp, Parser] {
         if (line == "")
@@ -138,14 +143,12 @@ export class Making implements Parser {
                 // More standard validation and defaults, in the context of the whole command.
             let standard: util.StandardVersion | undefined = parseStandard(ext.extension.getCppToolsVersion(), standardStr, language);
 
-            if (ext.extension) {
-                ext.extension.buildCustomConfigurationProvider(
-                    { defines, includes, forcedIncludes, standard,
-                        intelliSenseMode, compilerFullPath, compilerArgs, files: [file], windowsSDKVersion, currentPath,
-                        line: compilerTool.argv.join(" ") });
-            }
+            ext.extension.buildCustomConfigurationProvider(
+                { defines, includes, forcedIncludes, standard,
+                    intelliSenseMode, compilerFullPath, compilerArgs, files: [file], windowsSDKVersion, currentPath,
+                    line: compilerTool.argv.join(" ") });
         }
-    } // doParsingChunk function
+    } // handleCompilerCommand function
 
     async handleLinkerCommand(tool : ToolInvocation, currentPath : string): Promise<void> {
 
@@ -285,7 +288,7 @@ export class Making implements Parser {
             logger.message("Adding launch configuration:\n" + configuration.launchConfigurationToString(launchConfiguration), "Verbose");
             configuration.getLaunchConfigurations().push(launchConfiguration);
         }
-    }; // doLinkCommandsParsingChunk function
+    }; // handleLinkerCommand function
 
     targetBinaries: string[] = [];
 }
