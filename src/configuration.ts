@@ -78,12 +78,6 @@ export async function setCurrentMakefileConfiguration(configuration: string | un
         buildLog: buildLog,
         isDefault: true
     };
-    let cachePath : string | undefined = getConfigurationCachePath();
-    if (cachePath && (
-                keepConfigurationCache ||
-                keepDryRuns
-            ))
-        util.createDirectorySync(cachePath);
     statusBar.setConfiguration(currentMakefileConfiguration.name);
     await extension.updateBuildLogPresent(currentMakefileConfiguration.buildLog ? true : false);
 }
@@ -370,11 +364,14 @@ export async function readAlwaysPostConfigure(): Promise<void> {
 // Ie, each config is keyed to the configuration and target
 // TODO: The user should have the option to turn off the cache because it may become decoherent with the
 // workspace when the source is changed (eg, diff branch checked out) between vscode reloads.
-export function getConfigurationCachePath(): string | undefined {
-    if (currentMakefileConfiguration.makeDirectory)
-        return path.join(currentMakefileConfiguration.makeDirectory, ".vscode");
-    else
-        return undefined;
+export function getConfigurationCachePath(): string {
+    let builddir = currentMakefileConfiguration.makeDirectory || getCurrentTarget().dir;
+    if (!path.isAbsolute(builddir)) {
+        builddir = util.resolvePathToRoot(builddir);
+    }
+    let cachePath: string = path.join(builddir, ".vscode");
+    util.createDirectorySync(cachePath);
+    return cachePath;
 }
 
 let compileCommandsPath: string | undefined;
@@ -803,6 +800,9 @@ export async function readMakefileConfigurations(currentConfigurationName : stri
 // Assume the well-known "all" target for the default goal
 let currentTarget: make.BuildTarget = make.t_all;
 export function getCurrentTarget(): make.BuildTarget { return currentTarget; }
+export function getCurrentTargetAsFilename() : string {
+    return currentTarget.name.replace(/[^\w \(\)\[\]\{\}@\.\-\+]+/g,'_');
+}
 // Set the current target, or 'all' if none was given
 export function setCurrentTarget(target: make.BuildTarget = make.t_all): void { currentTarget = target; }
 
