@@ -44,7 +44,6 @@
    "autotools.configuration.makefile.buildLog.description": "The path to the build log that is read to bypass a dry-run",
    "autotools.configuration.makefile.extensionLog.description": "The path to an output file storing all content from the Makefile output channel.",
    "autotools.configuration.makefile.configurationCachePath.description": "The path to a cache file storing the output of the last dry-run make command. When unset, a file named 'configurationCache.log' is stored at the path specified by the 'makefile.extensionOutputFolder' setting.",
-   "autotools.configuration.makefile.dryrunSwitches.description": "Arguments to pass to the dry-run make invocation",
    "autotools.configuration.makefile.keepDryRuns.markdownDescription": "Keep the output of the dry-run in `${makeDirectory}/.vscode/${currentTarget}.dryrun.log`",
    "autotools.configuration.makefile.keepConfigurationCache.markdownDescription": "Keep the Intellisense configuration parsed from the makefile as `${makeDirectory}/.vscode/${currentTarget}.cache`.\n\n If this file exists when starting vscode, it will be loaded before dry-running. This can be used to **speed up** Intellisense initialization in very large projects where dry-running is slow.",
    "autotools.configuration.makefile.additionalCompilerNames.description": "Names of compiler tools to be added to the extension known list",

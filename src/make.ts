@@ -486,22 +486,7 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
     // Include all the make arguments defined in autotools.configurations.makeArgs
     makeArgs = makeArgs.concat(configuration.getConfigurationMakeArgs());
 
-    // If we are analyzing build targets, we need the following switches:
-    //  --print-data-base (which generates verbose output where we parse targets from).
-    // --no-builtin-variables and --no-builtin-rules (to reduce the size of the
-    // output produced by --print-data-base and also to obtain a list of targets
-    // that make sense, skipping over implicit targets like objects from sources
-    // or binaries from objects and libs).
-    // --question (to not execute anything, for us equivalent of dry-run
-    // but without printing commands, which contributes again to a smaller output).
-    // If we are analyzing compiler/linker commands for IntelliSense and launch targets,
-    // we use --dry-run and anything from autotools.dryrunSwitches.
-    const dryrunSwitches: string[] | undefined = configuration.getDryrunSwitches();
-    // rejecting GNU make's builtin variables and rules because automake
-    // generates implicit rules to cover all the targets. It does not rely
-    // on builtins
-    makeArgs.push("--no-builtin-variables");
-
+    // Assemble command line options from the requirements of each parser stage.
     makeArgs.push(...Make.makeArgs());
     makeArgs.push(...Database.makeArgs());
     makeArgs.push(...Goal.makeArgs());
@@ -517,21 +502,16 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
     makeArgs.push("AM_MAKEFLAGS=--assume-old=Makefile --assume-old=stamp-h1 Makefile");
     makeArgs.push("--assume-old=stamp-h1");
 
+    makeArgs.push(
+    // rejecting GNU make's builtin variables and rules because automake
+    // generates implicit rules to cover all the targets. It does not rely
+    // on builtins
+        "--no-builtin-variables",
+    // always make gets the full dependency graph, as opposed to incremental
+        "--always-make");
+
     // FIXME: also assume-old the configuration files listed
     // ./config.status --help
-
-    // If this is not a clean configure, remove --always-make from the arguments list.
-    // We need to have --always-make in autotools.dryrunSwitches and remove it for not clean configure
-    // (as opposed to not having --always-make in autotools.dryrunSwitches and adding it for clean configure)
-    // because we want to avoid having 2 dryrun switches settings (one for clean and one for not clean configure)
-    // and also because the user needs to be able to remove --always-make from any make --dry-run invocation,
-    // if it causes trouble.
-    dryrunSwitches?.forEach(sw => {
-        if (getConfigureIsClean() || (sw !== "--always-make" && sw !== "-B")) {
-            makeArgs.push(sw);
-        }
-    });
-
 
     logger.messageNoCR(`Generating ${getConfigureIsInBackground() ? "in the background a new " : ""}configuration cache with command: `);
 

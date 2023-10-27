@@ -366,19 +366,6 @@
                     "default": "",
                     "scope": "resource"
                 },
-                "autotools.dryrunSwitches": {
-                    "type": "array",
-                    "default": [
-                        "--always-make",
-                        "--keep-going",
-                        "--print-directory"
-                    ],
-                    "description": "%autotools.configuration.makefile.dryrunSwitches.description%",
-                    "items": {
-                        "type": "string"
-                    },
-                    "scope": "resource"
-                },
                 "autotools.keepDryRuns": {
                     "type": "boolean",
                     "markdownDescription": "%autotools.configuration.makefile.keepDryRuns.markdownDescription%",

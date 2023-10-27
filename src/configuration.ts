@@ -409,25 +409,6 @@ export async function readExcludeCompilerNames(): Promise<void> {
     }
 }
 
-let dryrunSwitches: string[] | undefined;
-export function getDryrunSwitches(): string[] | undefined { return dryrunSwitches; }
-export function setDryrunSwitches(switches: string[]): void { dryrunSwitches = switches; }
-
-// Read from settings the dry-run switches array. If there is no user definition, the defaults are:
-//   --always-make: to not skip over up-to-date targets
-//   --keep-going: to not stop at the first error that is encountered
-//   --print-data-base: to generate verbose log output that can be parsed to identify all the makefile targets
-// Some code bases have various issues with the above make parameters: infrastructure (not build) errors,
-// infinite reconfiguration loops, resulting in the extension being unusable.
-// To work around this, the setting autotools.dryrunSwitches is providing a way to skip over the problematic make arguments,
-// even if this results in not ideal behavior: less information available to be parsed, which leads to incomplete IntelliSense or missing targets.
-export async function readDryrunSwitches(): Promise<void> {
-    dryrunSwitches = await util.getExpandedSetting<string[]>("dryrunSwitches");
-    if (dryrunSwitches && dryrunSwitches.length > 0) {
-        logger.message(`Dry-run switches: '${dryrunSwitches?.join("', '")}'`);
-    }
-}
-
 // Keep the dry-run output in the configuration directory?
 //   true : file will be saved as ${makeDirectory}/.vscode/${currentTarget}.dryrun.log
 //   false: file will be not be saved
@@ -946,7 +927,6 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
     await readAlwaysPreConfigure();
     await readPostConfigureScript();
     await readAlwaysPostConfigure();
-    await readDryrunSwitches();
     await readkeepDryRuns();
     await readkeepConfigurationCache();
     await readAdditionalCompilerNames();
@@ -1179,17 +1159,6 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
                     // extension.updateBuildLogPresent(await readBuildLog());
                     updatedSettingsSubkeys.push(subKey);
                 }
-            }
-
-            subKey = "dryrunSwitches";
-            let updatedDryrunSwitches : string[] | undefined = await util.getExpandedSetting<string[]>(subKey);
-            if (!util.areEqual(updatedDryrunSwitches, dryrunSwitches)) {
-                // A change in autotools.dryrunSwitches should trigger an IntelliSense update
-                // only if the extension is not currently reading from a build log.
-                extension.getState().configureDirty = extension.getState().configureDirty ||
-                                                      !buildLog || !util.checkFileExistsSync(buildLog);
-                await readDryrunSwitches();
-                updatedSettingsSubkeys.push(subKey);
             }
 
             subKey = "keepDryRuns";
