@@ -100,6 +100,13 @@ const LeavingRE = /^# make(?:\[\d+\])?: Leaving directory '(.*)'$/;
 const NothingRE = /^make(?:\[\d+\])?: Nothing to be done for '(.*)'\.$/;
 const ExecutingRE = /^(.+):(\d+): update target '(.*)' due to: (?:.*)$/;
 const CopyrightRE = /^# GNU Make/;
+/**
+ * Parse the stdout of a GNU make run, and expect a Dumped database,
+ * directory entry/leaving trace messages, and expanded shell fragments would
+ * be run when building the targets.
+ * Calls Database, Executing parser to extract info about the current makefile,
+ * and Make to parse submake output.
+ */
 export class Make implements Parser {
     constructor(dir: string)
     {
@@ -214,6 +221,9 @@ export class Make implements Parser {
 
 const DatabaseRE = /^# Make data base, printed on (.*)$/;
 const FilesRE = /^# Files$/;
+/**
+ * Parse a GNU make database dump to extract the list of build goals (targets)
+ */
 export class Database implements Parser {
     // constructor() { this.goals = []; }
     static makeArgs(): string[] { return [
@@ -248,6 +258,12 @@ const GoalFlagsRe = /^# (.*):$/;
 const GoalRe = /^(.*):/;
 const GoalRecipeRe = /^recipe to execute \(from '(.*)', line (\d+)\):/;
 const GoalsEndRe = /^# files hash-table stats:$/;
+/**
+ * Parse information about a single goal, differentiating phony targets,
+ * and expandable to handle other flags that Make keeps about each target
+ * (eg, whether it is up-to-date). Calls the Recipe to parse the build recipe
+ * if any.
+ */
 export class Goal implements Parser {
     static readonly Flags = {
         None: 0,
@@ -326,6 +342,11 @@ export class Goal implements Parser {
     flags: number = Goal.Flags.None;
 }
 
+/**
+ * Parse an unexpanded build recipe for a target.
+ * Currently no information is captured, but it could be used to learn
+ * what kind of target it is (eg, if `@ref $(LINK)` or `$(COMPILE)` is referenced
+ */
 export class Recipe implements Parser {
     static makeArgs(): string[] { return [
         // Nothing. The goals are output when the Database is output

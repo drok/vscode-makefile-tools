@@ -393,7 +393,10 @@ export async function parseLineAsTool(
     );
 }
 
-
+/**
+ * Parse shell grammar (see Manpage bash "SHELL GRAMMAR") to obtain the arguments of a tool invocation,
+ * eg the -D or -I options of a compiler.
+ */
 export class Executing implements Parser {
     // constructor(goal: string) { this.goal = goal; }
     static makeArgs(): string[] { return [

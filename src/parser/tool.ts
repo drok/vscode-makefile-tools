@@ -41,6 +41,12 @@ const chunkSize: number = 100;
 
 
 const ObjectFileRE = /^.+\.(?:o|obj)$/;
+/**
+ * Parse the argument list of a tool invocation to determine if it is
+ * a compiler or linker, and add the learnt define[] and include[] to
+ * the IntelliSense config by calling
+ * @see ext.buildCustomConfigurationProvider()
+ */
 export class Making implements Parser {
     static makeArgs(): string[] { return [
         // Nothing
