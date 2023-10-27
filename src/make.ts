@@ -217,7 +217,7 @@ export function prepareBuildTarget(target: BuildTarget): string[] {
     makeArgs = makeArgs.concat(configuration.getConfigurationMakeArgs());
     makeArgs.push(target.name);
 
-    logger.message(`Building target "${target}" with command: '${configuration.getConfigurationMakeCommand()} ${makeArgs.join(" ")}'`);
+    logger.message(`Building target "${target}" with command: '${configuration.getMakePath()} ${makeArgs.join(" ")}'`);
     return makeArgs;
 }
 
@@ -240,7 +240,7 @@ let curPID: number = -1;
 export function getCurPID(): number { return curPID; }
 export function setCurPID(pid: number): void { curPID = pid; }
 
-const makefileBuildTaskName: string = "Makefile Tools Build Task";
+const makefileBuildTaskName: string = "Autotools Build Task";
 
 export async function buildTarget(triggeredBy: TriggeredBy, target: BuildTarget, clean: boolean = false): Promise<number> {
     if (blockedByOp(Operations.build)) {
@@ -254,7 +254,7 @@ export async function buildTarget(triggeredBy: TriggeredBy, target: BuildTarget,
     // Same start time for build and an eventual configure.
     let buildStartTime: number = Date.now();
 
-    // warn about an out of date configure state and configure if makefile.configureAfterCommand allows.
+    // warn about an out of date configure state and configure if autotools.configureAfterCommand allows.
     let configureExitCode: number | undefined; // used for telemetry
     let configureElapsedTime: number | undefined; // used for telemetry
     if (extension.getState().configureDirty) {
@@ -270,7 +270,7 @@ export async function buildTarget(triggeredBy: TriggeredBy, target: BuildTarget,
     }
 
     // Prepare a notification popup
-    let config: string | undefined = configuration.getCurrentMakefileConfiguration();
+    let config: string | undefined = configuration.getCurrentMakefileConfiguration().name;
     let configAndTarget: string = config;
     if (target.name) {
         configAndTarget += "/" + target.name + "@" + target.dir;
@@ -307,7 +307,7 @@ export async function buildTarget(triggeredBy: TriggeredBy, target: BuildTarget,
 
                 setIsBuilding(true);
 
-                // If required by the "makefile.clearOutputBeforeBuild" setting,
+                // If required by the "autotools.clearOutputBeforeBuild" setting,
                 // we need to clear the terminal output when "make"-ing target "clean"
                 // (but not when "make"-ing the following intended target, so that we see both together)
                 // or when "make"-ing the intended target in case of a not-clean build.
@@ -365,7 +365,7 @@ export async function doBuildTarget(progress: vscode.Progress<{}>, target: Build
     try {
         const quotingStlye: vscode.ShellQuoting = vscode.ShellQuoting.Strong;
         const quotingStyleName: string = "Strong";
-        let myTaskCommand: vscode.ShellQuotedString = {value: configuration.getConfigurationMakeCommand(), quoting: quotingStlye};
+        let myTaskCommand: vscode.ShellQuotedString = {value: configuration.getMakePath(), quoting: quotingStlye};
         let myTaskArgs: vscode.ShellQuotedString[] = makeArgs.map(arg => {
             return {value: arg, quoting: quotingStlye};
         });
@@ -380,7 +380,7 @@ export async function doBuildTarget(progress: vscode.Progress<{}>, target: Build
 
         let shellExec: vscode.ShellExecution = new vscode.ShellExecution(myTaskCommand, myTaskArgs, myTaskOptions);
         let myTask: vscode.Task = new vscode.Task({type: "shell", group: "build", label: makefileBuildTaskName},
-        vscode.TaskScope.Workspace, makefileBuildTaskName, "makefile", shellExec);
+        vscode.TaskScope.Workspace, makefileBuildTaskName, "autotools", shellExec);
 
         myTask.problemMatchers = configuration.getConfigurationProblemMatchers();
         myTask.presentationOptions.clear = clearTerminalOutput;
@@ -413,16 +413,12 @@ export async function doBuildTarget(progress: vscode.Progress<{}>, target: Build
 }
 
 // Content to be parsed by various operations post configure (like finding all build/launch targets).
-// Represents the content of the provided makefile.buildLog or a fresh output of make --dry-run
-// (which is also written into makefile.configurationCachePath).
+// Represents the content of the provided autotools.buildLog or a fresh output of make --dry-run
+// (which is also written into autotools.configurationCachePath).
 let parseContent: string | undefined;
-export function getParseContent(): string | undefined { return parseContent; }
-export function setParseContent(content: string): void { parseContent = content; }
 
 // The source file of parseContent (build log or configuration dryrun cache).
 let parseFile: string | undefined;
-export function getParseFile(): string | undefined { return parseFile; }
-export function setParseFile(file: string): void { parseFile = file; }
 
 // Targets need to parse a dryrun make invocation that does not include a target name
 // (other than default empty "" or the standard "all"), otherwise it would produce
@@ -442,35 +438,19 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
     if (!makefilePath)
         // Without a makefile, this function should never be called. This is a runtime error (a bug).
         throw new Error("No makefile found.");
-    // The Makefile Tools implementation stores a resolved absolute path in makefilePath.
-    // The autotools implementation of re-freshing the makefiles assumes a target name of exactly "Makefile"
-    // This means that if the makefile is automake-generated, the given target name must be exactly "Makefile",
-    // not some resolved path, and not a renamed filename.
-    // If the makefile is not automake-generated, it depends on how auto-refresh is implemented. The target name
-    // of the auto-refresh logic must match the name of the file. Whether absolutute or relative, it depends
-    // on the auto-refssh logic.
-    // General auto-refresh logic cannot be supported because of this. Autotools logic only works because
-    // the name of the target ("Makefile") is well known, and even then, only works when the file is not
-    // renamed.
-    // To support arbitrary makefilePath, a make utility that does not auto-update makefiles is needed.
-    // This is the make fork proposed at https://github.com/microsoft/vscode-makefile-tools/pull/500#issuecomment-1743946845
-    // "Is there a better way?"
-    // The parser is implemented to throw "Unexpected reconfig in Make ${this.dir}. This is a bug."
-    // if the --dry-running attempts to reconfigure (ie, entering a possibly infinite loop)
-    // The error is to avoid the infinite loop. Parsing would be unreliable past that point.
-    // throw new Error("BUG: The makefilepath must be the expected target name.");
 
     let startTime: number = Date.now();
 
     // Rules for parse content and file:
-    //     1. makefile.buildLog provided by the user in settings
-    //     2. configuration cache (the previous dryrun output): makefile.configurationCachePath
+    //     1. autotools.buildLog provided by the user in settings
+    //     2. configuration cache (the previous dryrun output): autotools.configurationCachePath
     //     3. the make dryrun output if (2) is missing
     // We do not use buildLog for build targets analysis because
     // we can afford to invoke make -pRrq (very quick even on large projects).
     // We make sure to give the regression tests suite a build log that already contains
     // targets information because we want to avoid invoking make for now.
-    let buildLog: string | undefined = configuration.getConfigurationBuildLog();
+    let buildLog: string | undefined = configuration.getCurrentMakefileConfiguration().buildLog;
+
     if (buildLog && process.env['MAKEFILE_TOOLS_TESTING'] === '1') {
         parseContent = util.readFile(buildLog);
         if (parseContent) {
@@ -492,7 +472,7 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
     // Continue with the make dryrun invocation
     let makeArgs: string[] = [];
 
-    // Prepend the target to the arguments given in the makefile.configurations object,
+    // Prepend the target to the arguments given in the autotools.configurations object,
     // unless we want to parse for the full set of available targets.
     let currentTarget: BuildTarget = configuration.getCurrentTarget();
 
@@ -503,7 +483,7 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
     }
     makeArgs.push(currentTarget.name);
 
-    // Include all the make arguments defined in makefile.configurations.makeArgs
+    // Include all the make arguments defined in autotools.configurations.makeArgs
     makeArgs = makeArgs.concat(configuration.getConfigurationMakeArgs());
 
     // If we are analyzing build targets, we need the following switches:
@@ -515,7 +495,7 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
     // --question (to not execute anything, for us equivalent of dry-run
     // but without printing commands, which contributes again to a smaller output).
     // If we are analyzing compiler/linker commands for IntelliSense and launch targets,
-    // we use --dry-run and anything from makefile.dryrunSwitches.
+    // we use --dry-run and anything from autotools.dryrunSwitches.
     const dryrunSwitches: string[] | undefined = configuration.getDryrunSwitches();
     // rejecting GNU make's builtin variables and rules because automake
     // generates implicit rules to cover all the targets. It does not rely
@@ -552,28 +532,25 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
         }
     });
 
-    // Append the target to the arguments given in the makefile.configurations object
-    // makeArgs.push(configuration.getCurrentTarget().name);
-    // TEMPORARY TEST: make all-recursive instead of all to skip checking if config.h is uptodate
-    makeArgs.push("all-recursive");
 
     logger.messageNoCR(`Generating ${getConfigureIsInBackground() ? "in the background a new " : ""}configuration cache with command: `);
 
-    logger.message(`'${configuration.getConfigurationMakeCommand()} ${makeArgs.join(" ")}'`);
+    logger.message(`'${configuration.getMakePath()} ${makeArgs.join(" ")}'`);
 
     try {
-        let dryrunFile : string = "./dryrun.log";
-        let extensionOutputFolder: string | undefined = configuration.getExtensionOutputFolder();
-        if (extensionOutputFolder) {
-            dryrunFile = path.join(extensionOutputFolder, dryrunFile);
-        }
-        dryrunFile = util.resolvePathToRoot(dryrunFile);
-        logger.message(`Writing the dry-run output: ${dryrunFile}`);
-
         const lineEnding: string = (process.platform === "win32" && process.env.MSYSTEM === undefined) ? "\r\n" : "\n";
+        let keepDryRuns: boolean = configuration.getKeepDryRuns();
+        let dryrunFile : string = configuration.getCurrentTarget() + ".dryrun.log";
+        if (keepDryRuns) {
+            let cachePath: string | undefined = configuration.getConfigurationCachePath();
+            if (cachePath) {
+                dryrunFile = path.join(cachePath, dryrunFile);
+            }
+            dryrunFile = util.resolvePathToRoot(dryrunFile);
+            logger.message(`Writing the dry-run output: ${dryrunFile}`);
 
-        util.writeFile(dryrunFile, `${configuration.getConfigurationMakeCommand()} ${makeArgs.join(" ")}${lineEnding}`);
-
+            util.writeFile(dryrunFile, `${configuration.getMakePath()} ${makeArgs.join(" ")}${lineEnding}`);
+        }
         let completeOutput: string = "";
         let completeErr: string = "";
         let stderrStr: string = "";
@@ -583,7 +560,8 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
         let lineBuffer: string = "";
 
         let stdout: any = (result: string): void => {
-            fs.appendFileSync(dryrunFile, result);
+            if (keepDryRuns)
+                fs.appendFileSync(dryrunFile, result);
 
             // slice remove the very last newline.
             // .split makes two lines out of '\n'
@@ -688,7 +666,9 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
                 vscode.window.showWarningMessage("Dryrun timeout. See Makefile Tools Output Channel for details.");
                 logger.message("Dryrun timeout. Verify that the make command works properly " +
                 "in your development terminal (it could wait for stdin).");
-                logger.message(`Double check the dryrun output log: ${dryrunFile}`);
+                if (keepDryRuns) {
+                    logger.message(`Double check the dryrun output log: ${dryrunFile}`);
+                }
 
                 // It's enough to show this warning popup once.
                 clearInterval(timeout);
@@ -711,7 +691,7 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
 
         // The dry-run analysis should operate on english.
         const result: util.SpawnProcessResult = await util.spawnChildProcess(configuration.getMakePath(), makeArgs, util.getWorkspaceRoot(), true, true, stdout, stderr);
-        if (completeErr) {
+        if (keepDryRuns && completeErr) {
             fs.appendFileSync(dryrunFile,
                 lineEnding +
                 lineEnding +
@@ -724,7 +704,7 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
         let elapsedTime: number = util.elapsedTimeSince(startTime);
         logger.message(`Generating dry-run elapsed time: ${elapsedTime}`);
 
-        parseFile = dryrunFile;
+        parseFile = keepDryRuns ? dryrunFile : (dryrunFile + " (not saved)");
         parseContent = completeOutput;
 
         // The error codes returned by the targets invocation (make -pRrq) mean something else
@@ -842,7 +822,7 @@ export async function preConfigure(triggeredBy: TriggeredBy): Promise<number> {
     if (!scriptFile) {
         vscode.window.showErrorMessage("Pre-configure failed: no script provided.");
         logger.message("No pre-configure script is set in settings. " +
-                       "Make sure a pre-configuration script path is defined with makefile.preConfigureScript.");
+                       "Make sure a pre-configuration script path is defined with autotools.preConfigureScript.");
         return ConfigureBuildReturnCodeTypes.notFound;
     }
 
@@ -878,7 +858,7 @@ export async function postConfigure(triggeredBy: TriggeredBy, ): Promise<number>
     if (!scriptFile) {
         vscode.window.showErrorMessage("Post-configure failed: no script provided.");
         logger.message("No post-configure script is set in settings. " +
-                       "Make sure a post-configuration script path is defined with makefile.postConfigureScript.");
+                       "Make sure a post-configuration script path is defined with autotools.postConfigureScript.");
         return ConfigureBuildReturnCodeTypes.notFound;
     }
 
@@ -1189,15 +1169,13 @@ export async function configure(triggeredBy: TriggeredBy, updateTargets: boolean
   }
 
   // Identify for telemetry whether this configure will read configuration constructs from cache.
-  let readCache: boolean = false;
   let configurationCachePath: string | undefined =
     configuration.getConfigurationCachePath();
-  if (
-    configurationCachePath &&
-    util.checkFileExistsSync(configurationCachePath)
-  ) {
-    readCache = true;
-  }
+  let configurationCache: string | undefined =
+    configurationCachePath ?
+        path.join(configurationCachePath, configuration.getCurrentTarget() + ".cache") : undefined;
+  let readCache: boolean = configurationCache ?
+    util.checkFileExistsSync(configurationCache) : false;
 
   let compileCommandsPath: string | undefined =
     configuration.getCompileCommandsPath();
@@ -1300,12 +1278,13 @@ export async function configure(triggeredBy: TriggeredBy, updateTargets: boolean
       // Rewrite the configuration cache according to the last updates of the internal arrays,
       // but not if the configure was cancelled and not while running regression tests.
       if (
-        configurationCachePath &&
+        configuration.getKeepConfigurationCache() &&
+        configurationCache &&
         retc !== ConfigureBuildReturnCodeTypes.cancelled &&
         process.env["MAKEFILE_TOOLS_TESTING"] !== "1"
       ) {
         util.writeFile(
-          configurationCachePath,
+          configurationCache,
           JSON.stringify(ConfigurationCache)
         );
       }
@@ -1564,12 +1543,13 @@ export async function loadConfigurationFromCache(progress: vscode.Progress<{}>, 
 
     await util.scheduleAsyncTask(async () => {await extension.registerCppToolsProvider(); });
     let cachePath: string | undefined = configuration.getConfigurationCachePath();
-    if (cachePath) {
-        let content: string | undefined = util.readFile(cachePath);
+    if (configuration.getKeepConfigurationCache() && cachePath) {
+        let cacheFile: string = path.join(cachePath, configuration.getCurrentTarget() + ".cache");
+        let content: string | undefined = util.readFile(cacheFile);
         if (content) {
             try {
                 progress.report({ increment: 1, message: localize("make.configure.cache", "Configuring from cache") });
-                logger.message(`Configuring from cache: ${cachePath}`);
+                logger.message(`Configuring from cache: ${cacheFile}`);
                 let configurationCache: ConfigurationCache = {
                     buildTargets: undefined,
                     launchTargets: [],
@@ -1724,11 +1704,11 @@ export async function doConfigure(progress: vscode.Progress<{}>, cancel: vscode.
             // But we do need to configure again after a build target change,
             // so call doConfigure here and not configure.
             // We don't need to alter yet any dirty or pending states, this being an 'inner' call of configure.
-            // We don't need to consider makefile.configureAfterCommand: even if set to false
+            // We don't need to consider autotools.configureAfterCommand: even if set to false
             // (which would result in changing a build target without a following configure - in the normal scenario)
             // now we need to configure because this build target reset was done under the covers
             // by the extension and as a result of a configure (which can only be triggered by the user
-            // if makefile.configureAfterCommand is set to false).
+            // if autotools.configureAfterCommand is set to false).
             // Calling doConfigure here will not result in extra telemetry (just extra logging).
             // The recursive call to doConfigure will fall still under the same progress bar and cancel button
             // as the caller and its result will be included into the telemetry information reported by that.

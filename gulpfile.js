@@ -48,7 +48,7 @@ const languages = [
 // ****************************
 // Command: translations-export
 // The following is used to export and XLF file containing english strings for translations.
-// The result will be written to: ./vscode-extensions-localization-export/ms-vscode/
+// The result will be written to: ./vscode-extensions-localization-export/mergesium/
 // ****************************
 
 const translationProjectName  = "vscode-extensions";
@@ -142,7 +142,7 @@ gulp.task("translations-export", (done) => {
     .pipe(filter(['**/*.nls.json', '**/*.nls.metadata.json']))
 
     // Consoldate them into nls.metadata.json, which the xlf is built from.
-    .pipe(nls.bundleMetaDataFiles('ms-vscode.makefile-tools', '.'))
+    .pipe(nls.bundleMetaDataFiles('mergesium.autotools', '.'))
 
     // filter down to just the resulting metadata files
     .pipe(filter(['**/nls.metadata.header.json', '**/nls.metadata.json']))
@@ -208,7 +208,7 @@ const generatedSrcLocBundle = () => {
         .pipe(tsProject()).js
         .pipe(nls.rewriteLocalizeCalls())
         .pipe(nls.createAdditionalLanguageFiles(languages, "i18n"))
-        .pipe(nls.bundleMetaDataFiles('ms-vscode.makefile-tools', 'out'))
+        .pipe(nls.bundleMetaDataFiles('mergesium.autotools', 'out'))
         .pipe(nls.bundleLanguageFiles())
         .pipe(gulp.dest('out'));
 };

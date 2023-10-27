@@ -66,7 +66,7 @@ export function logEvent(eventName: string, properties?: Properties, measures?: 
 
 // Allow-lists for various settings.
 function filterSetting(value: any, key: string, defaultValue: string) : string {
-    if (key === "makefile.dryrunSwitches") {
+    if (key === "autotools.dryrunSwitches") {
         let dryrunSwitches: string[] = value;
         let filteredSwitches: string[] | undefined = dryrunSwitches.map(sw => {
             switch (sw) {
@@ -115,9 +115,9 @@ function filterSetting(value: any, key: string, defaultValue: string) : string {
 // Example: don't report telemetry for all launch configurations but only for
 // the current launch configuration.
 function activeArrayItem(setting: string, key: string): number {
-    if (key === "makefile.configurations") {
+    if (key === "autotools.configurations") {
         let makefileConfigurations: configuration.MakefileConfiguration[] = configuration.getMakefileConfigurations();
-        let currentMakefileConfigurationName: string | undefined = configuration.getCurrentMakefileConfiguration();
+        let currentMakefileConfigurationName: string | undefined = configuration.getCurrentMakefileConfiguration().name;
         if (!currentMakefileConfigurationName) {
             return -1;
         }
@@ -131,7 +131,7 @@ function activeArrayItem(setting: string, key: string): number {
         return currentMakefileConfiguration ? makefileConfigurations.indexOf(currentMakefileConfiguration) : -1;
     }
 
-    if (key === "makefile.launchConfigurations") {
+    if (key === "autotools.launchConfigurations") {
         let launchConfigurations: configuration.LaunchConfiguration[] = configuration.getLaunchConfigurations();
         let currentLaunchConfiguration: configuration.LaunchConfiguration | undefined = launchConfigurations.find(config => {
             if (util.areEqual(config, configuration.getCurrentLaunchConfiguration())) {
@@ -147,12 +147,12 @@ function activeArrayItem(setting: string, key: string): number {
 
 // Filter the array item indexes from the key since for now, when we analyze an array,
 // we pick one item that corresponds to a current state of the project.
-// Example: makefile.configurations.0.name ==> makefile.configurations.name
+// Example: autotools.configurations.0.name ==> autotools.configurations.name
 // The extension currently has a settings structure with only one level of objects arrays
-// (makefile.configurations and makefile.launchConfigurations).
+// (autotools.configurations and autotools.launchConfigurations).
 // Other arrays are of simple type (like make or executable arguments, dryrun switches)
 // and don't create a key that would have 2 numerical properties
-// (there is no makefile.configurations.1.makeArgs.2.something).
+// (there is no autotools.configurations.1.makeArgs.2.something).
 // So, eliminate only one numerical (if exists) before the last dot in this key string.
 // We still need the complete key for anything else than the telemetry properties
 // (example: validation errors are more clear when an array item is highlighted).
@@ -210,7 +210,7 @@ export async function analyzeSettings(setting: any, key: string, propSchema: any
     // Validate the allowed values against the expanded variable.
     let enumValues: any[] = propSchema.enum;
     if (enumValues && enumValues.length > 0) {
-        const regexp: RegExp = /(makefile\.)(.+)/mg;
+        const regexp: RegExp = /(autotools\.)(.+)/mg;
         const res: RegExpExecArray | null = regexp.exec(key);
         let expandedSetting: string = res ? await util.getExpandedSetting<string>(res[2]) : setting;
         if (!enumValues.includes(expandedSetting)) {
@@ -266,14 +266,14 @@ export async function analyzeSettings(setting: any, key: string, propSchema: any
                 if (jsonType === "array") {
                     jsonProps = propSchema.items.properties || propSchema.items;
                 } else {
-                    // For a setting like "makefile.name1.name2.name3",
+                    // For a setting like "autotools.name1.name2.name3",
                     // when we need to query for its schema we should use the whole name as index
                     // but when we query for the workspace value, we have to use each sub object name:
                     // setting[name1][name2][name3].
                     // Otherwise we will not read anything useful about such a setting and we will also
                     // report a schema mismatch, even if it is written correctly.
                     let newProp: string = prop;
-                    let newFullProp: string = (key === "makefile") ? key + "." : "";
+                    let newFullProp: string = (key === "autotools") ? key + "." : "";
                     while (jsonProps === undefined && newProp !== "") {
                         newFullProp = newFullProp + newProp;
                         if (propSchema.properties) {

@@ -1,5 +1,5 @@
 {
-    "C_Cpp.default.configurationProvider": "ms-vscode.makefile-tools",
+    "C_Cpp.default.configurationProvider": "mergesium.autotools",
     "makefile.buildLog": "./dummy_dryrun.log",
     "makefile.extensionOutputFolder": "./.vscode",
     "makefile.extensionLog": "./.vscode/Makefile.out",

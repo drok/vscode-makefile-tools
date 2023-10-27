@@ -593,10 +593,10 @@ export function sortAndRemoveDuplicates(src: string[]) : string[] {
 export function reportDryRunError(dryrunOutputFile: string): void {
     logger.message(`You can see the detailed dry-run output at ${dryrunOutputFile}`);
     logger.message("Make sure that the extension is invoking the same make command as in your development prompt environment.");
-    logger.message("You may need to define or tweak a custom makefile configuration in settings via 'makefile.configurations' like described here: [link]");
-    logger.message("Also make sure your code base does not have any known issues with the dry-run switches used by this extension (makefile.dryrunSwitches).");
+    logger.message("You may need to define or tweak a custom makefile configuration in settings via 'autotools.configurations' like described here: [link]");
+    logger.message("Also make sure your code base does not have any known issues with the dry-run switches used by this extension (autotools.dryrunSwitches).");
     logger.message("If you are not able to fix the dry-run, open a GitHub issue in Makefile Tools repo: "
-        + "https://github.com/microsoft/vscode-makefile-tools/issues");
+        + "https://github.com/Mergesium/vscode-makefile-tools/issues");
 }
 
 // Helper to make paths absolute until the extension handles variables expansion.
@@ -630,12 +630,12 @@ export function userHome(): string {
 // is used on such types of settings) and for arrays or objects, expand recursively
 // until we reach the simple types for submembers. This handles any structure.
 export async function getExpandedSetting<T>(settingId: string, propSchema?: any): Promise<T | undefined> {
-    let workspaceConfiguration: vscode.WorkspaceConfiguration = vscode.workspace.getConfiguration("makefile");
+    let workspaceConfiguration: vscode.WorkspaceConfiguration = vscode.workspace.getConfiguration("autotools");
     let settingVal: any | undefined = workspaceConfiguration.get<T>(settingId);
 
     if (!propSchema) {
         propSchema = thisExtensionPackage().contributes.configuration.properties;
-        propSchema = propSchema.properties ? propSchema.properties[`makefile.${settingId}`] : propSchema[`makefile.${settingId}`];
+        propSchema = propSchema.properties ? propSchema.properties[`autotools.${settingId}`] : propSchema[`autotools.${settingId}`];
     }
 
     // Read what's at settingId in the workspace settings and for objects and arrays of complex types make sure
@@ -737,8 +737,8 @@ export async function getExpandedSettingVal<T>(settingId: string, settingVal: an
 //   but also the analysis of the meaning of a string (especially if not full path) is not simple.
 //   Forward slashes are recommended in paths.
 //       NOTES:
-//       - ${command:makefile.getConfiguration} is the same as ${configuration}
-//       - ${command:makefile.getBuildTarget} is the same as ${buildTarget}
+//       - ${command:autotools.getConfiguration} is the same as ${configuration}
+//       - ${command:autotools.getBuildTarget} is the same as ${buildTarget}
 //       - we need the above two commands because launch.json and tasks.json
 //         don't work with our predefined variables, only with the VSCode predefined variables.
 //         Such data is useful to be accessible to launch/tasks jsons too.
@@ -781,7 +781,7 @@ export async function expandVariablesInSetting(settingId: string, settingVal: st
             toStr = userHome();
             telemetryProperties.pattern =  result[2];
         } else if (result[2] === "configuration") {
-            toStr = configuration.getCurrentMakefileConfiguration();
+            toStr = configuration.getCurrentMakefileConfiguration().name;
             telemetryProperties.pattern =  result[2];
         } else if (result[2] === "buildTargetName") {
             toStr = configuration.getCurrentTarget().name || "";
@@ -813,14 +813,14 @@ export async function expandVariablesInSetting(settingId: string, settingVal: st
                 toStr = (workspaceCfg.get(res[2]) as string);
 
                 // The setting is either undefined or maybe we encountered a case with multiple names separated by dot for a property:
-                // makefile.set1.set2.set3.set4... which cannot be seen if given the whole setting ID at once.
+                // autotools.set1.set2.set3.set4... which cannot be seen if given the whole setting ID at once.
                 // Example:
-                // "makefile.set1.set2.set3": {
+                // "autotools.set1.set2.set3": {
                 //     "set4.set5": "val" 
                 //     "something.else": "other"
                 // }
-                // A get on the root workspace cannot see "makefile.set1.set2.set3.set4.set5", returns undefined.
-                // In the above case, one get of "makefile.set1.set2.set3" returns an object, then an access on "set4.set5" gets the final value "val".
+                // A get on the root workspace cannot see "autotools.set1.set2.set3.set4.set5", returns undefined.
+                // In the above case, one get of "autotools.set1.set2.set3" returns an object, then an access on "set4.set5" gets the final value "val".
                 // We don't know at which dot to stop for the first and the subsequent get operations, so starting with the workspace root
                 // we query for properties and see how much it matches from the full setting id, then we query again on the left over,
                 // until we get the final value.
@@ -874,12 +874,12 @@ export async function expandVariablesInSetting(settingId: string, settingVal: st
 
 // Function specialized to get properties with multiple dots in their names.
 // In case of more possibilities, return last.
-// Example: get the value of "makefile.panel.visibility" or a general hypothetic setting like
-// "makefile.set1.set2.set3.set4": {
+// Example: get the value of "autotools.panel.visibility" or a general hypothetic setting like
+// "autotools.set1.set2.set3.set4": {
 //      "set5.set6": "val1",
 //      "set7.set8": "val2"
 // }
-// getSettingMultipleDots will return "val2" for "makefile.set1.set2.set3.set4.set7.set8"
+// getSettingMultipleDots will return "val2" for "autotools.set1.set2.set3.set4.set7.set8"
 // and workspaceConfiguration.get<> will not see it as a whole.
 function getSettingMultipleDots(scope: any, settingId: string) : any {
     let result: any;
@@ -928,7 +928,7 @@ export async function scheduleAsyncTask<T>(task: () => Promise<T>): Promise<T> {
 }
 
 export function thisExtension(): vscode.Extension<any> {
-    const ext: vscode.Extension<any> | undefined = vscode.extensions.getExtension('ms-vscode.makefile-tools');
+    const ext: vscode.Extension<any> | undefined = vscode.extensions.getExtension('mergesium.autotools');
     if (!ext) {
       throw new Error("Our own extension is null.");
     }

@@ -1,34 +1,34 @@
 {
-    "name": "makefile-tools",
-    "displayName": "Makefile Tools",
-    "description": "Provide makefile support in VS Code: C/C++ IntelliSense, build, debug/run.",
-    "version": "0.7.0",
-    "publisher": "ms-vscode",
+    "name": "autotools",
+    "displayName": "Autotools Integration",
+    "description": "Import autotools configuration into C/C++ IntelliSense",
+    "version": "0.1.0",
+    "publisher": "mergesium",
     "preview": true,
-    "icon": "res/makefile-logo.png",
+    "icon": "res/autotools.png",
     "readme": "README.md",
     "author": {
-        "name": "Microsoft Corporation"
+        "name": "Mergesium Inc."
     },
     "license": "SEE LICENSE IN LICENSE.txt",
     "engines": {
         "vscode": "^1.74.0"
     },
     "bugs": {
-        "url": "https://github.com/Microsoft/vscode-makefile-tools/issues",
-        "email": "c_cpp_support@microsoft.com"
+        "url": "https://github.com/Mergesium/vscode-makefile-tools/issues",
+        "email": "support.vscode.autotools@mergesium.com"
     },
     "repository": {
         "type": "git",
-        "url": "https://github.com/Microsoft/vscode-makefile-tools.git"
+        "url": "https://github.com/Mergesium/vscode-makefile-tools.git"
     },
-    "homepage": "https://github.com/Microsoft/vscode-makefile-tools",
-    "qna": "https://github.com/Microsoft/vscode-makefile-tools/issues",
+    "homepage": "https://github.com/Mergesium/vscode-makefile-tools",
+    "qna": "https://github.com/Mergesium/vscode-makefile-tools/issues",
     "keywords": [
         "C",
         "C++",
         "IntelliSense",
-        "Microsoft",
+        "Mergesium",
         "Makefile"
     ],
     "categories": [
@@ -37,194 +37,152 @@
         "Other"
     ],
     "activationEvents": [
-        "onCommand:makefile.setBuildConfiguration",
-        "onCommand:makefile.getConfiguration",
-        "onCommand:makefile.setBuildTarget",
-        "onCommand:makefile.getBuildTarget",
-        "onCommand:makefile.buildTarget",
-        "onCommand:makefile.buildCleanTarget",
-        "onCommand:makefile.buildAll",
-        "onCommand:makefile.buildCleanAll",
-        "onCommand:makefile.setLaunchConfiguration",
-        "onCommand:makefile.launchDebug",
-        "onCommand:makefile.launchRun",
-        "onCommand:makefile.launchTargetPath",
-        "onCommand:makefile.getLaunchTargetPath",
-        "onCommand:makefile.launchTargetFileName",
-        "onCommand:makefile.getLaunchTargetFileName",
-        "onCommand:makefile.getLaunchTargetDirectory",
-        "onCommand:makefile.getLaunchTargetArgs",
-        "onCommand:makefile.getLaunchTargetArgsConcat",
-        "onCommand:makefile.makeBaseDirectory",
-        "onCommand:makefile.configure",
-        "onCommand:makefile.cleanConfigure",
-        "onCommand:makefile.preConfigure",
-        "onCommand:makefile.postConfigure",
-        "onCommand:makefile.outline.setBuildConfiguration",
-        "onCommand:makefile.outline.setBuildTarget",
-        "onCommand:makefile.outline.buildTarget",
-        "onCommand:makefile.outline.buildCleanTarget",
-        "onCommand:makefile.outline.setLaunchConfiguration",
-        "onCommand:makefile.outline.launchDebug",
-        "onCommand:makefile.outline.launchRun",
-        "onCommand:makefile.outline.configure",
-        "onCommand:makefile.outline.cleanConfigure",
-        "onCommand:makefile.outline.preConfigure",
-        "onCommand:makefile.outline.postConfigure",
-        "onCommand:makefile.resetState",
-        "workspaceContains:**/makefile",
-        "workspaceContains:**/Makefile",
-        "workspaceContains:**/GNUmakefile"
+        "*"
     ],
     "main": "./out/src/extension.js",
     "contributes": {
         "commands": [
             {
-                "command": "makefile.buildTarget",
-                "title": "%makefile-tools.command.makefile.buildTarget.title%"
+                "command": "autotools.buildTarget",
+                "title": "%autotools.command.makefile.buildTarget.title%"
             },
             {
-                "command": "makefile.buildCleanTarget",
-                "title": "%makefile-tools.command.makefile.buildCleanTarget.title%"
+                "command": "autotools.buildCleanTarget",
+                "title": "%autotools.command.makefile.buildCleanTarget.title%"
             },
             {
-                "command": "makefile.buildAll",
-                "title": "%makefile-tools.command.makefile.buildAll.title%"
+                "command": "autotools.buildAll",
+                "title": "%autotools.command.makefile.buildAll.title%"
             },
             {
-                "command": "makefile.buildCleanAll",
-                "title": "%makefile-tools.command.makefile.buildCleanAll.title%"
+                "command": "autotools.buildCleanAll",
+                "title": "%autotools.command.makefile.buildCleanAll.title%"
             },
             {
-                "command": "makefile.launchDebug",
-                "title": "%makefile-tools.command.makefile.launchDebug.title%"
+                "command": "autotools.launchDebug",
+                "title": "%autotools.command.makefile.launchDebug.title%"
             },
             {
-                "command": "makefile.launchRun",
-                "title": "%makefile-tools.command.makefile.launchRun.title%"
+                "command": "autotools.launchRun",
+                "title": "%autotools.command.makefile.launchRun.title%"
             },
             {
-                "command": "makefile.setBuildConfiguration",
-                "title": "%makefile-tools.command.makefile.setBuildConfiguration.title%"
+                "command": "autotools.setBuildConfiguration",
+                "title": "%autotools.command.makefile.setBuildConfiguration.title%"
             },
             {
-                "command": "makefile.setBuildTarget",
-                "title": "%makefile-tools.command.makefile.setBuildTarget.title%"
+                "command": "autotools.setBuildTarget",
+                "title": "%autotools.command.makefile.setBuildTarget.title%"
             },
             {
-                "command": "makefile.setLaunchConfiguration",
-                "title": "%makefile-tools.command.makefile.setLaunchConfiguration.title%"
+                "command": "autotools.setLaunchConfiguration",
+                "title": "%autotools.command.makefile.setLaunchConfiguration.title%"
             },
             {
-                "command": "makefile.configure",
-                "title": "%makefile-tools.command.makefile.configure.title%"
+                "command": "autotools.configure",
+                "title": "%autotools.command.makefile.configure.title%"
             },
             {
-                "command": "makefile.cleanConfigure",
-                "title": "%makefile-tools.command.makefile.cleanConfigure.title%"
+                "command": "autotools.cleanConfigure",
+                "title": "%autotools.command.makefile.cleanConfigure.title%"
             },
             {
-                "command": "makefile.preConfigure",
-                "title": "%makefile-tools.command.makefile.preConfigure.title%"
+                "command": "autotools.preConfigure",
+                "title": "%autotools.command.makefile.preConfigure.title%"
             },
             {
-                "command": "makefile.postConfigure",
-                "title": "%makefile-tools.command.makefile.postConfigure.title%"
+                "command": "autotools.postConfigure",
+                "title": "%autotools.command.makefile.postConfigure.title%"
             },
             {
-                "command": "makefile.outline.buildTarget",
-                "title": "%makefile-tools.command.makefile.buildTarget.title%",
+                "command": "autotools.outline.buildTarget",
+                "title": "%autotools.command.makefile.buildTarget.title%",
                 "icon": {
                     "light": "res/light/build.svg",
                     "dark": "res/dark/build.svg"
                 }
             },
             {
-                "command": "makefile.outline.buildCleanTarget",
-                "title": "%makefile-tools.command.makefile.buildCleanTarget.title%"
+                "command": "autotools.outline.buildCleanTarget",
+                "title": "%autotools.command.makefile.buildCleanTarget.title%"
             },
             {
-                "command": "makefile.outline.launchDebug",
-                "title": "%makefile-tools.command.makefile.launchDebug.title%",
+                "command": "autotools.outline.launchDebug",
+                "title": "%autotools.command.makefile.launchDebug.title%",
                 "icon": "$(debug)",
-                "enablement": "makefile:localDebugFeature"
+                "enablement": "autotools:localDebugFeature"
             },
             {
-                "command": "makefile.outline.launchRun",
-                "title": "%makefile-tools.command.makefile.launchRun.title%",
+                "command": "autotools.outline.launchRun",
+                "title": "%autotools.command.makefile.launchRun.title%",
                 "icon": "$(run)",
-                "enablement": "makefile:localRunFeature"
+                "enablement": "autotools:localRunFeature"
             },
             {
-                "command": "makefile.outline.setBuildConfiguration",
-                "title": "%makefile-tools.command.makefile.setBuildConfiguration.title%",
+                "command": "autotools.outline.setBuildConfiguration",
+                "title": "%autotools.command.makefile.setBuildConfiguration.title%",
                 "icon": "$(notebook-edit)"
             },
             {
-                "command": "makefile.outline.setBuildTarget",
-                "title": "%makefile-tools.command.makefile.setBuildTarget.title%",
+                "command": "autotools.outline.setBuildTarget",
+                "title": "%autotools.command.makefile.setBuildTarget.title%",
                 "icon": "$(notebook-edit)"
             },
             {
-                "command": "makefile.outline.setLaunchConfiguration",
-                "title": "%makefile-tools.command.makefile.setLaunchConfiguration.title%",
+                "command": "autotools.outline.setLaunchConfiguration",
+                "title": "%autotools.command.makefile.setLaunchConfiguration.title%",
                 "icon": "$(notebook-edit)"
             },
             {
-               "command": "makefile.outline.openMakefilePathSetting",
-               "title": "%makefile-tools.command.makefile.openMakefilePathSetting.title%",
-               "icon": "$(notebook-edit)"
-            },
-            {
-                "command": "makefile.outline.openMakefileFile",
-                "title": "%makefile-tools.command.makefile.openMakefileFile.title%",
+                "command": "autotools.outline.openMakefileFile",
+                "title": "%autotools.command.makefile.openMakefileFile.title%",
                 "icon": "$(open-preview)"
             },
             {
-                "command": "makefile.outline.openMakePathSetting",
-                "title": "%makefile-tools.command.makefile.openMakePathSetting.title%",
+                "command": "autotools.outline.openMakePathSetting",
+                "title": "%autotools.command.makefile.openMakePathSetting.title%",
                 "icon": "$(notebook-edit)"
             },
             {
-                "command": "makefile.outline.openBuildLogSetting",
-                "title": "%makefile-tools.command.makefile.openBuildLogSetting.title%",
+                "command": "autotools.outline.openBuildLogSetting",
+                "title": "%autotools.command.makefile.openBuildLogSetting.title%",
                 "icon": "$(notebook-edit)"
             },
             {
-                "command": "makefile.outline.openBuildLogFile",
-                "title": "%makefile-tools.command.makefile.openBuildLogFile.title%",
+                "command": "autotools.outline.openBuildLogFile",
+                "title": "%autotools.command.makefile.openBuildLogFile.title%",
                 "icon": "$(open-preview)"
             },
             {
-                "command": "makefile.outline.configure",
-                "title": "%makefile-tools.command.makefile.configure.title%",
+                "command": "autotools.outline.configure",
+                "title": "%autotools.command.makefile.configure.title%",
                 "icon": "$(settings)"
             },
             {
-                "command": "makefile.outline.cleanConfigure",
-                "title": "%makefile-tools.command.makefile.cleanConfigure.title%"
+                "command": "autotools.outline.cleanConfigure",
+                "title": "%autotools.command.makefile.cleanConfigure.title%"
             },
             {
-                "command": "makefile.outline.preConfigure",
-                "title": "%makefile-tools.command.makefile.preConfigure.title%"
+                "command": "autotools.outline.preConfigure",
+                "title": "%autotools.command.makefile.preConfigure.title%"
             },
             {
-                "command": "makefile.outline.postConfigure",
-                "title": "%makefile-tools.command.makefile.postConfigure.title%"
+                "command": "autotools.outline.postConfigure",
+                "title": "%autotools.command.makefile.postConfigure.title%"
             },
             {
-                "command": "makefile.resetState",
-                "title": "%makefile-tools.command.makefile.resetState.title%"
+                "command": "autotools.resetState",
+                "title": "%autotools.command.makefile.resetState.title%"
             }
         ],
         "problemMatchers": [
             {
               "name": "gcc",
               "source": "gcc",
-              "owner": "makefile-tools",
+              "owner": "autotools",
               "fileLocation": [
                 "autoDetect",
-                "${command:makefile.makeBaseDirectory}"
+                "${command:autotools.makeBaseDirectory}"
                ],
               "pattern": {
                 "regexp": "^(.*?):(\\d+):(\\d*):?\\s+(?:fatal\\s+)?(warning|error):\\s+(.*)$",
@@ -238,45 +196,37 @@
             {
                "name": "msvc",
                "source": "msvc",
-               "owner": "makefile-tools",
+               "owner": "autotools",
                "base": "$msCompile",
                "fileLocation": [
                  "autoDetect",
-                 "${command:makefile.makeBaseDirectory}"
+                 "${command:autotools.makeBaseDirectory}"
                ]
              }
           ],
         "configuration": {
             "type": "object",
-            "title": "Makefile Tools",
+            "title": "Autotools",
             "properties": {
-                "makefile.configurations": {
+                "autotools.configurations": {
                     "type": "array",
                     "default": [],
-                    "description": "%makefile-tools.configuration.makefile.configurations.description%",
+                    "description": "%autotools.configuration.makefile.configurations.description%",
                     "items": {
                         "type": "object",
                         "default": null,
                         "properties": {
                             "name": {
                                 "type": "string",
-                                "description": "%makefile-tools.configuration.makefile.configurations.name.description%"
-                            },
-                            "makefilePath": {
-                                "type": "string",
-                                "description": "%makefile-tools.configuration.makefile.configurations.makefilePath.description%"
-                            },
-                            "makePath": {
-                                "type": "string",
-                                "description": "%makefile-tools.configuration.makefile.configurations.makePath.description%"
+                                "description": "%autotools.configuration.makefile.configurations.name.description%"
                             },
                             "makeDirectory": {
                               "type": "string",
-                              "description": "%makefile-tools.configuration.makefile.configurations.makeDirectory.description%"
+                              "description": "%autotools.configuration.makefile.configurations.makeDirectory.description%"
                             },
                             "makeArgs": {
                                 "type": "array",
-                                "description": "%makefile-tools.configuration.makefile.configurations.makeArgs.description%",
+                                "description": "%autotools.configuration.makefile.configurations.makeArgs.description%",
                                 "items": {
                                     "type": "string"
                                 },
@@ -288,24 +238,24 @@
                                     "type": "string"
                                 },
                                 "default": ["$gcc", "$msvc"],
-                                "description": "%makefile-tools.configuration.makefile.configurations.problemMatchers.description%"
+                                "description": "%autotools.configuration.makefile.configurations.problemMatchers.description%"
                             },
                             "buildLog": {
                                 "type": "string",
-                                "description": "%makefile-tools.configuration.makefile.configurations.buildLog.description%"
+                                "description": "%autotools.configuration.makefile.configurations.buildLog.description%"
                             }
                         }
                     },
                     "scope": "resource"
                 },
-                "makefile.defaultLaunchConfiguration": {
+                "autotools.defaultLaunchConfiguration": {
                     "type": "object",
                     "default": null,
-                    "description": "%makefile-tools.configuration.makefile.defaultLaunchConfiguration.description%",
+                    "description": "%autotools.configuration.makefile.defaultLaunchConfiguration.description%",
                     "properties": {
                         "MIMode": {
                             "type": "string",
-                            "description": "%makefile-tools.configuration.makefile.defaultLaunchConfiguration.MIMode.description%",
+                            "description": "%autotools.configuration.makefile.defaultLaunchConfiguration.MIMode.description%",
                             "enum": [
                                 "gdb",
                                 "lldb"
@@ -313,35 +263,35 @@
                         },
                         "miDebuggerPath": {
                             "type": "string",
-                            "description": "%makefile-tools.configuration.makefile.defaultLaunchConfiguration.miDebuggerPath.description%"
+                            "description": "%autotools.configuration.makefile.defaultLaunchConfiguration.miDebuggerPath.description%"
                         },
                         "stopAtEntry": {
                             "type": "boolean",
-                            "description": "%makefile-tools.configuration.makefile.defaultLaunchConfiguration.stopAtEntry.description%",
+                            "description": "%autotools.configuration.makefile.defaultLaunchConfiguration.stopAtEntry.description%",
                             "default": false
                         },
                         "symbolSearchPath": {
                             "type": "string",
-                            "description": "%makefile-tools.configuration.makefile.defaultLaunchConfiguration.symbolSearchPath.description%"
+                            "description": "%autotools.configuration.makefile.defaultLaunchConfiguration.symbolSearchPath.description%"
                         }
                     },
                     "scope": "resource"
                 },
-                "makefile.launchConfigurations": {
+                "autotools.launchConfigurations": {
                     "type": "array",
                     "default": [],
-                    "description": "%makefile-tools.configuration.makefile.launchConfigurations.description%",
+                    "description": "%autotools.configuration.makefile.launchConfigurations.description%",
                     "items": {
                         "type": "object",
                         "default": null,
                         "properties": {
                             "binaryPath": {
                                 "type": "string",
-                                "description": "%makefile-tools.configuration.makefile.launchConfigurations.binaryPath.description%"
+                                "description": "%autotools.configuration.makefile.launchConfigurations.binaryPath.description%"
                             },
                             "binaryArgs": {
                                 "type": "array",
-                                "description": "%makefile-tools.configuration.makefile.launchConfigurations.binaryArgs.description%",
+                                "description": "%autotools.configuration.makefile.launchConfigurations.binaryArgs.description%",
                                 "items": {
                                     "type": "string"
                                 },
@@ -349,11 +299,11 @@
                             },
                             "cwd": {
                                 "type": "string",
-                                "description": "%makefile-tools.configuration.makefile.launchConfigurations.cwd.description%"
+                                "description": "%autotools.configuration.makefile.launchConfigurations.cwd.description%"
                             },
                             "MIMode": {
                                 "type": "string",
-                                "description": "%makefile-tools.configuration.makefile.launchConfigurations.MIMode.description%",
+                                "description": "%autotools.configuration.makefile.launchConfigurations.MIMode.description%",
                                 "enum": [
                                     "gdb",
                                     "lldb"
@@ -361,22 +311,22 @@
                             },
                             "miDebuggerPath": {
                                 "type": "string",
-                                "description": "%makefile-tools.configuration.makefile.launchConfigurations.miDebuggerPath.description%"
+                                "description": "%autotools.configuration.makefile.launchConfigurations.miDebuggerPath.description%"
                             },
                             "stopAtEntry": {
                                 "type": "boolean",
-                                "description": "%makefile-tools.configuration.makefile.launchConfigurations.stopAtEntry.description%",
+                                "description": "%autotools.configuration.makefile.launchConfigurations.stopAtEntry.description%",
                                 "default": false
                             },
                             "symbolSearchPath": {
                                 "type": "string",
-                                "description": "%makefile-tools.configuration.makefile.launchConfigurations.symbolSearchPath.description%"
+                                "description": "%autotools.configuration.makefile.launchConfigurations.symbolSearchPath.description%"
                             }
                         }
                     },
                     "scope": "resource"
                 },
-                "makefile.loggingLevel": {
+                "autotools.loggingLevel": {
                     "type": "string",
                     "enum": [
                         "Normal",
@@ -384,170 +334,171 @@
                         "Debug"
                     ],
                     "default": "Normal",
-                    "description": "%makefile-tools.configuration.makefile.loggingLevel.description%",
+                    "description": "%autotools.configuration.makefile.loggingLevel.description%",
                     "scope": "resource"
                 },
-                "makefile.makePath": {
+                "autotools.makePath": {
                     "type": "string",
                     "default": "make",
-                    "description": "%makefile-tools.configuration.makefile.makePath.description%",
+                    "description": "%autotools.configuration.makefile.makePath.description%",
                     "scope": "resource"
                 },
-                "makefile.makeDirectory": {
+                "autotools.makeDirectory": {
                     "type": "string",
-                    "description": "%makefile-tools.configuration.makefile.makeDirectory.description%",
+                    "description": "%autotools.configuration.makefile.makeDirectory.description%",
                     "scope": "resource"
                 },
-                "makefile.makefilePath": {
+                "autotools.buildLog": {
                     "type": "string",
-                    "description": "%makefile-tools.configuration.makefile.makefilePath.description%",
-                    "scope": "resource"
-                },
-                "makefile.buildLog": {
-                    "type": "string",
-                    "description": "%makefile-tools.configuration.makefile.buildLog.description%",
+                    "description": "%autotools.configuration.makefile.buildLog.description%",
                     "default": null,
                     "scope": "resource"
                 },
-                "makefile.extensionOutputFolder": {
+                "autotools.extensionOutputFolder": {
                     "type": "string",
-                    "description": "%makefile-tools.configuration.makefile.extensionOutputFolder.description%",
+                    "description": "%autotools.configuration.makefile.extensionOutputFolder.description%",
                     "default": "",
                     "scope": "resource"
                 },
-                "makefile.extensionLog": {
+                "autotools.extensionLog": {
                     "type": "string",
-                    "description": "%makefile-tools.configuration.makefile.extensionLog.description%",
+                    "description": "%autotools.configuration.makefile.extensionLog.description%",
                     "default": "",
                     "scope": "resource"
                 },
-                "makefile.configurationCachePath": {
-                    "type": "string",
-                    "description": "%makefile-tools.configuration.makefile.configurationCachePath.description%",
-                    "default": "",
-                    "scope": "resource"
-                },
-                "makefile.dryrunSwitches": {
+                "autotools.dryrunSwitches": {
                     "type": "array",
                     "default": [
                         "--always-make",
                         "--keep-going",
                         "--print-directory"
                     ],
-                    "description": "%makefile-tools.configuration.makefile.dryrunSwitches.description%",
+                    "description": "%autotools.configuration.makefile.dryrunSwitches.description%",
                     "items": {
                         "type": "string"
                     },
                     "scope": "resource"
                 },
-                "makefile.additionalCompilerNames": {
+                "autotools.keepDryRuns": {
+                    "type": "boolean",
+                    "markdownDescription": "%autotools.configuration.makefile.keepDryRuns.markdownDescription%",
+                    "default": false,
+                    "scope": "resource"
+                },
+                "autotools.keepConfigurationCache": {
+                    "type": "boolean",
+                    "markdownDescription": "%autotools.configuration.makefile.keepConfigurationCache.markdownDescription%",
+                    "default": false,
+                    "scope": "resource"
+                },
+                "autotools.additionalCompilerNames": {
                     "type": "array",
                     "default": [],
-                    "description": "%makefile-tools.configuration.makefile.additionalCompilerNames.description%",
+                    "description": "%autotools.configuration.makefile.additionalCompilerNames.description%",
                     "items": {
                         "type": "string"
                     },
                     "scope": "resource"
                 },
-                "makefile.excludeCompilerNames": {
+                "autotools.excludeCompilerNames": {
                     "type": "array",
                     "default": [],
-                    "description": "%makefile-tools.configuration.makefile.excludeCompilerNames.description%",
+                    "description": "%autotools.configuration.makefile.excludeCompilerNames.description%",
                     "items": {
                         "type": "string"
                     },
                     "scope": "resource"
                 },
-                "makefile.configureOnOpen": {
+                "autotools.configureOnOpen": {
                     "type": "boolean",
                     "default": true,
-                    "description": "%makefile-tools.configuration.makefile.configureOnOpen.description%",
+                    "description": "%autotools.configuration.makefile.configureOnOpen.description%",
                     "scope": "resource"
                 },
-                "makefile.configureOnEdit": {
+                "autotools.configureOnEdit": {
                     "type": "boolean",
                     "default": true,
-                    "description": "%makefile-tools.configuration.makefile.configureOnEdit.description%",
+                    "description": "%autotools.configuration.makefile.configureOnEdit.description%",
                     "scope": "resource"
                 },
-                "makefile.configureAfterCommand": {
+                "autotools.configureAfterCommand": {
                     "type": "boolean",
                     "default": true,
-                    "description": "%makefile-tools.configuration.makefile.configureAfterCommand.description%",
+                    "description": "%autotools.configuration.makefile.configureAfterCommand.description%",
                     "scope": "resource"
                 },
-                "makefile.preConfigureScript": {
+                "autotools.preConfigureScript": {
                     "type": "string",
-                    "description": "%makefile-tools.configuration.makefile.preConfigureScript.description%",
+                    "description": "%autotools.configuration.makefile.preConfigureScript.description%",
                     "default": null,
                     "scope": "resource"
                 },
-                "makefile.postConfigureScript": {
+                "autotools.postConfigureScript": {
                     "type": "string",
-                    "description": "%makefile-tools.configuration.makefile.postConfigureScript.description%",
+                    "description": "%autotools.configuration.makefile.postConfigureScript.description%",
                     "default": null,
                     "scope": "resource"
                 },
-                "makefile.alwaysPreConfigure": {
+                "autotools.alwaysPreConfigure": {
                     "type": "boolean",
-                    "description": "%makefile-tools.configuration.makefile.alwaysPreConfigure.description%",
+                    "description": "%autotools.configuration.makefile.alwaysPreConfigure.description%",
                     "default": false,
                     "scope": "resource"
                 },
-                "makefile.alwaysPostConfigure": {
+                "autotools.alwaysPostConfigure": {
                     "type": "boolean",
-                    "description": "%makefile-tools.configuration.makefile.alwaysPostConfigure.description%",
+                    "description": "%autotools.configuration.makefile.alwaysPostConfigure.description%",
                     "default": false,
                     "scope": "resource"
                 },
-                "makefile.ignoreDirectoryCommands": {
+                "autotools.ignoreDirectoryCommands": {
                     "type": "boolean",
-                    "description": "%makefile-tools.configuration.makefile.ignoreDirectoryCommands.description%",
+                    "description": "%autotools.configuration.makefile.ignoreDirectoryCommands.description%",
                     "default": true,
                     "scope": "resource"
                 },
-                "makefile.phonyOnlyTargets": {
+                "autotools.phonyOnlyTargets": {
                     "type": "boolean",
                     "default": false,
-                    "description": "%makefile-tools.configuration.makefile.phonyOnlyTargets.description%",
+                    "description": "%autotools.configuration.makefile.phonyOnlyTargets.description%",
                     "scope": "resource"
                 },
-                "makefile.saveBeforeBuildOrConfigure": {
+                "autotools.saveBeforeBuildOrConfigure": {
                     "type": "boolean",
                     "default": true,
-                    "description": "%makefile-tools.configuration.makefile.saveBeforeBuildOrConfigure.description%",
+                    "description": "%autotools.configuration.makefile.saveBeforeBuildOrConfigure.description%",
                     "scope": "resource"
                 },
-                "makefile.buildBeforeLaunch": {
+                "autotools.buildBeforeLaunch": {
                     "type": "boolean",
                     "default": true,
-                    "description": "%makefile-tools.configuration.makefile.buildBeforeLaunch.description%",
+                    "description": "%autotools.configuration.makefile.buildBeforeLaunch.description%",
                     "scope": "resource"
                 },
-                "makefile.clearOutputBeforeBuild": {
+                "autotools.clearOutputBeforeBuild": {
                     "type": "boolean",
                     "default": true,
-                    "description": "%makefile-tools.configuration.makefile.clearOutputBeforeBuild.description%",
+                    "description": "%autotools.configuration.makefile.clearOutputBeforeBuild.description%",
                     "scope": "resource"
                 },
-                "makefile.compileCommandsPath": {
+                "autotools.compileCommandsPath": {
                     "type": "string",
                     "default": null,
-                    "description": "%makefile-tools.configuration.makefile.compileCommandsPath.description%",
+                    "description": "%autotools.configuration.makefile.compileCommandsPath.description%",
                     "scope": "resource"
                 },
-                "makefile.panel.visibility": {
+                "autotools.panel.visibility": {
                     "type": "object",
                     "default": null,
                     "properties": {
                         "debug": {
                             "type": "boolean",
-                            "description": "%makefile-tools.configuration.makefile.panel.visibility.debug.description%",
+                            "description": "%autotools.configuration.makefile.panel.visibility.debug.description%",
                             "default": true
                         },
                         "run": {
                             "type": "boolean",
-                            "description": "%makefile-tools.configuration.makefile.panel.visibility.run.description%",
+                            "description": "%autotools.configuration.makefile.panel.visibility.run.description%",
                             "default": true
                         }
                     }
@@ -557,223 +508,209 @@
         "viewsContainers": {
             "activitybar": [
                 {
-                    "id": "makefile__viewContainer",
-                    "title": "Makefile",
-                    "when": "makefile:fullFeatureSet",
+                    "id": "autotools__viewContainer",
+                    "title": "Autotools",
+                    "when": "autotools:fullFeatureSet",
                     "icon": "res/viewcontainer.svg"
                 }
             ]
         },
         "views": {
-            "makefile__viewContainer": [
+            "autotools__viewContainer": [
                 {
-                    "id": "makefile.outline",
-                    "name": "%makefile-tools.configuration.views.makefile.outline.description%"
+                    "id": "autotools.outline",
+                    "name": "%autotools.configuration.views.makefile.outline.description%"
                 }
             ]
         },
         "menus": {
             "commandPalette": [
                 {
-                    "command": "makefile.preConfigure",
-                    "when": "makefile:fullFeatureSet"
+                    "command": "autotools.preConfigure",
+                    "when": "autotools:fullFeatureSet"
                 },
                 {
-                    "command": "makefile.postConfigure",
-                    "when": "makefile:fullFeatureSet"
+                    "command": "autotools.postConfigure",
+                    "when": "autotools:fullFeatureSet"
                 },
                 {
-                    "command": "makefile.buildTarget",
-                    "when": "makefile:fullFeatureSet"
+                    "command": "autotools.buildTarget",
+                    "when": "autotools:fullFeatureSet"
                 },
                 {
-                    "command": "makefile.buildCleanTarget",
-                    "when": "makefile:fullFeatureSet"
+                    "command": "autotools.buildCleanTarget",
+                    "when": "autotools:fullFeatureSet"
                 },
                 {
-                    "command": "makefile.buildAll",
-                    "when": "makefile:fullFeatureSet"
+                    "command": "autotools.buildAll",
+                    "when": "autotools:fullFeatureSet"
                 },
                 {
-                    "command": "makefile.buildCleanAll",
-                    "when": "makefile:fullFeatureSet"
+                    "command": "autotools.buildCleanAll",
+                    "when": "autotools:fullFeatureSet"
                 },
                 {
-                    "command": "makefile.launchDebug",
-                    "when": "makefile:localDebugFeature"
+                    "command": "autotools.launchDebug",
+                    "when": "autotools:localDebugFeature"
                 },
                 {
-                    "command": "makefile.launchRun",
-                    "when": "makefile:localRunFeature"
+                    "command": "autotools.launchRun",
+                    "when": "autotools:localRunFeature"
                 },
                 {
-                    "command": "makefile.setBuildConfiguration",
-                    "when": "makefile:fullFeatureSet"
+                    "command": "autotools.setBuildTarget",
+                    "when": "autotools:fullFeatureSet"
                 },
                 {
-                    "command": "makefile.setBuildTarget",
-                    "when": "makefile:fullFeatureSet"
+                    "command": "autotools.setLaunchConfiguration",
+                    "when": "autotools:localDebugFeature"
                 },
                 {
-                    "command": "makefile.setLaunchConfiguration",
-                    "when": "makefile:localDebugFeature"
-                },
-                {
-                    "command": "makefile.outline.configure",
+                    "command": "autotools.outline.configure",
                     "when": "never"
                 },
                 {
-                    "command": "makefile.outline.cleanConfigure",
+                    "command": "autotools.outline.cleanConfigure",
                     "when": "never"
                 },
                 {
-                    "command": "makefile.outline.preConfigure",
+                    "command": "autotools.outline.preConfigure",
                     "when": "never"
                 },
                 {
-                    "command": "makefile.outline.postConfigure",
-                    "when": "makefile:fullFeatureSet"
+                    "command": "autotools.outline.postConfigure",
+                    "when": "autotools:fullFeatureSet"
                 },
                 {
-                    "command": "makefile.outline.buildTarget",
+                    "command": "autotools.outline.buildTarget",
                     "when": "never"
                 },
                 {
-                    "command": "makefile.outline.buildCleanTarget",
+                    "command": "autotools.outline.buildCleanTarget",
                     "when": "never"
                 },
                 {
-                    "command": "makefile.outline.launchDebug",
+                    "command": "autotools.outline.launchDebug",
                     "when": "never"
                 },
                 {
-                    "command": "makefile.outline.launchRun",
+                    "command": "autotools.outline.launchRun",
                     "when": "never"
                 },
                 {
-                    "command": "makefile.outline.setBuildConfiguration",
+                    "command": "autotools.outline.setBuildConfiguration",
                     "when": "never"
                 },
                 {
-                    "command": "makefile.outline.setBuildTarget",
+                    "command": "autotools.outline.setBuildTarget",
                     "when": "never"
                 },
                 {
-                    "command": "makefile.outline.setLaunchConfiguration",
+                    "command": "autotools.outline.setLaunchConfiguration",
                     "when": "never"
                 }
             ],
             "view/title": [
                 {
-                    "command": "makefile.outline.preConfigure",
-                    "when": "view == makefile.outline",
+                    "command": "autotools.outline.preConfigure",
+                    "when": "view == autotools.outline",
                     "group": "1_makefileOutline@1"
                 },
                 {
-                    "command": "makefile.outline.postConfigure",
-                    "when": "view == makefile.outline",
+                    "command": "autotools.outline.postConfigure",
+                    "when": "view == autotools.outline",
                     "group": "1_makefileOutline@2"
                 },
                 {
-                    "command": "makefile.outline.configure",
-                    "when": "view == makefile.outline",
+                    "command": "autotools.outline.configure",
+                    "when": "view == autotools.outline",
                     "group": "1_makefileOutline@3"
                 },
                 {
-                    "command": "makefile.outline.cleanConfigure",
-                    "when": "view == makefile.outline",
+                    "command": "autotools.outline.cleanConfigure",
+                    "when": "view == autotools.outline",
                     "group": "1_makefileOutline@4"
                 },
                 {
-                    "command": "makefile.outline.buildTarget",
-                    "when": "makefile:fullFeatureSet && view == makefile.outline",
+                    "command": "autotools.outline.buildTarget",
+                    "when": "autotools:fullFeatureSet && view == autotools.outline",
                     "group": "navigation@1"
                 },
                 {
-                    "command": "makefile.outline.buildCleanTarget",
-                    "when": "makefile:fullFeatureSet && view == makefile.outline",
+                    "command": "autotools.outline.buildCleanTarget",
+                    "when": "autotools:fullFeatureSet && view == autotools.outline",
                     "group": "1_makefileOutline@4"
                 },
                 {
-                    "command": "makefile.outline.launchDebug",
-                    "when": "makefile:fullFeatureSet && view == makefile.outline && makefile:localDebugFeature",
+                    "command": "autotools.outline.launchDebug",
+                    "when": "autotools:fullFeatureSet && view == autotools.outline && autotools:localDebugFeature",
                     "group": "navigation@2"
                 },
                 {
-                    "command": "makefile.outline.launchRun",
-                    "when": "makefile:fullFeatureSet && view == makefile.outline && makefile:localRunFeature",
+                    "command": "autotools.outline.launchRun",
+                    "when": "autotools:fullFeatureSet && view == autotools.outline && autotools:localRunFeature",
                     "group": "navigation@3"
                 }
             ],
             "view/item/context": [
                 {
-                    "command": "makefile.outline.configure",
-                    "when": "view == makefile.outline && viewItem =~ /nodeType=configuration/",
+                    "command": "autotools.outline.configure",
+                    "when": "view == autotools.outline && viewItem =~ /nodeType=configuration/",
                     "group": "1_stateActions@1"
                 },
                 {
-                    "command": "makefile.outline.cleanConfigure",
-                    "when": "view == makefile.outline && viewItem =~ /nodeType=configuration/",
+                    "command": "autotools.outline.cleanConfigure",
+                    "when": "view == autotools.outline && viewItem =~ /nodeType=configuration/",
                     "group": "1_stateActions@2"
                 },
                 {
-                    "command": "makefile.outline.setBuildConfiguration",
-                    "when": "makefile:fullFeatureSet && view == makefile.outline && viewItem =~ /nodeType=configuration/",
+                    "command": "autotools.outline.setBuildConfiguration",
+                    "when": "view == autotools.outline && viewItem =~ /nodeType=configuration/",
                     "group": "inline@1"
                 },
                 {
-                    "command": "makefile.outline.buildTarget",
-                    "when": "makefile:fullFeatureSet && view == makefile.outline && viewItem =~ /nodeType=buildTarget/",
+                    "command": "autotools.outline.buildTarget",
+                    "when": "autotools:fullFeatureSet && view == autotools.outline && viewItem =~ /nodeType=buildTarget/",
                     "group": "1_stateActions@1"
                 },
                 {
-                    "command": "makefile.outline.buildCleanTarget",
-                    "when": "makefile:fullFeatureSet && view == makefile.outline && viewItem =~ /nodeType=buildTarget/",
+                    "command": "autotools.outline.buildCleanTarget",
+                    "when": "autotools:fullFeatureSet && view == autotools.outline && viewItem =~ /nodeType=buildTarget/",
                     "group": "1_stateActions@2"
                 },
                 {
-                    "command": "makefile.outline.setBuildTarget",
-                    "when": "makefile:fullFeatureSet && view == makefile.outline && viewItem =~ /nodeType=buildTarget/",
+                    "command": "autotools.outline.setBuildTarget",
+                    "when": "autotools:fullFeatureSet && view == autotools.outline && viewItem =~ /nodeType=buildTarget/",
                     "group": "inline@1"
                 },
                 {
-                    "command": "makefile.outline.launchDebug",
-                    "when": "makefile:fullFeatureSet && view == makefile.outline && viewItem =~ /nodeType=launchTarget/",
+                    "command": "autotools.outline.launchDebug",
+                    "when": "autotools:fullFeatureSet && view == autotools.outline && viewItem =~ /nodeType=launchTarget/",
                     "group": "1_stateActions@1"
                 },
                 {
-                    "command": "makefile.outline.launchRun",
-                    "when": "makefile:fullFeatureSet && view == makefile.outline && viewItem =~ /nodeType=launchTarget/",
+                    "command": "autotools.outline.launchRun",
+                    "when": "autotools:fullFeatureSet && view == autotools.outline && viewItem =~ /nodeType=launchTarget/",
                     "group": "1_stateActions@2"
                 },
                 {
-                    "command": "makefile.outline.setLaunchConfiguration",
-                    "when": "makefile:fullFeatureSet && view == makefile.outline && viewItem =~ /nodeType=launchTarget/",
+                    "command": "autotools.outline.setLaunchConfiguration",
+                    "when": "autotools:fullFeatureSet && view == autotools.outline && viewItem =~ /nodeType=launchTarget/",
                     "group": "inline@1"
                 },
                 {
-                    "command": "makefile.outline.openMakefilePathSetting",
-                    "when": "view == makefile.outline && viewItem =~ /nodeType=makefilePathInfo/",
-                    "group": "inline@2"
-                },
-                {
-                    "command": "makefile.outline.openMakefileFile",
-                    "when": "view == makefile.outline && viewItem =~ /nodeType=makefilePathInfo/ && makefile.makefileFilePresent",
+                    "command": "autotools.outline.openMakefileFile",
+                    "when": "view == autotools.outline && viewItem =~ /nodeType=makefilePathInfo/ && makefile.makefileFilePresent",
                     "group": "inline@1"
                 },
                 {
-                    "command": "makefile.outline.openMakePathSetting",
-                    "when": "view == makefile.outline && viewItem =~ /nodeType=makePathInfo/",
+                    "command": "autotools.outline.openBuildLogSetting",
+                    "when": "view == autotools.outline && viewItem =~ /nodeType=buildLogPathInfo/",
                     "group": "inline@1"
                 },
                 {
-                    "command": "makefile.outline.openBuildLogSetting",
-                    "when": "view == makefile.outline && viewItem =~ /nodeType=buildLogPathInfo/",
-                    "group": "inline@1"
-                },
-                {
-                    "command": "makefile.outline.openBuildLogFile",
-                    "when": "view == makefile.outline && viewItem =~ /nodeType=buildLogPathInfo/ && makefile.buildLogFilePresent",
+                    "command": "autotools.outline.openBuildLogFile",
+                    "when": "view == autotools.outline && viewItem =~ /nodeType=buildLogPathInfo/ && makefile.buildLogFilePresent",
                     "group": "inline@1"
                 }
             ]
@@ -787,7 +724,8 @@
         "translations-generate": "gulp translations-generate",
         "translations-import": "gulp translations-import",
         "watch": "tsc -watch -p ./",
-        "package": "vsce package --yarn -o makefile-tools.vsix",
+        "package": "vsce package --pre-release --yarn -o autotools.vsix",
+        "publish": "vsce publish --pre-release --yarn -i autotools.vsix",
         "pretest": "yarn compile",
         "test": "yarn run pretest && node ./out/src/test/runTest.js"
     },
@@ -803,7 +741,10 @@
         "chai": "^4.3.0",
         "chai-as-promised": "^7.1.1",
         "chai-string": "^1.5.0",
-        "fs-extra": "^9.1.0",
+        "typescript": "^5.0.2",
+        "@vscode/vsce": "^2.21.0",
+        "vrsource-tslint-rules": "^6.0.0",
+        "vscode-nls-dev": "^3.3.2",
         "gulp": "^4.0.2",
         "gulp-eslint": "^6.0.0",
         "gulp-filter": "^6.0.0",

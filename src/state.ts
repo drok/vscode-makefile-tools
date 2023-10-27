@@ -19,7 +19,7 @@ export class StateManager {
     return this.extensionContext.workspaceState.update(key, value);
   }
 
-  // The project build configuration (one of the entries in the array of makefile.configurations
+  // The project build configuration (one of the entries in the array of autotools.configurations
   // or a default).
   get buildConfiguration(): string | undefined {
     return this._get<string>('buildConfiguration');
@@ -36,7 +36,7 @@ export class StateManager {
     this._update('buildTarget', v);
   }
 
-  // The project launch configuration (one of the entries in the array of makefile.launchConfigurations).
+  // The project launch configuration (one of the entries in the array of autotools.launchConfigurations).
   get launchConfiguration(): string | undefined {
     return this._get<string>('launchConfiguration');
   }

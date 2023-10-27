@@ -31,7 +31,7 @@ export let extension: MakefileToolsExtension;
 
 export class MakefileToolsExtension {
     public readonly _projectOutlineProvider = new tree.ProjectOutlineProvider();
-    private readonly _projectOutlineTreeView = vscode.window.createTreeView('makefile.outline', {
+    private readonly _projectOutlineTreeView = vscode.window.createTreeView('autotools.outline', {
         treeDataProvider: this._projectOutlineProvider,
         showCollapseAll: false
     });
@@ -48,11 +48,11 @@ export class MakefileToolsExtension {
     }
 
     public updateBuildLogPresent(newValue: boolean): void {
-        vscode.commands.executeCommand("setContext", "makefile.buildLogFilePresent", newValue);
+        vscode.commands.executeCommand("setContext", "autotools.buildLogFilePresent", newValue);
     }
 
     public updateMakefileFilePresent(newValue: boolean): void {
-        vscode.commands.executeCommand("setContext", "makefile.makefileFilePresent", newValue);
+        vscode.commands.executeCommand("setContext", "autotools.makefileFilePresent", newValue);
     }
 
     public getState(): state.StateManager { return this.mementoState; }
@@ -67,7 +67,7 @@ export class MakefileToolsExtension {
     private fullFeatureSet: boolean = false;
     public getFullFeatureSet(): boolean { return this.fullFeatureSet; }
     public async setFullFeatureSet(newValue: boolean): Promise<void> {
-        await vscode.commands.executeCommand('setContext', "makefile:fullFeatureSet", newValue);
+        await vscode.commands.executeCommand('setContext', "autotools:fullFeatureSet", newValue);
         this.fullFeatureSet = newValue;
     }
 
@@ -214,11 +214,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
     telemetry.activate();
 
-    context.subscriptions.push(vscode.commands.registerCommand('makefile.setBuildConfiguration', async () => {
+    context.subscriptions.push(vscode.commands.registerCommand('autotools.setBuildConfiguration', async () => {
         await configuration.setNewConfiguration();
     }));
 
-    context.subscriptions.push(vscode.commands.registerCommand('makefile.getConfiguration', async () => {
+    context.subscriptions.push(vscode.commands.registerCommand('autotools.getConfiguration', async () => {
         telemetry.logEvent("getConfiguration");
         return configuration.getCurrentMakefileConfiguration();
     }));
@@ -253,125 +253,125 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         await make.buildTarget(make.TriggeredBy.buildCleanAll, make.t_all, true);
     }));
 
-    context.subscriptions.push(vscode.commands.registerCommand('makefile.setLaunchConfiguration', async () => {
+    context.subscriptions.push(vscode.commands.registerCommand('autotools.setLaunchConfiguration', async () => {
         await configuration.selectLaunchConfiguration();
     }));
 
-    context.subscriptions.push(vscode.commands.registerCommand('makefile.launchDebug', async () => {
+    context.subscriptions.push(vscode.commands.registerCommand('autotools.launchDebug', async () => {
         await launcher.debugCurrentTarget();
     }));
 
-    context.subscriptions.push(vscode.commands.registerCommand('makefile.launchRun', async () => {
+    context.subscriptions.push(vscode.commands.registerCommand('autotools.launchRun', async () => {
         await launcher.runCurrentTarget();
     }));
 
 
     /** Start of commands that shouldn't be exposed in package.json, they are used for command substitution in launch.json and tasks.json.  */
-    context.subscriptions.push(vscode.commands.registerCommand('makefile.getLaunchTargetPath', () => {
+    context.subscriptions.push(vscode.commands.registerCommand('autotools.getLaunchTargetPath', () => {
         telemetry.logEvent("getLaunchTargetPath");
         return launcher.getLaunchTargetPath();
     }));
 
-    context.subscriptions.push(vscode.commands.registerCommand('makefile.launchTargetPath', () => {
+    context.subscriptions.push(vscode.commands.registerCommand('autotools.launchTargetPath', () => {
       telemetry.logEvent("launchTargetPath");
       return launcher.launchTargetPath();
     }));
 
-    context.subscriptions.push(vscode.commands.registerCommand('makefile.getLaunchTargetDirectory', () => {
+    context.subscriptions.push(vscode.commands.registerCommand('autotools.getLaunchTargetDirectory', () => {
         telemetry.logEvent("getLaunchTargetDirectory");
         return launcher.getLaunchTargetDirectory();
     }));
 
-    context.subscriptions.push(vscode.commands.registerCommand('makefile.getLaunchTargetFileName', () => {
+    context.subscriptions.push(vscode.commands.registerCommand('autotools.getLaunchTargetFileName', () => {
       telemetry.logEvent("getLaunchTargetFileName");
       return launcher.getLaunchTargetFileName();
     }));
 
-    context.subscriptions.push(vscode.commands.registerCommand('makefile.launchTargetFileName', () => {
+    context.subscriptions.push(vscode.commands.registerCommand('autotools.launchTargetFileName', () => {
       telemetry.logEvent("launchTargetFileName");
       return launcher.launchTargetFileName();
     }));
 
-    context.subscriptions.push(vscode.commands.registerCommand('makefile.getLaunchTargetArgs', () => {
+    context.subscriptions.push(vscode.commands.registerCommand('autotools.getLaunchTargetArgs', () => {
         telemetry.logEvent("getLaunchTargetArgs");
         return launcher.getLaunchTargetArgs();
     }));
 
-    context.subscriptions.push(vscode.commands.registerCommand('makefile.getLaunchTargetArgsConcat', () => {
+    context.subscriptions.push(vscode.commands.registerCommand('autotools.getLaunchTargetArgsConcat', () => {
         telemetry.logEvent("getLaunchTargetArgsConcat");
         return launcher.getLaunchTargetArgsConcat();
     }));
 
-    context.subscriptions.push(vscode.commands.registerCommand('makefile.makeBaseDirectory', () => {
+    context.subscriptions.push(vscode.commands.registerCommand('autotools.makeBaseDirectory', () => {
         telemetry.logEvent("makeBaseDirectory");
         return configuration.makeBaseDirectory();
     }));
     /** End of commands that shouldn't be exposed in package.json, they are used for command substitution in launch.json and tasks.json. */
 
-    context.subscriptions.push(vscode.commands.registerCommand('makefile.configure', async () => {
+    context.subscriptions.push(vscode.commands.registerCommand('autotools.configure', async () => {
         await make.configure(make.TriggeredBy.configure);
     }));
 
-    context.subscriptions.push(vscode.commands.registerCommand('makefile.cleanConfigure', async () => {
+    context.subscriptions.push(vscode.commands.registerCommand('autotools.cleanConfigure', async () => {
         await make.cleanConfigure(make.TriggeredBy.cleanConfigure);
     }));
 
-    context.subscriptions.push(vscode.commands.registerCommand('makefile.preConfigure', async () => {
+    context.subscriptions.push(vscode.commands.registerCommand('autotools.preConfigure', async () => {
         await make.preConfigure(make.TriggeredBy.preconfigure);
     }));
 
-    context.subscriptions.push(vscode.commands.registerCommand('makefile.postConfigure', async () => {
+    context.subscriptions.push(vscode.commands.registerCommand('autotools.postConfigure', async () => {
         await make.postConfigure(make.TriggeredBy.postConfigure);
     }))
 
     // Reset state - useful for troubleshooting.
-    context.subscriptions.push(vscode.commands.registerCommand('makefile.resetState', () => {
+    context.subscriptions.push(vscode.commands.registerCommand('autotools.resetState', () => {
         telemetry.logEvent("commandResetState");
         extension.getState().reset();
     }));
 
-    context.subscriptions.push(vscode.commands.registerCommand('makefile.outline.configure', () => {
-        return vscode.commands.executeCommand("makefile.configure");
+    context.subscriptions.push(vscode.commands.registerCommand('autotools.outline.configure', () => {
+        return vscode.commands.executeCommand("autotools.configure");
     }));
 
-    context.subscriptions.push(vscode.commands.registerCommand('makefile.outline.cleanConfigure', () => {
-        return vscode.commands.executeCommand("makefile.cleanConfigure");
+    context.subscriptions.push(vscode.commands.registerCommand('autotools.outline.cleanConfigure', () => {
+        return vscode.commands.executeCommand("autotools.cleanConfigure");
     }));
 
-    context.subscriptions.push(vscode.commands.registerCommand('makefile.outline.preConfigure', () => {
-        return vscode.commands.executeCommand("makefile.preConfigure");
+    context.subscriptions.push(vscode.commands.registerCommand('autotools.outline.preConfigure', () => {
+        return vscode.commands.executeCommand("autotools.preConfigure");
     }));
 
-    context.subscriptions.push(vscode.commands.registerCommand('makefile.outline.postConfigure', () => {
-        return vscode.commands.executeCommand("makefile.postConfigure");
+    context.subscriptions.push(vscode.commands.registerCommand('autotools.outline.postConfigure', () => {
+        return vscode.commands.executeCommand("autotools.postConfigure");
     }))
 
-    context.subscriptions.push(vscode.commands.registerCommand('makefile.outline.setLaunchConfiguration', () => {
-        return vscode.commands.executeCommand("makefile.setLaunchConfiguration");
+    context.subscriptions.push(vscode.commands.registerCommand('autotools.outline.setLaunchConfiguration', () => {
+        return vscode.commands.executeCommand("autotools.setLaunchConfiguration");
     }));
 
-    context.subscriptions.push(vscode.commands.registerCommand('makefile.outline.launchDebug', () => {
-        return vscode.commands.executeCommand("makefile.launchDebug");
+    context.subscriptions.push(vscode.commands.registerCommand('autotools.outline.launchDebug', () => {
+        return vscode.commands.executeCommand("autotools.launchDebug");
     }));
 
-    context.subscriptions.push(vscode.commands.registerCommand('makefile.outline.launchRun', () => {
-        return vscode.commands.executeCommand("makefile.launchRun");
+    context.subscriptions.push(vscode.commands.registerCommand('autotools.outline.launchRun', () => {
+        return vscode.commands.executeCommand("autotools.launchRun");
     }));
 
-    context.subscriptions.push(vscode.commands.registerCommand('makefile.outline.setBuildTarget', () => {
-        return vscode.commands.executeCommand("makefile.setBuildTarget");
+    context.subscriptions.push(vscode.commands.registerCommand('autotools.outline.setBuildTarget', () => {
+        return vscode.commands.executeCommand("autotools.setBuildTarget");
     }));
 
-    context.subscriptions.push(vscode.commands.registerCommand('makefile.outline.buildTarget', () => {
-        return vscode.commands.executeCommand("makefile.buildTarget");
+    context.subscriptions.push(vscode.commands.registerCommand('autotools.outline.buildTarget', () => {
+        return vscode.commands.executeCommand("autotools.buildTarget");
     }));
 
-    context.subscriptions.push(vscode.commands.registerCommand('makefile.outline.buildCleanTarget', () => {
-        return vscode.commands.executeCommand("makefile.buildCleanTarget");
+    context.subscriptions.push(vscode.commands.registerCommand('autotools.outline.buildCleanTarget', () => {
+        return vscode.commands.executeCommand("autotools.buildCleanTarget");
     }));
 
-    context.subscriptions.push(vscode.commands.registerCommand('makefile.outline.setBuildConfiguration', () => {
-        return vscode.commands.executeCommand("makefile.setBuildConfiguration");
+    context.subscriptions.push(vscode.commands.registerCommand('autotools.outline.setBuildConfiguration', () => {
+        return vscode.commands.executeCommand("autotools.setBuildConfiguration");
     }));
 
     // Read from the workspace state before reading from settings,
@@ -389,11 +389,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         await vscode.commands.executeCommand("workbench.files.action.showActiveFileInExplorer");
     }
 
-    context.subscriptions.push(vscode.commands.registerCommand('makefile.outline.openMakefilePathSetting', async () => {
-        await openSettings("makefile.makefilePath");
+    context.subscriptions.push(vscode.commands.registerCommand('autotools.outline.openMakefilePathSetting', async () => {
+        await openSettings("autotools.makefilePath");
     }));
 
-    context.subscriptions.push(vscode.commands.registerCommand('makefile.outline.openMakefileFile', async () => {
+    context.subscriptions.push(vscode.commands.registerCommand('autotools.outline.openMakefileFile', async () => {
         const makefile = configuration.getConfigurationMakefile();
         if (makefile) {
             if (util.checkFileExistsSync(makefile)) {
@@ -401,27 +401,27 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             }
             else {
                 extension.updateMakefileFilePresent(false);
-                vscode.window.showErrorMessage(localize("makefile.outline.makefileFileNotFound", "The makefile file could not be opened."));
+                vscode.window.showErrorMessage(localize("autotools.outline.makefileFileNotFound", "The makefile file could not be opened."));
             }
         }
     }));
 
-    context.subscriptions.push(vscode.commands.registerCommand('makefile.outline.openMakePathSetting', async () => {
-        await openSettings("makefile.makePath");
+    context.subscriptions.push(vscode.commands.registerCommand('autotools.outline.openMakePathSetting', async () => {
+        await openSettings("autotools.makePath");
     }));
 
-    context.subscriptions.push(vscode.commands.registerCommand('makefile.outline.openBuildLogSetting', async () => {
-        await openSettings("makefile.buildLog");
+    context.subscriptions.push(vscode.commands.registerCommand('autotools.outline.openBuildLogSetting', async () => {
+        await vscode.commands.executeCommand('workbench.action.openWorkspaceSettingsFile', { revealSetting: { key: 'autotools.configurations', edit: true }});
     }));
 
-    context.subscriptions.push(vscode.commands.registerCommand('makefile.outline.openBuildLogFile', async () => {
+    context.subscriptions.push(vscode.commands.registerCommand('autotools.outline.openBuildLogFile', async () => {
         const buildLog = configuration.getBuildLog();
         if (buildLog) {
             if (util.checkFileExistsSync(buildLog)) {
                 await openFile(vscode.Uri.file(buildLog));
             } else {
                 extension.updateBuildLogPresent(false);
-                vscode.window.showErrorMessage(localize("makefile.outline.buildLogFileNotFound", "The build log file could not be opened."));
+                vscode.window.showErrorMessage(localize("autotools.outline.buildLogFileNotFound", "The build log file could not be opened."));
             }
         }
     }));
@@ -444,10 +444,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }
 
     // Analyze settings for type validation and telemetry
-    let workspaceConfiguration: vscode.WorkspaceConfiguration = vscode.workspace.getConfiguration("makefile");
+    let workspaceConfiguration: vscode.WorkspaceConfiguration = vscode.workspace.getConfiguration("autotools");
     let telemetryProperties: telemetry.Properties | null = {};
     try {
-        telemetryProperties = await telemetry.analyzeSettings(workspaceConfiguration, "makefile",
+        telemetryProperties = await telemetry.analyzeSettings(workspaceConfiguration, "autotools",
             util.thisExtensionPackage().contributes.configuration.properties,
             true, telemetryProperties);
     } catch (e) {

@@ -36,8 +36,8 @@ export interface CustomConfigProviderItem {
 }
 
 export class CppConfigurationProvider implements cpp.CustomConfigurationProvider {
-    public readonly name = 'Makefile Tools';
-    public readonly extensionId = 'ms-vscode.makefile-tools';
+    public readonly name = 'Autotools Integration';
+    public readonly extensionId = 'mergesium.autotools';
 
     private workspaceBrowseConfiguration: cpp.WorkspaceBrowseConfiguration = { browsePath: [] };
 
