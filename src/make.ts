@@ -21,6 +21,7 @@ import * as path from 'path';
 import * as util from './util';
 import * as telemetry from './telemetry';
 import * as vscode from 'vscode';
+import { quote } from 'shell-quote';
 
 import * as nls from 'vscode-nls';
 nls.config({ messageFormat: nls.MessageFormat.bundle, bundleFormat: nls.BundleFormat.standalone })();
@@ -524,8 +525,8 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
         if (keepDryRuns) {
             dryrunFile = path.join(configuration.getConfigurationCachePath(), dryrunFile);
             logger.message(`Writing the dry-run output: ${dryrunFile}`);
-
-            util.writeFile(dryrunFile, `${configuration.getMakePath()} ${makeArgs.join(" ")}${lineEnding}`);
+            let quoted_cmd = quote([configuration.getMakePath()].concat(makeArgs));
+            util.writeFile(dryrunFile, `${quoted_cmd}${lineEnding}`);
         }
         let completeOutput: string = "";
         let completeErr: string = "";
