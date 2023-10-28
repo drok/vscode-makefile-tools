@@ -78,9 +78,9 @@ export async function setCurrentMakefileConfiguration(configuration: string | un
 export function readCurrentMakefileConfiguration(): void {
     let buildConfiguration : string | undefined = extension.getState().buildConfiguration;
     if (!buildConfiguration) {
-        logger.message("No current configuration is defined in the workspace state. Assuming 'Default'.");
+        logger.message("No build configuration is selected. Assuming 'Default'.");
     } else {
-        logger.message(`Reading current configuration "${buildConfiguration}" from the workspace state.`);
+        logger.message(`Selected build configuration is "${buildConfiguration}"`);
     }
     setCurrentMakefileConfigurationName(buildConfiguration);
 }
