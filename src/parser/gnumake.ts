@@ -98,8 +98,10 @@ enum MakeSection {
 const EnteringRE = /^# make(?:\[\d+\])?: Entering directory '(.*)'$/;
 const LeavingRE = /^# make(?:\[\d+\])?: Leaving directory '(.*)'$/;
 const NothingRE = /^make(?:\[\d+\])?: Nothing to be done for '(.*)'\.$/;
-const ExecutingRE = /^(.+):(\d+): update target '(.*)' due to: (?:.*)$/;
+const ExecutingRE = /^(.+):(\d+): (?:update target '(.*)' due to: (?:.*)|target '(.*)' does not exist)$/;
+const UptodateRE = /^make(?:\[\d+\])?: '(.*)' is up to date\.$/;
 const CopyrightRE = /^# GNU Make/;
+const RecursingRE = /^Making (.*) in (.*)$/;
 /**
  * Parse the stdout of a GNU make run, and expect a Dumped database,
  * directory entry/leaving trace messages, and expanded shell fragments would
@@ -151,7 +153,7 @@ export class Make implements Parser {
                 }
                 let executing = ExecutingRE.exec(line);
                 if (executing) {
-                    this.file = executing[3];
+                    this.file = executing[3] || executing[4];
                     if (this.file == "config.status") {
                         // For some reason, reconfig was triggerred, meaning
                         // --dry-run was not respected. Abort. this is a bug.
@@ -159,6 +161,9 @@ export class Make implements Parser {
                     }
                     return [ParserDisp.Enter, new Executing(this)];
                 }
+                let uptodate = UptodateRE.exec(line);
+                if (uptodate)
+                    return [ParserDisp.Continue, this];
                 /* intentional fall-through, allows recursing subdirs */
             case MakeSection.Starting:
                 let entering = EnteringRE.exec(line);
@@ -168,8 +173,24 @@ export class Make implements Parser {
                 }
                 // this is for the 2nd and later script lines for a target
                 if (this.section == MakeSection.Making) {
+                    /* echo "Making $target in $subdir" is a script snippet of automake
+                     * used to recurse into a subdir. The snipped is executed even in
+                     * --dry-run mode. It's not make's output, but a shell command's stdout.
+                     * Simply skip it and don't parse it as a shell execution line.
+                     * No need to capture the target and directory (relative subdir), because
+                     * the next "Entering" line will contain the full dir (make's output)
+                     * the target name is an automake auxiliary target, and this hint could be
+                     * used to exclude it from the subdir's target list
+                     */
+                    let recursing = RecursingRE.exec(line);
+                    if (recursing)
+                        return [ParserDisp.Continue, this];
                     let nextcmd = new Executing(this);
-                    return nextcmd.ingest(line);
+                    let [disp,next] = nextcmd.ingest(line);
+                    if (disp == ParserDisp.Leave)
+                        // The command is done. Look for more in the same make run.
+                        return [ParserDisp.Continue, this];
+                    return [disp, next];
                 }
                 break;
             case MakeSection.Copyright:
