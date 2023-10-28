@@ -506,7 +506,6 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
             util.writeFile(dryrunFile, `${quoted_cmd}${lineEnding}`);
         }
         let completeErr: string = "";
-        let stderrStr: string = "";
         let heartBeat: number = Date.now();
         let parserStack: Parser[] = [new Make("")];
         let linenumber: number = 0;
@@ -596,16 +595,6 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
         };
 
         let stderr: any = (result: string): void => {
-            // We need this lineEnding to see more clearly the output coming from all these compilers and tools.
-            // But there is some unpredictability regarding how much these tools fragment their output, on various
-            // OSes and systems. To compare easily against a fix baseline, don't use lineEnding while running tests.
-            // So far this has been seen for stderr and not for stdout.
-            let appendStr: string = result;
-            if (process.env['MAKEFILE_TOOLS_TESTING'] !== '1') {
-               appendStr += lineEnding;
-            }
-            stderrStr += appendStr;
-
             // Sometimes there is useful information coming via the stderr
             // (one example is even a bug of the make tool, because it reports
             // "Entering directory" on stderr instead of stdout causing various issues).
@@ -666,7 +655,7 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
         if (result.returnCode !== ConfigureBuildReturnCodeTypes.success) {
             logger.message("The make dry-run command failed.");
             logger.message("IntelliSense may work only partially or not at all.");
-            logger.message(stderrStr);
+            logger.message(completeErr);
 
             // Report the standard dry-run error & guide only when the configure was not cancelled
             // by the user (which causes retCode to be null).
