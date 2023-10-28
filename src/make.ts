@@ -496,6 +496,8 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
     logger.message(`'${configuration.getMakePath()} ${makeArgs.join(" ")}'`);
 
     try {
+        // TODO: Use stream writes
+        // Problem is described here: https://stackoverflow.com/questions/3459476/how-to-append-to-a-file-in-node/43370201#43370201
         const lineEnding: string = (process.platform === "win32" && process.env.MSYSTEM === undefined) ? "\r\n" : "\n";
         let keepDryRuns: boolean = configuration.getKeepDryRuns();
         let dryrunFile : string = configuration.getCurrentTargetAsFilename() + ".dryrun.log";
