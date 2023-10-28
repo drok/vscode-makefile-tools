@@ -144,16 +144,6 @@
                 "icon": "$(notebook-edit)"
             },
             {
-                "command": "autotools.outline.openBuildLogSetting",
-                "title": "%autotools.command.makefile.openBuildLogSetting.title%",
-                "icon": "$(notebook-edit)"
-            },
-            {
-                "command": "autotools.outline.openBuildLogFile",
-                "title": "%autotools.command.makefile.openBuildLogFile.title%",
-                "icon": "$(open-preview)"
-            },
-            {
                 "command": "autotools.outline.configure",
                 "title": "%autotools.command.makefile.configure.title%",
                 "icon": "$(settings)"
@@ -239,10 +229,6 @@
                                 },
                                 "default": ["$gcc", "$msvc"],
                                 "description": "%autotools.configuration.makefile.configurations.problemMatchers.description%"
-                            },
-                            "buildLog": {
-                                "type": "string",
-                                "description": "%autotools.configuration.makefile.configurations.buildLog.description%"
                             }
                         }
                     },
@@ -346,12 +332,6 @@
                 "autotools.makeDirectory": {
                     "type": "string",
                     "description": "%autotools.configuration.makefile.makeDirectory.description%",
-                    "scope": "resource"
-                },
-                "autotools.buildLog": {
-                    "type": "string",
-                    "description": "%autotools.configuration.makefile.buildLog.description%",
-                    "default": null,
                     "scope": "resource"
                 },
                 "autotools.extensionOutputFolder": {
@@ -688,16 +668,6 @@
                 {
                     "command": "autotools.outline.openMakefileFile",
                     "when": "view == autotools.outline && viewItem =~ /nodeType=makefilePathInfo/ && makefile.makefileFilePresent",
-                    "group": "inline@1"
-                },
-                {
-                    "command": "autotools.outline.openBuildLogSetting",
-                    "when": "view == autotools.outline && viewItem =~ /nodeType=buildLogPathInfo/",
-                    "group": "inline@1"
-                },
-                {
-                    "command": "autotools.outline.openBuildLogFile",
-                    "when": "view == autotools.outline && viewItem =~ /nodeType=buildLogPathInfo/ && makefile.buildLogFilePresent",
                     "group": "inline@1"
                 }
             ]

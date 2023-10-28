@@ -413,11 +413,6 @@ export async function doBuildTarget(progress: vscode.Progress<{}>, target: Build
     }
 }
 
-// Content to be parsed by various operations post configure (like finding all build/launch targets).
-// Represents the content of the provided autotools.buildLog or a fresh output of make --dry-run
-// (which is also written into autotools.configurationCachePath).
-let parseContent: string | undefined;
-
 // The source file of parseContent (build log or configuration dryrun cache).
 let parseFile: string | undefined;
 
@@ -443,26 +438,8 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
     let startTime: number = Date.now();
 
     // Rules for parse content and file:
-    //     1. autotools.buildLog provided by the user in settings
-    //     2. configuration cache (the previous dryrun output): autotools.configurationCachePath
-    //     3. the make dryrun output if (2) is missing
-    // We do not use buildLog for build targets analysis because
-    // we can afford to invoke make -pRrq (very quick even on large projects).
-    // We make sure to give the regression tests suite a build log that already contains
-    // targets information because we want to avoid invoking make for now.
-    let buildLog: string | undefined = configuration.getCurrentMakefileConfiguration().buildLog;
-
-    if (buildLog && process.env['MAKEFILE_TOOLS_TESTING'] === '1') {
-        parseContent = util.readFile(buildLog);
-        if (parseContent) {
-            parseFile = buildLog;
-            return {
-                retc: ConfigureBuildReturnCodeTypes.success,
-                elapsed: util.elapsedTimeSince(startTime)
-            };
-        }
-    }
-
+    //     1. configuration cache (the previous dryrun output): autotools.configurationCachePath
+    //     2. the make dryrun output if (2) is missing
     const dryRunString = localize("make.generating.dryrun", "Generating dry-run output");
     progress.report({
         increment: 1, message: dryRunString +
@@ -528,7 +505,6 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
             let quoted_cmd = quote([configuration.getMakePath()].concat(makeArgs));
             util.writeFile(dryrunFile, `${quoted_cmd}${lineEnding}`);
         }
-        let completeOutput: string = "";
         let completeErr: string = "";
         let stderrStr: string = "";
         let heartBeat: number = Date.now();
@@ -682,7 +658,6 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
         logger.message(`Generating dry-run elapsed time: ${elapsedTime}`);
 
         parseFile = keepDryRuns ? dryrunFile : (dryrunFile + " (not saved)");
-        parseContent = completeOutput;
 
         // The error codes returned by the targets invocation (make -pRrq) mean something else
         // (for example if targets are out of date). We can ignore the return code for this
@@ -1137,14 +1112,6 @@ export async function configure(triggeredBy: TriggeredBy, updateTargets: boolean
   let postConfigureExitCode: number | undefined; // used for telemetry
   let postConfigureElapsedTime: number | undefined; // used for telemetry
 
-  // Identify for telemetry whether this configure will invoke make --dry-run or will read from a build log
-  // If a build log is set and it exists, we are sure make --dry-run is not getting invoked.
-  let makeDryRun: boolean = true;
-  let buildLog: string | undefined = configuration.getConfigurationBuildLog();
-  if (buildLog && util.checkFileExistsSync(buildLog)) {
-    makeDryRun = false;
-  }
-
   // Identify for telemetry whether this configure will read configuration constructs from cache.
   let configurationCache: string =
         path.join(configuration.getConfigurationCachePath(),
@@ -1298,7 +1265,6 @@ export async function configure(triggeredBy: TriggeredBy, updateTargets: boolean
     };
     const telemetryProperties: telemetry.Properties = {
       firstTime: (!ranConfigureInCodebaseLifetime).toString(),
-      makeDryRun: makeDryRun.toString(),
       readCache: readCache.toString(),
       isClean: getConfigureIsClean().toString(),
       triggeredBy: triggeredBy,

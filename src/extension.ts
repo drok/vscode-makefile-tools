@@ -20,7 +20,6 @@ import * as vscode from 'vscode';
 import * as cpp from 'vscode-cpptools';
 
 import * as nls from 'vscode-nls';
-import { readBuildLog } from './configuration';
 nls.config({ messageFormat: nls.MessageFormat.bundle, bundleFormat: nls.BundleFormat.standalone })();
 const localize: nls.LocalizeFunc = nls.loadMessageBundle();
 
@@ -45,10 +44,6 @@ export class MakefileToolsExtension {
     private compilerFullPath ?: string;
 
     public constructor(public readonly extensionContext: vscode.ExtensionContext) {
-    }
-
-    public updateBuildLogPresent(newValue: boolean): void {
-        vscode.commands.executeCommand("setContext", "autotools.buildLogFilePresent", newValue);
     }
 
     public updateMakefileFilePresent(newValue: boolean): void {
@@ -408,22 +403,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
     context.subscriptions.push(vscode.commands.registerCommand('autotools.outline.openMakePathSetting', async () => {
         await openSettings("autotools.makePath");
-    }));
-
-    context.subscriptions.push(vscode.commands.registerCommand('autotools.outline.openBuildLogSetting', async () => {
-        await vscode.commands.executeCommand('workbench.action.openWorkspaceSettingsFile', { revealSetting: { key: 'autotools.configurations', edit: true }});
-    }));
-
-    context.subscriptions.push(vscode.commands.registerCommand('autotools.outline.openBuildLogFile', async () => {
-        const buildLog = configuration.getBuildLog();
-        if (buildLog) {
-            if (util.checkFileExistsSync(buildLog)) {
-                await openFile(vscode.Uri.file(buildLog));
-            } else {
-                extension.updateBuildLogPresent(false);
-                vscode.window.showErrorMessage(localize("autotools.outline.buildLogFileNotFound", "The build log file could not be opened."));
-            }
-        }
     }));
 
     // Delete the script that is created by this extension in the temporary folder

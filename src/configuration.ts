@@ -28,11 +28,9 @@ let statusBar: ui.UI = ui.getUI();
 // from which one can be picked via this extension and saved in settings.
 
 // Priority rules for where is the Makefile Tools extension parsing the needed information from:
-//    1. autotools.configurations.buildLog setting
-//    2. autotools.buildLog setting
-//    3. autotools.configurations.makeArgs
-//    4. autotools.makePath and default args
-//    5. default make tool and args
+//    1. autotools.configurations.makeArgs
+//    2. autotools.makePath and default args
+//    3. default make tool and args
 
 export interface MakefileConfiguration {
     // A name associated with a particular build command process and args/options
@@ -47,10 +45,6 @@ export interface MakefileConfiguration {
 
     // list of problem matcher names to be used when building the current target
     problemMatchers?: string[];
-
-    // a pre-generated build log, from which it is preffered to parse from,
-    // instead of the dry-run output of the make tool
-    buildLog?: string;
 
     // is this a default configuration?
     isDefault: boolean;
@@ -75,11 +69,9 @@ export async function setCurrentMakefileConfiguration(configuration: string | un
     currentMakefileConfiguration = (configuration && getMakefileConfiguration(configuration)) || {
         name: "Default",
         makeDirectory: makeDirectory,
-        buildLog: buildLog,
         isDefault: true
     };
     statusBar.setConfiguration(currentMakefileConfiguration.name);
-    await extension.updateBuildLogPresent(currentMakefileConfiguration.buildLog ? true : false);
 }
 
 // Read the current configuration from workspace state, update status bar item
@@ -239,42 +231,6 @@ export function makeBaseDirectory(): string {
     }
 
     return util.getWorkspaceRoot();
-}
-
-let buildLog: string | undefined;
-export function getBuildLog(): string | undefined { return buildLog; }
-export function setBuildLog(path: string): void { buildLog = path; }
-
-// Read from settings the path of the build log that is desired to be parsed
-// instead of a dry-run command output.
-// Useful for complex, tricky and corner case repos for which make --dry-run
-// is not working as the extension expects.
-// Example: --dry-run actually running configure commands, instead of only displaying them,
-// possibly changing unexpectedly a previous configuration set by the repo developer.
-// This scenario may also result in infinite loop, depending on how the makefile
-// and the configuring process are written, thus making the extension unusable.
-// Defining a build log to be parsed instead of a dry-run output represents a good alternative.
-// Also useful for developing unit tests based on real world code,
-// that would not clone a whole repo for testing.
-// It is recommended to produce the build log with all the following commands,
-// so that the extension has the best content to operate on.
-//    --always-make (to make sure no target is skipped because it is up to date)
-//    --keep-going (to not stumble on the first error)
-//    --print-data-base (special verbose printing which this extension is using for parsing the makefile targets)
-// If any of the above switches is missing, the extension may have less log to parse from,
-// therefore offering less intellisense information for source files,
-// identifying less possible binaries to debug or not providing any makefile targets (other than the 'all' default).
-export async function readBuildLog(): Promise<boolean> {
-    buildLog = await util.getExpandedSetting<string>("buildLog");
-    if (buildLog) {
-        buildLog = util.resolvePathToRoot(buildLog);
-        logger.message(`Build log defined at "${buildLog}"`);
-        if (!util.checkFileExistsSync(buildLog)) {
-            logger.message("Build log not found on disk.");
-            return false;
-        }
-    }
-    return true;
 }
 
 let loggingLevel: string | undefined;
@@ -576,15 +532,10 @@ let configurationProblemMatchers: string[] = [];
 export function getConfigurationProblemMatchers(): string[] { return configurationProblemMatchers; }
 export function setConfigurationProblemMatchers(problemMatchers: string[]): void { configurationProblemMatchers = problemMatchers; }
 
-let configurationBuildLog: string | undefined;
-export function getConfigurationBuildLog(): string | undefined { return configurationBuildLog; }
-export function setConfigurationBuildLog(name: string): void { configurationBuildLog = name; }
-
 // Analyze the settings of the current makefile configuration and the global workspace settings,
 // according to various merging rules and decide what make command and build log
 // apply to the current makefile configuration.
 async function analyzeConfigureParams(): Promise<void> {
-    getBuildLogForConfiguration();
     await getCommandForConfiguration();
     getProblemMatchersForConfiguration();
 }
@@ -673,32 +624,23 @@ export async function getCommandForConfiguration(): Promise<void> {
     setConfigurationMakefile(makefileExists ? relativeMakefile : undefined);
     extension.updateMakefileFilePresent(makefileExists);
 
- // Validation and warnings about properly defining the makefile and make tool.
-    // These are not needed if the current configuration reads from a build log instead of dry-run output.
-    let buildLog: string | undefined = currentMakefileConfiguration.buildLog;
-    let buildLogContent: string | undefined = buildLog ? util.readFile(buildLog) : undefined;
-    if (!buildLogContent) {
-        if (!makefileExists) {
-            logger.message("The makefile entry point was not found. " +
-                "Make sure it exists at the location defined by " +
-                "autotools.makeDirectory, autotools.configurations[].makeDirectory" +
-                "or in the root of the workspace.");
+    // Validation and warnings about properly defining the makefile and make tool.
+    if (!makefileExists) {
+        logger.message("The makefile entry point was not found. " +
+            "Make sure it exists at the location defined by " +
+            "autotools.makeDirectory, autotools.configurations[].makeDirectory" +
+            "or in the root of the workspace.");
 
-            // we may need more advanced ability to process settings
-            // insight into different project structures
-            const telemetryProperties: telemetry.Properties = {
-                reason: "no Makefile"
-            };
+        // we may need more advanced ability to process settings
+        // insight into different project structures
+        const telemetryProperties: telemetry.Properties = {
+            reason: "no Makefile"
+        };
 
-            telemetry.logEvent("makefileNotFound", telemetryProperties);
-            await extension.setFullFeatureSet(false);
-            disableAllOptionallyVisibleCommands();
-        } else {
-            await extension.setFullFeatureSet(true);
-            enableOptionallyVisibleCommands();
-        }
+        telemetry.logEvent("makefileNotFound", telemetryProperties);
+        await extension.setFullFeatureSet(false);
+        disableAllOptionallyVisibleCommands();
     } else {
-        // If we have a build log, then we want Makefile Tools to be fully active and the UI visible.
         await extension.setFullFeatureSet(true);
         enableOptionallyVisibleCommands();
     }
@@ -707,24 +649,6 @@ export async function getCommandForConfiguration(): Promise<void> {
 // Helper to find in the array of MakefileConfiguration which problemMatchers correspond to a configuration name
 export function getProblemMatchersForConfiguration(): void {
     configurationProblemMatchers = currentMakefileConfiguration.problemMatchers || [];
-}
-
-// Helper to find in the array of MakefileConfiguration which buildLog correspond to a configuration name
-export function getBuildLogForConfiguration(): void {
-    configurationBuildLog = currentMakefileConfiguration.buildLog;
-
-    if (configurationBuildLog) {
-        logger.message(`Found build log path setting "${configurationBuildLog}" defined for configuration "${currentMakefileConfiguration.name}"`);
-
-        if (!path.isAbsolute(configurationBuildLog)) {
-            configurationBuildLog = path.join(util.getWorkspaceRoot(), configurationBuildLog);
-            logger.message(`Resolving build log path to "${configurationBuildLog}"`);
-        }
-
-        if (!util.checkFileExistsSync(configurationBuildLog)) {
-            logger.message("Build log not found. Remove the build log setting or provide a build log file on disk at the given location.");
-        }
-    }
 }
 
 let makefileConfigurations: MakefileConfiguration[] = [];
@@ -922,7 +846,6 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
     await readLoggingLevel();
     await readMakePath();
     await readMakeDirectory();
-    await readBuildLog();
     await readPreConfigureScript();
     await readAlwaysPreConfigure();
     await readPostConfigureScript();
@@ -954,8 +877,7 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
     // config arg after config is fully loaded.
     await extension._projectOutlineProvider.update(extension.getState().buildConfiguration,
                                              currentTarget,
-                                             extension.getState().launchConfiguration,
-                                             getConfigurationBuildLog());
+                                             extension.getState().launchConfiguration);
 
     // Verify the dirty state of the IntelliSense config provider and update accordingly.
     // The makefile.configureOnEdit setting can be set to false when this behavior is inconvenient.
@@ -1052,20 +974,6 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
                 updatedSettingsSubkeys.push(subKey);
             }
 
-            subKey = "buildLog";
-            let updatedBuildLog : string | undefined = await util.getExpandedSetting<string>(subKey);
-            if (updatedBuildLog) {
-                updatedBuildLog = util.resolvePathToRoot(updatedBuildLog);
-            }
-            // Configuration is dirty if the Default buildLog changes
-            // when the Default configuration ia active
-            if (currentMakefileConfiguration.isDefault && updatedBuildLog !== buildLog) {
-                currentMakefileConfiguration.buildLog = updatedBuildLog;
-                extension.getState().configureDirty = true;
-                extension.updateBuildLogPresent(await readBuildLog());
-                updatedSettingsSubkeys.push(subKey);
-            }
-
             subKey = "extensionLog";
             let updatedExtensionLog : string | undefined = await util.getExpandedSetting<string>(subKey);
             if (updatedExtensionLog) {
@@ -1119,8 +1027,7 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
                 // Not very likely, but it is safe to consider that a different make tool
                 // may produce a different dry-run output with potential impact on IntelliSense,
                 // so trigger an update (unless we read from a build log).
-                extension.getState().configureDirty = extension.getState().configureDirty ||
-                                                      !buildLog || !util.checkFileExistsSync(buildLog);
+                extension.getState().configureDirty = extension.getState().configureDirty;
                 await readMakePath();
                 updatedSettingsSubkeys.push(subKey);
             }
@@ -1130,8 +1037,7 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
             if (updatedMakeDirectory !== makeDirectory) {
                 // A change in autotools.makeDirectory should trigger an IntelliSense update
                 // only if the extension is not currently reading from a build log.
-                extension.getState().configureDirty = extension.getState().configureDirty ||
-                                                      !buildLog || !util.checkFileExistsSync(buildLog);
+                extension.getState().configureDirty = extension.getState().configureDirty;
                 await readMakeDirectory();
                 updatedSettingsSubkeys.push(subKey);
             }
@@ -1150,15 +1056,7 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
                 });
                 // TODO: should call an onConfigurationUpdate(updatedConfiguration);
                 // so that not only build log, but other updated members can be handled
-                let buildLogUpdated: boolean = !currentMakefileConfiguration.isDefault &&
-                    updatedConfiguration !== undefined &&
-                    updatedConfiguration.buildLog !== currentMakefileConfiguration.buildLog;
                 await readMakefileConfigurations(currentMakefileConfigurationName);
-                if (buildLogUpdated) {
-                    extension.getState().configureDirty = true;
-                    // extension.updateBuildLogPresent(await readBuildLog());
-                    updatedSettingsSubkeys.push(subKey);
-                }
             }
 
             subKey = "keepDryRuns";
@@ -1269,7 +1167,6 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
 
             // Final updates in some constructs that depend on more than one of the above settings.
             await analyzeConfigureParams();
-            await extension._projectOutlineProvider.updateBuildLogPathInfo(getConfigurationBuildLog());
 
             // Report all the settings changes detected by now.
             // TODO: to avoid unnecessary telemetry processing, evaluate whether the changes done

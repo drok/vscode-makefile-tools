@@ -155,40 +155,6 @@ export class ConfigurationNode extends BaseNode {
 
 }
 
-export class BuildLogPathInfoNode extends BaseNode {
-   constructor(pathInSettings: string, pathDisplayed: string) {
-      super(pathDisplayed);
-      this._title = pathDisplayed;
-      this._tooltip = pathInSettings;
-   }
-
-   _title: string;
-   _tooltip: string;
-
-   update(pathInSettings: string, pathDisplayed: string): void {
-      this._title = localize("tree.build.log.path.info", "{0}", `${pathDisplayed}`);
-      this._tooltip = pathInSettings;
-   }
-
-   getChildren(): BaseNode[] {
-       return [];
-   }
-
-   getTreeItem(): vscode.TreeItem {
-       try {
-           const item: vscode.TreeItem = new vscode.TreeItem(this._title);
-           item.collapsibleState = vscode.TreeItemCollapsibleState.None;
-           item.tooltip = this._tooltip;
-           item.contextValue = [
-               `nodeType=buildLogPathInfo`,
-           ].join(',');
-           return item;
-       } catch (e) {
-           return new vscode.TreeItem(localize("issue.rendering.item", "{0} (there was an issue rendering this item)", this._title));
-       }
-   }
-}
-
 export class ProjectOutlineProvider implements vscode.TreeDataProvider<BaseNode> {
     private readonly _changeEvent = new vscode.EventEmitter<BaseNode | null>();
     private readonly _unsetString = localize("Unset", "Unset");
@@ -197,13 +163,11 @@ export class ProjectOutlineProvider implements vscode.TreeDataProvider<BaseNode>
         this._currentConfigurationItem = new ConfigurationNode(this._unsetString);
         this._currentBuildTargetItem = new BuildTargetNode(new BuildTarget("", ""));
         this._currentLaunchTargetItem = new LaunchTargetNode(this._unsetString);
-        this._currentBuildLogPathInfoItem = new BuildLogPathInfoNode(this._unsetString, "");
     }
 
     private _currentConfigurationItem: ConfigurationNode;
     private _currentBuildTargetItem: BuildTargetNode;
     private _currentLaunchTargetItem: LaunchTargetNode;
-    private _currentBuildLogPathInfoItem: BuildLogPathInfoNode;
 
     get onDidChangeTreeData(): any {
         return this._changeEvent.event;
@@ -218,20 +182,15 @@ export class ProjectOutlineProvider implements vscode.TreeDataProvider<BaseNode>
         if (configuration.isOptionalFeatureEnabled("debug") || configuration.isOptionalFeatureEnabled("run")) {
             return [this._currentConfigurationItem,
                     this._currentBuildTargetItem,
-                    this._currentLaunchTargetItem,
-                    this._currentBuildLogPathInfoItem];
+                    this._currentLaunchTargetItem];
         } else {
             return [this._currentConfigurationItem,
-                    this._currentBuildTargetItem,
-                    this._currentBuildLogPathInfoItem];
+                    this._currentBuildTargetItem];
         }
      }
 
     pathDisplayed(pathInSettings: string | undefined, kind: string, searchInPath: boolean, makeRelative: boolean): string {
        if (!pathInSettings) {
-         if (kind === "Build Log") {
-            extension.updateBuildLogPresent(false);
-         }
          return `${kind}: [Unset]`;
        }
        
@@ -240,22 +199,15 @@ export class ProjectOutlineProvider implements vscode.TreeDataProvider<BaseNode>
        const finalPath: string = pathInEnv || pathInSettings;
        let checkFileExists: boolean = pathInSettings !== undefined;
 
-       if (kind === "Build Log") {
-        checkFileExists  = util.checkFileExistsSync(finalPath);
-        extension.updateBuildLogPresent(checkFileExists);
-       }
-
        return (!checkFileExists ? `${kind} (not found)` : `${kind}`) + `: [${makeRelative ? util.makeRelPath(finalPath, util.getWorkspaceRoot()) : finalPath}]`;
     }
 
     async update(configuration: string | undefined,
                  buildTarget: BuildTarget,
-                 launchTarget: string | undefined,
-                 buildLogInfo: string | undefined): Promise<void> {
+                 launchTarget: string | undefined): Promise<void> {
         this._currentConfigurationItem.update(configuration || this._unsetString);
         this._currentBuildTargetItem.update(buildTarget);
         await this._currentLaunchTargetItem.update(launchTarget || this._unsetString);
-        this._currentBuildLogPathInfoItem.update(buildLogInfo || this._unsetString, this.pathDisplayed(buildLogInfo, "Build Log", false, false));
 
         this.updateTree();
     }
@@ -273,11 +225,6 @@ export class ProjectOutlineProvider implements vscode.TreeDataProvider<BaseNode>
     async updateLaunchTarget(launchTarget: string): Promise<void> {
         await this._currentLaunchTargetItem.update(launchTarget);
         this.updateTree();
-    }
-
-    async updateBuildLogPathInfo(buildLogPathInfo: string | undefined): Promise<void> {
-      this._currentBuildLogPathInfoItem.update(buildLogPathInfo || this._unsetString, this.pathDisplayed(buildLogPathInfo, "Build Log", false, true));
-      this.updateTree();
     }
 
     updateTree(): void {
