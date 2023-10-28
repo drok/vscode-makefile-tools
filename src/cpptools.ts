@@ -47,20 +47,7 @@ export class CppConfigurationProvider implements cpp.CustomConfigurationProvider
            norm_path = norm_path.toUpperCase();
         }
 
-        // First look in the file index computed during the last configure.
-        // If nothing is found and there is a configure running right now,
-        // try also the temporary index of the current configure.
-        let sourceFileConfiguration: SourceFileConfigurationItem | undefined = this.fileIndex.get(norm_path);
-        if (!sourceFileConfiguration && make.getIsConfiguring()) {
-            sourceFileConfiguration = make.getDeltaCustomConfigurationProvider().fileIndex.get(norm_path);
-            logger.message(`Configuration for file ${norm_path} was not found. Searching in the current configure temporary file index.`);
-        }
-
-        if (!sourceFileConfiguration) {
-            logger.message(`Configuration for file ${norm_path} was not found. CppTools will set a default configuration.`);
-        }
-
-        return sourceFileConfiguration;
+        return this.fileIndex.get(norm_path);
     }
 
     public async canProvideConfiguration(uri: vscode.Uri): Promise<boolean> {
@@ -85,34 +72,6 @@ export class CppConfigurationProvider implements cpp.CustomConfigurationProvider
     public setCustomConfigurationProvider(provider: CustomConfigurationProvider): void {
         this.fileIndex = provider.fileIndex;
         this.workspaceBrowseConfiguration = provider.workspaceBrowse;
-    }
-
-    // Used to merge a new set of configurations on top of what was calculated during the previous configure.
-    // If this is clean configure, clear all the arrays before the merge.
-    public mergeCustomConfigurationProvider(provider: CustomConfigurationProvider): void {
-        if (make.getConfigureIsClean()) {
-            this.fileIndex.clear();
-            this.workspaceBrowseConfiguration = {
-                browsePath: [],
-                compilerArgs: [],
-                compilerPath: undefined,
-                standard: undefined,
-                windowsSdkVersion: undefined
-            };
-        }
-
-        let map: Map<string, SourceFileConfigurationItem> = this.fileIndex;
-        provider.fileIndex.forEach(function(value, key): void {
-            map.set(key, value);
-        });
-
-        this.workspaceBrowseConfiguration = {
-            browsePath: util.sortAndRemoveDuplicates(this.workspaceBrowseConfiguration.browsePath.concat(provider.workspaceBrowse.browsePath)),
-            compilerArgs: this.workspaceBrowseConfiguration.compilerArgs?.concat(provider.workspaceBrowse.compilerArgs || []),
-            compilerPath: provider.workspaceBrowse.compilerPath,
-            standard: provider.workspaceBrowse.standard,
-            windowsSdkVersion: provider.workspaceBrowse.windowsSdkVersion
-        };
     }
 
     public async canProvideBrowseConfiguration(): Promise<boolean> {

@@ -90,10 +90,27 @@ export class MakefileToolsExtension {
         // any of them being pushed into make.customConfigProviderItems.
         if (this.cppToolsAPI) {
             if (!this.ranNotifyReadyInSession && this.cppToolsAPI.notifyReady) {
+                // FIXME: not ready yet.
                 this.cppToolsAPI.notifyReady(this.cppConfigurationProvider);
                 this.setRanNotifyReadyInSession(true);
             }
         }
+    }
+
+    // Clear cached config data
+    public resetCppToolsProvider(): void {
+        let cache = this.cppConfigurationProvider.getCustomConfigurationProvider();
+        cache.fileIndex.clear();
+        cache.workspaceBrowse = {
+            browsePath: [],
+            compilerArgs: [],
+            compilerPath: undefined,
+            standard: undefined,
+            windowsSdkVersion: undefined
+        };
+        this.cppConfigurationProvider.setCustomConfigurationProvider(cache);
+        // workspaceBrowseConfiguration
+        // this.updateCppToolsProvider();
     }
 
     // Request a custom config provider update.
@@ -128,14 +145,9 @@ export class MakefileToolsExtension {
         }
     }
 
-    private cummulativeBrowsePath: string[] = [];
-    public clearCummulativeBrowsePath(): void {
-        this.cummulativeBrowsePath = [];
-    }
-
     public buildCustomConfigurationProvider(customConfigProviderItem: toolParser.CustomConfigProviderItem): void {
         this.compilerFullPath = customConfigProviderItem.compilerFullPath;
-        let provider: cpptools.CustomConfigurationProvider = make.getDeltaCustomConfigurationProvider();
+        let provider: cpptools.CustomConfigurationProvider = this.getCppConfigurationProvider().getCustomConfigurationProvider();
 
         const configuration: cpp.SourceFileConfiguration = {
             defines: customConfigProviderItem.defines,
@@ -168,34 +180,24 @@ export class MakefileToolsExtension {
                                                   sourceFileConfigurationItem);
             extension.getCppConfigurationProvider().logConfigurationProviderItem(sourceFileConfigurationItem);
 
-            let folder: string = path.dirname(filePath);
-            if (!this.cummulativeBrowsePath.includes(folder)) {
-                this.cummulativeBrowsePath.push(folder);
+            let folder: string = path.dirname(filePath); // FIXME: uses a Set, avoid the lsearch
+            if (!provider.workspaceBrowse.browsePath.includes(folder)) {
+                provider.workspaceBrowse.browsePath.push(folder);
             }
         });
 
-        customConfigProviderItem.includes.forEach(incl => {
-            if (!this.cummulativeBrowsePath.includes(incl)) {
-                this.cummulativeBrowsePath.push(incl);
+        customConfigProviderItem.includes.forEach(incl => { // FIXME: uses a Set, avoid the lsearch
+            if (!provider.workspaceBrowse.browsePath.includes(incl)) {
+                provider.workspaceBrowse.browsePath.push(incl);
             }
         });
 
         customConfigProviderItem.forcedIncludes.forEach(fincl => {
-            let folder: string = path.dirname(fincl);
-            if (!this.cummulativeBrowsePath.includes(folder)) {
-                this.cummulativeBrowsePath.push(fincl);
+            let folder: string = path.dirname(fincl); // FIXME: uses a Set, avoid the lsearch
+            if (!provider.workspaceBrowse.browsePath.includes(folder)) {
+                provider.workspaceBrowse.browsePath.push(fincl);
             }
         });
-
-        provider.workspaceBrowse = {
-            browsePath: this.cummulativeBrowsePath,
-            standard: customConfigProviderItem.standard,
-            compilerPath: customConfigProviderItem.compilerFullPath,
-            compilerArgs: customConfigProviderItem.compilerArgs,
-            windowsSdkVersion: customConfigProviderItem.windowsSDKVersion
-        };
-
-        make.setCustomConfigurationProvider(provider);
     }
 
     public getCompilerFullPath() : string | undefined { return this.compilerFullPath; }

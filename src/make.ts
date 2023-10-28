@@ -6,7 +6,6 @@
 import * as configuration from './configuration';
 import * as cpp from 'vscode-cpptools';
 import * as cpptools from './cpptools';
-import {CustomConfigProviderItem} from './cpptools';
 import {extension} from './extension';
 import * as fs from 'fs';
 import * as logger from './logger';
@@ -116,21 +115,6 @@ export enum TriggeredBy {
     configureBeforeLaunchTargetChange = "configureDirty (before launch target change), settings (configureAfterCommand)",
     launch = "Launch (debug|run)",
     tests = "Makefile Tools Regression Tests"
-}
-
-let fileIndex: Map<string, cpptools.SourceFileConfigurationItem> = new Map<string, cpptools.SourceFileConfigurationItem>();
-let workspaceBrowseConfiguration: cpp.WorkspaceBrowseConfiguration = { browsePath: [] };
-export function getDeltaCustomConfigurationProvider(): cpptools.CustomConfigurationProvider {
-    let provider: cpptools.CustomConfigurationProvider = {
-        fileIndex: fileIndex,
-        workspaceBrowse: workspaceBrowseConfiguration
-    };
-
-    return provider;
-}
-export function setCustomConfigurationProvider(provider: cpptools.CustomConfigurationProvider): void {
-    fileIndex = provider.fileIndex;
-    workspaceBrowseConfiguration = provider.workspaceBrowse;
 }
 
 // Identifies and logs whether an operation should be prevented from running.
@@ -431,16 +415,23 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
     }
 
     const makefilePath :string | undefined = configuration.getConfigurationMakefile();
-    if (!makefilePath)
+    if (!makefilePath) {
+        extension.resetCppToolsProvider();
+
         // Without a makefile, this function should never be called. This is a runtime error (a bug).
         throw new Error("No makefile found.");
+    }
 
     let startTime: number = Date.now();
+
+    // Prepend the target to the arguments given in the autotools.configurations object,
+    // unless we want to parse for the full set of available targets.
+    let currentTarget: BuildTarget = configuration.getCurrentTarget();
 
     // Rules for parse content and file:
     //     1. configuration cache (the previous dryrun output): autotools.configurationCachePath
     //     2. the make dryrun output if (2) is missing
-    const dryRunString = localize("make.generating.dryrun", "Generating dry-run output");
+    const dryRunString = localize("make.generating.dryrun", "Importing autotools configuration for {} ...", currentTarget.toString());
     progress.report({
         increment: 1, message: dryRunString +
             ((recursive) ? ` ${recursiveString}` : "") +
@@ -450,19 +441,23 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
     // Continue with the make dryrun invocation
     let makeArgs: string[] = [];
 
-    // Prepend the target to the arguments given in the autotools.configurations object,
-    // unless we want to parse for the full set of available targets.
-    let currentTarget: BuildTarget = configuration.getCurrentTarget();
-
     // FIXME: if current target = make.t_all, dir is empty, make will be done in proj dir
+    // make directory and makefile. If a target is selected, only set the target dir
     if (currentTarget.dir) {
         makeArgs.push("-C");
         makeArgs.push(currentTarget.dir);
+        let makefile = configuration.getConfigurationMakefile();
+        if (makefile) {
+            // FIXME: this refers to the configuration makefile, not the target's makefile
+            makeArgs.push("-f");
+            makeArgs.push(makefile);
+        }
     }
-    makeArgs.push(currentTarget.name);
 
     // Include all the make arguments defined in autotools.configurations.makeArgs
     makeArgs = makeArgs.concat(configuration.getConfigurationMakeArgs());
+
+    makeArgs.push(currentTarget.name);
 
     // Assemble command line options from the requirements of each parser stage.
     makeArgs.push(...Make.makeArgs());
@@ -512,6 +507,9 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
         let parserStack: Parser[] = [new Make("")];
         let linenumber: number = 0;
         let lineBuffer: string = "";
+
+        // Clear the existing Intellisense config from cache or previous parsing
+        extension.resetCppToolsProvider();
 
         let stdout: any = (result: string): void => {
             if (keepDryRuns)
@@ -619,20 +617,6 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
             }
         }, 5 * 1000);
 
-        // If this configure is clean, overwrite the final file index, otherwise merge with it.
-        let provider: cpptools.CustomConfigurationProvider = getDeltaCustomConfigurationProvider();
-        extension.getCppConfigurationProvider().mergeCustomConfigurationProvider(provider);
-
-        // Empty the 'delta' configurations.
-//        provider.fileIndex.clear();
-//        provider.workspaceBrowse = {
-//            browsePath: [],
-//            compilerArgs: [],
-//            compilerPath: undefined,
-//            standard: undefined,
-//            windowsSdkVersion: undefined
-//        };
-
         // The dry-run analysis should operate on english.
         const result: util.SpawnProcessResult = await util.spawnChildProcess(configuration.getMakePath(), makeArgs, util.getWorkspaceRoot(), true, true, stdout, stderr);
         if (keepDryRuns && completeErr) {
@@ -667,20 +651,11 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
                 util.reportDryRunError(dryrunFile);
             }
 
-            // Empty the 'delta' configurations.
-            provider.fileIndex.clear();
-            provider.workspaceBrowse = {
-                browsePath: [],
-                compilerArgs: [],
-                compilerPath: undefined,
-                standard: undefined,
-                windowsSdkVersion: undefined
-            };
+            extension.resetCppToolsProvider();
             // FIXME: Since dry-running failed, also unlink the configCache file
-        }
-
-        setCustomConfigurationProvider(provider);
-        extension.updateCppToolsProvider();
+        } else
+            // All done, notify that new data is available
+            extension.updateCppToolsProvider();
 
         curPID = -1;
         return {
@@ -1394,74 +1369,6 @@ async function parseLaunchConfigurations(progress: vscode.Progress<{}>, cancel: 
     };
 }
 
-async function updateProvider(progress: vscode.Progress<{}>, cancel: vscode.CancellationToken,
-                              dryRunOutput: string, recursive: boolean = false): Promise<ConfigureSubphaseStatus> {
-    if (cancel.isCancellationRequested) {
-        return {
-            retc: ConfigureBuildReturnCodeTypes.cancelled,
-            elapsed: 0
-        };
-    }
-
-    let startTime: number = Date.now();
-    logger.message(`Updating the CppTools IntelliSense Configuration Provider.${(recursive) ? "(recursive)" : ""}`);
-
-    let onStatus: any = (status: string): void => {
-        progress.report({ increment: 1, message: `${status}${(recursive) ? recursiveString : ""} ...` });
-    };
-
-    let onFoundCustomConfigProviderItem: any = (customConfigProviderItem: CustomConfigProviderItem): void => {
-        // Configurations parsed from dryrun output or build log are saved temporarily in the delta file index
-        extension.buildCustomConfigurationProvider(customConfigProviderItem);
-    };
-
-    // Empty the cummulative browse path before we start a new parse for custom configuration.
-    // We can empty even if the configure is not clean, because the new browse paths will be appended
-    // to the previous browse paths.
-    extension.clearCummulativeBrowsePath();
-    let retc: number = await toolParser.parseCustomConfigProvider(cancel, dryRunOutput, onStatus, onFoundCustomConfigProviderItem);
-    if (retc !== ConfigureBuildReturnCodeTypes.cancelled) {
-        // If this configure is clean, overwrite the final file index, otherwise merge with it.
-        let provider: cpptools.CustomConfigurationProvider = getDeltaCustomConfigurationProvider();
-        extension.getCppConfigurationProvider().mergeCustomConfigurationProvider(provider);
-
-        // Empty the 'delta' configurations.
-        provider.fileIndex.clear();
-        provider.workspaceBrowse = {
-            browsePath: [],
-            compilerArgs: [],
-            compilerPath: undefined,
-            standard: undefined,
-            windowsSdkVersion: undefined
-        };
-        setCustomConfigurationProvider(provider);
-
-        extension.updateCppToolsProvider();
-    }
-
-    return {
-        retc,
-        elapsed: util.elapsedTimeSince(startTime)
-    };
-}
-
-export async function preprocessDryRun(progress: vscode.Progress<{}>, cancel: vscode.CancellationToken,
-                                       dryrunOutput: string, recursive: boolean = false): Promise<shellParser.PreprocessDryRunOutputReturnType> {
-    if (cancel.isCancellationRequested) {
-        return {
-            retc: ConfigureBuildReturnCodeTypes.cancelled,
-            elapsed: 0,
-            result: ""
-        };
-    }
-
-    let onStatus: any = (status: string): void => {
-        progress.report({ increment: 1, message: `${status}${(recursive) ? recursiveString : ""} ...` });
-    };
-
-    return shellParser.preprocessDryRunOutput(cancel, dryrunOutput, onStatus);
-}
-
 /**
  * Loads into Intellisense a previously calculated configuration.
  * This function should not be called if there is no cache to load.
@@ -1593,11 +1500,6 @@ export async function doConfigure(progress: vscode.Progress<{}>, cancel: vscode.
     } else {
         logger.message("Loading configurations from cache is not necessary.", "Verbose");
     }
-
-    // Empty the cummulative browse path before we start a new parse for custom configuration.
-    // We can empty even if the configure is not clean, because the new browse paths will be appended
-    // to the previous browse paths.
-    extension.clearCummulativeBrowsePath();
 
     // This generates the dryrun output (saving it on disk) or reads an alternative build log.
     // Timings for this sub-phase happen inside.

@@ -558,12 +558,12 @@ export async function getCommandForConfiguration(): Promise<void> {
     // makefile.configurations.makeDirectory overwrites makefile.makeDirectory.
     // top_builddir is resolved to either a subdirectory of the workspace or an absolute path.
     let makeDirectoryUsed: string = util.resolvePathToRoot(currentMakefileConfiguration.makeDirectory || "");
-    if (makeDirectoryUsed) {
-        // If out-of-tree, add -C argument
-        configurationMakeArgs.push("-C");
-        configurationMakeArgs.push(`${makeDirectoryUsed}`);
-        configurationMakefile = makeDirectoryUsed;
-    }
+//    if (makeDirectoryUsed) {
+//        // If out-of-tree, add -C argument
+//        configurationMakeArgs.push("-C");
+//        configurationMakeArgs.push(`${makeDirectoryUsed}`);
+//        configurationMakefile = makeDirectoryUsed;
+//    }
 
     // Add the makefile path via the -f make switch.
     // The make file is in makeDirectory or in the workspace directory,
@@ -592,8 +592,8 @@ export async function getCommandForConfiguration(): Promise<void> {
     // make is GNU or not.
     if (makefileExists) {
         configurationMakefile = relativeMakefile;
-        configurationMakeArgs.push("-f");
-        configurationMakeArgs.push(`${relativeMakefile}`);
+//        configurationMakeArgs.push("-f");
+//        configurationMakeArgs.push(`${relativeMakefile}`);
         // Need to rethink this (GitHub 59).
         // Some repos don't work when we automatically add -C, others don't work when we don't.
         // configurationMakeArgs.push("-C");
