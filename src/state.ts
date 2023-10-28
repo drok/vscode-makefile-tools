@@ -11,8 +11,7 @@ export class StateManager {
   constructor(readonly extensionContext: vscode.ExtensionContext) {}
 
   private _get<T>(key: string): T | undefined {
-    let val = this.extensionContext.workspaceState.get<T>(key);
-    return typeof val === "object" && val !== null ? val : undefined;
+    return this.extensionContext.workspaceState.get<T>(key);
   }
 
   private _update(key: string, value: any): Thenable<void> {
