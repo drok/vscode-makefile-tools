@@ -603,7 +603,7 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
             completeErr += result;
         };
 
-        const heartBeatTimeout: number = 30; // half minute. TODO: make this a setting
+        const heartBeatTimeout: number = 300; // half minute. TODO: make this a setting
         let timeout: NodeJS.Timeout = setInterval(function (): void {
             let elapsedHeartBit: number = util.elapsedTimeSince(heartBeat);
             if (elapsedHeartBit > heartBeatTimeout) {
