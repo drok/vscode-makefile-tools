@@ -1302,6 +1302,12 @@ export async function setTargetByName(targetName: make.BuildTarget) : Promise<vo
     extension._projectOutlineProvider.updateBuildTarget(targetName);
 }
 
+const automake_names: { [key: string]: string } = {
+    "automake.target.desc.all": localize("automake.target.desc.all", "Build default targets ('all')"),
+    "automake.target.desc.check": localize("automake.target.desc.check", "Build and run test suite ('check')"),
+    "automake.target.desc.distcheck": localize("automake.target.desc.distcheck", "Test package distribution ('distcheck')"),
+    "automake.target.desc.install": localize("automake.target.desc.install", "Build and install ('install')"),
+};
 class TargetPickItem implements vscode.QuickPickItem {
     label: string;
     target: BuildTarget;
@@ -1318,21 +1324,45 @@ async function selectBuildTarget() {
     try {
         return await new  Promise<BuildTarget | undefined>((resolve, reject) => {
             const quickPick = vscode.window.createQuickPick<TargetPickItem>();
-            quickPick.placeholder = 'Select a build target';
-            disposable.push(
-                quickPick.onDidChangeValue(value => {
-                    let items : TargetPickItem[] = [];
-                    buildTargets.forEach((targets, dir) => {
-                        targets.forEach((target) => {
-                            items.push(new TargetPickItem(`${target.goal} @ ${dir}`, new BuildTarget(dir, target.goal || "any")));
-                        });
-                    });
-                    if (!value) {
-                        quickPick.items = [];
-                        return;
+            quickPick.placeholder = 'Select a build goal';
+            quickPick.ignoreFocusOut = true;
+            quickPick.busy = true;
+
+            let items : TargetPickItem[] = [];
+            buildTargets.forEach((targets, dir) => {
+                targets.filter((target) => (target.flags & (
+                        Goal.Flags.Linked_binary |
+                        Goal.Flags.Automake_primary)))
+                .forEach((target) => {
+                    let label : string;
+                    switch (target.goal) {
+                        case "all": label = localize("automake.target.desc.all", "Build default targets ('all') in {0}", dir);
+                            break;
+                        case "check": label = localize("automake.target.desc.check", "Build and run test suite ('check') in {0}", dir);
+                            break;
+                        case "distcheck": label = localize("automake.target.desc.distcheck", "Test package distribution ('distcheck') in {0}", dir);
+                            break;
+                        case "install": label = localize("automake.target.desc.install", "Build and install ('install') in {0}", dir);
+                            break;
+                        default: label = `${target.goal} @ ${dir}`;
+                            break;
                     }
-                    quickPick.items = items;
+                    items.push(new TargetPickItem(label, new BuildTarget(dir, target.goal || "any")));
+                });
+            });
+            quickPick.items = items;
+            disposable.push(
+/* Implement some subselection HERE */
+/*
+                quickPick.onDidChangeValue(value => {
+                    if (!value) {
+                        quickPick.items = items;
+                        return;
+                    } else {
+                        quickPick.items = items.filter(item => item.target.dir.indexOf(value) != -1);
+                    }
                 }),
+*/
                 quickPick.onDidChangeSelection((selection) => {
                     if (selection && selection[0]) {
                         if (selection[0] instanceof TargetPickItem) {

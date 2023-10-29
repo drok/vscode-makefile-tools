@@ -262,7 +262,10 @@ export class Database implements Parser {
             if (!sub.goal) { /* End-of-goals, at # files hash-table stats */
                 return undefined;
             } else {
-                this.goals.push(sub);
+                /* Don't store automake auxiliary targets, they are thus
+                 * unavailable for target selection */
+                if (!(sub.flags & Goal.Flags.Automake_auxiliary))
+                    this.goals.push(sub);
                 return new Goal(); /* look for more Goals */
             }
         } else if (sub instanceof EmptyLine) { return undefined; }
@@ -277,6 +280,19 @@ const GoalAckInfoRe = /^(?:Implicit\/static pattern stem:|Last modified)/;
 const GoalVarsRe = /^# (?:automatic|. :=|variable set hash-table stats:|Load=)/;
 const GoalFlagsRe = /^# (.*):$/;
 const GoalRe = /^(.*):/;
+const AutomakePrimaryRe = /^(?:all|check|distcheck|install)$/;
+const GNUMakeAuxiliaryRe = new RegExp('^\.(?:' +
+    '(PHONY|SUFFIXES|PRECIOUS|NOEXPORT|MAKE)' +
+    ')$');
+/* Auxiliary goals are internally used by automake. They are dropped by the parser */
+const AutomakeAuxRe = /(?:-recursive|-am|config.status|Makefile|stamp-h1|am--refresh|^\.deps\/.*|^\.DEFAULT|^\.obj|^\.c|^\.o|depcomp|compile|missing|install-sh|Makefile.am)$/;
+/* Noise targets are those a user most likely never wants to build from a gui */
+const AutomakeNoiseRe = new RegExp('^(' +
+    'ID|GTAGS|TAGS|CTAGS|tags|ctags|cscope|cscope\.files|cscopelist|' +
+    'installdirs|distcleancheck|distuninstallcheck|distdir' +
+    'mostlyclean|maintainer-clean-generic|mostlyclean-generic|clean-cscope|clean|' +
+    'dist.*|uninstall-.*|install-.*|maintainer-.*|distclean-.*|' +
+    'Makefile.in)$');
 const GoalRecipeRe = /^recipe to execute \(from '(.*)', line (\d+)\):/;
 const GoalsEndRe = /^# files hash-table stats:$/;
 /**
@@ -286,9 +302,19 @@ const GoalsEndRe = /^# files hash-table stats:$/;
  * if any.
  */
 export class Goal implements Parser {
-    static readonly Flags = {
+    public static readonly Flags = {
         None: 0,
+        /* Flags gathered from Make (phony, etc) */
         Not_a_target: 1,
+
+        /* Well-known automake targets */
+        Automake_primary: 2,
+        Automake_auxiliary: 4,
+        Automake_noise: 8,
+
+
+        /* Flags gathered from automake (recipe hints like $(LINK) */
+        Linked_binary: 256,
     };
     static makeArgs(): string[] { return [
         // Nothing. The goals are output when the Database is output
@@ -335,7 +361,7 @@ export class Goal implements Parser {
                             let recipe = GoalRecipeRe.exec(info[1]);
                             if (recipe) {
                                 if (this.goal)
-                                    return [ParserDisp.Enter, new Recipe()];
+                                    return [ParserDisp.Enter, new Recipe(this)];
                                 else
                                     throw new Error(`Unexpected Recipe in ${recipe[1]}:${recipe[2]} before goal name`);
                             }
@@ -350,6 +376,12 @@ export class Goal implements Parser {
             if (goal) {
                 if (this.goal)
                     throw new Error("Unexpected multiple goals per Goal section");
+                if (AutomakeAuxRe.test(goal[1]) || GNUMakeAuxiliaryRe.test(goal[1]))
+                    this.flags |= Goal.Flags.Automake_auxiliary;
+                else if (AutomakePrimaryRe.test(goal[1]))
+                    this.flags |= Goal.Flags.Automake_primary;
+                else if (AutomakeNoiseRe.test(goal[1]))
+                    this.flags |= Goal.Flags.Automake_noise;
                 this.goal = goal[1];
                 return [ParserDisp.Continue, this];
             }
@@ -363,20 +395,24 @@ export class Goal implements Parser {
     flags: number = Goal.Flags.None;
 }
 
+const LinkerRe = /\$\(LINK\)\s/;
 /**
  * Parse an unexpanded build recipe for a target.
  * Currently no information is captured, but it could be used to learn
  * what kind of target it is (eg, if `@ref $(LINK)` or `$(COMPILE)` is referenced
  */
 export class Recipe implements Parser {
+    constructor(goal: Goal) { this.goal = goal; }
     static makeArgs(): string[] { return [
         // Nothing. The goals are output when the Database is output
     ];};
     ingest (line: string) : [ParserDisp, Parser] {
         if (line == "")
             return [ParserDisp.Leave, this];
+        if (LinkerRe.test(line))
+            this.goal.flags |= Goal.Flags.Linked_binary;
         return [ParserDisp.Continue, this];
     }
     push(sub: Parser) { return undefined;}
-    // goal: string;
+    goal: Goal;
 }
