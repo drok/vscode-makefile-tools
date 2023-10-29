@@ -56,73 +56,6 @@ export class BuildTargetNode extends BaseNode {
 
 }
 
-export class LaunchTargetNode extends BaseNode {
-    _name: string;
-    _toolTip: string;
-
-    // Keep the tree node label as short as possible.
-    // The binary path is the most important component of a launch target.
-    async getShortLaunchTargetName(completeLaunchTargetName: string): Promise<string> {
-        let launchConfiguration: configuration.LaunchConfiguration | undefined = await configuration.stringToLaunchConfiguration(completeLaunchTargetName);
-        let shortName: string;
-
-        if (!launchConfiguration) {
-            shortName = "Unset";
-        } else {
-            if (vscode.workspace.workspaceFolders) {
-                // In a complete launch target string, the binary path is relative to cwd.
-                // In here, since we don't show cwd, make it relative to current workspace folder.
-                shortName = util.makeRelPath(launchConfiguration.binaryPath, vscode.workspace.workspaceFolders[0].uri.fsPath);
-            } else {
-                // Just in case, if for some reason we don't have a workspace folder, return full binary path.
-                shortName = launchConfiguration.binaryPath;
-            }
-        }
-
-        return localize("tree.launch.target", "Launch target: {0}", `[${shortName}]`);
-    }
-
-    constructor(targetName: string) {
-        super(`launchTarget:${targetName}`);
-
-        // Show the complete launch target name as tooltip and the short name as label
-        this._name = targetName;
-        this._toolTip = targetName;
-    }
-
-    async update(targetName: string): Promise<void> {
-        // Show the complete launch target name as tooltip and the short name as label
-        this._name = await this.getShortLaunchTargetName(targetName);
-        this._toolTip = targetName;
-    }
-
-    getChildren(): BaseNode[] {
-        return [];
-    }
-
-    getTreeItem(): vscode.TreeItem {
-        try {
-            const item: vscode.TreeItem = new vscode.TreeItem(this._name);
-            item.collapsibleState = vscode.TreeItemCollapsibleState.None;
-            item.tooltip = localize("launch.target.currently.selected.for.debug.run.in.terminal",
-                                    "The launch target currently selected for debug and run in terminal.\n{0}", this._toolTip);
-            // enablement in autotools.outline.setLaunchConfiguration is not
-            // disabling this TreeItem
-            item.command = {
-                command: "autotools.outline.setLaunchConfiguration",
-                title: "%autotools.command.makefile.setLaunchConfiguration.title%"
-            };
-            item.contextValue = [
-                `nodeType=launchTarget`,
-            ].join(',');
-            return item;
-        } catch (e) {
-            return new vscode.TreeItem(localize("issue.rendering.item", "{0} (there was an issue rendering this item)", this._name));
-        }
-    }
-
-}
-
 export class ConfigurationNode extends BaseNode {
     constructor(configurationName: string) {
         super(`configuration:${configurationName}`);
@@ -162,12 +95,10 @@ export class ProjectOutlineProvider implements vscode.TreeDataProvider<BaseNode>
     constructor() {
         this._currentConfigurationItem = new ConfigurationNode(this._unsetString);
         this._currentBuildTargetItem = new BuildTargetNode(new BuildTarget("", ""));
-        this._currentLaunchTargetItem = new LaunchTargetNode(this._unsetString);
     }
 
     private _currentConfigurationItem: ConfigurationNode;
     private _currentBuildTargetItem: BuildTargetNode;
-    private _currentLaunchTargetItem: LaunchTargetNode;
 
     get onDidChangeTreeData(): any {
         return this._changeEvent.event;
@@ -181,8 +112,7 @@ export class ProjectOutlineProvider implements vscode.TreeDataProvider<BaseNode>
         }
         if (configuration.isOptionalFeatureEnabled("debug") || configuration.isOptionalFeatureEnabled("run")) {
             return [this._currentConfigurationItem,
-                    this._currentBuildTargetItem,
-                    this._currentLaunchTargetItem];
+                    this._currentBuildTargetItem];
         } else {
             return [this._currentConfigurationItem,
                     this._currentBuildTargetItem];
@@ -203,11 +133,9 @@ export class ProjectOutlineProvider implements vscode.TreeDataProvider<BaseNode>
     }
 
     async update(configuration: string | undefined,
-                 buildTarget: BuildTarget,
-                 launchTarget: string | undefined): Promise<void> {
+                 buildTarget: BuildTarget): Promise<void> {
         this._currentConfigurationItem.update(configuration || this._unsetString);
         this._currentBuildTargetItem.update(buildTarget);
-        await this._currentLaunchTargetItem.update(launchTarget || this._unsetString);
 
         this.updateTree();
     }
@@ -219,11 +147,6 @@ export class ProjectOutlineProvider implements vscode.TreeDataProvider<BaseNode>
 
     updateBuildTarget(buildTarget: BuildTarget): void {
         this._currentBuildTargetItem.update(buildTarget);
-        this.updateTree();
-    }
-
-    async updateLaunchTarget(launchTarget: string): Promise<void> {
-        await this._currentLaunchTargetItem.update(launchTarget);
         this.updateTree();
     }
 

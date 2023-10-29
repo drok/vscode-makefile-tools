@@ -382,141 +382,6 @@ export async function readkeepConfigurationCache() : Promise<void> {
     keepConfigurationCache = await util.getExpandedSetting<boolean>("keepConfigurationCache") || false;
 }
 
-// Currently, the makefile extension supports debugging only an executable.
-// TODO: Parse for symbol search paths
-// TODO: support dll debugging.
-export interface LaunchConfiguration {
-    // The following properties constitute a minimal launch configuration object.
-    // They all can be deduced from the dry-run output or build log.
-    // When the user is selecting a launch configuration, the extension is verifying
-    // whether there is an entry in the launch configurations array in settings
-    // and if not, it is generating a new one with the values computed by the parser.
-    binaryPath: string; // full path to the binary that this launch configuration is tied to
-    binaryArgs: string[]; // arguments that this binary is called with for this launch configuration
-    cwd: string; // folder from where the binary is run
-
-    // The following represent optional properties that can be additionally defined by the user in settings.
-    MIMode?: string;
-    miDebuggerPath?: string;
-    stopAtEntry?: boolean;
-    symbolSearchPath?: string;
-}
-
-let launchConfigurations: LaunchConfiguration[] = [];
-export function getLaunchConfigurations(): LaunchConfiguration[] { return launchConfigurations; }
-export function setLaunchConfigurations(configurations: LaunchConfiguration[]): void { launchConfigurations = configurations; }
-
-// Read launch configurations defined by the user in settings: autotools.launchConfigurations[]
-async function readLaunchConfigurations(): Promise<void> {
-   launchConfigurations = await util.getExpandedSetting<LaunchConfiguration[]>("launchConfigurations") || [];
-}
-
-// Helper used to fill the launch configurations quick pick.
-// The input object for this method is either read from the settings or it is an object
-// constructed by the parser while analyzing the dry-run output (or the build log),
-// when the extension is trying to determine if and how (from what folder, with what arguments)
-// the makefile is invoking any of the programs that are built by the current target.
-// Properties other than cwd, binary path and args could be manually defined by the user
-// in settings (after the extension creates a first minimal launch configuration object) and are not relevant
-// for the strings being used to populate the quick pick.
-// Syntax:
-//    [CWD path]>[binaryPath]([binaryArg1,binaryArg2,binaryArg3,...])
-export function launchConfigurationToString(configuration: LaunchConfiguration): string {
-    let binPath: string = util.makeRelPath(configuration.binaryPath, configuration.cwd);
-    let binArgs: string = configuration.binaryArgs.join(",");
-    return `${configuration.cwd}>${binPath}(${binArgs})`;
-}
-
-// Helper used to construct a minimal launch configuration object
-// (only cwd, binary path and arguments) from a string that respects
-// the syntax of its quick pick.
-export async function stringToLaunchConfiguration(str: string): Promise<LaunchConfiguration | undefined> {
-    let regexp: RegExp = /(.*)\>(.*)\((.*)\)/mg;
-    let match: RegExpExecArray | null = regexp.exec(str);
-
-    if (match) {
-        let fullPath: string = await util.makeFullPath(match[2], match[1]);
-        let splitArgs: string[] = (match[3] === "") ? [] : match[3].split(",");
-
-        return {
-            cwd: match[1],
-            binaryPath: fullPath,
-            binaryArgs: splitArgs
-        };
-    } else {
-        return undefined;
-    }
-}
-
-let currentLaunchConfiguration: LaunchConfiguration | undefined;
-export function getCurrentLaunchConfiguration(): LaunchConfiguration | undefined { return currentLaunchConfiguration; }
-export async function setCurrentLaunchConfiguration(configuration: LaunchConfiguration | undefined): Promise<void> {
-    currentLaunchConfiguration = configuration;
-    let launchConfigStr: string = currentLaunchConfiguration ? launchConfigurationToString(currentLaunchConfiguration) : "";
-    statusBar.setLaunchConfiguration(launchConfigStr);
-    await extension._projectOutlineProvider.updateLaunchTarget(launchConfigStr);
-}
-
-function getLaunchConfiguration(name: string): LaunchConfiguration | undefined {
-    return launchConfigurations.find(k => {
-        if (launchConfigurationToString(k) === name) {
-            return { ...k, keep: true };
-        }
-    });
-}
-
-// Construct the current launch configuration object:
-// Read the identifier from workspace state storage, then find the corresponding object
-// in the launch configurations array from settings.
-// Also update the status bar item.
-async function readCurrentLaunchConfiguration(): Promise<void> {
-    await readLaunchConfigurations();
-    let currentLaunchConfigurationName: string | undefined = extension.getState().launchConfiguration;
-    if (currentLaunchConfigurationName) {
-        currentLaunchConfiguration = getLaunchConfiguration(currentLaunchConfigurationName);
-    }
-
-    let launchConfigStr : string = "No launch configuration set.";
-    if (currentLaunchConfiguration) {
-        launchConfigStr = launchConfigurationToString(currentLaunchConfiguration);
-        logger.message(`Reading current launch configuration "${launchConfigStr}" from the workspace state.`);
-    } else {
-        // A null launch configuration after a non empty launch configuration string name
-        // means that the name stored in the project state does not match any of the entries in settings.
-        // This typically happens after the user modifies manually "autotools.launchConfigurations"
-        // in the .vscode/settings.json, specifically the entry that corresponds to the current launch configuration.
-        // Make sure to unset the launch configuration in this scenario.
-        if (currentLaunchConfigurationName !== undefined && currentLaunchConfigurationName !== "") {
-            logger.message(`Launch configuration "${currentLaunchConfigurationName}" is no longer defined in settings "autotools.launchConfigurations".`);
-            await setLaunchConfigurationByName("");
-        } else {
-            logger.message("No current launch configuration is set in the workspace state.");
-        }
-    }
-
-    statusBar.setLaunchConfiguration(launchConfigStr);
-    await extension._projectOutlineProvider.updateLaunchTarget(launchConfigStr);
-}
-
-export interface DefaultLaunchConfiguration {
-    MIMode?: string;
-    miDebuggerPath?: string;
-    stopAtEntry?: boolean;
-    symbolSearchPath?: string;
-}
-
-let defaultLaunchConfiguration: DefaultLaunchConfiguration | undefined;
-export function getDefaultLaunchConfiguration(): DefaultLaunchConfiguration | undefined { return defaultLaunchConfiguration; }
-// No setter needed. Currently only the user can define autotools.defaultLaunchConfiguration
-
-export async function readDefaultLaunchConfiguration(): Promise<void> {
-    defaultLaunchConfiguration = await util.getExpandedSetting<DefaultLaunchConfiguration>("defaultLaunchConfiguration");
-    logger.message(`Default launch configuration: MIMode = ${defaultLaunchConfiguration?.MIMode},
-                    miDebuggerPath = ${defaultLaunchConfiguration?.miDebuggerPath},
-                    stopAtEntry = ${defaultLaunchConfiguration?.stopAtEntry},
-                    symbolSearchPath = ${defaultLaunchConfiguration?.symbolSearchPath}`);
-}
-
 let configurationMakeArgs: string[] = [];
 export function getConfigurationMakeArgs(): string[] { return configurationMakeArgs; }
 export function setConfigurationMakeArgs(args: string[]): void { configurationMakeArgs = args; }
@@ -783,14 +648,6 @@ export async function readSaveBeforeBuildOrConfigure(): Promise<void> {
     logger.message(`Save before build or configure: ${saveBeforeBuildOrConfigure}`);
 }
 
-let buildBeforeLaunch: boolean | undefined;
-export function getBuildBeforeLaunch(): boolean | undefined { return buildBeforeLaunch; }
-export function setBuildBeforeLaunch(build: boolean): void { buildBeforeLaunch = build; }
-export async function readBuildBeforeLaunch(): Promise<void> {
-    buildBeforeLaunch = await util.getExpandedSetting<boolean>("buildBeforeLaunch");
-    logger.message(`Build before launch: ${buildBeforeLaunch}`);
-}
-
 let clearOutputBeforeBuild: boolean | undefined;
 export function getClearOutputBeforeBuild(): boolean | undefined { return clearOutputBeforeBuild; }
 export function setClearOutputBeforeBuild(clear: boolean): void { clearOutputBeforeBuild = clear; }
@@ -856,14 +713,11 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
     await readAdditionalCompilerNames();
     await readExcludeCompilerNames();
     await readMakefileConfigurations(currentMakefileConfigurationName);
-    await readCurrentLaunchConfiguration();
-    await readDefaultLaunchConfiguration();
     await readConfigureOnOpen();
     await readConfigureOnEdit();
     await readConfigureAfterCommand();
     await readPhonyOnlyTargets();
     await readSaveBeforeBuildOrConfigure();
-    await readBuildBeforeLaunch();
     await readClearOutputBeforeBuild();
     await readIgnoreDirectoryCommands();
     await readCompileCommandsPath();
@@ -877,8 +731,7 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
     // FIXME: seems wrong to do || make.t_all; this fn should probably be called
     // config arg after config is fully loaded.
     await extension._projectOutlineProvider.update(extension.getState().buildConfiguration,
-                                             currentTarget,
-                                             extension.getState().launchConfiguration);
+                                             currentTarget);
 
     // Verify the dirty state of the IntelliSense config provider and update accordingly.
     // The makefile.configureOnEdit setting can be set to false when this behavior is inconvenient.
@@ -948,25 +801,7 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
             let telemetryProperties: telemetry.Properties | null = {};
             let updatedSettingsSubkeys: string[] = [];
             const keyRoot: string = "autotools";
-            let subKey: string = "launchConfigurations";
-
-            let updatedLaunchConfigurations : LaunchConfiguration[] | undefined = await util.getExpandedSetting<LaunchConfiguration[]>(subKey);
-            if (!util.areEqual(updatedLaunchConfigurations, launchConfigurations)) {
-                // Changing a launch configuration does not impact the make or compiler tools invocations,
-                // so no IntelliSense update is needed.
-                await readCurrentLaunchConfiguration(); // this gets a refreshed view of all launch configurations
-                // and also updates the current one in case it was affected
-                updatedSettingsSubkeys.push(subKey);
-            }
-
-            subKey = "defaultLaunchConfiguration";
-            let updatedDefaultLaunchConfiguration : DefaultLaunchConfiguration | undefined = await util.getExpandedSetting<DefaultLaunchConfiguration>(subKey);
-            if (!util.areEqual(updatedDefaultLaunchConfiguration, defaultLaunchConfiguration)) {
-                // Changing a global debug configuration does not impact the make or compiler tools invocations,
-                // so no IntelliSense update is needed.
-                await readDefaultLaunchConfiguration();
-                updatedSettingsSubkeys.push(subKey);
-            }
+            let subKey: string;
 
             subKey = "loggingLevel";
             let updatedLoggingLevel : string | undefined = await util.getExpandedSetting<string>(subKey);
@@ -1120,13 +955,6 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
             let updatedSaveBeforeBuildOrConfigure : boolean | undefined = await util.getExpandedSetting<boolean>(subKey);
             if (updatedSaveBeforeBuildOrConfigure !== saveBeforeBuildOrConfigure) {
                 await readSaveBeforeBuildOrConfigure();
-                updatedSettingsSubkeys.push(subKey);
-            }
-
-            subKey = "buildBeforeLaunch";
-            let updatedBuildBeforeLaunch : boolean | undefined = await util.getExpandedSetting<boolean>(subKey);
-            if (updatedBuildBeforeLaunch !== buildBeforeLaunch) {
-                await readBuildBeforeLaunch();
                 updatedSettingsSubkeys.push(subKey);
             }
 
@@ -1428,7 +1256,7 @@ export async function selectTarget(context: vscode.ExtensionContext): Promise<vo
 
     const chosen = await selectBuildTarget();
 
-    if (chosen instanceof BuildTarget) {
+    if (!(chosen instanceof BuildTarget)) {
         return;
     }
     if (chosen && chosen !== getCurrentTarget()) {
@@ -1447,138 +1275,6 @@ export async function selectTarget(context: vscode.ExtensionContext): Promise<vo
     }
 }
 
-// The 'name' of a launch configuration is a string following this syntax:
-//    [cwd]>[binaryPath](binaryArg1,binaryArg2,...)
-// These strings are found by the extension while parsing the output of the dry-run or build log,
-// which reflect possible different ways of running the binaries built by the makefile.
-// TODO: If we find that these strings are not unique (meaning the makefile may invoke
-// the given binary in the exact same way more than once), incorporate also the containing target
-// name in the syntax (or, since in theory one can write a makefile target to run the same binary
-// in the same way more than once, add some number suffix).
-export async function setLaunchConfigurationByName(launchConfigurationName: string) : Promise<void> {
-    // Find the matching entry in the array of launch configurations
-    // or generate a new entry in settings if none are found.
-    currentLaunchConfiguration = getLaunchConfiguration(launchConfigurationName);
-    if (!currentLaunchConfiguration) {
-        currentLaunchConfiguration = await stringToLaunchConfiguration(launchConfigurationName);
-        if (currentLaunchConfiguration) {
-            // Read again all launch configurations from settings, so that we push this incoming into that array as well
-            // because we want to persist the original unexpanded content of launch configurations.
-            let workspaceConfiguration: vscode.WorkspaceConfiguration = vscode.workspace.getConfiguration("autotools");
-            let launchConfigAsInSettings: LaunchConfiguration[] = workspaceConfiguration.get<LaunchConfiguration[]>("launchConfigurations") || [];
-            launchConfigAsInSettings.push(currentLaunchConfiguration);
-            // Push into the processed 'in-memory' launch configurations array as well.
-            launchConfigurations.push(currentLaunchConfiguration);
-            await workspaceConfiguration.update("launchConfigurations", launchConfigAsInSettings);
-            logger.message(`Inserting a new entry for ${launchConfigurationName} in the array of autotools.launchConfigurations. ` +
-                           "You may define any additional debug properties for it in settings.");
-        }
-    }
-
-    if (currentLaunchConfiguration) {
-        logger.message(`Setting current launch target "${launchConfigurationName}"`);
-        extension.getState().launchConfiguration = launchConfigurationName;
-        statusBar.setLaunchConfiguration(launchConfigurationName);
-    } else {
-        if (launchConfigurationName === "") {
-            logger.message("Unsetting the current launch configuration.");
-        } else {
-            logger.message(`A problem occured while analyzing launch configuration name ${launchConfigurationName}. Current launch configuration is unset.`);
-        }
-        extension.getState().launchConfiguration = undefined;
-        statusBar.setLaunchConfiguration("No launch configuration set");
-    }
-
-    // Refresh settings, they may reference variables or commands reading launch targets commands: ${command:autotools.getLaunchTargetPath} and others...
-    logger.message("Re-reading settings after launch target change.");
-    await initFromSettings();
-    await extension._projectOutlineProvider.updateLaunchTarget(launchConfigurationName);
-}
-
-// Fill a drop-down with all the launch configurations found for binaries built by the makefile
-// under the scope of the current build configuration and target
-// Selection updates current launch configuration that will be ready for the next debug/run operation
-export async function selectLaunchConfiguration(): Promise<void> {
-    // Cannot select a new launch configuration if the project is currently building or (pre-)configuring.
-    if (make.blockedByOp(make.Operations.changeLaunchTarget)) {
-        return;
-    }
-
-    // warn about an out of date configure state and configure if autotools.configureAfterCommand allows.
-    if (extension.getState().configureDirty ||
-        // The configure state might not be dirty from the last session but if the project is set to skip
-        // configure on open and no configure happened yet we still must warn.
-        (configureOnOpen === false && !extension.getCompletedConfigureInSession())) {
-        logger.message("The project needs a configure to populate the launch targets correctly.");
-        if (configureAfterCommand) {
-            let retc: number = await make.configure(make.TriggeredBy.configureBeforeLaunchTargetChange);
-            if (retc !== make.ConfigureBuildReturnCodeTypes.success) {
-                logger.message("The launch targets list may not be accurate because configure failed.");
-            }
-        }
-    }
-
-    // TODO: create a quick pick with description and details for items
-    // to better view the long targets commands
-
-    // In the quick pick, include also any autotools.launchConfigurations entries,
-    // as long as they exist on disk and without allowing duplicates.
-    let launchTargetsNames: string[] = [...launchTargets];
-    launchConfigurations.forEach(launchConfiguration => {
-        if (util.checkFileExistsSync(launchConfiguration.binaryPath)) {
-            launchTargetsNames.push(launchConfigurationToString(launchConfiguration));
-        }
-    });
-    launchTargetsNames = util.sortAndRemoveDuplicates(launchTargetsNames);
-    let options: vscode.QuickPickOptions = {};
-    options.ignoreFocusOut = true; // so that the logger and the quick pick don't compete over focus
-    if (launchTargets.length === 0) {
-        options.placeHolder = "No launch targets identified";
-    }
-    const chosen: string | undefined = await vscode.window.showQuickPick(launchTargetsNames, options);
-
-    if (chosen) {
-        let currentLaunchConfiguration: LaunchConfiguration | undefined = getCurrentLaunchConfiguration();
-        if (!currentLaunchConfiguration || chosen !== launchConfigurationToString(currentLaunchConfiguration)) {
-            let telemetryProperties: telemetry.Properties | null = {
-                state: "launchConfiguration"
-            };
-            telemetry.logEvent("stateChanged", telemetryProperties);
-
-            await setLaunchConfigurationByName(chosen);
-
-            // Refresh telemetry for this new launch configuration
-            // (this will find the corresponding item in the autotools.launchConfigurations array
-            // and report all the relevant settings of that object).
-            // Because of this, the event name is still "settingsChanged", even if
-            // we're doing a state change now.
-            let keyRoot: string = "autotools";
-            let subKey: string = "launchConfigurations";
-            let key: string = keyRoot + "." + subKey;
-            let workspaceConfiguration: vscode.WorkspaceConfiguration = vscode.workspace.getConfiguration(keyRoot);
-            telemetryProperties = {};
-
-            // We should have at least one item in the launchConfigurations array
-            // if the extension changes state for launch configuration,
-            // but guard just in case.
-            let launchConfigurationSetting: any = workspaceConfiguration[subKey];
-            if (launchConfigurationSetting) {
-                try {
-                    telemetryProperties = await telemetry.analyzeSettings(launchConfigurationSetting, key,
-                        util.thisExtensionPackage().contributes.configuration.properties[key],
-                        true, telemetryProperties);
-                } catch (e) {
-                    logger.message(e.message);
-                }
-
-                if (telemetryProperties && util.hasProperties(telemetryProperties)) {
-                    telemetry.logEvent("settingsChanged", telemetryProperties);
-                }
-            }
-        }
-    }
-}
-
 // List of targets defined in the makefile project.
 // Parsed from the build log, configuration cache or live dry-run output at configure time.
 // Currently, this list contains any abstract intermediate target
@@ -1588,24 +1284,3 @@ let buildTargets: Map<string, Goal[]> = new Map();
 export function getBuildTargets(dir: string): Goal[] { return buildTargets.get(dir) || []; }
 export function setBuildTargets(targets: Map<string, Goal[]>): void { buildTargets = targets; }
 export function getAllBuildTargets(): Map<string, Goal[]> { return buildTargets; }
-
-// List of all the binaries built by the current project and all the ways
-// they may be invoked (from what cwd, with what arguments).
-// This is parsed from the build log, configuration cache or live dry-run output at configure time.
-// This is what populates the 'launch targets' quick pick and is different than the
-// launch configurations defined in settings.
-// A launch configuration extends a launch target with various debugger settings.
-// Each launch configuration entry is written in settings by the extension
-// when the user actively selects any launch target from the quick pick.
-// Then the user can add any of the provided extra attributes (miMode, miDebuggerPath, etc...)
-// under that entry. It is possible that not all launch targets have a launch configuration counterpart,
-// but if they do it is only one. Technically, we can imagine one launch target may have
-// more than one launch configurations defined in settings (same binary, location and arguments debugged
-// with different scenarios)) but this is not yet supported because currently the launch configurations
-// are uniquely referenced by a string formed by cwd, binary and args (which form a launch target).
-// The quick pick is not populated by the launch configurations list because its entries may be
-// out of date and most importantly a subset. We want the quick pick to reflect all the possibilities
-// that are found available with the current configuration of the project.
-let launchTargets: string[] = [];
-export function getLaunchTargets(): string[] { return launchTargets; }
-export function setLaunchTargets(targets: string[]): void { launchTargets = targets; }

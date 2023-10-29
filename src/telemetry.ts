@@ -131,17 +131,6 @@ function activeArrayItem(setting: string, key: string): number {
         return currentMakefileConfiguration ? makefileConfigurations.indexOf(currentMakefileConfiguration) : -1;
     }
 
-    if (key === "autotools.launchConfigurations") {
-        let launchConfigurations: configuration.LaunchConfiguration[] = configuration.getLaunchConfigurations();
-        let currentLaunchConfiguration: configuration.LaunchConfiguration | undefined = launchConfigurations.find(config => {
-            if (util.areEqual(config, configuration.getCurrentLaunchConfiguration())) {
-                return config;
-            }
-        });
-
-        return currentLaunchConfiguration ? launchConfigurations.indexOf(currentLaunchConfiguration) : -1;
-    }
-
     return -1;
 }
 

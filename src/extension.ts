@@ -5,7 +5,6 @@
 
 import * as configuration from './configuration';
 import * as cpptools from './cpptools';
-import * as launch from './launch';
 import * as fs from 'fs';
 import * as logger from './logger';
 import * as make from './make';
@@ -24,7 +23,6 @@ nls.config({ messageFormat: nls.MessageFormat.bundle, bundleFormat: nls.BundleFo
 const localize: nls.LocalizeFunc = nls.loadMessageBundle();
 
 let statusBar: ui.UI = ui.getUI();
-let launcher: launch.Launcher = launch.getLauncher();
 
 export let extension: MakefileToolsExtension;
 
@@ -250,55 +248,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         await make.buildTarget(make.TriggeredBy.buildCleanAll, make.t_all, true);
     }));
 
-    context.subscriptions.push(vscode.commands.registerCommand('autotools.setLaunchConfiguration', async () => {
-        await configuration.selectLaunchConfiguration();
-    }));
-
-    context.subscriptions.push(vscode.commands.registerCommand('autotools.launchDebug', async () => {
-        await launcher.debugCurrentTarget();
-    }));
-
-    context.subscriptions.push(vscode.commands.registerCommand('autotools.launchRun', async () => {
-        await launcher.runCurrentTarget();
-    }));
-
-
-    /** Start of commands that shouldn't be exposed in package.json, they are used for command substitution in launch.json and tasks.json.  */
-    context.subscriptions.push(vscode.commands.registerCommand('autotools.getLaunchTargetPath', () => {
-        telemetry.logEvent("getLaunchTargetPath");
-        return launcher.getLaunchTargetPath();
-    }));
-
-    context.subscriptions.push(vscode.commands.registerCommand('autotools.launchTargetPath', () => {
-      telemetry.logEvent("launchTargetPath");
-      return launcher.launchTargetPath();
-    }));
-
-    context.subscriptions.push(vscode.commands.registerCommand('autotools.getLaunchTargetDirectory', () => {
-        telemetry.logEvent("getLaunchTargetDirectory");
-        return launcher.getLaunchTargetDirectory();
-    }));
-
-    context.subscriptions.push(vscode.commands.registerCommand('autotools.getLaunchTargetFileName', () => {
-      telemetry.logEvent("getLaunchTargetFileName");
-      return launcher.getLaunchTargetFileName();
-    }));
-
-    context.subscriptions.push(vscode.commands.registerCommand('autotools.launchTargetFileName', () => {
-      telemetry.logEvent("launchTargetFileName");
-      return launcher.launchTargetFileName();
-    }));
-
-    context.subscriptions.push(vscode.commands.registerCommand('autotools.getLaunchTargetArgs', () => {
-        telemetry.logEvent("getLaunchTargetArgs");
-        return launcher.getLaunchTargetArgs();
-    }));
-
-    context.subscriptions.push(vscode.commands.registerCommand('autotools.getLaunchTargetArgsConcat', () => {
-        telemetry.logEvent("getLaunchTargetArgsConcat");
-        return launcher.getLaunchTargetArgsConcat();
-    }));
-
     context.subscriptions.push(vscode.commands.registerCommand('autotools.makeBaseDirectory', () => {
         telemetry.logEvent("makeBaseDirectory");
         return configuration.makeBaseDirectory();
@@ -342,18 +291,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     context.subscriptions.push(vscode.commands.registerCommand('autotools.outline.postConfigure', () => {
         return vscode.commands.executeCommand("autotools.postConfigure");
     }))
-
-    context.subscriptions.push(vscode.commands.registerCommand('autotools.outline.setLaunchConfiguration', () => {
-        return vscode.commands.executeCommand("autotools.setLaunchConfiguration");
-    }));
-
-    context.subscriptions.push(vscode.commands.registerCommand('autotools.outline.launchDebug', () => {
-        return vscode.commands.executeCommand("autotools.launchDebug");
-    }));
-
-    context.subscriptions.push(vscode.commands.registerCommand('autotools.outline.launchRun', () => {
-        return vscode.commands.executeCommand("autotools.launchRun");
-    }));
 
     context.subscriptions.push(vscode.commands.registerCommand('autotools.outline.setBuildTarget', () => {
         return vscode.commands.executeCommand("autotools.setBuildTarget");
@@ -447,7 +384,6 @@ export async function deactivate(): Promise<void> {
 
     const items : any = [
         extension,
-        launcher,
         statusBar
     ];
 

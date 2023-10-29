@@ -44,32 +44,6 @@ export const t_none = new BuildTarget("", "");
 export const t_all = new BuildTarget("", "all");
 export const t_clean = new BuildTarget("", "clean");
 
-let isBuilding: boolean = false;
-export function getIsBuilding(): boolean { return isBuilding; }
-export function setIsBuilding(building: boolean): void {
-    isBuilding = building;
-}
-
-let isConfiguring: boolean = false;
-export function getIsConfiguring(): boolean { return isConfiguring; }
-export function setIsConfiguring(configuring: boolean): void { isConfiguring = configuring; }
-
-let configureIsInBackground: boolean = false;
-export function getConfigureIsInBackground(): boolean { return configureIsInBackground; }
-export function setConfigureIsInBackground(background: boolean): void { configureIsInBackground = background; }
-
-let configureIsClean: boolean = false;
-export function getConfigureIsClean(): boolean { return configureIsClean; }
-export function setConfigureIsClean(clean: boolean): void { configureIsClean = clean; }
-
-let isPreConfiguring: boolean = false;
-export function getIsPreConfiguring(): boolean { return isPreConfiguring; }
-export function setIsPreConfiguring(preConfiguring: boolean): void { isPreConfiguring = preConfiguring; }
-
-let isPostConfiguring: boolean = false;
-export function getIsPostConfiguring(): boolean { return isPostConfiguring; };
-export function setIsPostConfiguring(postConfiguring: boolean): void { isPostConfiguring = postConfiguring; }
-
 // Leave positive error codes for make exit values
 export enum ConfigureBuildReturnCodeTypes {
     success = 0,
@@ -918,7 +892,6 @@ export async function runPostConfigureScript(progress: vscode.Progress<{}>, scri
 
 interface ConfigurationCache {
     buildTargets: Map<string, Goal[]> | undefined;
-    launchTargets: string[];
     customConfigurationProvider: {
         workspaceBrowse: cpp.WorkspaceBrowseConfiguration;
         fileIndex: [string, {
@@ -930,7 +903,7 @@ interface ConfigurationCache {
 }
 
 function isConfigurationEmpty(configurationCache: ConfigurationCache): boolean {
-    if (!configurationCache.buildTargets && configurationCache.launchTargets.length === 0 && configurationCache.customConfigurationProvider.workspaceBrowse.browsePath.length === 0) {
+    if (!configurationCache.buildTargets && configurationCache.customConfigurationProvider.workspaceBrowse.browsePath.length === 0) {
         return true;
     }
     return false;
@@ -1135,12 +1108,7 @@ export async function configure(triggeredBy: TriggeredBy, updateTargets: boolean
           extension.getState().configureDirty = true;
 
           retc = ConfigureBuildReturnCodeTypes.cancelled;
-          setIsConfiguring(false);
-          setConfigureIsClean(false);
-          setConfigureIsInBackground(false);
         });
-
-        setIsConfiguring(true);
 
         return doConfigure(progress, cancel, updateTargets, readCache, configurationCache);
       }
@@ -1174,7 +1142,6 @@ export async function configure(triggeredBy: TriggeredBy, updateTargets: boolean
       .getCustomConfigurationProvider();
     let ConfigurationCache: ConfigurationCache = {
       buildTargets: configuration.getAllBuildTargets(),
-      launchTargets: configuration.getLaunchTargets(),
       customConfigurationProvider: {
         workspaceBrowse: provider.workspaceBrowse,
         // trick to serialize a map in a JSON
@@ -1223,7 +1190,6 @@ export async function configure(triggeredBy: TriggeredBy, updateTargets: boolean
       // FIXME: expensive counting
       // FIXME: this only counts top_builddir targets
       numberBuildTargets: Array.from(configuration.getBuildTargets("")).length,
-      numberLaunchTargets: configuration.getLaunchTargets().length,
       numberIndexedSourceFiles: provider.fileIndex.size,
       numberMakefileConfigurations:
         configuration.getMakefileConfigurations().length,
@@ -1232,7 +1198,6 @@ export async function configure(triggeredBy: TriggeredBy, updateTargets: boolean
     const telemetryProperties: telemetry.Properties = {
       firstTime: (!ranConfigureInCodebaseLifetime).toString(),
       readCache: readCache.toString(),
-      isClean: getConfigureIsClean().toString(),
       triggeredBy: triggeredBy,
     };
 
@@ -1256,10 +1221,6 @@ export async function configure(triggeredBy: TriggeredBy, updateTargets: boolean
     }
 
     logger.message(`Configure elapsed time: ${configureElapsedTime}`);
-
-    setIsConfiguring(false);
-    setConfigureIsClean(false);
-    setConfigureIsInBackground(false);
 
     // Let's consider that a cancelled configure is not a complete configure,
     // even if, depending when the cancel happened, the cache may have been loaded already.
@@ -1306,68 +1267,6 @@ export async function configure(triggeredBy: TriggeredBy, updateTargets: boolean
   }
 }
 
-async function parseLaunchConfigurations(progress: vscode.Progress<{}>, cancel: vscode.CancellationToken,
-                                         dryRunOutput: string, recursive: boolean = false): Promise<ConfigureSubphaseStatus> {
-
-    if (cancel.isCancellationRequested) {
-        return {
-            retc: ConfigureBuildReturnCodeTypes.cancelled,
-            elapsed: 0
-        };
-    }
-
-    let startTime: number = Date.now();
-    let launchConfigurations: configuration.LaunchConfiguration[] = [];
-
-    let onStatus: any = (status: string): void => {
-        progress.report({ increment: 1, message: `${status}${(recursive) ? recursiveString : ""}...` });
-    };
-
-    let onFoundLaunchConfiguration: any = (launchConfiguration: configuration.LaunchConfiguration): void => {
-        launchConfigurations.push(launchConfiguration);
-    };
-
-    let retc: number = await toolParser.parseLaunchConfigurations(cancel, dryRunOutput, onStatus, onFoundLaunchConfiguration);
-    if (retc === ConfigureBuildReturnCodeTypes.success) {
-        let launchConfigurationsStr: string[] = [];
-        launchConfigurations.forEach(config => {
-            launchConfigurationsStr.push(configuration.launchConfigurationToString(config));
-        });
-
-        if (launchConfigurationsStr.length === 0) {
-            logger.message(`No${getConfigureIsClean() ? "" : " new"}${getConfigureIsClean() ? "" : " new"} launch configurations have been detected.`);
-        } else {
-            // Sort and remove duplicates that can be created in the following scenarios:
-            //    - the same target binary invoked several times with the same arguments and from the same path
-            //    - a target binary invoked once with no parameters is still a duplicate
-            //      of the entry generated by the linker command which produced the binary
-            //    - sometimes the same binary is linked more than once in the same location
-            //      (example: instrumentation) but the launch configurations list need only one entry,
-            //      corresponding to the final binary, not the intermediate ones.
-            launchConfigurationsStr = util.sortAndRemoveDuplicates(launchConfigurationsStr);
-
-            logger.message(`Found the following ${launchConfigurationsStr.length}${getConfigureIsClean() ? "" : " new"} launch targets defined in the makefile: ${launchConfigurationsStr.join(";")}`);
-        }
-
-        if (getConfigureIsClean()) {
-            // If configure is clean, delete any old launch targets found previously.
-            configuration.setLaunchTargets(launchConfigurationsStr);
-        } else {
-            // If we're merging with a previous set of launch targets,
-            // remove duplicates because sometimes, depending how the makefiles are set up,
-            // a non --always-make dry-run may still log commands for up to date files.
-            // These would be found also in the previous list of launch targets.
-            configuration.setLaunchTargets(util.sortAndRemoveDuplicates(configuration.getLaunchTargets().concat(launchConfigurationsStr)));
-        }
-
-        logger.message(`Complete list of launch targets: ${configuration.getLaunchTargets().join(";")}`);
-    }
-
-    return {
-        retc,
-        elapsed: util.elapsedTimeSince(startTime)
-    };
-}
 
 /**
  * Loads into Intellisense a previously calculated configuration.
@@ -1393,7 +1292,6 @@ async function loadConfigurationFromCache(progress: vscode.Progress<{}>, cancel:
             logger.message(`Configuring from cache: ${cacheFile}`);
             let configurationCache: ConfigurationCache = {
                 buildTargets: undefined,
-                launchTargets: [],
                 customConfigurationProvider: {
                     workspaceBrowse: {
                         browsePath: []
@@ -1427,7 +1325,6 @@ async function loadConfigurationFromCache(progress: vscode.Progress<{}>, cancel:
             await util.scheduleTask(() => {
                 if (configurationCache.buildTargets)
                     configuration.setBuildTargets(configurationCache.buildTargets);
-                configuration.setLaunchTargets(configurationCache.launchTargets);
             });
 
             await util.scheduleTask(() => {
@@ -1441,9 +1338,6 @@ async function loadConfigurationFromCache(progress: vscode.Progress<{}>, cancel:
 
         } catch (e) {
             logger.message("An error occured while parsing the configuration cache.");
-            logger.message("Running clean configure instead.");
-            setConfigureIsInBackground(false);
-            setConfigureIsClean(true);
         }
 
         elapsedTime = util.elapsedTimeSince(startTime);
@@ -1506,16 +1400,6 @@ export async function doConfigure(progress: vscode.Progress<{}>, cancel: vscode.
     subphaseStats.generateParseContent = await generateParseContent(progress, cancel, recursiveDoConfigure);
     if (subphaseStats.generateParseContent.retc === ConfigureBuildReturnCodeTypes.cancelled) {
         return subphaseStats;
-    }
-
-    // Verify if the current launch configuration is still part of the list and unset otherwise.
-    // By this point, configuration.getLaunchTargets() contains a complete list (old and new).
-    let currentLaunchConfiguration: configuration.LaunchConfiguration | undefined = configuration.getCurrentLaunchConfiguration();
-    let currentLaunchConfigurationStr: string | undefined = currentLaunchConfiguration ? configuration.launchConfigurationToString(currentLaunchConfiguration) : "";
-    if (currentLaunchConfigurationStr !== "" && currentLaunchConfiguration &&
-        !configuration.getLaunchConfigurations().includes(currentLaunchConfiguration)) {
-            logger.message(`Current launch configuration ${currentLaunchConfigurationStr} is no longer present in the available list.`);
-            await configuration.setLaunchConfigurationByName("");
     }
 
     // Configure build targets only if necessary:

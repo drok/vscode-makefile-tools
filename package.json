@@ -59,24 +59,12 @@
                 "title": "%autotools.command.makefile.buildCleanAll.title%"
             },
             {
-                "command": "autotools.launchDebug",
-                "title": "%autotools.command.makefile.launchDebug.title%"
-            },
-            {
-                "command": "autotools.launchRun",
-                "title": "%autotools.command.makefile.launchRun.title%"
-            },
-            {
                 "command": "autotools.setBuildConfiguration",
                 "title": "%autotools.command.makefile.setBuildConfiguration.title%"
             },
             {
                 "command": "autotools.setBuildTarget",
                 "title": "%autotools.command.makefile.setBuildTarget.title%"
-            },
-            {
-                "command": "autotools.setLaunchConfiguration",
-                "title": "%autotools.command.makefile.setLaunchConfiguration.title%"
             },
             {
                 "command": "autotools.configure",
@@ -107,18 +95,6 @@
                 "title": "%autotools.command.makefile.buildCleanTarget.title%"
             },
             {
-                "command": "autotools.outline.launchDebug",
-                "title": "%autotools.command.makefile.launchDebug.title%",
-                "icon": "$(debug)",
-                "enablement": "autotools:localDebugFeature"
-            },
-            {
-                "command": "autotools.outline.launchRun",
-                "title": "%autotools.command.makefile.launchRun.title%",
-                "icon": "$(run)",
-                "enablement": "autotools:localRunFeature"
-            },
-            {
                 "command": "autotools.outline.setBuildConfiguration",
                 "title": "%autotools.command.makefile.setBuildConfiguration.title%",
                 "icon": "$(notebook-edit)"
@@ -126,11 +102,6 @@
             {
                 "command": "autotools.outline.setBuildTarget",
                 "title": "%autotools.command.makefile.setBuildTarget.title%",
-                "icon": "$(notebook-edit)"
-            },
-            {
-                "command": "autotools.outline.setLaunchConfiguration",
-                "title": "%autotools.command.makefile.setLaunchConfiguration.title%",
                 "icon": "$(notebook-edit)"
             },
             {
@@ -229,84 +200,6 @@
                                 },
                                 "default": ["$gcc", "$msvc"],
                                 "description": "%autotools.configuration.makefile.configurations.problemMatchers.description%"
-                            }
-                        }
-                    },
-                    "scope": "resource"
-                },
-                "autotools.defaultLaunchConfiguration": {
-                    "type": "object",
-                    "default": null,
-                    "description": "%autotools.configuration.makefile.defaultLaunchConfiguration.description%",
-                    "properties": {
-                        "MIMode": {
-                            "type": "string",
-                            "description": "%autotools.configuration.makefile.defaultLaunchConfiguration.MIMode.description%",
-                            "enum": [
-                                "gdb",
-                                "lldb"
-                            ]
-                        },
-                        "miDebuggerPath": {
-                            "type": "string",
-                            "description": "%autotools.configuration.makefile.defaultLaunchConfiguration.miDebuggerPath.description%"
-                        },
-                        "stopAtEntry": {
-                            "type": "boolean",
-                            "description": "%autotools.configuration.makefile.defaultLaunchConfiguration.stopAtEntry.description%",
-                            "default": false
-                        },
-                        "symbolSearchPath": {
-                            "type": "string",
-                            "description": "%autotools.configuration.makefile.defaultLaunchConfiguration.symbolSearchPath.description%"
-                        }
-                    },
-                    "scope": "resource"
-                },
-                "autotools.launchConfigurations": {
-                    "type": "array",
-                    "default": [],
-                    "description": "%autotools.configuration.makefile.launchConfigurations.description%",
-                    "items": {
-                        "type": "object",
-                        "default": null,
-                        "properties": {
-                            "binaryPath": {
-                                "type": "string",
-                                "description": "%autotools.configuration.makefile.launchConfigurations.binaryPath.description%"
-                            },
-                            "binaryArgs": {
-                                "type": "array",
-                                "description": "%autotools.configuration.makefile.launchConfigurations.binaryArgs.description%",
-                                "items": {
-                                    "type": "string"
-                                },
-                                "default": []
-                            },
-                            "cwd": {
-                                "type": "string",
-                                "description": "%autotools.configuration.makefile.launchConfigurations.cwd.description%"
-                            },
-                            "MIMode": {
-                                "type": "string",
-                                "description": "%autotools.configuration.makefile.launchConfigurations.MIMode.description%",
-                                "enum": [
-                                    "gdb",
-                                    "lldb"
-                                ]
-                            },
-                            "miDebuggerPath": {
-                                "type": "string",
-                                "description": "%autotools.configuration.makefile.launchConfigurations.miDebuggerPath.description%"
-                            },
-                            "stopAtEntry": {
-                                "type": "boolean",
-                                "description": "%autotools.configuration.makefile.launchConfigurations.stopAtEntry.description%",
-                                "default": false
-                            },
-                            "symbolSearchPath": {
-                                "type": "string",
-                                "description": "%autotools.configuration.makefile.launchConfigurations.symbolSearchPath.description%"
                             }
                         }
                     },
@@ -436,12 +329,6 @@
                     "description": "%autotools.configuration.makefile.saveBeforeBuildOrConfigure.description%",
                     "scope": "resource"
                 },
-                "autotools.buildBeforeLaunch": {
-                    "type": "boolean",
-                    "default": true,
-                    "description": "%autotools.configuration.makefile.buildBeforeLaunch.description%",
-                    "scope": "resource"
-                },
                 "autotools.clearOutputBeforeBuild": {
                     "type": "boolean",
                     "default": true,
@@ -517,20 +404,8 @@
                     "when": "autotools:fullFeatureSet"
                 },
                 {
-                    "command": "autotools.launchDebug",
-                    "when": "autotools:localDebugFeature"
-                },
-                {
-                    "command": "autotools.launchRun",
-                    "when": "autotools:localRunFeature"
-                },
-                {
                     "command": "autotools.setBuildTarget",
                     "when": "autotools:fullFeatureSet"
-                },
-                {
-                    "command": "autotools.setLaunchConfiguration",
-                    "when": "autotools:localDebugFeature"
                 },
                 {
                     "command": "autotools.outline.configure",
@@ -557,23 +432,11 @@
                     "when": "never"
                 },
                 {
-                    "command": "autotools.outline.launchDebug",
-                    "when": "never"
-                },
-                {
-                    "command": "autotools.outline.launchRun",
-                    "when": "never"
-                },
-                {
                     "command": "autotools.outline.setBuildConfiguration",
                     "when": "never"
                 },
                 {
                     "command": "autotools.outline.setBuildTarget",
-                    "when": "never"
-                },
-                {
-                    "command": "autotools.outline.setLaunchConfiguration",
                     "when": "never"
                 }
             ],
@@ -607,16 +470,6 @@
                     "command": "autotools.outline.buildCleanTarget",
                     "when": "autotools:fullFeatureSet && view == autotools.outline",
                     "group": "1_makefileOutline@4"
-                },
-                {
-                    "command": "autotools.outline.launchDebug",
-                    "when": "autotools:fullFeatureSet && view == autotools.outline && autotools:localDebugFeature",
-                    "group": "navigation@2"
-                },
-                {
-                    "command": "autotools.outline.launchRun",
-                    "when": "autotools:fullFeatureSet && view == autotools.outline && autotools:localRunFeature",
-                    "group": "navigation@3"
                 }
             ],
             "view/item/context": [
@@ -648,21 +501,6 @@
                 {
                     "command": "autotools.outline.setBuildTarget",
                     "when": "autotools:fullFeatureSet && view == autotools.outline && viewItem =~ /nodeType=buildTarget/",
-                    "group": "inline@1"
-                },
-                {
-                    "command": "autotools.outline.launchDebug",
-                    "when": "autotools:fullFeatureSet && view == autotools.outline && viewItem =~ /nodeType=launchTarget/",
-                    "group": "1_stateActions@1"
-                },
-                {
-                    "command": "autotools.outline.launchRun",
-                    "when": "autotools:fullFeatureSet && view == autotools.outline && viewItem =~ /nodeType=launchTarget/",
-                    "group": "1_stateActions@2"
-                },
-                {
-                    "command": "autotools.outline.setLaunchConfiguration",
-                    "when": "autotools:fullFeatureSet && view == autotools.outline && viewItem =~ /nodeType=launchTarget/",
                     "group": "inline@1"
                 },
                 {

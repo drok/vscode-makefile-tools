@@ -29,7 +29,6 @@
 
 import * as configuration from '../../configuration';
 import { expect } from 'chai';
-import * as launch from '../../launch';
 import * as make from '../../make';
 import { BuildTarget } from '../../make';
 import * as util from '../../util';
@@ -63,7 +62,6 @@ suite('Fake dryrun parsing', /*async*/() => {
       // Settings reset from the previous test run.
       extension.getState().reset(false);
       await vscode.workspace.getConfiguration("makefile").update("launchConfigurations", undefined);
-      configuration.setCurrentLaunchConfiguration(undefined);
       configuration.setCurrentMakefileConfiguration("Default");
       configuration.initFromState();
       await configuration.initFromSettings();
@@ -116,7 +114,6 @@ suite('Fake dryrun parsing', /*async*/() => {
          // Settings reset from the previous test run.
          extension.getState().reset(false);
          await vscode.workspace.getConfiguration("makefile").update("launchConfigurations", undefined);
-         configuration.setCurrentLaunchConfiguration(undefined);
          configuration.setCurrentMakefileConfiguration("Default");
          configuration.initFromState();
          await configuration.initFromSettings();
@@ -170,7 +167,6 @@ suite('Fake dryrun parsing', /*async*/() => {
          // Settings reset from the previous test run.
          extension.getState().reset(false);
          await vscode.workspace.getConfiguration("makefile").update("launchConfigurations", undefined);
-         configuration.setCurrentLaunchConfiguration(undefined);
          configuration.setCurrentMakefileConfiguration("Default");
          configuration.initFromState();
          await configuration.initFromSettings();
@@ -190,23 +186,6 @@ suite('Fake dryrun parsing', /*async*/() => {
          configuration.prepareConfigurationsQuickPick();
          await configuration.setConfigurationByName("InterestingSmallMakefile_windows_configDebug");
          const retc: number = await make.cleanConfigure(make.TriggeredBy.tests, true);
-
-         const launchConfigurations: string[] = ["bin\\InterestingSmallMakefile\\ARC H3\\Debug\\main.exe(str3a,str3b,str3c)",
-            "bin\\InterestingSmallMakefile\\arch1\\Debug\\main.exe(str3a,str3b,str3c)",
-            "bin\\InterestingSmallMakefile\\arch2\\Debug\\main.exe()"];
-         for (const config of launchConfigurations) {
-            await configuration.setLaunchConfigurationByName(vscode.workspace.rootPath + ">" + config);
-            let status: string = await launch.getLauncher().validateLaunchConfiguration(make.Operations.debug);
-            let launchConfiguration: configuration.LaunchConfiguration | undefined;
-            if (status === launch.LaunchStatuses.success) {
-               launchConfiguration = configuration.getCurrentLaunchConfiguration();
-            }
-
-            if (launchConfiguration) {
-               launch.getLauncher().prepareDebugCurrentTarget(launchConfiguration);
-               launch.getLauncher().prepareRunCurrentTarget();
-            }
-         }
 
          // A bit more coverage, "RelSize" and "RelSpeed" are set up
          // to exercise different combinations of pre-created build log and/or make tools.
@@ -247,7 +226,6 @@ suite('Fake dryrun parsing', /*async*/() => {
          // Settings reset from the previous test run.
          extension.getState().reset(false);
          await vscode.workspace.getConfiguration("makefile").update("launchConfigurations", undefined);
-         configuration.setCurrentLaunchConfiguration(undefined);
          configuration.setCurrentMakefileConfiguration("Default");
          configuration.initFromState();
          await configuration.initFromSettings();
@@ -267,21 +245,6 @@ suite('Fake dryrun parsing', /*async*/() => {
          configuration.prepareConfigurationsQuickPick();
          await configuration.setConfigurationByName(process.platform === "linux" ? "8cc_linux" : "8cc_mingw");
          const retc: number = await make.cleanConfigure(make.TriggeredBy.tests, true);
-
-         const launchConfigurations: string[] = ["8cc()"];
-         for (const config of launchConfigurations) {
-            await configuration.setLaunchConfigurationByName(vscode.workspace.rootPath + ">" + config);
-            let status: string = await launch.getLauncher().validateLaunchConfiguration(make.Operations.debug);
-            let launchConfiguration: configuration.LaunchConfiguration | undefined;
-            if (status === launch.LaunchStatuses.success) {
-               launchConfiguration = configuration.getCurrentLaunchConfiguration();
-            }
-
-            if (launchConfiguration) {
-               launch.getLauncher().prepareDebugCurrentTarget(launchConfiguration);
-               launch.getLauncher().prepareRunCurrentTarget();
-            }
-         }
 
          let all: BuildTarget = make.t_all;
          await configuration.setTargetByName(all);
@@ -309,7 +272,6 @@ suite('Fake dryrun parsing', /*async*/() => {
          // Settings reset from the previous test run.
          extension.getState().reset(false);
          await vscode.workspace.getConfiguration("makefile").update("launchConfigurations", undefined);
-         configuration.setCurrentLaunchConfiguration(undefined);
          configuration.setCurrentMakefileConfiguration("Default");
          configuration.initFromState();
          await configuration.initFromSettings();
@@ -329,21 +291,6 @@ suite('Fake dryrun parsing', /*async*/() => {
          configuration.prepareConfigurationsQuickPick();
          await configuration.setConfigurationByName(process.platform === "linux" ? "Fido_linux" : "Fido_mingw");
          const retc: number = await make.cleanConfigure(make.TriggeredBy.tests, true);
-
-         const launchConfigurations: string[] = ["bin/foo.o()"];
-         for (const config of launchConfigurations) {
-            await configuration.setLaunchConfigurationByName(vscode.workspace.rootPath + ">" + config);
-            let status: string = await launch.getLauncher().validateLaunchConfiguration(make.Operations.debug);
-            let launchConfiguration: configuration.LaunchConfiguration | undefined;
-            if (status === launch.LaunchStatuses.success) {
-               launchConfiguration = configuration.getCurrentLaunchConfiguration();
-            }
-
-            if (launchConfiguration) {
-               launch.getLauncher().prepareDebugCurrentTarget(launchConfiguration);
-               launch.getLauncher().prepareRunCurrentTarget();
-            }
-         }
 
          let foo_o: BuildTarget = new BuildTarget("", "bin/foo.o");
          await configuration.setTargetByName(foo_o);
@@ -371,7 +318,6 @@ suite('Fake dryrun parsing', /*async*/() => {
          // Settings reset from the previous test run.
          extension.getState().reset(false);
          await vscode.workspace.getConfiguration("makefile").update("launchConfigurations", undefined);
-         configuration.setCurrentLaunchConfiguration(undefined);
          configuration.setCurrentMakefileConfiguration("Default");
          configuration.initFromState();
          await configuration.initFromSettings();
@@ -391,21 +337,6 @@ suite('Fake dryrun parsing', /*async*/() => {
          configuration.prepareConfigurationsQuickPick();
          await configuration.setConfigurationByName(process.platform === "linux" ? "tinyvm_linux_pedantic" : "tinyvm_mingw_pedantic");
          const retc: number = await make.cleanConfigure(make.TriggeredBy.tests, true);
-
-         const launchConfigurations: string[] = ["bin/tvmi()"];
-         for (const config of launchConfigurations) {
-            await configuration.setLaunchConfigurationByName(vscode.workspace.rootPath + ">" + config);
-            let status: string = await launch.getLauncher().validateLaunchConfiguration(make.Operations.debug);
-            let launchConfiguration: configuration.LaunchConfiguration | undefined;
-            if (status === launch.LaunchStatuses.success) {
-               launchConfiguration = configuration.getCurrentLaunchConfiguration();
-            }
-
-            if (launchConfiguration) {
-               launch.getLauncher().prepareDebugCurrentTarget(launchConfiguration);
-               launch.getLauncher().prepareRunCurrentTarget();
-            }
-         }
 
          let tvmi: BuildTarget = new BuildTarget("", "tvmi");
          await configuration.setTargetByName(tvmi);
@@ -431,7 +362,6 @@ suite('Fake dryrun parsing', /*async*/() => {
       // Settings reset from the previous test run.
       extension.getState().reset(false);
       await vscode.workspace.getConfiguration("makefile").update("launchConfigurations", undefined);
-      configuration.setCurrentLaunchConfiguration(undefined);
       configuration.setCurrentMakefileConfiguration("Default");
       configuration.initFromState();
       await configuration.initFromSettings();
@@ -472,7 +402,6 @@ suite('Fake dryrun parsing', /*async*/() => {
       // Settings reset from the previous test run.
       extension.getState().reset(false);
       await vscode.workspace.getConfiguration("makefile").update("launchConfigurations", undefined);
-      configuration.setCurrentLaunchConfiguration(undefined);
       configuration.setCurrentMakefileConfiguration("Default");
       configuration.initFromState();
       await configuration.initFromSettings();
@@ -489,13 +418,6 @@ suite('Fake dryrun parsing', /*async*/() => {
       }
 
       await util.getExpandedSettingVal("buildLog", "./${workspaceFolder}/${configuration}/${buildTarget}/something/${configuration}/${buildTarget}/build.log");
-
-      let stopAtEntry: string = await util.expandVariablesInSetting("defaultLaunchConfiguration.stopAtEntry", "${config:makefile.panel.visibility.debug}");
-      let tmpDefaultLaunchConfiguration: configuration.DefaultLaunchConfiguration = {
-         miDebuggerPath: "./${workspaceRoot}/${command:makefile.getConfiguration}/${command:makefile.getBuildTarget}",
-         stopAtEntry: util.booleanify(stopAtEntry)
-      };
-      await util.getExpandedSettingVal<configuration.DefaultLaunchConfiguration>("defaultLaunchConfiguration", tmpDefaultLaunchConfiguration);
 
       let tmpConfigurations: configuration.MakefileConfiguration[] = [{
          name: "MyTmpName",
