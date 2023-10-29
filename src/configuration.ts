@@ -17,6 +17,7 @@ import * as multiStep from './multiStepInput';
 
 import * as nls from 'vscode-nls';
 import { dir } from 'console';
+import { Disposable } from 'vscode-jsonrpc';
 nls.config({ messageFormat: nls.MessageFormat.bundle, bundleFormat: nls.BundleFormat.standalone })();
 const localize: nls.LocalizeFunc = nls.loadMessageBundle();
 
@@ -1301,6 +1302,57 @@ export async function setTargetByName(targetName: make.BuildTarget) : Promise<vo
     extension._projectOutlineProvider.updateBuildTarget(targetName);
 }
 
+class TargetPickItem implements vscode.QuickPickItem {
+    label: string;
+    target: BuildTarget;
+    constructor(label: string, target: BuildTarget) {
+        this.label = label;
+        this.target = target;
+    }
+}
+// createQuickPick based on sample
+// https://github.com/microsoft/vscode-extension-samples/blob/main/quickinput-sample/src/quickOpen.ts
+// Open a quick pick to select target from the buildTargets Map
+async function selectBuildTarget() {
+    const disposable : Disposable[] = [];
+    try {
+        return await new  Promise<BuildTarget | undefined>((resolve, reject) => {
+            const quickPick = vscode.window.createQuickPick<TargetPickItem>();
+            quickPick.placeholder = 'Select a build target';
+            disposable.push(
+                quickPick.onDidChangeValue(value => {
+                    let items : TargetPickItem[] = [];
+                    buildTargets.forEach((targets, dir) => {
+                        targets.forEach((target) => {
+                            items.push(new TargetPickItem(`${target.goal} @ ${dir}`, new BuildTarget(dir, target.goal || "any")));
+                        });
+                    });
+                    if (!value) {
+                        quickPick.items = [];
+                        return;
+                    }
+                    quickPick.items = items;
+                }),
+                quickPick.onDidChangeSelection((selection) => {
+                    if (selection && selection[0]) {
+                        if (selection[0] instanceof TargetPickItem) {
+                            resolve(selection[0].target);
+                            quickPick.hide();
+                        }
+                    }
+                }),
+                quickPick.onDidHide(() => {
+                    resolve(undefined);
+                    quickPick.dispose();
+                })
+            );
+            quickPick.show();
+        });
+    } finally {
+        disposable.forEach(d => d.dispose());
+    }
+}
+
 // Fill a drop-down with all the target names run by building the makefile for the current configuration
 // Triggers a cpptools configuration provider update after selection.
 // TODO: change the UI list to multiple selections mode and store an array of current active targets
@@ -1344,28 +1396,7 @@ export async function selectTarget(context: vscode.ExtensionContext): Promise<vo
     //     buildTargets.push("all");
     // }
 
-//    const options: { [key: string]: (context: ExtensionContext) => Promise<void> } = {
-//            showQuickPick,
-//            showInputBox,
-//            multiStepInput,
-//            quickOpen,
-//        };
-    const quickPick = vscode.window.createQuickPick();
-    //quickPick.items = Object.keys(options).map(label => ({ label }));
-    quickPick.items = Array.from(buildTargets.keys())
-        .map(label => ({ label }));
-    
-    Object.keys(options).map(label => ({ label }));
-    quickPick.onDidChangeSelection(selection => {
-        if (selection[0]) {
-            //options[selection[0].label](context)
-            //    .catch(console.error);
-        }
-    });
-    quickPick.onDidHide(() => quickPick.dispose());
-    quickPick.show();
-
-    const chosen = await multiStep.multiStepInput(context);
+    const chosen = await selectBuildTarget();
 
     if (chosen instanceof BuildTarget) {
         return;
