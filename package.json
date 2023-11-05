@@ -29,12 +29,11 @@
         "vscode-test": "^0.4.1"
     },
     "dependencies": {
+        "@mergesium/shell-quote": "^2.0.1",
         "@types/glob": "^7.1.1",
-        "@types/shell-quote": "^1.7.3",
         "@vscode/extension-telemetry": "^0.6.2",
         "glob": "^7.1.6",
         "module-alias": "^2.2.2",
-        "shell-quote": "^1.8.1",
         "vscode-cpptools": "^6.1.0",
         "vscode-jsonrpc": "^3.6.2",
         "vscode-nls": "^5.0.0"
