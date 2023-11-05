@@ -318,6 +318,60 @@
                 }
             }
         },
+        "debuggers": [
+            {
+                "type": "cppdbg",
+                "label": "Autotools Debug",
+                "languages": ["c", "cpp"],
+                "configurationAttributes": {
+                    "launch": {
+                        "properties": {
+                            "program": {
+                                "type": "string",
+                                "default": "${file}",
+                                "description": "%autotools.debugger.launch.program.description%"
+                            },
+                            "args": {
+                                "type": "array",
+                                "default": [],
+                                "description": "%autotools.debugger.launch.args.description%"
+                            },
+                            "cwd": {
+                                "type": "string",
+                                "default": "${workspaceFolder}",
+                                "description": "%autotools.debugger.launch.cwd.description%"
+                            },
+                            "env": {
+                                "type": "object",
+                                "description": "%autotools.debugger.launch.env.description%",
+                                "default": {}
+                            },
+                            "stopAtEntry": {
+                                "type": "boolean",
+                                "default": false,
+                                "description": "%autotools.debugger.launch.stopAtEntry.description%"
+                            }
+                        }
+                    }
+                },
+                "configurationSnippets": [
+                    {
+                        "label": "Autotools: Launch current build target under gdb",
+                        "description": "Debug current build target with cppdbg. Uses variables",
+                        "body": {
+                            "type": "cppdbg",
+                            "request": "launch",
+                            "name": "${1:Launch Program autoools}",
+                            "program": "^\"\\${command:autotools.getBuildTargetDir}/\\${command:autotools.getBuildTargetName}\"",
+                            "cwd": "^\"\\${workspaceFolder}\"",
+                            "env": {},
+                            "stopAtEntry": true
+
+                        }
+                    }
+                ]
+            }
+        ],
         "viewsContainers": {
             "activitybar": [
                 {
