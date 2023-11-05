@@ -42,6 +42,11 @@
     normalize-path "^2.0.1"
     through2 "^2.0.3"
 
+"@mergesium/shell-quote@^2.0.1":
+  version "2.0.1"
+  resolved "https://registry.yarnpkg.com/@mergesium/shell-quote/-/shell-quote-2.0.1.tgz#4860facc2d92c080ff4ed4e150b92366716e209f"
+  integrity sha512-YaRiQh/kbfvPC/nVTwlev8ub+lD1fUcua2pNLoIdKWbCPOU5AMsE7GCTmxypfNNw70sGnm0fatD8cD54+5LFsA==
+
 "@microsoft/1ds-core-js@3.2.9", "@microsoft/1ds-core-js@^3.2.3":
   version "3.2.9"
   resolved "https://registry.yarnpkg.com/@microsoft/1ds-core-js/-/1ds-core-js-3.2.9.tgz#8a26935966e4871d1f1e40d992828bdd52bba84e"
@@ -230,11 +235,6 @@
   version "10.17.60"
   resolved "https://registry.yarnpkg.com/@types/node/-/node-10.17.60.tgz#35f3d6213daed95da7f0f73e75bcc6980e90597b"
   integrity sha512-F0KIgDJfy2nA3zMLmWGKxcH2ZVEtCZXHHdOQs2gSaQ27+lNeEfGxzkIw90aXswATX7AZ33tahPbzy6KAfUreVw==
-
-"@types/shell-quote@^1.7.3":
-  version "1.7.3"
-  resolved "https://registry.yarnpkg.com/@types/shell-quote/-/shell-quote-1.7.3.tgz#12d1c1342b6a8ad926596c2e2a7d660c0b87f45c"
-  integrity sha512-CeYcQaOnluyKPHJTuJmaH9RDJEQSVxGMVf2EZab3chpA8sI65FB19t0x3JlS37NbxL+TUottk9pMypMJQcfhIw==
 
 "@types/vscode@^1.74.0":
   version "1.76.0"
@@ -3831,11 +3831,6 @@ shebang-regex@^3.0.0:
   version "3.0.0"
   resolved "https://registry.yarnpkg.com/shebang-regex/-/shebang-regex-3.0.0.tgz#ae16f1644d873ecad843b0307b143362d4c42172"
   integrity sha512-7++dFhtcx3353uBaq8DDR4NuxBetBzC7ZQOhmTQInHEd6bSrXdiEyzCvG07Z44UYdLShWUyXt5M/yhz8ekcb1A==
-
-shell-quote@^1.8.1:
-  version "1.8.1"
-  resolved "https://registry.yarnpkg.com/shell-quote/-/shell-quote-1.8.1.tgz#6dbf4db75515ad5bac63b4f1894c3a154c766680"
-  integrity sha512-6j1W9l1iAs/4xYBI1SYOVZyFcCis9b4KCLQ8fgAGG07QvzaRLVVRQvAy85yNmmZSjYjg4MWh4gNvlPujU/5LpA==
 
 side-channel@^1.0.4:
   version "1.0.4"

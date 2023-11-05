@@ -20,7 +20,7 @@ import * as path from 'path';
 import * as util from './util';
 import * as telemetry from './telemetry';
 import * as vscode from 'vscode';
-import { quote } from 'shell-quote';
+import { quote } from '@mergesium/shell-quote';
 
 import * as nls from 'vscode-nls';
 nls.config({ messageFormat: nls.MessageFormat.bundle, bundleFormat: nls.BundleFormat.standalone })();

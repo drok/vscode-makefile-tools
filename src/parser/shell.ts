@@ -13,7 +13,7 @@ import * as path from 'path';
 import * as util from '../util';
 import * as vscode from 'vscode';
 import {Parser, ParserDisp} from '../parser';
-import {parse} from 'shell-quote';
+import { parse } from '@mergesium/shell-quote';
 // import  from '../extension';
 import { extension } from '../extension';
 import { Making } from './tool';
