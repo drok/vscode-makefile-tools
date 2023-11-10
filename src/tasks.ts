@@ -9,6 +9,7 @@ import { Task, TaskDefinition, TaskScope, TaskGroup, TaskProvider, ProcessExecut
 import { Goal } from './parser/gnumake';
 import { error } from 'console';
 import * as configuration from './configuration';
+import { BuildTarget, t_all } from './make';
 
 export class AutoToolsTaskProvider implements TaskProvider {
 	static myType = 'autotools';
@@ -23,8 +24,8 @@ export class AutoToolsTaskProvider implements TaskProvider {
     }
 
 	public resolveTask(task: Task): Task | undefined {
-		const the_task = task.definition.task;
-		if (the_task) {
+		const target = task.definition.target;
+		if (target?.goal) {
 			// resolveTask requires that the same definition object be used.
 			const definition: MyTaskDefinition = <any>task.definition;
 			return new Task(definition, task.scope ?? TaskScope.Workspace, definition.target.goal, AutoToolsTaskProvider.myType,
@@ -44,15 +45,10 @@ interface MyTaskDefinition extends TaskDefinition {
      */
     task: string;
   
-    /**
-     * The rake file containing the task
-     */
-    file?: string;
-
     /*
      * The makefile goal that this task operates on
      */
-    goal: Goal;
+    target: BuildTarget;
 };
 
 async function getTasks(): Promise<Task[]> {
@@ -61,13 +57,19 @@ async function getTasks(): Promise<Task[]> {
         goals
             .filter((goal) => goal.flags & Goal.Flags.Linked_binary)
             .forEach((g) => {
-                const kind: MyTaskDefinition = {
-                    type: AutoToolsTaskProvider.myType,
-                    task: g.goal || "unknown-task",
-                    goal: g
-                };
-                if (g.flags & Goal.Flags.Linked_binary) {
-                    var task = new Task(kind, TaskScope.Workspace, g.goal || "blah-name", "blah-source", new ProcessExecution(`${g.goal}`));
+                if ((g.flags & Goal.Flags.Linked_binary) && g.goal) {
+                    const kind: MyTaskDefinition = {
+                        type: AutoToolsTaskProvider.myType,
+                        task: g.goal,
+                        target: new BuildTarget(dir, g.goal)
+                    };
+                    var task = new Task(kind, TaskScope.Workspace, "make " + (g.goal || "blah-name"),
+                        localize("autotools.build.task", "autotools in {0}", dir),
+                        new ProcessExecution(
+                            configuration.getMakePath(),
+                            (dir ? ['-C', dir] : [])
+                            .concat(configuration.getConfigurationMakeArgs())
+                            .concat(g.goal)));
                     task.group = TaskGroup.Build;
                     targets.push(task);
                 }

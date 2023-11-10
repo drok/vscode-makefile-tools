@@ -40,5 +40,8 @@
    "autotools.configuration.makefile.compileCommandsPath.description": "The path to the compilation database file",
    "autotools.configuration.makefile.panel.visibility.debug.description": "Enable debugging locally (in this host) images built by this extension",
    "autotools.configuration.makefile.panel.visibility.run.description": "Enable running locally (in this host) images built by this extension",
-   "autotools.taskDefinitions.label.description": "Build current autotools target"
+   "autotools.taskDefinitions.target.builddir.description": "Directory where make will be run",
+   "autotools.taskDefinitions.target.goal.description": "Name of the goal as defined in the Makefile (eg, all, check, myprogram.exe, mylib.a, etc)",
+   "autotools.taskDefinitions.target.description": "Definition of the target to be built",
+   "autotools.taskDefinitions.label.description": "Description of this task, visible in the command pallete"
 }

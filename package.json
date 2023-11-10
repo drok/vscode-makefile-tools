@@ -357,12 +357,28 @@
             {
                 "type": "autotools",
                 "when": "processExecutionSupported && autotools.makefileFilePresent",
-                "required": ["label"],
+                "required": ["label", "target"],
                 "properties": {
                     "label": {
                         "type": "string",
                         "description": "%autotools.taskDefinitions.label.description%",
                         "default": "Build it with autotools"
+                    },
+                    "target": {
+                        "description": "%autotools.taskDefinitions.target.description%",
+                        "properties": {
+                            "builddir": {
+                                "type": "string",
+                                "description": "%autotools.taskDefinitions.target.builddir.description%",
+                                "default": "${command:autotools.builddir}"
+                            },
+                            "goal": {
+                                "type": "string",
+                                "description": "%autotools.taskDefinitions.target.goal.description%",
+                                "default": "${command:autotools.goal}",
+                                "examples": ["all", "check", "myprogram.exe"]
+                            }
+                        }
                     }
                 }
             }

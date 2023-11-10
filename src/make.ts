@@ -403,12 +403,12 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
     // Rules for parse content and file:
     //     1. configuration cache (the previous dryrun output): autotools.configurationCachePath
     //     2. the make dryrun output if (2) is missing
-    const dryRunString = localize("make.generating.dryrun", "Importing autotools configuration for {} ...", currentTarget.toString());
-    progress.report({
-        increment: 1, message: dryRunString +
-            ((recursive) ? ` ${recursiveString}` : "") +
-                "..."
-    });
+//    const dryRunString = localize("make.generating.dryrun", "Importing autotools configuration {} ...", configuration.getCurrentMakefileConfiguration().name);
+//    progress.report({
+//        increment: 1, message: dryRunString +
+//            ((recursive) ? ` ${recursiveString}` : "") +
+//                "..."
+//    });
 
     // Continue with the make dryrun invocation
     let makeArgs: string[] = [];
