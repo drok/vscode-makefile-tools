@@ -69,7 +69,7 @@ export function getCurrentMakefileConfiguration(): MakefileConfiguration { retur
 export async function setCurrentMakefileConfiguration(configuration: string | undefined): Promise<void> {
     currentMakefileConfiguration = (configuration && getMakefileConfiguration(configuration)) || {
         name: "Default",
-        makeDirectory: makeDirectory,
+        makeDirectory: (vscode.workspace.workspaceFolders ? vscode.workspace.workspaceFolders[0].name : ""),
         isDefault: true
     };
     statusBar.setConfiguration(currentMakefileConfiguration.name);
@@ -188,23 +188,6 @@ export function setMakePath(path: string | undefined): void { makePath = path ||
 // in "autotools.configurations.makePath".
 async function readMakePath(): Promise<void> {
     setMakePath(await util.getExpandedSetting<string>("makePath"));
-}
-
-let makeDirectory: string | undefined;
-export function getMakeDirectory(): string | undefined { return makeDirectory; }
-export function setMakeDirectory(dir: string = ''): void { makeDirectory = dir; }
-// Read the make working directory path if defined in settings.
-// It represents a default to look for if no other makeDirectory is already provided
-// in autotools.configurations.makeDirectory.
-// TODO: validate and integrate with "-C [DIR_PATH]" passed in autotools.configurations.makeArgs.
-async function readMakeDirectory(): Promise<void> {
-    let makeDirectorySetting: string | undefined = await util.getExpandedSetting<string>("makeDirectory");
-    if (!makeDirectorySetting) {
-        logger.message("No folder path to the makefile is defined in the settings file.");
-        setMakeDirectory();
-    } else {
-        setMakeDirectory(makeDirectorySetting);
-    }
 }
 
 // Command property accessible from launch.json:
@@ -703,7 +686,6 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
 
     await readLoggingLevel();
     await readMakePath();
-    await readMakeDirectory();
     await readPreConfigureScript();
     await readAlwaysPreConfigure();
     await readPostConfigureScript();
@@ -865,16 +847,6 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
                 // so trigger an update (unless we read from a build log).
                 extension.getState().configureDirty = extension.getState().configureDirty;
                 await readMakePath();
-                updatedSettingsSubkeys.push(subKey);
-            }
-
-            subKey = "makeDirectory";
-            let updatedMakeDirectory : string | undefined = await util.getExpandedSetting<string>(subKey);
-            if (updatedMakeDirectory !== makeDirectory) {
-                // A change in autotools.makeDirectory should trigger an IntelliSense update
-                // only if the extension is not currently reading from a build log.
-                extension.getState().configureDirty = extension.getState().configureDirty;
-                await readMakeDirectory();
                 updatedSettingsSubkeys.push(subKey);
             }
 
