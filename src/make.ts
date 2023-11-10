@@ -72,7 +72,6 @@ export enum TriggeredBy {
     buildTarget = "command pallette (buildTarget)",
     buildCleanTarget = "command pallette (buildCleanTarget)",
     buildAll = "command pallette (buildAll)",
-    buildCleanAll = "command pallette (buildCleanAll)",
     preconfigure = "command pallette (preConfigure)",
     alwaysPreconfigure = "settings (alwaysPreConfigure)",
     postConfigure = "command pallette (postConfigure)",

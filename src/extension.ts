@@ -247,10 +247,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         await make.buildTarget(make.TriggeredBy.buildAll, make.t_all, false);
     }));
 
-    context.subscriptions.push(vscode.commands.registerCommand('autotools.buildCleanAll', async () => {
-        await make.buildTarget(make.TriggeredBy.buildCleanAll, make.t_all, true);
-    }));
-
     context.subscriptions.push(vscode.commands.registerCommand('autotools.makeBaseDirectory', () => {
         telemetry.logEvent("makeBaseDirectory");
         return configuration.makeBaseDirectory();

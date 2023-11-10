@@ -2,7 +2,6 @@
    "autotools.command.makefile.buildTarget.title": "Autotools: Build the current target",
    "autotools.command.makefile.buildCleanTarget.title": "Autotools: Build clean the current target",
    "autotools.command.makefile.buildAll.title": "Autotools: Build the target ALL",
-   "autotools.command.makefile.buildCleanAll.title": "Autotools: Build clean the target ALL",
    "autotools.command.makefile.setBuildConfiguration.title": "Autotools: Set the current build configuration",
    "autotools.command.makefile.setBuildTarget.title": "Autotools: Set the target to be built by make",
    "autotools.command.makefile.openMakePathSetting.title": "Autotools: Open Make Path Setting",
