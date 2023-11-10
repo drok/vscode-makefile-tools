@@ -239,10 +239,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         await make.buildTarget(make.TriggeredBy.buildTarget, configuration.getCurrentTarget(), false);
     }));
 
-    context.subscriptions.push(vscode.commands.registerCommand('autotools.buildCleanTarget', async () => {
-        await make.buildTarget(make.TriggeredBy.buildCleanTarget, configuration.getCurrentTarget(), true);
-    }));
-
     context.subscriptions.push(vscode.commands.registerCommand('autotools.buildAll', async () => {
         await make.buildTarget(make.TriggeredBy.buildAll, make.t_all, false);
     }));
@@ -297,10 +293,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
     context.subscriptions.push(vscode.commands.registerCommand('autotools.outline.buildTarget', () => {
         return vscode.commands.executeCommand("autotools.buildTarget");
-    }));
-
-    context.subscriptions.push(vscode.commands.registerCommand('autotools.outline.buildCleanTarget', () => {
-        return vscode.commands.executeCommand("autotools.buildCleanTarget");
     }));
 
     context.subscriptions.push(vscode.commands.registerCommand('autotools.outline.setBuildConfiguration', () => {

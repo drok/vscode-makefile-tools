@@ -43,20 +43,8 @@
     "contributes": {
         "commands": [
             {
-                "command": "autotools.buildTarget",
-                "title": "%autotools.command.makefile.buildTarget.title%"
-            },
-            {
-                "command": "autotools.buildCleanTarget",
-                "title": "%autotools.command.makefile.buildCleanTarget.title%"
-            },
-            {
                 "command": "autotools.buildAll",
                 "title": "%autotools.command.makefile.buildAll.title%"
-            },
-            {
-                "command": "autotools.buildCleanAll",
-                "title": "%autotools.command.makefile.buildCleanAll.title%"
             },
             {
                 "command": "autotools.setBuildConfiguration",
@@ -81,18 +69,6 @@
             {
                 "command": "autotools.postConfigure",
                 "title": "%autotools.command.makefile.postConfigure.title%"
-            },
-            {
-                "command": "autotools.outline.buildTarget",
-                "title": "%autotools.command.makefile.buildTarget.title%",
-                "icon": {
-                    "light": "res/light/build.svg",
-                    "dark": "res/dark/build.svg"
-                }
-            },
-            {
-                "command": "autotools.outline.buildCleanTarget",
-                "title": "%autotools.command.makefile.buildCleanTarget.title%"
             },
             {
                 "command": "autotools.outline.setBuildConfiguration",
@@ -406,15 +382,7 @@
                     "when": "autotools:fullFeatureSet"
                 },
                 {
-                    "command": "autotools.buildCleanTarget",
-                    "when": "autotools:fullFeatureSet"
-                },
-                {
                     "command": "autotools.buildAll",
-                    "when": "autotools:fullFeatureSet"
-                },
-                {
-                    "command": "autotools.buildCleanAll",
                     "when": "autotools:fullFeatureSet"
                 },
                 {
@@ -436,14 +404,6 @@
                 {
                     "command": "autotools.outline.postConfigure",
                     "when": "autotools:fullFeatureSet"
-                },
-                {
-                    "command": "autotools.outline.buildTarget",
-                    "when": "never"
-                },
-                {
-                    "command": "autotools.outline.buildCleanTarget",
-                    "when": "never"
                 },
                 {
                     "command": "autotools.outline.setBuildConfiguration",
@@ -474,16 +434,6 @@
                     "command": "autotools.outline.cleanConfigure",
                     "when": "view == autotools.outline",
                     "group": "1_makefileOutline@4"
-                },
-                {
-                    "command": "autotools.outline.buildTarget",
-                    "when": "autotools:fullFeatureSet && view == autotools.outline",
-                    "group": "navigation@1"
-                },
-                {
-                    "command": "autotools.outline.buildCleanTarget",
-                    "when": "autotools:fullFeatureSet && view == autotools.outline",
-                    "group": "1_makefileOutline@4"
                 }
             ],
             "view/item/context": [
@@ -501,16 +451,6 @@
                     "command": "autotools.outline.setBuildConfiguration",
                     "when": "view == autotools.outline && viewItem =~ /nodeType=configuration/",
                     "group": "inline@1"
-                },
-                {
-                    "command": "autotools.outline.buildTarget",
-                    "when": "autotools:fullFeatureSet && view == autotools.outline && viewItem =~ /nodeType=buildTarget/",
-                    "group": "1_stateActions@1"
-                },
-                {
-                    "command": "autotools.outline.buildCleanTarget",
-                    "when": "autotools:fullFeatureSet && view == autotools.outline && viewItem =~ /nodeType=buildTarget/",
-                    "group": "1_stateActions@2"
                 },
                 {
                     "command": "autotools.outline.setBuildTarget",

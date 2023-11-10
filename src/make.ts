@@ -70,7 +70,6 @@ export enum Operations {
 
 export enum TriggeredBy {
     buildTarget = "command pallette (buildTarget)",
-    buildCleanTarget = "command pallette (buildCleanTarget)",
     buildAll = "command pallette (buildAll)",
     preconfigure = "command pallette (preConfigure)",
     alwaysPreconfigure = "settings (alwaysPreConfigure)",
