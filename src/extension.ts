@@ -235,14 +235,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         return configuration.getCurrentTarget().builddir;
     }));
 
-    context.subscriptions.push(vscode.commands.registerCommand('autotools.buildTarget', async () => {
-        await make.buildTarget(make.TriggeredBy.buildTarget, configuration.getCurrentTarget(), false);
-    }));
-
-    context.subscriptions.push(vscode.commands.registerCommand('autotools.buildAll', async () => {
-        await make.buildTarget(make.TriggeredBy.buildAll, make.t_all, false);
-    }));
-
     context.subscriptions.push(vscode.commands.registerCommand('autotools.makeBaseDirectory', () => {
         telemetry.logEvent("makeBaseDirectory");
         return configuration.makeBaseDirectory();
@@ -273,14 +265,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
     context.subscriptions.push(vscode.commands.registerCommand('autotools.outline.configure', () => {
         return vscode.commands.executeCommand("autotools.configure");
-    }));
-
-    context.subscriptions.push(vscode.commands.registerCommand('autotools.outline.cleanConfigure', () => {
-        return vscode.commands.executeCommand("autotools.cleanConfigure");
-    }));
-
-    context.subscriptions.push(vscode.commands.registerCommand('autotools.outline.preConfigure', () => {
-        return vscode.commands.executeCommand("autotools.preConfigure");
     }));
 
     context.subscriptions.push(vscode.commands.registerCommand('autotools.outline.postConfigure', () => {

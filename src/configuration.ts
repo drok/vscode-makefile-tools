@@ -607,38 +607,6 @@ export async function readConfigureOnEdit(): Promise<void> {
     logger.message(`Configure on edit: ${configureOnEdit}`);
 }
 
-let configureAfterCommand: boolean | undefined;
-export function getConfigureAfterCommand(): boolean | undefined { return configureAfterCommand; }
-export function setConfigureAfterCommand(configure: boolean): void { configureAfterCommand = configure; }
-export async function readConfigureAfterCommand(): Promise<void> {
-    configureAfterCommand = await util.getExpandedSetting<boolean>("configureAfterCommand");
-    logger.message(`Configure after command: ${configureAfterCommand}`);
-}
-
-let phonyOnlyTargets: boolean | undefined;
-export function getPhonyOnlyTargets(): boolean | undefined { return phonyOnlyTargets; }
-export function setPhonyOnlyTargets(phony: boolean): void { phonyOnlyTargets = phony; }
-export async function readPhonyOnlyTargets(): Promise<void> {
-    phonyOnlyTargets = await util.getExpandedSetting<boolean>("phonyOnlyTargets");
-    logger.message(`Only .PHONY targets: ${phonyOnlyTargets}`);
-}
-
-let saveBeforeBuildOrConfigure: boolean | undefined;
-export function getSaveBeforeBuildOrConfigure(): boolean | undefined { return saveBeforeBuildOrConfigure; }
-export function setSaveBeforeBuildOrConfigure(save: boolean): void { saveBeforeBuildOrConfigure = save; }
-export async function readSaveBeforeBuildOrConfigure(): Promise<void> {
-    saveBeforeBuildOrConfigure = await util.getExpandedSetting<boolean>("saveBeforeBuildOrConfigure");
-    logger.message(`Save before build or configure: ${saveBeforeBuildOrConfigure}`);
-}
-
-let clearOutputBeforeBuild: boolean | undefined;
-export function getClearOutputBeforeBuild(): boolean | undefined { return clearOutputBeforeBuild; }
-export function setClearOutputBeforeBuild(clear: boolean): void { clearOutputBeforeBuild = clear; }
-export async function readClearOutputBeforeBuild(): Promise<void> {
-    clearOutputBeforeBuild = await util.getExpandedSetting<boolean>("clearOutputBeforeBuild");
-    logger.message(`Clear output before build: ${clearOutputBeforeBuild}`);
-}
-
 // This setting is useful for some repos where directory changing commands (cd, push, pop)
 // are missing or printed more than once, resulting in associating some IntelliSense information
 // with the wrong file or even with a non existent URL.
@@ -697,10 +665,6 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
     await readMakefileConfigurations(currentMakefileConfigurationName);
     await readConfigureOnOpen();
     await readConfigureOnEdit();
-    await readConfigureAfterCommand();
-    await readPhonyOnlyTargets();
-    await readSaveBeforeBuildOrConfigure();
-    await readClearOutputBeforeBuild();
     await readIgnoreDirectoryCommands();
     await readCompileCommandsPath();
 
@@ -906,34 +870,6 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
             let updatedConfigureOnEdit : boolean | undefined = await util.getExpandedSetting<boolean>(subKey);
             if (updatedConfigureOnEdit !== configureOnEdit) {
                 await readConfigureOnEdit();
-                updatedSettingsSubkeys.push(subKey);
-            }
-
-            subKey = "configureAfterCommand";
-            let updatedConfigureAfterCommand : boolean | undefined = await util.getExpandedSetting<boolean>(subKey);
-            if (updatedConfigureAfterCommand !== configureAfterCommand) {
-                await readConfigureAfterCommand();
-                updatedSettingsSubkeys.push(subKey);
-            }
-
-            subKey = "phonyOnlyTargets";
-            let updatedPhonyOnlyTargets : boolean | undefined = await util.getExpandedSetting<boolean>(subKey);
-            if (updatedPhonyOnlyTargets !== phonyOnlyTargets) {
-                await readPhonyOnlyTargets();
-                updatedSettingsSubkeys.push(subKey);
-            }
-
-            subKey = "saveBeforeBuildOrConfigure";
-            let updatedSaveBeforeBuildOrConfigure : boolean | undefined = await util.getExpandedSetting<boolean>(subKey);
-            if (updatedSaveBeforeBuildOrConfigure !== saveBeforeBuildOrConfigure) {
-                await readSaveBeforeBuildOrConfigure();
-                updatedSettingsSubkeys.push(subKey);
-            }
-
-            subKey = "clearOutputBeforeBuild";
-            let updatedClearOutputBeforeBuild : boolean | undefined = await util.getExpandedSetting<boolean>(subKey);
-            if (updatedClearOutputBeforeBuild !== clearOutputBeforeBuild) {
-                await readClearOutputBeforeBuild();
                 updatedSettingsSubkeys.push(subKey);
             }
 

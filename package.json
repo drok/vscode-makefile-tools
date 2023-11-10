@@ -293,29 +293,12 @@
                     "default": true,
                     "scope": "resource"
                 },
-                "autotools.phonyOnlyTargets": {
-                    "type": "boolean",
-                    "default": false,
-                    "description": "%autotools.configuration.makefile.phonyOnlyTargets.description%",
-                    "scope": "resource"
-                },
                 "autotools.saveBeforeBuildOrConfigure": {
                     "type": "boolean",
                     "default": true,
                     "description": "%autotools.configuration.makefile.saveBeforeBuildOrConfigure.description%",
                     "scope": "resource"
                 },
-                "autotools.clearOutputBeforeBuild": {
-                    "type": "boolean",
-                    "default": true,
-                    "description": "%autotools.configuration.makefile.clearOutputBeforeBuild.description%",
-                    "scope": "resource"
-                },
-                "autotools.compileCommandsPath": {
-                    "type": "string",
-                    "default": null,
-                    "description": "%autotools.configuration.makefile.compileCommandsPath.description%",
-                    "scope": "resource"
                 },
                 "autotools.panel.visibility": {
                     "type": "object",

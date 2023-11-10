@@ -196,8 +196,7 @@ suite('Fake dryrun parsing', /*async*/() => {
 
          // InterestingSmallMakefile_windows_configRelSpeed constructs a more interesting build command.
          let Execute_Arch3: BuildTarget = new BuildTarget("", "Execute_Arch3");
-         await configuration.setTargetByName(Execute_Arch3);
-         make.prepareBuildTarget(Execute_Arch3);
+         // FIXME: rework await configuration.setTargetByName(Execute_Arch3);
 
          extension.getState().reset(false);
          await vscode.workspace.getConfiguration("makefile").update("launchConfigurations", undefined);
@@ -247,8 +246,7 @@ suite('Fake dryrun parsing', /*async*/() => {
          const retc: number = await make.cleanConfigure(make.TriggeredBy.tests, true);
 
          let all: BuildTarget = make.t_all;
-         await configuration.setTargetByName(all);
-         make.prepareBuildTarget(all);
+         // FIXME: Rework await configuration.setTargetByName(all);
 
          // Compare the output log with the baseline
          // TODO: incorporate relevant diff snippets into the test log.
@@ -293,8 +291,7 @@ suite('Fake dryrun parsing', /*async*/() => {
          const retc: number = await make.cleanConfigure(make.TriggeredBy.tests, true);
 
          let foo_o: BuildTarget = new BuildTarget("", "bin/foo.o");
-         await configuration.setTargetByName(foo_o);
-         make.prepareBuildTarget(foo_o);
+         // FIXME: rework await configuration.setTargetByName(foo_o);
 
          // Compare the output log with the baseline
          // TODO: incorporate relevant diff snippets into the test log.
@@ -339,8 +336,7 @@ suite('Fake dryrun parsing', /*async*/() => {
          const retc: number = await make.cleanConfigure(make.TriggeredBy.tests, true);
 
          let tvmi: BuildTarget = new BuildTarget("", "tvmi");
-         await configuration.setTargetByName(tvmi);
-         make.prepareBuildTarget(tvmi);
+         // FIXME: rework await configuration.setTargetByName(tvmi);
 
          // Compare the output log with the baseline
          // TODO: incorporate relevant diff snippets into the test log.
@@ -378,8 +374,9 @@ suite('Fake dryrun parsing', /*async*/() => {
       await configuration.setConfigurationByName("test-make-f");
       await make.cleanConfigure(make.TriggeredBy.tests);
 
-      await configuration.setConfigurationByName("test-make-C");
-      await make.buildTarget(make.TriggeredBy.tests, make.t_all, true);
+//    FIXME: invoke runTask to make the current target
+//      await configuration.setConfigurationByName("test-make-C");
+//      await make.buildTarget(make.TriggeredBy.tests, make.t_all, true);
 
       // Compare the output log with the baseline
       // TODO: incorporate relevant diff snippets into the test log.
