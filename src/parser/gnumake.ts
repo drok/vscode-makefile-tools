@@ -213,6 +213,18 @@ export class Make implements Parser {
                 targets.set(this.dir, sub.goals);
             }
             this.goals = sub.goals;
+            sub.variables.some((v) => {
+                switch (v.variable?.name) {
+                    case "TESTS":
+                        // Targets with spaces in their names are not supported
+                        // because make doesn't support them, at least not without
+                        // significant song and dance. If you need to support
+                        // tests with spaces in their names, please send PR.
+                        this.tests = v.variable?.value.split(' ');
+                        return true;
+                }
+                return false;
+            });
             return this;
         } else if (sub instanceof Make) {
             if (this == sub)
@@ -237,11 +249,13 @@ export class Make implements Parser {
     section: MakeSection;
     file: string | undefined;
     goals: Goal[] = [];
+    tests: string[] | undefined;
     submake: Make[] = [];
 }
 
 const DatabaseRE = /^# Make data base, printed on (.*)$/;
 const FilesRE = /^# Files$/;
+const VariablesRE = /^# Variables$/;
 /**
  * Parse a GNU make database dump to extract the list of build goals (targets)
  */
@@ -251,9 +265,10 @@ export class Database implements Parser {
         "--print-data-base",
     ];};
     ingest (line: string) : [ParserDisp, Parser] {
-        let files = FilesRE.exec(line);
-        if (files)
+        if (FilesRE.test(line))
             return [ParserDisp.Enter, new EmptyLine(new Goal())];
+        if (VariablesRE.test(line))
+            return [ParserDisp.Enter, new EmptyLine(new Variable())];
         return [ParserDisp.Continue, this];
             // throw new Error(`Unexpected line ${line}`);
     }
@@ -268,10 +283,84 @@ export class Database implements Parser {
                     this.goals.push(sub);
                 return new Goal(); /* look for more Goals */
             }
+        } else if (sub instanceof Variable) {
+            if (!sub.flags) { /* End-of-variables */
+                return undefined;
+            } else if (sub.variable) { /* gather only variables that were
+                                        * interesting enough to collect */
+                this.variables.push(sub);
+            }
+            return new Variable();
         } else if (sub instanceof EmptyLine) { return undefined; }
         throw new Error(`Unexpected push in ${sub}`);
     }
     goals : Goal[] = [];
+    variables : Variable[] = [];
+    tests : string[] = [];
+}
+
+// Lines which have variable content, but I don't need them
+// const VariableMakefileRe = /^# makefile \(from '(.*)', line (\d+)\)$/;
+const VariableFlagsRe = /^# (makefile|environment|automatic|default|command|'override'|variable)/;
+const VariableDefinitionRe = /^(.*) = (.*)$/;
+/**
+ * Parse information about a single variable, differentiating makefile,
+ * environment, default (:=), command line, 'override' directives
+ * and automatic variables.
+ */
+export class Variable implements Parser {
+    public static readonly Flags = {
+        None: 0,
+        /* Variable maked as "makefile" */
+        makefile: 1,
+
+        /* other variables */
+        other: 2,
+    };
+    static makeArgs(): string[] { return [
+        // Nothing. The goals are output when the Database is output
+    ];};
+    ingest (line: string) : [ParserDisp, Parser] {
+        if (line == "") {
+            if (!this.variable)
+                throw new Error("Unexpected end of variable");
+            return [ParserDisp.Leave, this];
+        } else {
+            if (!this.flags) {
+                let flags = VariableFlagsRe.exec(line);
+                if (flags) {
+                    switch (flags[1]) {
+                        case "variable":
+                            if (line == '# variable set hash-table stats:')
+                                return [ParserDisp.Leave, this];
+                            throw new Error(`Unexpected variable line '${line}'`);
+                        case "makefile":
+                            this.flags |= Variable.Flags.makefile;
+                            break;
+                        default:
+                            this.flags |= Variable.Flags.other;
+                            break;
+                    }
+                } else
+                    throw new Error(`Unexpected variable line '${line}'`);
+                return [ParserDisp.Continue, this];
+            }
+            if (this.flags & Variable.Flags.makefile) {
+                let variable = VariableDefinitionRe.exec(line);
+                if (variable) {
+                    switch (variable[1]) {
+                        case "TESTS": this.variable = { name: variable[1], value: variable[2] }; break;
+                    }
+                }
+            }
+        }
+        return [ParserDisp.Leave, this];
+    }
+    push(sub: Parser) {
+        return undefined; /* The end of the Recipe is the end of the Goal */
+    }
+    variable: { name: string, value : string } | undefined;
+    flags: number = Goal.Flags.None;
 }
 
 const GoalInfoRe = /^#  (.*)$/;

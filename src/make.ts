@@ -14,7 +14,7 @@ import {Executing} from './parser/shell';
 import * as toolParser from './parser/tool';
 import {Making} from './parser/tool';
 import {CompileCommand} from './parser/tool';
-import {Make, Goal, Database} from './parser/gnumake';
+import {Make, Goal, Variable, Database} from './parser/gnumake';
 import {Parser, ParserDisp} from './parser';
 import * as path from 'path';
 import * as util from './util';
@@ -146,6 +146,7 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
     // Assemble command line options from the requirements of each parser stage.
     makeArgs.push(...Make.makeArgs());
     makeArgs.push(...Database.makeArgs());
+    makeArgs.push(...Variable.makeArgs());
     makeArgs.push(...Goal.makeArgs());
     // I don't care about recipes, but they will be printed anyway
     // makeArgs.push(...Recipe.makeArgs());
