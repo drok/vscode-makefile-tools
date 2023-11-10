@@ -637,7 +637,7 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
             elapsed: elapsedTime
         };
     } catch (error) {
-        logger.message(error);
+        logger.message("Parsing the configuration failed due to: " + error);
         return {
             retc: ConfigureBuildReturnCodeTypes.notFound,
             elapsed: util.elapsedTimeSince(startTime)
@@ -1288,7 +1288,7 @@ async function loadConfigurationFromCache(progress: vscode.Progress<{}>, cancel:
     let content: string | undefined = util.readFile(cacheFile);
     if (content) {
         try {
-            progress.report({ increment: 1, message: localize("make.configure.cache", "Configuring from cache") });
+            progress.report({ increment: 1, message: localize("make.configure.cache", "Importing cached configuration") });
             logger.message(`Configuring from cache: ${cacheFile}`);
             let configurationCache: ConfigurationCache = {
                 buildTargets: undefined,
@@ -1321,11 +1321,9 @@ async function loadConfigurationFromCache(progress: vscode.Progress<{}>, cancel:
                 configurationCache.buildTargets = new Map(targets);
             });
 
-            //configurationCache.buildTargets = new Map(configurationCache.buildTargets);
-            await util.scheduleTask(() => {
-                if (configurationCache.buildTargets)
-                    configuration.setBuildTargets(configurationCache.buildTargets);
-            });
+            if (configurationCache.buildTargets?.size) {
+                configuration.setBuildTargets(configurationCache.buildTargets);
+            }
 
             await util.scheduleTask(() => {
                 // The configurations saved in the cache are read directly into the final file index.

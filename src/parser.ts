@@ -10,11 +10,12 @@
    new Parser = next line should be fed to the new Parser.
    undefined = parsing this section has ended.
  */
-   export enum ParserDisp {
+export enum ParserDisp {
     Continue,
     Enter,
     Leave,
 }
+
 export interface Parser {
     // On ingesting a new line, a Parser retuns a disposition (Enter, Leave or Continue),
     // and a target parser.

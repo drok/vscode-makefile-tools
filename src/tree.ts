@@ -44,7 +44,7 @@ export class BuildTargetNode extends BaseNode {
         try {
             const item: vscode.TreeItem = new vscode.TreeItem(this._name);
             item.collapsibleState = vscode.TreeItemCollapsibleState.None;
-            item.tooltip = localize("makefile.target.currently.selected.for.build", "The makefile target currently selected for build.");
+            item.tooltip = localize("makefile.target.currently.selected.for.build", "The target currently selected for build.");
             item.contextValue = [
                 `nodeType=buildTarget`,
             ].join(',');
