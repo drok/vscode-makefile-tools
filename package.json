@@ -377,6 +377,20 @@
                 }
             ]
         },
+        "taskDefinitions": [
+            {
+                "type": "autotools",
+                "when": "processExecutionSupported && autotools.makefileFilePresent",
+                "required": ["label"],
+                "properties": {
+                    "label": {
+                        "type": "string",
+                        "description": "%autotools.taskDefinitions.label.description%",
+                        "default": "Build it with autotools"
+                    }
+                }
+            }
+        ],
         "menus": {
             "commandPalette": [
                 {

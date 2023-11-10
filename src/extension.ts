@@ -17,6 +17,7 @@ import * as ui from './ui';
 import * as util from './util';
 import * as vscode from 'vscode';
 import * as cpp from 'vscode-cpptools';
+import { AutoToolsTaskProvider } from './tasks';
 
 import * as nls from 'vscode-nls';
 nls.config({ messageFormat: nls.MessageFormat.bundle, bundleFormat: nls.BundleFormat.standalone })();
@@ -39,9 +40,11 @@ export class MakefileToolsExtension {
     private mementoState = new state.StateManager(this.extensionContext);
     private cppToolsAPI?: cpp.CppToolsApi;
     private cppConfigurationProviderRegister?: Promise<void>;
+    public taskProvider: AutoToolsTaskProvider;
     private compilerFullPath ?: string;
 
     public constructor(public readonly extensionContext: vscode.ExtensionContext) {
+        this.taskProvider = new AutoToolsTaskProvider();
     }
 
     public updateMakefileFilePresent(newValue: boolean): void {
@@ -343,6 +346,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     context.subscriptions.push(vscode.commands.registerCommand('autotools.outline.openMakePathSetting', async () => {
         await openSettings("autotools.makePath");
     }));
+
+    vscode.tasks.registerTaskProvider(AutoToolsTaskProvider.myType, extension.taskProvider);
 
     // Delete the script that is created by this extension in the temporary folder
     // with the purpose of spliting a compilation command fragment into switch arguments

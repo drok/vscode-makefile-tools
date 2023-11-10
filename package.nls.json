@@ -41,5 +41,6 @@
    "autotools.configuration.makefile.clearOutputBeforeBuild.description": "Clear the output channel at the beginning of a build",
    "autotools.configuration.makefile.compileCommandsPath.description": "The path to the compilation database file",
    "autotools.configuration.makefile.panel.visibility.debug.description": "Enable debugging locally (in this host) images built by this extension",
-   "autotools.configuration.makefile.panel.visibility.run.description": "Enable running locally (in this host) images built by this extension"
+   "autotools.configuration.makefile.panel.visibility.run.description": "Enable running locally (in this host) images built by this extension",
+   "autotools.taskDefinitions.label.description": "Build current autotools target"
 }
