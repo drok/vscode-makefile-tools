@@ -305,7 +305,7 @@ export async function readAlwaysPostConfigure(): Promise<void> {
 // TODO: The user should have the option to turn off the cache because it may become decoherent with the
 // workspace when the source is changed (eg, diff branch checked out) between vscode reloads.
 export function getConfigurationCachePath(): string {
-    let builddir = currentMakefileConfiguration.makeDirectory || getCurrentTarget().dir;
+    let builddir = currentMakefileConfiguration.makeDirectory || getCurrentTarget().builddir;
     if (!path.isAbsolute(builddir)) {
         builddir = util.resolvePathToRoot(builddir);
     }
@@ -574,7 +574,7 @@ export async function readMakefileConfigurations(currentConfigurationName : stri
 let currentTarget: make.BuildTarget = make.t_all;
 export function getCurrentTarget(): make.BuildTarget { return currentTarget; }
 export function getCurrentTargetAsFilename() : string {
-    return currentTarget.name.replace(/[^\w \(\)\[\]\{\}@\.\-\+]+/g,'_');
+    return currentTarget.goal.replace(/[^\w \(\)\[\]\{\}@\.\-\+]+/g,'_');
 }
 // Set the current target, or 'all' if none was given
 export function setCurrentTarget(target: make.BuildTarget = make.t_all): void { currentTarget = target; }
@@ -1092,7 +1092,7 @@ export async function setNewConfiguration(): Promise<void> {
 
 export async function setTargetByName(targetName: make.BuildTarget) : Promise<void> {
     currentTarget = targetName;
-    let displayTarget: string = targetName.name ? `${currentTarget.name} @ ${currentTarget.dir}`: "Default";
+    let displayTarget: string = targetName.goal ? `${currentTarget.goal} @ ${currentTarget.builddir}`: "Default";
     statusBar.setTarget(currentTarget);
     logger.message(`Setting target ${displayTarget}`);
     logger.message("Re-reading settings after target change.");

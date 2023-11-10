@@ -784,10 +784,10 @@ export async function expandVariablesInSetting(settingId: string, settingVal: st
             toStr = configuration.getCurrentMakefileConfiguration().name;
             telemetryProperties.pattern =  result[2];
         } else if (result[2] === "buildTargetName") {
-            toStr = configuration.getCurrentTarget().name || "";
+            toStr = configuration.getCurrentTarget().goal || "";
             telemetryProperties.pattern =  result[2];
         } else if (result[2] === "buildTargetDir") {
-            toStr = configuration.getCurrentTarget().dir || "";
+            toStr = configuration.getCurrentTarget().builddir || "";
             telemetryProperties.pattern =  result[2];
         } else if (result[4] === "env" && result[5]) {
             toStr = process.env[result[5]] || "";

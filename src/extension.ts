@@ -225,14 +225,14 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
        await configuration.selectTarget(context);
     }));
 
-    context.subscriptions.push(vscode.commands.registerCommand('autotools.getBuildTargetName', async () => {
-        telemetry.logEvent("getBuildTargetName");
-        return configuration.getCurrentTarget().name;
+    context.subscriptions.push(vscode.commands.registerCommand('autotools.goal', async () => {
+        telemetry.logEvent("goal");
+        return configuration.getCurrentTarget().goal;
     }));
 
-    context.subscriptions.push(vscode.commands.registerCommand('autotools.getBuildTargetDir', async () => {
-        telemetry.logEvent("getBuildTargetDir");
-        return configuration.getCurrentTarget().dir;
+    context.subscriptions.push(vscode.commands.registerCommand('autotools.builddir', async () => {
+        telemetry.logEvent("builddir");
+        return configuration.getCurrentTarget().builddir;
     }));
 
     context.subscriptions.push(vscode.commands.registerCommand('autotools.buildTarget', async () => {

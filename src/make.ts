@@ -29,14 +29,14 @@ const recursiveString = localize("recursive", "(recursive)");
 
 export class BuildTarget {
     constructor(dir: string, name: string) {
-        this.dir = dir;
-        this.name = name;
+        this.builddir = dir;
+        this.goal = name;
     }
     public toString = () : string => {
-        return `${this.name} @@ ${this.dir}`;
+        return `${this.goal} @@ ${this.builddir}`;
     }
-    dir: string;
-    name: string;
+    builddir: string;
+    goal: string;
 }
 
 // Predefined, well known build targets
@@ -163,16 +163,16 @@ export function prepareBuildTarget(target: BuildTarget): string[] {
 
     // Prepend the target to the arguments given in the configurations json.
     // If a clean build is desired, "clean" should precede the target.
-    if (target.name) {
-        makeArgs.push(target.name);
+    if (target.goal) {
+        makeArgs.push(target.goal);
     }
 
-    if (target.dir) {
+    if (target.builddir) {
         makeArgs.push("-C");
-        makeArgs.push(target.dir);
+        makeArgs.push(target.builddir);
     }
     makeArgs = makeArgs.concat(configuration.getConfigurationMakeArgs());
-    makeArgs.push(target.name);
+    makeArgs.push(target.goal);
 
     logger.message(`Building target "${target}" with command: '${configuration.getMakePath()} ${makeArgs.join(" ")}'`);
     return makeArgs;
@@ -229,8 +229,8 @@ export async function buildTarget(triggeredBy: TriggeredBy, target: BuildTarget,
     // Prepare a notification popup
     let config: string | undefined = configuration.getCurrentMakefileConfiguration().name;
     let configAndTarget: string = config;
-    if (target.name) {
-        configAndTarget += "/" + target.name + "@" + target.dir;
+    if (target.goal) {
+        configAndTarget += "/" + target.goal + "@" + target.builddir;
     }
 
     configAndTarget = `"${configAndTarget}"`;
@@ -290,7 +290,7 @@ export async function buildTarget(triggeredBy: TriggeredBy, target: BuildTarget,
                 let buildElapsedTime: number = util.elapsedTimeSince(buildStartTime);
                 const telemetryProperties: telemetry.Properties = {
                     exitCode: retc?.toString() || "undefined",
-                    target: processTargetForTelemetry(target.name),
+                    target: processTargetForTelemetry(target.goal),
                     triggeredBy: triggeredBy
                 };
                 const telemetryMeasures: telemetry.Measures = {
@@ -429,7 +429,7 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
     // Include all the make arguments defined in autotools.configurations.makeArgs
     makeArgs = makeArgs.concat(configuration.getConfigurationMakeArgs());
 
-    makeArgs.push(currentTarget.name);
+    makeArgs.push(t_all.goal);
 
     // Assemble command line options from the requirements of each parser stage.
     makeArgs.push(...Make.makeArgs());
@@ -1257,7 +1257,7 @@ export async function configure(triggeredBy: TriggeredBy, updateTargets: boolean
       logger.message(`Postconfigure elapsed time: ${postConfigureElapsedTime}`);
     }
 
-    telemetryProperties.buildTarget = processTargetForTelemetry(currentBuildTarget.name);
+    telemetryProperties.buildTarget = processTargetForTelemetry(currentBuildTarget.goal);
     telemetry.logEvent("configure", telemetryProperties, telemetryMeasures);
 
     if (retc !== ConfigureBuildReturnCodeTypes.success) {
@@ -1407,8 +1407,8 @@ export async function doConfigure(progress: vscode.Progress<{}>, cancel: vscode.
         // Verify if the current build target is still part of the list and unset otherwise.
         // By this point, configuration.getBuildTargets() contains a comlete list (old and new).
         let currentBuildTarget: BuildTarget = configuration.getCurrentTarget();
-        if (currentBuildTarget.name &&
-            configuration.getBuildTargets(currentBuildTarget.dir).find((n) => n.goal == currentBuildTarget.name)) {
+        if (currentBuildTarget.goal &&
+            configuration.getBuildTargets(currentBuildTarget.builddir).find((n) => n.goal == currentBuildTarget.goal)) {
             logger.message(`Current build target ${currentBuildTarget} is no longer present in the available list.` +
                 ` Unsetting the current build target.`);
 

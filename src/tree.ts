@@ -26,14 +26,14 @@ abstract class BaseNode {
 
 export class BuildTargetNode extends BaseNode {
     constructor(targetName: BuildTarget) {
-        super(`buildTarget:${targetName.name}@${targetName.dir}`);
-        this._name = targetName.name;
+        super(`buildTarget:${targetName.goal}@${targetName.builddir}`);
+        this._name = targetName.goal;
     }
 
     _name: string;
 
     update(targetName: BuildTarget): void {
-        this._name = localize("tree.build.target", "Build target: {0}", `[${targetName.name} @ ${targetName.dir}]`);
+        this._name = localize("tree.build.target", "Build target: {0}", `[${targetName.goal} @ ${targetName.builddir}]`);
     }
 
     getChildren(): BaseNode[] {

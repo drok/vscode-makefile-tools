@@ -23,7 +23,7 @@ export class UI {
     }
 
     public setTarget(target: BuildTarget): void {
-        this.targetButton.text = "$(tag) Target to build: " + target.name + "@" + target.dir;
+        this.targetButton.text = "$(tag) Target to build: " + target.goal + "@" + target.builddir;
     }
 
     public setLaunchConfiguration(launchConfigurationStr: string | undefined): void {
