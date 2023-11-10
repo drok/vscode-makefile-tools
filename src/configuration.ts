@@ -582,7 +582,7 @@ export function setCurrentTarget(target: make.BuildTarget = make.t_all): void { 
 // Read current target from workspace state, update status bar item
 function readCurrentTarget(): void {
     let buildTarget : BuildTarget | undefined = extension.getState().buildTarget;
-    setCurrentTarget(buildTarget);
+    setCurrentTarget(buildTarget?.builddir ? buildTarget : make.t_all);
     if (!buildTarget) {
         logger.message(`No target defined in the workspace state. Assuming '${currentTarget}'.`);
     } else {

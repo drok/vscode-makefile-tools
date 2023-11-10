@@ -6,7 +6,7 @@
 import * as configuration from './configuration';
 import * as path from 'path';
 import * as util from './util';
-import { BuildTarget } from './make';
+import { BuildTarget, t_none } from './make';
 import * as vscode from 'vscode';
 
 import * as nls from 'vscode-nls';
@@ -94,7 +94,7 @@ export class ProjectOutlineProvider implements vscode.TreeDataProvider<BaseNode>
 
     constructor() {
         this._currentConfigurationItem = new ConfigurationNode(this._unsetString);
-        this._currentBuildTargetItem = new BuildTargetNode(new BuildTarget("", ""));
+        this._currentBuildTargetItem = new BuildTargetNode(t_none);
     }
 
     private _currentConfigurationItem: ConfigurationNode;
