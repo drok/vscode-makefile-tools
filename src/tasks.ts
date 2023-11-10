@@ -79,9 +79,9 @@ async function getTasks(): Promise<Task[]> {
                             .concat(g.goal)));
                     task.group = TaskGroup.Build;
                     task.detail =
-                        (g.flags & Goal.Flags.Linked_binary) ? localize("automake.program", "Program") :
-                        (g.flags & Goal.Flags.Static_library) ? localize("automake.ranlib", "Static Library") :
-                        "Unrecognized target";
+                        (g.flags & Goal.Flags.Linked_binary) ? localize("automake.program", "Build program") :
+                        (g.flags & Goal.Flags.Static_library) ? localize("automake.ranlib", "Build static library") :
+                        localize("automake.build", "Build");
                     targets.push(task);
                 }
             })});

@@ -341,10 +341,10 @@
                                 "default": "${workspaceFolder}",
                                 "description": "%autotools.debugger.launch.cwd.description%"
                             },
-                            "env": {
-                                "type": "object",
+                            "environment": {
+                                "type": "array",
                                 "description": "%autotools.debugger.launch.env.description%",
-                                "default": {}
+                                "default": []
                             },
                             "stopAtEntry": {
                                 "type": "boolean",
@@ -361,12 +361,12 @@
                         "body": {
                             "type": "cppdbg",
                             "request": "launch",
-                            "name": "${1:Launch Program autoools}",
-                            "program": "^\"\\${command:autotools.getBuildTargetDir}/\\${command:autotools.getBuildTargetName}\"",
+                            "name": "${1:Launch current autotools build target}",
+                            "program": "^\"\\${command:autotools.builddir}/\\${command:autotools.goal}\"",
                             "cwd": "^\"\\${workspaceFolder}\"",
-                            "env": {},
-                            "stopAtEntry": true
-
+                            "environment": [],
+                            "args": [],
+                            "stopAtEntry": false
                         }
                     }
                 ]
