@@ -11,6 +11,10 @@ import { error } from 'console';
 import * as configuration from './configuration';
 import { BuildTarget, t_all } from './make';
 
+import * as nls from 'vscode-nls';
+nls.config({ messageFormat: nls.MessageFormat.bundle, bundleFormat: nls.BundleFormat.standalone })();
+const localize: nls.LocalizeFunc = nls.loadMessageBundle();
+
 export class AutoToolsTaskProvider implements TaskProvider {
 	static myType = 'autotools';
 	private myPromise: Thenable<Task[]> | undefined = undefined;
@@ -55,9 +59,12 @@ async function getTasks(): Promise<Task[]> {
     var targets : Task[] = [];
     configuration.getAllBuildTargets().forEach((goals, dir) => {
         goals
-            .filter((goal) => goal.flags & Goal.Flags.Linked_binary)
+            .filter((goal) => goal.flags & (
+                    Goal.Flags.Static_library |
+                    Goal.Flags.Linked_binary
+                    ))
             .forEach((g) => {
-                if ((g.flags & Goal.Flags.Linked_binary) && g.goal) {
+                if (g.goal) {
                     const kind: MyTaskDefinition = {
                         type: AutoToolsTaskProvider.myType,
                         task: g.goal,
@@ -71,6 +78,10 @@ async function getTasks(): Promise<Task[]> {
                             .concat(configuration.getConfigurationMakeArgs())
                             .concat(g.goal)));
                     task.group = TaskGroup.Build;
+                    task.detail =
+                        (g.flags & Goal.Flags.Linked_binary) ? localize("automake.program", "Program") :
+                        (g.flags & Goal.Flags.Static_library) ? localize("automake.ranlib", "Static Library") :
+                        "Unrecognized target";
                     targets.push(task);
                 }
             })});

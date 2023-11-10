@@ -315,6 +315,7 @@ export class Goal implements Parser {
 
         /* Flags gathered from automake (recipe hints like $(LINK) */
         Linked_binary: 256,
+        Static_library: 512,
     };
     static makeArgs(): string[] { return [
         // Nothing. The goals are output when the Database is output
@@ -396,6 +397,7 @@ export class Goal implements Parser {
 }
 
 const LinkerRe = /\$\(LINK\)\s/;
+const RanlibRe = /\$\(RANLIB\)\s/;
 /**
  * Parse an unexpanded build recipe for a target.
  * Currently no information is captured, but it could be used to learn
@@ -411,6 +413,8 @@ export class Recipe implements Parser {
             return [ParserDisp.Leave, this];
         if (LinkerRe.test(line))
             this.goal.flags |= Goal.Flags.Linked_binary;
+        if (RanlibRe.test(line))
+            this.goal.flags |= Goal.Flags.Static_library;
         return [ParserDisp.Continue, this];
     }
     push(sub: Parser) { return undefined;}
