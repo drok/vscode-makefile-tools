@@ -396,20 +396,6 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
 
     let startTime: number = Date.now();
 
-    // Prepend the target to the arguments given in the autotools.configurations object,
-    // unless we want to parse for the full set of available targets.
-    let currentTarget: BuildTarget = configuration.getCurrentTarget();
-
-    // Rules for parse content and file:
-    //     1. configuration cache (the previous dryrun output): autotools.configurationCachePath
-    //     2. the make dryrun output if (2) is missing
-//    const dryRunString = localize("make.generating.dryrun", "Importing autotools configuration {} ...", configuration.getCurrentMakefileConfiguration().name);
-//    progress.report({
-//        increment: 1, message: dryRunString +
-//            ((recursive) ? ` ${recursiveString}` : "") +
-//                "..."
-//    });
-
     // Continue with the make dryrun invocation
     let makeArgs: string[] = [];
 
@@ -553,15 +539,6 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
                 parserStack = [];
                 throw new Error("Quitting the parse due to " + e);
             }
-
-            progress.report({
-              increment: 1,
-              message:
-                dryRunString +
-                (recursive ? ` ${recursiveString}` : "") +
-                "...",
-            });
-                                                    
 
             heartBeat = Date.now();
         };
@@ -1073,7 +1050,7 @@ export async function configure(triggeredBy: TriggeredBy, updateTargets: boolean
     subphaseStats = await vscode.window.withProgress(
       {
         location: vscode.ProgressLocation.Notification,
-        title: localize("make.configuring.title", "Configuring"),
+        title: localize("make.configuring.title", "Importing autotools configuration '{0}'", configuration.getCurrentMakefileConfiguration().name),
         cancellable: true,
       },
       (progress, cancel) => {
