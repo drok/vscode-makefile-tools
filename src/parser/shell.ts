@@ -13,7 +13,7 @@ import * as path from 'path';
 import * as util from '../util';
 import * as vscode from 'vscode';
 import {Parser, ParserDisp} from '../parser';
-import { parse } from '@mergesium/shell-quote';
+import { parse, quote } from '@mergesium/shell-quote';
 // import  from '../extension';
 import { extension } from '../extension';
 import { Making } from './tool';
@@ -208,6 +208,8 @@ export interface ToolInvocation {
 
     // Find a named option argument, return its value
     getArg(wanted: string): string | undefined;
+
+    toString() : string;
 }
 
 export class Tool implements ToolInvocation {
@@ -280,6 +282,9 @@ export class Tool implements ToolInvocation {
             return this.argv[index + 1];
         }
         return undefined;
+    }
+    toString(): string {
+        return quote([this.fullPath, ...this.argv]);
     }
 }
 
