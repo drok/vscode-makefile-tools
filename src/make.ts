@@ -401,15 +401,14 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
 
     // FIXME: if current target = make.t_all, dir is empty, make will be done in proj dir
     // make directory and makefile. If a target is selected, only set the target dir
-    if (currentTarget.dir) {
-        makeArgs.push("-C");
-        makeArgs.push(currentTarget.dir);
-        let makefile = configuration.getConfigurationMakefile();
-        if (makefile) {
-            // FIXME: this refers to the configuration makefile, not the target's makefile
-            makeArgs.push("-f");
-            makeArgs.push(makefile);
-        }
+    let dir = configuration.getCurrentMakefileConfiguration().makeDirectory;
+    if (dir) {
+        makeArgs.push(...["-C", dir]);
+    }
+    let makefile = configuration.getConfigurationMakefile();
+    if (makefile) {
+        // FIXME: this refers to the configuration makefile, not the target's makefile
+        makeArgs.push(...["-f", makefile]);
     }
 
     // Include all the make arguments defined in autotools.configurations.makeArgs
