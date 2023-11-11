@@ -73,11 +73,6 @@
                 "icon": "$(notebook-edit)"
             },
             {
-                "command": "autotools.outline.openMakefileFile",
-                "title": "%autotools.command.makefile.openMakefileFile.title%",
-                "icon": "$(open-preview)"
-            },
-            {
                 "command": "autotools.outline.openMakePathSetting",
                 "title": "%autotools.command.makefile.openMakePathSetting.title%",
                 "icon": "$(notebook-edit)"
@@ -452,11 +447,6 @@
                 {
                     "command": "autotools.outline.setBuildTarget",
                     "when": "autotools:fullFeatureSet && view == autotools.outline && viewItem =~ /nodeType=buildTarget/",
-                    "group": "inline@1"
-                },
-                {
-                    "command": "autotools.outline.openMakefileFile",
-                    "when": "view == autotools.outline && viewItem =~ /nodeType=makefilePathInfo/ && makefile.makefileFilePresent",
                     "group": "inline@1"
                 }
             ]

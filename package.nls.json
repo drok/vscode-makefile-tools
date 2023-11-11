@@ -3,7 +3,6 @@
    "autotools.command.makefile.setBuildConfiguration.title": "Autotools: Set the current build configuration",
    "autotools.command.makefile.setBuildTarget.title": "Autotools: Set the target to be built by make",
    "autotools.command.makefile.openMakePathSetting.title": "Autotools: Open Make Path Setting",
-   "autotools.command.makefile.openMakefileFile.title": "Autotools: Open Makefile File",
    "workbench.action.openWorkspaceSettings.title": "Preferences: Open Workspace Settings",
    "autotools.command.makefile.configure.title": "Autotools: Configure",
    "autotools.command.makefile.cleanConfigure.title": "Autotools: Clean Configure",

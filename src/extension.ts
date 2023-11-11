@@ -291,19 +291,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         await openSettings("autotools.makefilePath");
     }));
 
-    context.subscriptions.push(vscode.commands.registerCommand('autotools.outline.openMakefileFile', async () => {
-        const makefile = configuration.getConfigurationMakefile();
-        if (makefile) {
-            if (util.checkFileExistsSync(makefile)) {
-                await openFile(vscode.Uri.file(makefile));
-            }
-            else {
-                extension.updateMakefileFilePresent(false);
-                vscode.window.showErrorMessage(localize("autotools.outline.makefileFileNotFound", "The makefile file could not be opened."));
-            }
-        }
-    }));
-
     context.subscriptions.push(vscode.commands.registerCommand('autotools.outline.openMakePathSetting', async () => {
         await openSettings("autotools.makePath");
     }));
