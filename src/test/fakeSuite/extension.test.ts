@@ -79,11 +79,6 @@ suite('Fake dryrun parsing', /*async*/() => {
          util.deleteFileSync(extensionLogPath);
       }
 
-      // Run a preconfigure script to include our tests fake compilers path so that we always find gcc/gpp/clang/...etc...
-      // from this extension repository instead of a real installation which may vary from system to system.
-      configuration.setPreConfigureScript(path.join(vscode.workspace.rootPath || "./", systemPlatform === "win32" ? ".vscode/preconfigure.bat" : ".vscode/preconfigure_nonwin.sh"));
-      await make.preConfigure(make.TriggeredBy.tests);
-
       configuration.prepareConfigurationsQuickPick();
       await configuration.setConfigurationByName("complex_escaped_quotes");
 
@@ -131,11 +126,6 @@ suite('Fake dryrun parsing', /*async*/() => {
             util.deleteFileSync(extensionLogPath);
          }
 
-         // Run a preconfigure script to include our tests fake compilers path so that we always find gcc/gpp/clang/...etc...
-         // from this extension repository instead of a real installation which may vary from system to system.
-         configuration.setPreConfigureScript(path.join(vscode.workspace.rootPath || "./", ".vscode/preconfigure.bat"));
-         await make.preConfigure(make.TriggeredBy.tests);
-
          configuration.prepareConfigurationsQuickPick();
          await configuration.setConfigurationByName("complex_escaped_quotes_winOnly");
 
@@ -177,11 +167,6 @@ suite('Fake dryrun parsing', /*async*/() => {
          if (extensionLogPath && util.checkFileExistsSync(extensionLogPath)) {
             util.deleteFileSync(extensionLogPath);
          }
-
-         // Run a preconfigure script to include our tests "Program Files" path so that we always find a cl.exe
-         // from this extension repository instead of a real VS installation that happens to be in the path.
-         configuration.setPreConfigureScript(path.join(vscode.workspace.rootPath || "./", ".vscode/preconfigure.bat"));
-         await make.preConfigure(make.TriggeredBy.tests);
 
          configuration.prepareConfigurationsQuickPick();
          await configuration.setConfigurationByName("InterestingSmallMakefile_windows_configDebug");
@@ -236,11 +221,6 @@ suite('Fake dryrun parsing', /*async*/() => {
             util.deleteFileSync(extensionLogPath);
          }
 
-         // Run a preconfigure script to include our tests fake compilers path so that we always find gcc/gpp/clang/...etc...
-         // from this extension repository instead of a real installation which may vary from system to system.
-         configuration.setPreConfigureScript(path.join(vscode.workspace.rootPath || "./", ".vscode/preconfigure_nonwin.sh"));
-         await make.preConfigure(make.TriggeredBy.tests);
-
          configuration.prepareConfigurationsQuickPick();
          await configuration.setConfigurationByName(process.platform === "linux" ? "8cc_linux" : "8cc_mingw");
          const retc: number = await make.cleanConfigure(make.TriggeredBy.tests, true);
@@ -281,11 +261,6 @@ suite('Fake dryrun parsing', /*async*/() => {
             util.deleteFileSync(extensionLogPath);
          }
 
-         // Run a preconfigure script to include our tests fake compilers path so that we always find gcc/gpp/clang/...etc...
-         // from this extension repository instead of a real installation which may vary from system to system.
-         configuration.setPreConfigureScript(path.join(vscode.workspace.rootPath || "./", ".vscode/preconfigure_nonwin.sh"));
-         await make.preConfigure(make.TriggeredBy.tests);
-
          configuration.prepareConfigurationsQuickPick();
          await configuration.setConfigurationByName(process.platform === "linux" ? "Fido_linux" : "Fido_mingw");
          const retc: number = await make.cleanConfigure(make.TriggeredBy.tests, true);
@@ -325,11 +300,6 @@ suite('Fake dryrun parsing', /*async*/() => {
          if (extensionLogPath && util.checkFileExistsSync(extensionLogPath)) {
             util.deleteFileSync(extensionLogPath);
          }
-
-         // Run a preconfigure script to include our tests fake compilers path so that we always find gcc/gpp/clang/...etc...
-         // from this extension repository instead of a real installation which may vary from system to system.
-         configuration.setPreConfigureScript(path.join(vscode.workspace.rootPath || "./", ".vscode/preconfigure_nonwin.sh"));
-         await make.preConfigure(make.TriggeredBy.tests);
 
          configuration.prepareConfigurationsQuickPick();
          await configuration.setConfigurationByName(process.platform === "linux" ? "tinyvm_linux_pedantic" : "tinyvm_mingw_pedantic");

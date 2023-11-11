@@ -1,10 +1,6 @@
 # What's New?
 
-## Makefile Tools 0.8
-Improvements:
-- Add support for a post configure script. [#391](https://github.com/microsoft/vscode-makefile-tools/issues/391)
-
-## Makefile Tools 0.7.0
+## 0.7.0
 Improvements:
 - Variable expansion support in settings. [#25](https://github.com/microsoft/vscode-makefile-tools/issues/25)
 - Improve the UI user experience when key pieces (makefile, make, build.log) are not found. [#394](https://github.com/microsoft/vscode-makefile-tools/issues/394)

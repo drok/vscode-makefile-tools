@@ -248,58 +248,6 @@ export async function readExtensionLog(): Promise<void> {
     }
 }
 
-let preConfigureScript: string | undefined;
-export function getPreConfigureScript(): string | undefined { return preConfigureScript; }
-export function setPreConfigureScript(path: string): void { preConfigureScript = path; }
-
-let postConfigureScript: string | undefined;
-export function getPostConfigureScript(): string | undefined { return postConfigureScript; }
-export function setPostConfigureScript(path: string): void { postConfigureScript = path; }
-
-// Read from settings the path to a script file that needs to have been run at least once
-// before a sucessful configure of this project.
-export async function readPreConfigureScript(): Promise<void> {
-    preConfigureScript = await util.getExpandedSetting<string>("preConfigureScript");
-    if (preConfigureScript) {
-        preConfigureScript = util.resolvePathToRoot(preConfigureScript);
-        logger.message(`Found pre-configure script defined as ${preConfigureScript}`);
-        if (!util.checkFileExistsSync(preConfigureScript)) {
-            logger.message("Pre-configure script not found on disk.");
-        }
-    }
-}
-
-export async function readPostConfigureScript(): Promise<void> {
-    postConfigureScript = await util.getExpandedSetting<string>("postConfigureScript");
-    if (postConfigureScript) {
-        postConfigureScript = util.resolvePathToRoot(postConfigureScript);
-        logger.message(`Found post-configure script defined as ${postConfigureScript}`);
-        if (!util.checkFileExistsSync(postConfigureScript)) {
-            logger.message("Post-configure script not found on disk");
-        }
-    }
-}
-
-let alwaysPreConfigure: boolean | undefined;
-export function getAlwaysPreConfigure(): boolean | undefined { return alwaysPreConfigure; }
-export function setAlwaysPreConfigure(path: boolean): void { alwaysPreConfigure = path; }
-
-let alwaysPostConfigure: boolean | undefined;
-export function getAlwaysPostConfigure(): boolean | undefined { return alwaysPostConfigure; }
-export function setAlwaysPostConfigure(path: boolean): void { alwaysPostConfigure = path; }
-
-// Read from settings whether the pre-configure step is supposed to be executed
-// always before the configure operation.
-export async function readAlwaysPreConfigure(): Promise<void> {
-    alwaysPreConfigure = await util.getExpandedSetting<boolean>("alwaysPreConfigure");
-    logger.message(`Always pre-configure: ${alwaysPreConfigure}`);
-}
-
-export async function readAlwaysPostConfigure(): Promise<void> {
-    alwaysPostConfigure = await util.getExpandedSetting<boolean>("alwaysPostConfigure");
-    logger.message(`Always post-configure: ${alwaysPostConfigure}`);
-}
-
 // The configuration cache is stored in ${makeDirectory}/.vscode/${currentTarget}.cache
 // Ie, each config is keyed to the configuration and target
 // TODO: The user should have the option to turn off the cache because it may become decoherent with the
@@ -654,10 +602,6 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
 
     await readLoggingLevel();
     await readMakePath();
-    await readPreConfigureScript();
-    await readAlwaysPreConfigure();
-    await readPostConfigureScript();
-    await readAlwaysPostConfigure();
     await readkeepDryRuns();
     await readkeepConfigurationCache();
     await readAdditionalCompilerNames();
@@ -764,42 +708,6 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
             if (updatedExtensionLog !== extensionLog) {
                 // No IntelliSense update needed.
                 await readExtensionLog();
-                updatedSettingsSubkeys.push(subKey);
-            }
-
-            subKey = "preConfigureScript";
-            let updatedPreConfigureScript : string | undefined = await util.getExpandedSetting<string>(subKey);
-            if (updatedPreConfigureScript) {
-                updatedPreConfigureScript = util.resolvePathToRoot(updatedPreConfigureScript);
-            }
-            if (updatedPreConfigureScript !== preConfigureScript) {
-                // No IntelliSense update needed.
-                await readPreConfigureScript();
-                updatedSettingsSubkeys.push(subKey);
-            }
-
-            subKey = "postConfigureScript";
-            let updatedPostConfigureScript: string | undefined = await util.getExpandedSetting<string>(subKey);
-            if (updatedPostConfigureScript) {
-                updatedPostConfigureScript = util.resolvePathToRoot(updatedPostConfigureScript);
-            }
-            if (updatedPostConfigureScript !== postConfigureScript) {
-                await readPostConfigureScript();
-                updatedSettingsSubkeys.push(subKey);
-            }
-
-            subKey = "alwaysPreConfigure";
-            let updatedAlwaysPreConfigure : boolean | undefined = await util.getExpandedSetting<boolean>(subKey);
-            if (updatedAlwaysPreConfigure !== alwaysPreConfigure) {
-                // No IntelliSense update needed.
-                await readAlwaysPreConfigure();
-                updatedSettingsSubkeys.push(subKey);
-            }
-
-            subKey = "alwaysPostConfigure";
-            let updatedAlwaysPostConfigure: boolean | undefined = await util.getExpandedSetting<boolean>(subKey);
-            if (updatedAlwaysPostConfigure !== alwaysPostConfigure) {
-                await readAlwaysPostConfigure();
                 updatedSettingsSubkeys.push(subKey);
             }
 

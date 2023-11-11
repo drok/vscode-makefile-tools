@@ -63,14 +63,6 @@
                 "title": "%autotools.command.makefile.cleanConfigure.title%"
             },
             {
-                "command": "autotools.preConfigure",
-                "title": "%autotools.command.makefile.preConfigure.title%"
-            },
-            {
-                "command": "autotools.postConfigure",
-                "title": "%autotools.command.makefile.postConfigure.title%"
-            },
-            {
                 "command": "autotools.outline.setBuildConfiguration",
                 "title": "%autotools.command.makefile.setBuildConfiguration.title%",
                 "icon": "$(notebook-edit)"
@@ -98,14 +90,6 @@
             {
                 "command": "autotools.outline.cleanConfigure",
                 "title": "%autotools.command.makefile.cleanConfigure.title%"
-            },
-            {
-                "command": "autotools.outline.preConfigure",
-                "title": "%autotools.command.makefile.preConfigure.title%"
-            },
-            {
-                "command": "autotools.outline.postConfigure",
-                "title": "%autotools.command.makefile.postConfigure.title%"
             },
             {
                 "command": "autotools.resetState",
@@ -261,30 +245,6 @@
                     "type": "boolean",
                     "default": true,
                     "description": "%autotools.configuration.makefile.configureAfterCommand.description%",
-                    "scope": "resource"
-                },
-                "autotools.preConfigureScript": {
-                    "type": "string",
-                    "description": "%autotools.configuration.makefile.preConfigureScript.description%",
-                    "default": null,
-                    "scope": "resource"
-                },
-                "autotools.postConfigureScript": {
-                    "type": "string",
-                    "description": "%autotools.configuration.makefile.postConfigureScript.description%",
-                    "default": null,
-                    "scope": "resource"
-                },
-                "autotools.alwaysPreConfigure": {
-                    "type": "boolean",
-                    "description": "%autotools.configuration.makefile.alwaysPreConfigure.description%",
-                    "default": false,
-                    "scope": "resource"
-                },
-                "autotools.alwaysPostConfigure": {
-                    "type": "boolean",
-                    "description": "%autotools.configuration.makefile.alwaysPostConfigure.description%",
-                    "default": false,
                     "scope": "resource"
                 },
                 "autotools.ignoreDirectoryCommands": {
@@ -443,18 +403,6 @@
         "menus": {
             "commandPalette": [
                 {
-                    "command": "autotools.preConfigure",
-                    "when": "autotools:fullFeatureSet"
-                },
-                {
-                    "command": "autotools.postConfigure",
-                    "when": "autotools:fullFeatureSet"
-                },
-                {
-                    "command": "autotools.buildTarget",
-                    "when": "autotools:fullFeatureSet"
-                },
-                {
                     "command": "autotools.buildAll",
                     "when": "autotools:fullFeatureSet"
                 },
@@ -471,14 +419,6 @@
                     "when": "never"
                 },
                 {
-                    "command": "autotools.outline.preConfigure",
-                    "when": "never"
-                },
-                {
-                    "command": "autotools.outline.postConfigure",
-                    "when": "autotools:fullFeatureSet"
-                },
-                {
                     "command": "autotools.outline.setBuildConfiguration",
                     "when": "never"
                 },
@@ -488,16 +428,6 @@
                 }
             ],
             "view/title": [
-                {
-                    "command": "autotools.outline.preConfigure",
-                    "when": "view == autotools.outline",
-                    "group": "1_makefileOutline@1"
-                },
-                {
-                    "command": "autotools.outline.postConfigure",
-                    "when": "view == autotools.outline",
-                    "group": "1_makefileOutline@2"
-                },
                 {
                     "command": "autotools.outline.configure",
                     "when": "view == autotools.outline",

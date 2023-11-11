@@ -249,14 +249,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         await make.cleanConfigure(make.TriggeredBy.cleanConfigure);
     }));
 
-    context.subscriptions.push(vscode.commands.registerCommand('autotools.preConfigure', async () => {
-        await make.preConfigure(make.TriggeredBy.preconfigure);
-    }));
-
-    context.subscriptions.push(vscode.commands.registerCommand('autotools.postConfigure', async () => {
-        await make.postConfigure(make.TriggeredBy.postConfigure);
-    }))
-
     // Reset state - useful for troubleshooting.
     context.subscriptions.push(vscode.commands.registerCommand('autotools.resetState', () => {
         telemetry.logEvent("commandResetState");
@@ -267,9 +259,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         return vscode.commands.executeCommand("autotools.configure");
     }));
 
-    context.subscriptions.push(vscode.commands.registerCommand('autotools.outline.postConfigure', () => {
-        return vscode.commands.executeCommand("autotools.postConfigure");
-    }))
 
     context.subscriptions.push(vscode.commands.registerCommand('autotools.outline.setBuildTarget', () => {
         return vscode.commands.executeCommand("autotools.setBuildTarget");
