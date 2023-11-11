@@ -285,7 +285,7 @@ export class Database implements Parser {
             }
         } else if (sub instanceof Variable) {
             if (!sub.flags) { /* End-of-variables */
-                return undefined;
+                return sub;
             } else if (sub.variable) { /* gather only variables that were
                                         * interesting enough to collect */
                 this.variables.push(sub);
@@ -368,7 +368,7 @@ const GoalInfoRe = /^#  (.*)$/;
 const GoalAckInfoRe = /^(?:Implicit\/static pattern stem:|Last modified)/;
 const GoalVarsRe = /^# (?:automatic|. :=|variable set hash-table stats:|Load=)/;
 const GoalFlagsRe = /^# (.*):$/;
-const GoalRe = /^(.*):/;
+const GoalRe = /^(.*): ?(.*)$/;
 const AutomakePrimaryRe = /^(?:all|check|distcheck|install)$/;
 const GNUMakeAuxiliaryRe = new RegExp('^\.(?:' +
     '(PHONY|SUFFIXES|PRECIOUS|NOEXPORT|MAKE)' +
@@ -405,6 +405,7 @@ export class Goal implements Parser {
         /* Flags gathered from automake (recipe hints like $(LINK) */
         Linked_binary: 256,
         Static_library: 512,
+        Test_Suite: 1024,
     };
     static makeArgs(): string[] { return [
         // Nothing. The goals are output when the Database is output
@@ -473,6 +474,10 @@ export class Goal implements Parser {
                 else if (AutomakeNoiseRe.test(goal[1]))
                     this.flags |= Goal.Flags.Automake_noise;
                 this.goal = goal[1];
+                if (this.goal == "test-suite.log") {
+                    this.flags |= Goal.Flags.Test_Suite;
+                    this.depends = goal[2].split(' ');
+                }
                 return [ParserDisp.Continue, this];
             }
         }
@@ -483,6 +488,7 @@ export class Goal implements Parser {
     }
     goal: string | undefined = undefined;
     flags: number = Goal.Flags.None;
+    depends: string[] | undefined = undefined;
 }
 
 const LinkerRe = /\$\(LINK\)\s/;

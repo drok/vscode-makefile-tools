@@ -401,6 +401,26 @@
                         "description": "%autotools.taskDefinitions.label.description%",
                         "default": "Build it with autotools"
                     },
+                    "task": {
+                        "type": "string",
+                        "description": "%autotools.taskDefinitions.task.description%",
+                        "default": "build",
+                        "examples": ["build", "test", "check"],
+                        "anyOf": [
+                            {
+                                "enum": ["build"],
+                                "description": "%autotools.taskDefinitions.task.build.description%"
+                            },
+                            {
+                                "enum": ["test"],
+                                "description": "%autotools.taskDefinitions.task.test.description%"
+                            },
+                            {
+                                "enum": ["check"],
+                                "description": "%autotools.taskDefinitions.task.check.description%"
+                            }
+                        ]
+                    },
                     "target": {
                         "description": "%autotools.taskDefinitions.target.description%",
                         "properties": {
@@ -413,7 +433,7 @@
                                 "type": "string",
                                 "description": "%autotools.taskDefinitions.target.goal.description%",
                                 "default": "${command:autotools.goal}",
-                                "examples": ["all", "check", "myprogram.exe"]
+                                "examples": ["all", "myprogram.exe", "library.a"]
                             }
                         }
                     }

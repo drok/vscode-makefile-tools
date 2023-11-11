@@ -42,8 +42,15 @@
    "autotools.configuration.makefile.compileCommandsPath.description": "The path to the compilation database file",
    "autotools.configuration.makefile.panel.visibility.debug.description": "Enable debugging locally (in this host) images built by this extension",
    "autotools.configuration.makefile.panel.visibility.run.description": "Enable running locally (in this host) images built by this extension",
+   "autotools.taskDefinitions.task.description": "What will this task do (build or test)",
+   "autotools.taskDefinitions.task.build.description": "Task builds a make target (program, library, etc)",
+   "autotools.taskDefinitions.task.test.description": "Task runs one test, named in the 'target' member",
+   "autotools.taskDefinitions.task.check.description": "Task runs the test suite, ie 'make check'",
    "autotools.taskDefinitions.target.builddir.description": "Directory where make will be run",
    "autotools.taskDefinitions.target.goal.description": "Name of the goal as defined in the Makefile (eg, all, check, myprogram.exe, mylib.a, etc)",
    "autotools.taskDefinitions.target.description": "Definition of the target to be built",
+   "autotools.taskDefinitions.test.builddir.description": "Directory where the test or suite will be run",
+   "autotools.taskDefinitions.test.goal.description": "Name of the test log file to be refreshed (basename is test name's basename), or 'check'",
+   "autotools.taskDefinitions.test.description": "Definition of the test or suite to be run",
    "autotools.taskDefinitions.label.description": "Description of this task, visible in the command pallete"
 }
