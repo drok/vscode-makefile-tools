@@ -73,11 +73,6 @@
                 "icon": "$(notebook-edit)"
             },
             {
-                "command": "autotools.outline.openMakePathSetting",
-                "title": "%autotools.command.makefile.openMakePathSetting.title%",
-                "icon": "$(notebook-edit)"
-            },
-            {
                 "command": "autotools.outline.configure",
                 "title": "%autotools.command.makefile.configure.title%",
                 "icon": "$(settings)"
