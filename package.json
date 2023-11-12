@@ -342,50 +342,119 @@
         },
         "taskDefinitions": [
             {
-                "type": "autotools",
+                "type": "build",
                 "when": "processExecutionSupported && autotools.makefileFilePresent",
-                "required": ["label", "target"],
+                "required": ["label", "task", "target"],
                 "properties": {
                     "label": {
                         "type": "string",
                         "description": "%autotools.taskDefinitions.label.description%",
-                        "default": "Build it with autotools"
+                        "examples": ["Build myprogram", "Build mylib", "Build Tarball", "Build docs"]
                     },
                     "task": {
-                        "type": "string",
+                        "enum": ["build"],
                         "description": "%autotools.taskDefinitions.task.description%",
-                        "default": "build",
-                        "examples": ["build", "test", "check"],
-                        "anyOf": [
-                            {
-                                "enum": ["build"],
-                                "description": "%autotools.taskDefinitions.task.build.description%"
-                            },
-                            {
-                                "enum": ["test"],
-                                "description": "%autotools.taskDefinitions.task.test.description%"
-                            },
-                            {
-                                "enum": ["check"],
-                                "description": "%autotools.taskDefinitions.task.check.description%"
-                            }
-                        ]
+                        "default": "build"
                     },
                     "target": {
                         "description": "%autotools.taskDefinitions.target.description%",
+                        "not": true,
+                        "required": ["builddir", "goal"],
+                        "if" : { "task": "build" },
                         "properties": {
                             "builddir": {
                                 "type": "string",
                                 "description": "%autotools.taskDefinitions.target.builddir.description%",
-                                "default": "${command:autotools.builddir}"
+                                "examples": ["src", "src/lib", "lib"]
                             },
                             "goal": {
                                 "type": "string",
                                 "description": "%autotools.taskDefinitions.target.goal.description%",
-                                "default": "${command:autotools.goal}",
                                 "examples": ["all", "myprogram.exe", "library.a"]
                             }
                         }
+                    }
+                }
+            },
+            {
+                "type": "test",
+                "when": "processExecutionSupported && autotools.makefileFilePresent",
+                "required": ["label", "task", "test"],
+                "properties": {
+                    "label": {
+                        "type": "string",
+                        "description": "%autotools.taskDefinitions.label.description%",
+                        "default": "Run test example"
+                    },
+                    "task": {
+                        "enum": ["test"],
+                        "description": "%autotools.taskDefinitions.task.description%"
+                    },
+                    "test": {
+                        "description": "%autotools.taskDefinitions.test.description%",
+                        "if" : { "task": "test" },
+                        "properties": {
+                            "builddir": {
+                                "type": "string",
+                                "description": "%autotools.taskDefinitions.test.builddir.description%",
+                                "examples": ["test/unit-tests", "test/integration-tests"]
+                            },
+                            "goal": {
+                                "type": "string",
+                                "description": "%autotools.taskDefinitions.test.goal.description%",
+                                "examples": ["unit-tests.log", "integration-tests.log"]
+                            }
+                        }
+                    }
+                }
+            },
+            {
+                "type": "check",
+                "when": "processExecutionSupported && autotools.makefileFilePresent",
+                "required": ["label", "task"],
+                "properties": {
+                    "label": {
+                        "type": "string",
+                        "description": "%autotools.taskDefinitions.label.description%",
+                        "default": "Run test-suite 'check'"
+                    },
+                    "task": {
+                        "enum": ["check"],
+                        "description": "%autotools.taskDefinitions.task.description%"
+                    },
+                    "check": {
+                        "description": "%autotools.taskDefinitions.check.description%",
+                        "properties": {
+                            "builddir": {
+                                "type": "string",
+                                "description": "%autotools.taskDefinitions.check.builddir.description%",
+                                "examples": ["test/unit-tests", "test/integration-tests"]
+                            },
+                            "TESTS": {
+                                "type": "array",
+                                "description": "%autotools.taskDefinitions.check.tests.markdownDescription%"
+                            },
+                            "TEST_SUITE_LOG": {
+                                "type": "string",
+                                "description": "%autotools.taskDefinitions.check.log.markdownDescription%"
+                            }
+                        }
+                    }
+                }
+            },
+            {
+                "type": "bootstrap",
+                "when": "processExecutionSupported && autotools.makefileFilePresent",
+                "required": ["label", "task"],
+                "properties": {
+                    "label": {
+                        "type": "string",
+                        "description": "%autotools.taskDefinitions.label.description%",
+                        "default": "Bootstrap autotools"
+                    },
+                    "task": {
+                        "enum": ["bootstrap"],
+                        "description": "%autotools.taskDefinitions.task.description%"
                     }
                 }
             }

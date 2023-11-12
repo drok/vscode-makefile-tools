@@ -9,14 +9,21 @@ import { Task, TaskDefinition, TaskScope, TaskGroup, TaskProvider, ProcessExecut
 import { Goal } from './parser/gnumake';
 import { error } from 'console';
 import * as configuration from './configuration';
-import { BuildTarget, t_all } from './make';
+import { BuildTarget, t_all, t_none } from './make';
+import { resolvePathToRoot, checkFileExistsSync } from './util';
+import * as vscode from 'vscode';
 
 import * as nls from 'vscode-nls';
+import { Script } from 'vm';
+import { extension } from './extension';
 nls.config({ messageFormat: nls.MessageFormat.bundle, bundleFormat: nls.BundleFormat.standalone })();
 const localize: nls.LocalizeFunc = nls.loadMessageBundle();
 
 export class AutoToolsTaskProvider implements TaskProvider {
-	static myType = 'autotools';
+	static buildType = 'build';
+	static testType = 'test';
+	static checkType = 'check';
+	static bootstrapType = 'bootstrap';
 	private myPromise: Thenable<Task[]> | undefined = undefined;
     public bootstrapTask?: vscode.Task;
 
@@ -44,9 +51,13 @@ export class AutoToolsTaskProvider implements TaskProvider {
 
 	public resolveTask(_task: Task): Task | undefined {
 		const task = _task.definition.task;
-		if (task == "build") {
+        if (!task) {
+            return undefined;
+        }
+        switch (task) {
+		case "build": {
 			// resolveTask requires that the same definition object be used.
-			const definition: BuildTask = <any>_task.definition;
+            const definition: BuildTask = <any>_task.definition;
 			return new Task(definition, _task.scope ?? TaskScope.Workspace, definition.target.goal,
                 AutoToolsTaskProvider.myType,
                 new ProcessExecution(
@@ -54,8 +65,9 @@ export class AutoToolsTaskProvider implements TaskProvider {
                     (definition.target.builddir ? ['-C', definition.target.builddir] : [])
                     .concat(configuration.getConfigurationMakeArgs())
                     .concat(definition.target.goal)));
-        }
-		if (task == "test") {
+            }
+            break;
+		case "test": {
 			// resolveTask requires that the same definition object be used.
 			const definition: TestTask = <any>_task.definition;
 			return new Task(definition, _task.scope ?? TaskScope.Workspace, definition.test.goal,
@@ -70,7 +82,11 @@ export class AutoToolsTaskProvider implements TaskProvider {
                     .concat("--always-make", "--assume-old=Makefile")
                     .concat(configuration.getConfigurationMakeArgs())
                     .concat(definition.target.goal)));
-        }
+            }
+            break;
+        case "bootstrap":
+            return this.bootstrapTask;
+    }
 
 		return undefined;
 	}
@@ -119,6 +135,15 @@ interface TestTask extends TaskDefinition {
      */
     test: BuildTarget;
 };
+
+interface BootstrapTask extends TaskDefinition {
+    /**
+     * The task name
+     */
+    task: string;
+};
+
+//     if (!checkFileExistsSync(resolvePathToRoot("configure"))) {
 
 async function getTasks(): Promise<Task[]> {
     var targets : Task[] = [];
