@@ -183,6 +183,12 @@
                     "default": "",
                     "scope": "resource"
                 },
+                "autotools.autoBootstrap": {
+                    "type": "boolean",
+                    "markdownDescription": "%autotools.configuration.autoBootstrap.markdownDescription%",
+                    "default": true,
+                    "scope": "resource"
+                },
                 "autotools.keepDryRuns": {
                     "type": "boolean",
                     "markdownDescription": "%autotools.configuration.makefile.keepDryRuns.markdownDescription%",

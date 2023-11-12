@@ -1,4 +1,5 @@
 {
+   "autotools.command.bootstrap.title": "Autotools: Bootstrap",
    "autotools.command.makefile.buildAll.title": "Autotools: Build the target ALL",
    "autotools.command.makefile.setBuildConfiguration.title": "Autotools: Set the current build configuration",
    "autotools.command.makefile.setBuildTarget.title": "Autotools: Set the target to be built by make",

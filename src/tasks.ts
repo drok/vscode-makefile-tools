@@ -18,7 +18,22 @@ const localize: nls.LocalizeFunc = nls.loadMessageBundle();
 export class AutoToolsTaskProvider implements TaskProvider {
 	static myType = 'autotools';
 	private myPromise: Thenable<Task[]> | undefined = undefined;
+    public bootstrapTask?: vscode.Task;
 
+    constructor() {
+        let b = this.bootstrap_cmd();
+        if (b) {
+            const kind: BootstrapTask = {
+                type: AutoToolsTaskProvider.bootstrapType,
+                task: "bootstrap"
+            };
+            this.bootstrapTask = new Task(kind, TaskScope.Workspace, "Bootstrap autotools",
+                localize("autotools.bootstrap.task", "Bootstrap"),
+                new ProcessExecution(b[0], b.slice(1)));
+            this.bootstrapTask.group = TaskGroup.Build;
+            this.bootstrapTask.detail = localize("automake.bootstrap", "$(tools) Bootstrap project using '" + b.join(' ') + "'");
+        }
+    }
 	public provideTasks(): Thenable<Task[]> | undefined {
 		return this.myPromise;
 	}
@@ -59,6 +74,26 @@ export class AutoToolsTaskProvider implements TaskProvider {
 
 		return undefined;
 	}
+    private bootstrap_cmd(): string[] | undefined {
+        if (!checkFileExistsSync(resolvePathToRoot("configure.ac")) && !checkFileExistsSync(resolvePathToRoot("configure.in"))) {
+            return undefined;
+        } else {
+            let script = resolvePathToRoot("bootstrap");
+            if (checkFileExistsSync(script))
+                return [script];
+
+            script = resolvePathToRoot("autogen.sh");
+            if (checkFileExistsSync(script))
+                return [script];
+        }
+        return ["autoreconf", "-fvi"];
+    }
+
+    public async bootstrap(): Promise<void> {
+        if (this.bootstrapTask) {
+            vscode.tasks.executeTask(this.bootstrapTask);
+        }
+    }
 }
 
 interface BuildTask extends TaskDefinition {
@@ -156,5 +191,8 @@ async function getTasks(): Promise<Task[]> {
                     targets.push(task);
                 }
             })});
+    if (extension.taskProvider.bootstrapTask) {
+        targets.push(extension.taskProvider.bootstrapTask);
+    }
     return targets;
 }

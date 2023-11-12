@@ -291,6 +291,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         await openSettings("autotools.makefilePath");
     }));
 
+    context.subscriptions.push(vscode.commands.registerCommand('autotools.command.bootstrap', async () => {
+        await extension.taskProvider.bootstrap();
+    }));
+
     vscode.tasks.registerTaskProvider(AutoToolsTaskProvider.myType, extension.taskProvider);
 
     if (configuration.getConfigureOnOpen() && extension.getFullFeatureSet()) {
