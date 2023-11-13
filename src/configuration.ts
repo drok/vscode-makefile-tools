@@ -684,9 +684,6 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
                 updatedSettingsSubkeys.push(subKey);
             }
 
-                updatedSettingsSubkeys.push(subKey);
-            }
-
             subKey = "ignoreDirectoryCommands";
             let updatedIgnoreDirectoryCommands : boolean | undefined = await util.getExpandedSetting<boolean>(subKey);
             if (updatedIgnoreDirectoryCommands !== ignoreDirectoryCommands) {
