@@ -523,14 +523,6 @@ export async function getCurrentTarget(): Promise<make.BuildTarget> {
     return Promise.reject("Testing - no current build target");
 }
 
-let configureOnOpen: boolean | undefined;
-export function getConfigureOnOpen(): boolean | undefined { return configureOnOpen; }
-export function setConfigureOnOpen(configure: boolean): void { configureOnOpen = configure; }
-export async function readConfigureOnOpen(): Promise<void> {
-    configureOnOpen = await util.getExpandedSetting<boolean>("configureOnOpen");
-    logger.message(`Configure on open: ${configureOnOpen}`);
-}
-
 let configureOnEdit: boolean | undefined;
 export function getConfigureOnEdit(): boolean | undefined { return configureOnEdit; }
 export function setConfigureOnEdit(configure: boolean): void { configureOnEdit = configure; }
@@ -588,7 +580,6 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
     await readkeepDryRuns();
     await readkeepConfigurationCache();
     await readMakefileConfigurations(currentMakefileConfigurationName);
-    await readConfigureOnOpen();
     await readConfigureOnEdit();
     await readIgnoreDirectoryCommands();
 
@@ -747,13 +738,6 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
                 updatedSettingsSubkeys.push(subKey);
             }
 
-            subKey = "configureOnOpen";
-            let updatedConfigureOnOpen : boolean | undefined = await util.getExpandedSetting<boolean>(subKey);
-            if (updatedConfigureOnOpen !== configureOnOpen) {
-                await readConfigureOnOpen();
-                updatedSettingsSubkeys.push(subKey);
-            }
-
             subKey = "configureOnEdit";
             let updatedConfigureOnEdit : boolean | undefined = await util.getExpandedSetting<boolean>(subKey);
             if (updatedConfigureOnEdit !== configureOnEdit) {
@@ -870,7 +854,7 @@ export async function setNewConfiguration(): Promise<void> {
 
         if (configureAfterCommand) {
             logger.message("Automatically reconfiguring the project after a makefile configuration change.");
-            await make.cleanConfigure(make.TriggeredBy.configureAfterConfigurationChange);
+            await make.configure(make.TriggeredBy.configureAfterConfigurationChange);
         }
 
         // Refresh telemetry for this new makefile configuration

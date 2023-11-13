@@ -31,8 +31,6 @@
    "autotools.configuration.makefile.keepConfigurationCache.markdownDescription": "Keep the Intellisense configuration parsed from the makefile as `${makeDirectory}/.vscode/${currentTarget}.cache`.\n\n If this file exists when starting vscode, it will be loaded before dry-running. This can be used to **speed up** Intellisense initialization in very large projects where dry-running is slow.",
    "autotools.configuration.makefile.additionalCompilerNames.description": "Names of compiler tools to be added to the extension known list",
    "autotools.configuration.makefile.excludeCompilerNames.description": "Names of compiler tools to be excluded from the extension known list",
-   "autotools.configuration.makefile.configureOnOpen.description": "Automatically configure Makefile project directories when they are opened",
-   "autotools.configuration.makefile.configureOnEdit.description": "Automatically configure Makefile project directories when any relevant makefiles and/or settings are changed",
    "autotools.configuration.makefile.configureAfterCommand.description": "Automatically configure Makefile project directories after relevant operations, like change build configuration or makefile target",
    "autotools.configuration.makefile.ignoreDirectoryCommands.description": "Don't analyze directory changing commands like cd, push, pop.",
    "autotools.configuration.makefile.compileCommandsPath.description": "The path to the compilation database file",
