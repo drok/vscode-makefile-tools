@@ -69,6 +69,21 @@ export class MakefileToolsExtension {
         // FIXME: Implement Disposable
         this.tasks.forEach((provider) => vscode.tasks.registerTaskProvider(provider.myType, provider));
 
+        if (!this.bootstrapTask.isBootstrapped()) {
+            let cmd = this.bootstrapTask.bootstrap_cmd();
+            if (cmd) {
+                const doit: string = localize("autotools.bootstrap.me", "Bootstrap");
+                vscode.window.showErrorMessage(
+                    localize("autotools.want.bootstrap", "The project needs to be bootstrapped ('{0}').", cmd.join(' ')),
+                    doit,
+                    localize("autotools.cancel", "Cancel")).then((value) => {
+                    if (value === doit) {
+                        this.bootstrapTask.bootstrap();
+                    }
+                });
+            }
+        }
+
         // FIXME: This is a workaround for vscode not parsing tasks.json prior to fetchTasks()
         const kind:BuildTask = {
             type: "build",

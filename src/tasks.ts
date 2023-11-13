@@ -265,7 +265,7 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
             new ProcessExecution(b[0], b.slice(1)));
 	}
 
-    private bootstrap_cmd(): string[] | undefined {
+    public bootstrap_cmd(): string[] | undefined {
         if (!checkFileExistsSync(resolvePathToRoot("configure.ac")) && !checkFileExistsSync(resolvePathToRoot("configure.in"))) {
             return undefined;
         } else {
@@ -278,6 +278,9 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
                 return [script];
         }
         return ["autoreconf", "-fvi"];
+    }
+    public isBootstrapped(): boolean {
+        return checkFileExistsSync(resolvePathToRoot("configure"));
     }
     update(): void {}
 
