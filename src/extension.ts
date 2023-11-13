@@ -322,18 +322,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         return 'autotools: build \'' + built.goal + '\' in ' + built.builddir;
     }));
 
-    context.subscriptions.push(vscode.commands.registerCommand('autotools.makeBaseDirectory', () => {
-        telemetry.logEvent("makeBaseDirectory");
-        return configuration.makeBaseDirectory();
+    context.subscriptions.push(vscode.commands.registerCommand('autotools.buildAll', async () => {
+        extension.build(make.t_all);
     }));
     /** End of commands that shouldn't be exposed in package.json, they are used for command substitution in launch.json and tasks.json. */
 
     context.subscriptions.push(vscode.commands.registerCommand('autotools.configure', async () => {
         await make.configure(make.TriggeredBy.configure);
-    }));
-
-    context.subscriptions.push(vscode.commands.registerCommand('autotools.cleanConfigure', async () => {
-        await make.cleanConfigure(make.TriggeredBy.cleanConfigure);
     }));
 
     // Reset state - useful for troubleshooting.
@@ -376,10 +371,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
     extension.registerTasks();
 
-    if (configuration.getConfigureOnOpen() && extension.getFullFeatureSet()) {
-        // Always clean configure on open
-        await make.cleanConfigure(make.TriggeredBy.cleanConfigureOnOpen);
-    }
+    await make.configure(make.TriggeredBy.cleanConfigure);
 
     // Analyze settings for type validation and telemetry
     let workspaceConfiguration: vscode.WorkspaceConfiguration = vscode.workspace.getConfiguration("autotools");

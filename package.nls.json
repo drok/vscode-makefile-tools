@@ -8,7 +8,6 @@
    "autotools.command.editMakefileAm.title": "Edit Makefile.am",
    "workbench.action.openWorkspaceSettings.title": "Preferences: Open Workspace Settings",
    "autotools.command.makefile.configure.title": "Autotools: Configure",
-   "autotools.command.makefile.cleanConfigure.title": "Autotools: Clean Configure",
    "autotools.command.makefile.resetState.title": "Autotools: Reset the Makefile Tools Extension workspace state (For troubleshooting)",
    "autotools.configuration.views.makefile.outline.description": "Project Outline",
    "autotools.configuration.makefile.makePath.description": "The path to the make tool",

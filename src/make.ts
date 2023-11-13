@@ -806,20 +806,3 @@ export async function doConfigure(progress: vscode.Progress<{}>, cancel: vscode.
     extension.getState().configureDirty = false;
     return subphaseStats;
 }
-
-// A clean configure = a non clean configure + empty the CppTools custom IntelliSense config provider.
-// In the case of a dry-run setting (not a build log) it also means adding --always-make to the make invocation.
-// Because we want to first read any existing cache and let the remaining heavy processing run in the background,
-// we don't delete the cache here. We just mark it to be later deleted by the non clean configure.
-export async function cleanConfigure(triggeredBy: TriggeredBy, updateTargets: boolean = true): Promise<number> {
-    // Even if the core configure process also checks for blocking operations,
-    // verify the same here as well, to make sure that we don't delete the caches
-    // only to return early from the core configure.
-    if (blockedByOp(Operations.configure)) {
-        return ConfigureBuildReturnCodeTypes.blocked;
-    }
-
-    setConfigureIsClean(true);
-
-    return configure(triggeredBy, updateTargets);
-}

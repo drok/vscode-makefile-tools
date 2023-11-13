@@ -82,10 +82,6 @@ suite('Fake dryrun parsing', /*async*/() => {
       configuration.prepareConfigurationsQuickPick();
       await configuration.setConfigurationByName("complex_escaped_quotes");
 
-      // No need to setting and building a target, running a launch target, ...etc... like the other tests
-      // Compare log output only from a configure to see how we parse the quotes and escape characters in compiler command lines.
-      let retc: number = await make.cleanConfigure(make.TriggeredBy.tests, true);
-
       // Compare the output log with the baseline
       // TODO: incorporate relevant diff snippets into the test log.
       // Until then, print into base and diff files for easier viewing
@@ -129,10 +125,6 @@ suite('Fake dryrun parsing', /*async*/() => {
          configuration.prepareConfigurationsQuickPick();
          await configuration.setConfigurationByName("complex_escaped_quotes_winOnly");
 
-         // No need to setting and building a target, running a launch target, ...etc... like the other tests
-         // Compare log output only from a configure to see how we parse the quotes and escape characters in compiler command lines.
-         let retc: number = await make.cleanConfigure(make.TriggeredBy.tests, true);
-
          // Compare the output log with the baseline
          // TODO: incorporate relevant diff snippets into the test log.
          // Until then, print into base and diff files for easier viewing
@@ -170,7 +162,6 @@ suite('Fake dryrun parsing', /*async*/() => {
 
          configuration.prepareConfigurationsQuickPick();
          await configuration.setConfigurationByName("InterestingSmallMakefile_windows_configDebug");
-         const retc: number = await make.cleanConfigure(make.TriggeredBy.tests, true);
 
          // A bit more coverage, "RelSize" and "RelSpeed" are set up
          // to exercise different combinations of pre-created build log and/or make tools.
@@ -223,7 +214,6 @@ suite('Fake dryrun parsing', /*async*/() => {
 
          configuration.prepareConfigurationsQuickPick();
          await configuration.setConfigurationByName(process.platform === "linux" ? "8cc_linux" : "8cc_mingw");
-         const retc: number = await make.cleanConfigure(make.TriggeredBy.tests, true);
 
          let all: BuildTarget = make.t_all;
          // FIXME: Rework await configuration.setTargetByName(all);
@@ -263,7 +253,6 @@ suite('Fake dryrun parsing', /*async*/() => {
 
          configuration.prepareConfigurationsQuickPick();
          await configuration.setConfigurationByName(process.platform === "linux" ? "Fido_linux" : "Fido_mingw");
-         const retc: number = await make.cleanConfigure(make.TriggeredBy.tests, true);
 
          let foo_o: BuildTarget = new BuildTarget("", "bin/foo.o");
          // FIXME: rework await configuration.setTargetByName(foo_o);
@@ -303,7 +292,6 @@ suite('Fake dryrun parsing', /*async*/() => {
 
          configuration.prepareConfigurationsQuickPick();
          await configuration.setConfigurationByName(process.platform === "linux" ? "tinyvm_linux_pedantic" : "tinyvm_mingw_pedantic");
-         const retc: number = await make.cleanConfigure(make.TriggeredBy.tests, true);
 
          let tvmi: BuildTarget = new BuildTarget("", "tvmi");
          // FIXME: rework await configuration.setTargetByName(tvmi);
@@ -342,7 +330,6 @@ suite('Fake dryrun parsing', /*async*/() => {
       configuration.prepareConfigurationsQuickPick();
 
       await configuration.setConfigurationByName("test-make-f");
-      await make.cleanConfigure(make.TriggeredBy.tests);
 
 //    FIXME: invoke runTask to make the current target
 //      await configuration.setConfigurationByName("test-make-C");
