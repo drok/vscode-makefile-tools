@@ -79,8 +79,7 @@
               "source": "gcc",
               "owner": "autotools",
               "fileLocation": [
-                "autoDetect",
-                "${command:autotools.makeBaseDirectory}"
+                "autoDetect"
                ],
               "pattern": {
                 "regexp": "^(.*?):(\\d+):(\\d*):?\\s+(?:fatal\\s+)?(warning|error):\\s+(.*)$",
@@ -97,8 +96,7 @@
                "owner": "autotools",
                "base": "$msCompile",
                "fileLocation": [
-                 "autoDetect",
-                 "${command:autotools.makeBaseDirectory}"
+                 "autoDetect"
                ]
              }
           ],
@@ -118,9 +116,9 @@
                                 "type": "string",
                                 "description": "%autotools.configuration.makefile.configurations.name.description%"
                             },
-                            "makeDirectory": {
+                            "top_builddir": {
                               "type": "string",
-                              "description": "%autotools.configuration.makefile.configurations.makeDirectory.description%"
+                              "description": "%autotools.configurations.top_builddir.description%"
                             },
                             "makeArgs": {
                                 "type": "array",
@@ -157,11 +155,6 @@
                     "type": "string",
                     "default": "make",
                     "description": "%autotools.configuration.makefile.makePath.description%",
-                    "scope": "resource"
-                },
-                "autotools.makeDirectory": {
-                    "type": "string",
-                    "description": "%autotools.configuration.makefile.makeDirectory.description%",
                     "scope": "resource"
                 },
                 "autotools.extensionLog": {

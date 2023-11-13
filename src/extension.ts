@@ -300,17 +300,17 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         // goal_path can be absolute if the builddir in task.json is absolute
         // automatic tasks have a relative builddir
         if (cpptools_stat_bug) {
-            let builddir = configuration.getCurrentMakefileConfiguration().makeDirectory || '.';
+            let builddir = configuration.getCurrentMakefileConfiguration().top_builddir || '.';
             let abs_builddir =
                 path.isAbsolute(builddir) ? builddir :
-                util.resolvePathToRoot(configuration.getCurrentMakefileConfiguration().makeDirectory || "");
+                util.resolvePathToRoot(configuration.getCurrentMakefileConfiguration().top_builddir || "");
             return path.isAbsolute(goal_path) ?
                 goal_path :
                 path.join(abs_builddir, goal_path).normalize();
         }
         return path.isAbsolute(goal_path) ?
             goal_path :
-            path.join(configuration.getCurrentMakefileConfiguration().makeDirectory || '.', goal_path).normalize();
+            path.join(configuration.getCurrentMakefileConfiguration().top_builddir || '.', goal_path).normalize();
     }));
 
     // Return the name of the build task that would build the default_program. It is meant to be
@@ -327,17 +327,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             type: "build",
             target: make.t_all
         };
-        let top_builddir = configuration.getCurrentMakefileConfiguration().makeDirectory;
+        let top_builddir = configuration.getCurrentMakefileConfiguration().top_builddir;
         await vscode.tasks.executeTask(new vscode.Task(kind, vscode.TaskScope.Workspace, 'build all', 'autotools',
             new vscode.ProcessExecution(configuration.getMakePath(),
                 (top_builddir ? ['-C', top_builddir] : [])
                 .concat(make.t_all.goal)
             )));
-    }));
-
-    context.subscriptions.push(vscode.commands.registerCommand('autotools.makeBaseDirectory', () => {
-        telemetry.logEvent("makeBaseDirectory");
-        return configuration.makeBaseDirectory();
     }));
     /** End of commands that shouldn't be exposed in package.json, they are used for command substitution in launch.json and tasks.json. */
 

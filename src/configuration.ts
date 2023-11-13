@@ -40,7 +40,7 @@ export interface MakefileConfiguration {
     name: string;
 
     // a folder path (full or relative) containing the entrypoint makefile
-    makeDirectory?: string;
+    top_builddir?: string;
 
     // options used in the build invocation
     // don't use more than one argument in a string
@@ -71,7 +71,7 @@ export function getCurrentMakefileConfiguration(): MakefileConfiguration { retur
 export async function setCurrentMakefileConfiguration(configuration: string | undefined): Promise<void> {
     currentMakefileConfiguration = (configuration && getMakefileConfiguration(configuration)) || {
         name: "Default",
-        makeDirectory: (vscode.workspace.workspaceFolders ? vscode.workspace.workspaceFolders[0].name : ""),
+        top_builddir: (vscode.workspace.workspaceFolders ? vscode.workspace.workspaceFolders[0].name : ""),
         isDefault: true
     };
     statusBar.setConfiguration(currentMakefileConfiguration.name);
@@ -192,33 +192,6 @@ async function readMakePath(): Promise<void> {
     setMakePath(await util.getExpandedSetting<string>("makePath"));
 }
 
-// Command property accessible from launch.json:
-// the folder in which the current "make" invocation operates:
-// passed with -C (otherwise it is the workspace folder).
-// Note: -f does not change the current working directory. It only points to a makefile somewhere else.
-export function makeBaseDirectory(): string {
-    // In case more than one -C arguments are given to "make", it will chose the last one.
-    // getConfigurationMakeArgs will contain the final command we calculate for the "make" executable.
-    // We don't need to know here which -C gets pushed last (global makeDirectory,
-    // configuration local makeDirectory or one in makeArgs). Just reverse to easily get the last one.
-    const makeArgs: string[] = getConfigurationMakeArgs().concat().reverse();
-    let prevArg: string = "";
-    for (const arg of makeArgs) {
-       if (arg === "-C") {
-         return prevArg;
-       } else if (arg.startsWith("--directory")) {
-         const eqIdx: number = arg.indexOf("=");
-         return arg.substring(eqIdx + 1, arg.length);
-       }
-
-       // Since we reversed the "make" command line arguments, the path of a -C will be seen before the switch.
-       // Remember every previous argument to have it available in case we find the first -C.
-       prevArg = arg;
-    }
-
-    return util.getWorkspaceRoot();
-}
-
 let loggingLevel: string | undefined;
 export function getLoggingLevel(): string | undefined { return loggingLevel; }
 export function setLoggingLevel(logLevel: string): void { loggingLevel = logLevel; }
@@ -250,12 +223,12 @@ export async function readExtensionLog(): Promise<void> {
     }
 }
 
-// The configuration cache is stored in ${makeDirectory}/.vscode/all.cache
+// The configuration cache is stored in ${top_builddir}/.vscode/all.cache
 // Ie, each config is keyed to the configuration and target
 // TODO: The user should have the option to turn off the cache because it may become decoherent with the
 // workspace when the source is changed (eg, diff branch checked out) between vscode reloads.
 export function getConfigurationCachePath(): string {
-    let builddir = currentMakefileConfiguration.makeDirectory || util.getWorkspaceRoot();
+    let builddir = currentMakefileConfiguration.top_builddir || util.getWorkspaceRoot();
     if (!path.isAbsolute(builddir)) {
         builddir = util.resolvePathToRoot(builddir);
     }
@@ -265,7 +238,7 @@ export function getConfigurationCachePath(): string {
 }
 
 // Keep the dry-run output in the configuration directory?
-//   true : file will be saved as ${makeDirectory}/.vscode/all.dryrun.log
+//   true : file will be saved as ${top_builddir}/.vscode/all.dryrun.log
 //   false: file will be not be saved
 let keepDryRuns: boolean;
 export function getKeepDryRuns(): boolean { return keepDryRuns; }
@@ -274,7 +247,7 @@ export async function readkeepDryRuns() : Promise<void> {
 }
 
 // Keep the configurationCache in the configuration directory?
-//   true : file will be saved as ${makeDirectory}/.vscode/all.cache,
+//   true : file will be saved as ${top_builddir}/.vscode/all.cache,
 //          and loaded at next reload, before dry-running
 //   false: file will be not be saved
 let keepConfigurationCache: boolean;
@@ -316,41 +289,30 @@ function getMakefileConfiguration(configuration: string): MakefileConfiguration 
 }
 
 // Helper to find in the array of MakefileConfiguration which command/args correspond to a configuration name.
-// Higher level settings (like autotools.makePath, autotools.makeDirectory)
+// Higher level settings (like autotools.makePath, autotools.configurations.top_builddir)
 // also have an additional effect on the final command.
 export async function getCommandForConfiguration(): Promise<void> {
-    configurationMakeArgs = [];
-
-    // Add the working directory path via the -C switch.
-    // makefile.configurations.makeDirectory overwrites makefile.makeDirectory.
     // top_builddir is resolved to either a subdirectory of the workspace or an absolute path.
-    let makeDirectoryUsed: string = util.resolvePathToRoot(currentMakefileConfiguration.makeDirectory || "");
-//    if (makeDirectoryUsed) {
-//        // If out-of-tree, add -C argument
-//        configurationMakeArgs.push("-C");
-//        configurationMakeArgs.push(`${makeDirectoryUsed}`);
-//        configurationMakefile = makeDirectoryUsed;
-//    }
+    let abs_top_builddir: string = util.resolvePathToRoot(currentMakefileConfiguration.top_builddir || "");
 
-    // Add the makefile path via the -f make switch.
-    // The make file is in makeDirectory or in the workspace directory,
-    // and is named "Makefile" or "makefile".
+    // The make file is in top_builddir
+    // and is named "Makefile" or "makefile" or "GNUmakefile".
     let makeFileTest: string | undefined;
-    // filename of makefile relative to makeDirectory
+    // filename of makefile relative to top_builddir
     let relativeMakefile: string | undefined;
     let makefileExists : boolean = false;
     relativeMakefile = "GNUmakefile";
-    makeFileTest = path.join(makeDirectoryUsed, relativeMakefile);
-    makefileExists = util.checkFileExistsSync(util.resolvePathToRoot(makeFileTest));
+    makeFileTest = path.join(abs_top_builddir, relativeMakefile);
+    makefileExists = util.checkFileExistsSync(makeFileTest);
     if (!makefileExists) {
         relativeMakefile = "Makefile";
-        makeFileTest = path.join(makeDirectoryUsed, relativeMakefile);
-        makefileExists = util.checkFileExistsSync(util.resolvePathToRoot(makeFileTest));
+        makeFileTest = path.join(abs_top_builddir, relativeMakefile);
+        makefileExists = util.checkFileExistsSync(makeFileTest);
     }
     if (!makefileExists) {
         relativeMakefile = "makefile";
-        makeFileTest = path.join(makeDirectoryUsed, relativeMakefile);
-        makefileExists = util.checkFileExistsSync(util.resolvePathToRoot(makeFileTest));
+        makeFileTest = path.join(abs_top_builddir, relativeMakefile);
+        makefileExists = util.checkFileExistsSync(makeFileTest);
     }
 
     // if we found the makefile add it to command line to ensure make has the same understanding
@@ -395,8 +357,7 @@ export async function getCommandForConfiguration(): Promise<void> {
     if (!makefileExists) {
         logger.message("The makefile entry point was not found. " +
             "Make sure it exists at the location defined by " +
-            "autotools.makeDirectory, autotools.configurations[].makeDirectory" +
-            "or in the root of the workspace.");
+            "autotools.configurations[].top_builddir");
 
         // we may need more advanced ability to process settings
         // insight into different project structures
@@ -588,7 +549,7 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
     // Modifying any makefile should trigger an IntelliSense config provider update,
     // so make the dirty state true.
     // TODO: limit to makefiles relevant to this project, instead of any random makefile anywhere.
-    //       We can't listen only to the makefile pointed to by autotools.makefilePath or autotools.makeDirectory,
+    //       We can't listen only to the makefile pointed to autotools.configurations.top_builddir,
     //       because that is only the entry point and can refer to other relevant makefiles.
     // TODO: don't trigger an update for any dummy save, verify how the content changed.
     vscode.workspace.onDidSaveTextDocument(e => {

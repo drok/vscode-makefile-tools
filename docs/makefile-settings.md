@@ -13,4 +13,3 @@ Supported commands for substitution:
 |`makefile.getLaunchTargetArgsConcat`|A string describing the arguments of the current launch target concatenated in a single string and separated by space.|
 |`makefile.launchTargetPath`|The full path to the target executable, including the filename. If `makefile.buildBeforeLaunch` is true, invoking this substitution will also start a build.|
 |`makefile.launchTargetFileName`|The name of the target executable file without any path or extension information. If `makefile.buildBeforeLaunch` is true, invoking this substitution will also start a build.|
-|`makefile.makeBaseDirectory`|The folder where `make` will be starting from: passed with -C or otherwise the workspace folder.|

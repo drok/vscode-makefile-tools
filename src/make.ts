@@ -113,12 +113,14 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
 
     let startTime: number = Date.now();
 
+    let c = configuration.getCurrentMakefileConfiguration();
+
     // Continue with the make dryrun invocation
     let makeArgs: string[] = [];
 
     // FIXME: if current target = make.t_all, dir is empty, make will be done in proj dir
     // make directory and makefile. If a target is selected, only set the target dir
-    let dir = configuration.getCurrentMakefileConfiguration().makeDirectory;
+    let dir = c.top_builddir;
     if (dir) {
         makeArgs.push(...["-C", dir]);
     }
@@ -129,7 +131,7 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
     }
 
     // Include all the make arguments defined in autotools.configurations.makeArgs
-    makeArgs = makeArgs.concat(configuration.getConfigurationMakeArgs());
+    makeArgs = makeArgs.concat(c.makeArgs || []);
 
     makeArgs.push(t_all.goal);
 

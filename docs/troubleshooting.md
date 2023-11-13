@@ -68,7 +68,7 @@ If the repository needs any special commands before make is successful:
 
 If there is no Makefile in the root:
 
-- Point  **makefile.makefilePath** or makefile.configurations.makefilePath to your Makefile (if you use the "-f" make switch). If you prefer to use the switch "-C" you can point  **makefile.makeDirectory** or makefile.configurations.makeDirectory to the folder containing your makefile.
+- Point  **makefile.configurations.top_builddir** to your the top of the build tree.
 - Manually activate the extension by either reloading the window or running any Makefile Tools command (like Configure) from the Command Palette
 
 Launch targets missing:
