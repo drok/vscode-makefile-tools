@@ -84,14 +84,6 @@ If you see a squiggle at the beginning of a source file with the error message &
 - The same root cause may also manifest as headers and defines squiggles (instead of incompatible language modes) throughout a source file whose URL is not associated with any information sent to CppTools
 - Both symptoms are accompanied by the following message in the output channel: &quot;Configuration for file was not found. CppTools will set a default configuration.&quot;
 
-If your Build targets list is too long:
-
-- Use **makefile.phonyOnlyTargets** to filter out targets that the Makefile explicitly defines as Phony
-
-Watch out for tricky lines in dryrun/build logs that may cause crashes or infinite loops when the extension parses content:
-
-- many dashes in a row (---------------------) causes infinite recursion according to regexp101.com
-- LK repository dryrun has 6000 char lines and many such lines in a row, each of them is very slow (takes hours)
 - Tip: disable MAKECONFIGHEADER in make/macros.mk, to avoid the enormous echo commands from being printed
   - This can be done under a make flag that can be tied to makefile.configurations.makeArgs to only avoid the echos when in dryrun mode
 

@@ -6,8 +6,6 @@
     "makefile.makePath": "c:/some/other/fake/path",
     "makefile.buildBeforeLaunch": false,
     "makefile.loggingLevel": "Debug",
-    "makefile.additionalCompilerNames": ["MyOwnFakeCompiler"],
-    "makefile.compileCommandsPath": "./.vscode/compile_commands.json",
     "makefile.panel.visibility": {
       "debug": true
     },

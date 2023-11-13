@@ -264,38 +264,6 @@ export function getConfigurationCachePath(): string {
     return cachePath;
 }
 
-let compileCommandsPath: string | undefined;
-export function getCompileCommandsPath(): string | undefined { return compileCommandsPath; }
-export function setCompileCommandsPath(path: string): void { compileCommandsPath = path; }
-export async function readCompileCommandsPath(): Promise<void> {
-    compileCommandsPath = await util.getExpandedSetting<string>("compileCommandsPath");
-    if (compileCommandsPath) {
-        compileCommandsPath = util.resolvePathToRoot(compileCommandsPath);
-    }
-
-    logger.message(`compile_commands.json path: ${compileCommandsPath}`);
-}
-
-let additionalCompilerNames: string[] | undefined;
-export function getAdditionalCompilerNames(): string[] | undefined { return additionalCompilerNames; }
-export function setAdditionalCompilerNames(compilerNames: string[]): void { additionalCompilerNames = compilerNames; }
-export async function readAdditionalCompilerNames(): Promise<void> {
-    additionalCompilerNames = await util.getExpandedSetting<string[]>("additionalCompilerNames");
-    if (additionalCompilerNames && additionalCompilerNames.length > 0) {
-        logger.message(`Additional compiler names: '${additionalCompilerNames?.join("', '")}'`);
-    }
-}
-
-let excludeCompilerNames: string[] | undefined;
-export function getExcludeCompilerNames(): string[] | undefined { return excludeCompilerNames; }
-export function setExcludeCompilerNames(compilerNames: string[]): void { excludeCompilerNames = compilerNames; }
-export async function readExcludeCompilerNames(): Promise<void> {
-    excludeCompilerNames = await util.getExpandedSetting<string[]>("excludeCompilerNames");
-    if (excludeCompilerNames && excludeCompilerNames.length > 0) {
-        logger.message(`Exclude compiler names: '${excludeCompilerNames?.join("', '")}'`);
-    }
-}
-
 // Keep the dry-run output in the configuration directory?
 //   true : file will be saved as ${makeDirectory}/.vscode/all.dryrun.log
 //   false: file will be not be saved
@@ -615,13 +583,10 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
     await readMakePath();
     await readkeepDryRuns();
     await readkeepConfigurationCache();
-    await readAdditionalCompilerNames();
-    await readExcludeCompilerNames();
     await readMakefileConfigurations(currentMakefileConfigurationName);
     await readConfigureOnOpen();
     await readConfigureOnEdit();
     await readIgnoreDirectoryCommands();
-    await readCompileCommandsPath();
 
     initOptionalFeatures();
     await readFeaturesVisibility();
@@ -796,16 +761,6 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
             let updatedIgnoreDirectoryCommands : boolean | undefined = await util.getExpandedSetting<boolean>(subKey);
             if (updatedIgnoreDirectoryCommands !== ignoreDirectoryCommands) {
                 await readIgnoreDirectoryCommands();
-                updatedSettingsSubkeys.push(subKey);
-            }
-
-            subKey = "compileCommandsPath";
-            let updatedCompileCommandsPath: string | undefined = await util.getExpandedSetting<string>(subKey);
-            if (updatedCompileCommandsPath) {
-                updatedCompileCommandsPath = util.resolvePathToRoot(updatedCompileCommandsPath);
-            }
-            if (updatedCompileCommandsPath !== compileCommandsPath) {
-                await readCompileCommandsPath();
                 updatedSettingsSubkeys.push(subKey);
             }
 

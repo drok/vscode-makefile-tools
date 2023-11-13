@@ -196,24 +196,6 @@
                     "default": false,
                     "scope": "resource"
                 },
-                "autotools.additionalCompilerNames": {
-                    "type": "array",
-                    "default": [],
-                    "description": "%autotools.configuration.makefile.additionalCompilerNames.description%",
-                    "items": {
-                        "type": "string"
-                    },
-                    "scope": "resource"
-                },
-                "autotools.excludeCompilerNames": {
-                    "type": "array",
-                    "default": [],
-                    "description": "%autotools.configuration.makefile.excludeCompilerNames.description%",
-                    "items": {
-                        "type": "string"
-                    },
-                    "scope": "resource"
-                },
                 "autotools.configureOnOpen": {
                     "type": "boolean",
                     "default": true,

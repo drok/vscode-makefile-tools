@@ -92,6 +92,7 @@ export class Making implements Parser {
 
         // Parse and log the includes, forced includes and the defines
         let includes = compilerTool.filterArgs('I');
+        // FIXME: cpptools bug: cannot handle relative paths
         includes = await util.makeFullPaths(includes, currentPath);
         let forcedIncludes = compilerTool.filterArgs('FI');
         forcedIncludes = forcedIncludes.concat(compilerTool.filterArgs('include'));
