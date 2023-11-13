@@ -258,10 +258,35 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         return (await configuration.getCurrentTarget()).builddir;
     }));
 
+    // Return the relative path to the default build task's target
+    // or the first Linked_binary target detected.
+    // Due to bug in cpptools, this temporarily returns an absolute path (always), but
+    // this will eventually be fixed. Don't rely on abs paths.
     context.subscriptions.push(vscode.commands.registerCommand('autotools.default_program', async () => {
         telemetry.logEvent("default_program");
         let built = await configuration.getCurrentTarget();
-        return path.join(built.builddir ?? ".", built.goal);
+        // cpptools has a bug where if the "program" member of a launch debug configuration
+        // is a relative path, it checks in the wrong directory and fails to find it.
+        // Work around this by using the absolute path of the builddir until bug is fixed
+        // I want to use relative path to avoid accessing parent dirs (which may be EACCESS)
+        // but currently a lot of vscode would break if parent dirs to to user's home
+        // were EACCESS.
+        let cpptools_stat_bug = true;
+        let goal_path = path.join(built.builddir ?? '.', built.goal);
+        // goal_path can be absolute if the builddir in task.json is absolute
+        // automatic tasks have a relative builddir
+        if (cpptools_stat_bug) {
+            let builddir = configuration.getCurrentMakefileConfiguration().makeDirectory || '.';
+            let abs_builddir =
+                path.isAbsolute(builddir) ? builddir :
+                util.resolvePathToRoot(configuration.getCurrentMakefileConfiguration().makeDirectory || "");
+            return path.isAbsolute(goal_path) ?
+                goal_path :
+                path.join(abs_builddir, goal_path).normalize();
+        }
+        return path.isAbsolute(goal_path) ?
+            goal_path :
+            path.join(configuration.getCurrentMakefileConfiguration().makeDirectory || '.', goal_path).normalize();
     }));
 
     context.subscriptions.push(vscode.commands.registerCommand('autotools.makeBaseDirectory', () => {

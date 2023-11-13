@@ -29,6 +29,7 @@ export class AutoToolsBuildTaskProvider implements MyTaskProvider {
 
     public update() {
         var targets: Task[] = [];
+        let top_builddir = configuration.getCurrentMakefileConfiguration().makeDirectory;
         configuration.getAllBuildTargets().forEach((goals, dir) => {
             goals
                 .filter((goal) => goal.flags & (
@@ -45,7 +46,8 @@ export class AutoToolsBuildTaskProvider implements MyTaskProvider {
                             "autotools",
                             new ProcessExecution(
                                 configuration.getMakePath(),
-                                (dir ? ['-C', dir] : [])
+                                (top_builddir ? ['-C', top_builddir] : [])
+                                .concat(dir ? ['-C', dir] : [])
                                 .concat(configuration.getConfigurationMakeArgs())
                                 .concat(g.goal)));
                         task.group = TaskGroup.Build;
@@ -87,11 +89,13 @@ export class AutoToolsBuildTaskProvider implements MyTaskProvider {
 
         // resolveTask requires that the same definition object be used.
         const definition: BuildTask = <any>_task.definition;
+        let top_builddir = configuration.getCurrentMakefileConfiguration().makeDirectory;
         return new Task(definition, _task.scope ?? TaskScope.Workspace, target.goal ?? t_all.goal,
             this.myType,
             new ProcessExecution(
                 configuration.getMakePath(),
-                (target.builddir ? ['-C', target.builddir] : [])
+                (top_builddir ? ['-C', top_builddir] : [])
+                .concat(target.builddir ? ['-C', target.builddir] : [])
                 .concat(configuration.getConfigurationMakeArgs())
                 .concat(target.goal ?? t_all.goal)));
 	}
@@ -108,6 +112,7 @@ export class AutoToolsTestTaskProvider implements MyTaskProvider {
 
     public update() {
         var targets: Task[] = [];
+        let top_builddir = configuration.getCurrentMakefileConfiguration().makeDirectory;
         configuration.getAllBuildTargets().forEach((goals, dir) => {
             goals
                 .filter((goal) => goal.flags & (
@@ -124,10 +129,11 @@ export class AutoToolsTestTaskProvider implements MyTaskProvider {
                             "autotools",
                             new ProcessExecution(
                                 configuration.getMakePath(),
-                                (dir ? ['-C', dir] : [])
                                 // Treat the goal (test.log) a phony so it will always be remade.
                                 .concat("--eval=.PHONY: " + d.goal)
                                 .concat(configuration.getCurrentMakefileConfiguration().makeArgs || [])
+                                (top_builddir ? ['-C', top_builddir] : [])
+                                .concat(dir ? ['-C', dir] : [])
                                 .concat(d)));
                             task.group = TaskGroup.Test;
                             task.detail = localize("automake.test", "$(check) Run test '" + path.basename(d, ".log") + "'");
@@ -146,16 +152,16 @@ export class AutoToolsTestTaskProvider implements MyTaskProvider {
 
         // resolveTask requires that the same definition object be used.
         const definition: TestTask = <any>_task.definition;
+        let top_builddir = configuration.getCurrentMakefileConfiguration().makeDirectory;
         return new Task(definition, _task.scope ?? TaskScope.Workspace, test.goal,
             this.myType,
             new ProcessExecution(
                 configuration.getMakePath(),
-                (test.builddir ? ['-C', test.builddir] : [])
-                // up-to-date test.log files might already exist, they need
-                // overwritten if the user runs the test again, hence
-                // --always-make, but Makefile must not be remade,
-                // because it means reconfiguration (infinite loop)
-                .concat("--always-make", "--assume-old=Makefile")
+                (top_builddir ? ['-C', top_builddir] : [])
+                .concat(test.builddir ? ['-C', test.builddir] : [])
+                // Treat the goal (test.log) a phony so it will always be remade.
+                // The Makefile will be refreshed only if necessary
+                .concat("--eval=.PHONY: " + test.goal)
                 .concat(configuration.getConfigurationMakeArgs())
                 .concat(test.goal)));
 	}
@@ -172,6 +178,7 @@ export class AutoToolsCheckTaskProvider implements MyTaskProvider {
     update() {
 
         var targets : Task[] = [];
+        let top_builddir = configuration.getCurrentMakefileConfiguration().makeDirectory;
         configuration.getAllBuildTargets().forEach((goals, dir) => {
             goals
             .filter((goal) => goal.flags & (
@@ -185,7 +192,8 @@ export class AutoToolsCheckTaskProvider implements MyTaskProvider {
                 "autotools",
                 new ProcessExecution(
                     configuration.getMakePath(),
-                    (dir ? ['-C', dir] : [])
+                    (top_builddir ? ['-C', top_builddir] : [])
+                    .concat(dir ? ['-C', dir] : [])
                     .concat(configuration.getConfigurationMakeArgs())
                     .concat("check")));
                 task.group = TaskGroup.Test;
@@ -202,16 +210,13 @@ export class AutoToolsCheckTaskProvider implements MyTaskProvider {
 
         // resolveTask requires that the same definition object be used.
         const definition: TestTask = <any>_task.definition;
+        let top_builddir = configuration.getCurrentMakefileConfiguration().makeDirectory;
         return new Task(definition, _task.scope ?? TaskScope.Workspace, "check",
             this.myType,
             new ProcessExecution(
                 configuration.getMakePath(),
-                (check.builddir ? ['-C', check.builddir] : [])
-                // up-to-date test.log files might already exist, they need
-                // overwritten if the user runs the test again, hence
-                // --always-make, but Makefile must not be remade,
-                // because it means reconfiguration (infinite loop)
-                .concat("--always-make", "--assume-old=Makefile")
+                (top_builddir ? ['-C', top_builddir] : [])
+                .concat(check.builddir ? ['-C', check.builddir] : [])
                 .concat(configuration.getConfigurationMakeArgs())
                 .concat(definition.target.goal)
                 .concat(check.TESTS ? 'TESTS=' +  check.TESTS.join(' ') : [])

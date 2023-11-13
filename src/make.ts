@@ -183,7 +183,8 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
         }
         let completeErr: string = "";
         let heartBeat: number = Date.now();
-        let parserStack: Parser[] = [new Make("")];
+        let abs_top_builddir = util.resolvePathToRoot(dir || "");
+        let parserStack: Parser[] = [new Make(abs_top_builddir, abs_top_builddir)];
         let linenumber: number = 0;
         let lineBuffer: string = "";
 

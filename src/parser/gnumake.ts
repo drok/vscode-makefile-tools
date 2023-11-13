@@ -11,6 +11,7 @@ import * as logger from '../logger';
 import * as make from '../make';
 import * as util from '../util';
 import * as vscode from 'vscode';
+import * as path from 'path';
 // import {CustomConfigProviderItem} from '../cpptools';
 import {Parser, ParserDisp, EmptyLine } from '../parser';
 import { Executing } from './shell';
@@ -110,9 +111,10 @@ const RecursingRE = /^Making (.*) in (.*)$/;
  * and Make to parse submake output.
  */
 export class Make implements Parser {
-    constructor(dir: string)
+    constructor(dir: string, root: string)
     {
-        this.dir = dir;
+        this.dir = path.relative(root, dir);
+        this.root = root;
         this.section = dir ? MakeSection.Making : MakeSection.Starting;
     }
     static makeArgs(): string[] { return [
@@ -169,7 +171,7 @@ export class Make implements Parser {
                 let entering = EnteringRE.exec(line);
                 if (entering) {
                     this.section = MakeSection.Making;
-                    return [ParserDisp.Enter, new Make(entering[1])];
+                    return [ParserDisp.Enter, new Make(entering[1], this.root)];
                 }
                 // this is for the 2nd and later script lines for a target
                 if (this.section == MakeSection.Making) {
@@ -243,9 +245,10 @@ export class Make implements Parser {
         return this.file;
     }
     public getDir(): string {
-        return this.dir;
+        return path.join(this.root, this.dir);
     }
     dir: string;
+    root: string;
     section: MakeSection;
     file: string | undefined;
     goals: Goal[] = [];
