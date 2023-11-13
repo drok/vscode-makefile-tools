@@ -256,10 +256,6 @@ export async function readkeepConfigurationCache() : Promise<void> {
     keepConfigurationCache = await util.getExpandedSetting<boolean>("keepConfigurationCache") || false;
 }
 
-let configurationMakeArgs: string[] = [];
-export function getConfigurationMakeArgs(): string[] { return configurationMakeArgs; }
-export function setConfigurationMakeArgs(args: string[]): void { configurationMakeArgs = args; }
-
 // The following (makefile, problem matchers, build log), same as command&args above
 // are deduced via a set of rules of defaults and overrides that we calculate only when necessary
 // and access the last result otherwise.
@@ -321,34 +317,13 @@ export async function getCommandForConfiguration(): Promise<void> {
     // make is GNU or not.
     if (makefileExists) {
         configurationMakefile = relativeMakefile;
-//        configurationMakeArgs.push("-f");
-//        configurationMakeArgs.push(`${relativeMakefile}`);
-        // Need to rethink this (GitHub 59).
-        // Some repos don't work when we automatically add -C, others don't work when we don't.
-        // configurationMakeArgs.push("-C");
-        // configurationMakeArgs.push(path.parse(configurationMakefile).dir);
-
-        // Make sure we append "autotools.configurations[].makeArgs" last, in case the developer wants to overwrite any arguments that the extension
-        // deduces from the settings. Additionally, for -f/-C, resolve path to root.
-        if (currentMakefileConfiguration.makeArgs) {
-            let prevArg: string = "";
-            currentMakefileConfiguration.makeArgs.forEach(arg => {
-            if (prevArg === "-C") {
-                configurationMakeArgs.push(util.resolvePathToRoot(arg));
-            } else if (arg.startsWith("--directory")) {
-                const eqIdx: number = arg.indexOf("=");
-                const folderStr: string = arg.substring(eqIdx + 1, arg.length);
-                configurationMakeArgs.push(`--directory=${util.resolvePathToRoot(folderStr)}`);
-            } else {
-                configurationMakeArgs.push(arg);
-            }
-            prevArg = arg;
-        });
-        }
-        logger.message(`Deduced command '${makePath} ${configurationMakeArgs.join(" ")}' for configuration "${currentMakefileConfiguration.name}"`);
-     } else {
+        if (currentMakefileConfiguration.makeArgs)
+            logger.message(`Deduced command '${makePath} ${currentMakefileConfiguration.makeArgs.join(" ")}' for configuration "${currentMakefileConfiguration.name}"`);
+        else
+            logger.message(`Deduced command '${makePath}' for configuration "${currentMakefileConfiguration.name}"`);
+    } else {
         logger.message(`A makefile was not found for configuration "${currentMakefileConfiguration.name}"`);
-     }
+    }
     // store the found makefile for display in the outline
     setConfigurationMakefile(makefileExists ? relativeMakefile : undefined);
     extension.updateMakefileFilePresent(makefileExists);
