@@ -301,13 +301,29 @@
                 },
                 "configurationSnippets": [
                     {
-                        "label": "Autotools: Launch the default build target under cppdbg",
-                        "description": "Debug default build target with cppdbg. Uses variables",
+                        "label": "Autotools: Launch the default build target",
+                        "descriptionMarkdown": "Uses ${command:autotools.default_program} to automatically detect the target. Useful for debugging multiple programs with the same args and env. `autotools:default_program_build_task` is the default build task if set and is a linked binary program, otherwise the first program detected by importing the Makefiles",
                         "body": {
                             "type": "cppdbg",
                             "request": "launch",
-                            "name": "${1:Launch current autotools build target}",
+                            "name": "${1:Launch the default build target}",
                             "program": "^\"\\${command:autotools.default_program}\"",
+                            "preLaunchTask": "^\"\\${command:autotools.default_program_build_task}\"",
+                            "cwd": "^\"\\${workspaceFolder}\"",
+                            "environment": [],
+                            "args": [],
+                            "stopAtEntry": false
+                        }
+                    },
+                    {
+                        "label": "Autotools: Launch a program",
+                        "description": "Hardcoded program path. Useful for debugging programs with different args or env",
+                        "body": {
+                            "type": "cppdbg",
+                            "request": "launch",
+                            "name": "${1:Launch myapp}",
+                            "program": "src/myapp",
+                            "preLaunchTask": "autotools: build 'myapp' in src",
                             "cwd": "^\"\\${workspaceFolder}\"",
                             "environment": [],
                             "args": [],

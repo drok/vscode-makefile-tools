@@ -289,6 +289,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             path.join(configuration.getCurrentMakefileConfiguration().makeDirectory || '.', goal_path).normalize();
     }));
 
+    // Return the name of the build task that would build the default_program. It is meant to be
+    // used in the preLaunchTask property of a debug configuration, so the debugged program is built
+    // before launching
+    context.subscriptions.push(vscode.commands.registerCommand('autotools.default_program_build_task', async () => {
+        telemetry.logEvent("default_program");
+        let built = await configuration.getCurrentTarget();
+        return 'autotools: build \'' + built.goal + '\' in ' + built.builddir;
+    }));
+
     context.subscriptions.push(vscode.commands.registerCommand('autotools.makeBaseDirectory', () => {
         telemetry.logEvent("makeBaseDirectory");
         return configuration.makeBaseDirectory();
