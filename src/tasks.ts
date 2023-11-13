@@ -41,8 +41,8 @@ export class AutoToolsBuildTaskProvider implements MyTaskProvider {
                             type: this.myType,
                             target: new BuildTarget(dir, g.goal)
                         };
-                        var task = new Task(kind, TaskScope.Workspace, "make " + (g.goal || "blah-name"),
-                            localize("autotools.build.task", "autotools in {0}", dir),
+                        var task = new Task(kind, TaskScope.Workspace, "build '" + g.goal + "' in " + dir,
+                            "autotools",
                             new ProcessExecution(
                                 configuration.getMakePath(),
                                 (dir ? ['-C', dir] : [])
