@@ -539,7 +539,16 @@ export async function getCurrentTarget(): Promise<make.BuildTarget> {
     }
 
     // No current build target
-    return Promise.reject("No current build target");
+    const showme: string = localize("autotools.showme", "Show me");
+    vscode.window.showErrorMessage(
+        localize("autotools.no.debuggable", "No debuggable program was found. Try selecting a default build task."),
+        localize("autotools.cancel", "Cancel"),
+        showme).then((value) => {
+        if (value === showme) {
+            vscode.commands.executeCommand("workbench.action.tasks.configureDefaultBuildTask");
+        }
+    });
+    return Promise.reject("Testing - no current build target");
 }
 
 let configureOnOpen: boolean | undefined;
