@@ -461,7 +461,7 @@ function getRelevantConfigStats(stats: any): ConfigureSubphaseStatusItem[] {
 // There is the downside that any files that are removed from the makefile
 // (thus disappearing from the log with commands) will still have IntelliSense loaded
 // until the next clean configure.
-export async function configure(triggeredBy: TriggeredBy, updateTargets: boolean = true): Promise<number> {
+export async function configure(triggeredBy: TriggeredBy): Promise<number> {
   // Mark that this workspace had at least one attempt at configuring, before any chance of early return,
   // to accurately identify whether this project configured successfully out of the box or not.
   let ranConfigureInCodebaseLifetime: boolean =
@@ -541,7 +541,7 @@ export async function configure(triggeredBy: TriggeredBy, updateTargets: boolean
           retc = ConfigureBuildReturnCodeTypes.cancelled;
         });
 
-        return doConfigure(progress, cancel, updateTargets, readCache, configurationCache);
+        return doConfigure(progress, cancel, readCache, configurationCache);
       }
     );
 
@@ -757,7 +757,7 @@ async function loadConfigurationFromCache(progress: vscode.Progress<{}>, cancel:
 // Sometimes the targets do not need an update (for example, when there has been
 // a change in the current build target), as requested through the boolean.
 // This saves unnecessary parsing which may be signifficant for very big code bases.
-export async function doConfigure(progress: vscode.Progress<{}>, cancel: vscode.CancellationToken, updateTargets: boolean, readCache: boolean, cacheFile: string, recursiveDoConfigure: boolean = false): Promise<ConfigureSubphasesStatus> {
+export async function doConfigure(progress: vscode.Progress<{}>, cancel: vscode.CancellationToken, readCache: boolean, cacheFile: string, recursiveDoConfigure: boolean = false): Promise<ConfigureSubphasesStatus> {
     let subphaseStats: ConfigureSubphasesStatus = {};
 
     // Configure does not start in the background (we have to load a configuration cache first).
