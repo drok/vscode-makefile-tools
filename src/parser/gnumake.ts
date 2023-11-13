@@ -208,6 +208,8 @@ export class Make implements Parser {
     push(sub: Parser) : Parser | undefined {
         if (sub instanceof Database) {
             let targets = configuration.getAllBuildTargets();
+            // FIXME: GNU make enters several times the same directory during --dry-run
+            // Can the work of parsing additional enterings be avoided?
             if (!targets.has(this.dir)) {
             //    let goals = new Set<string>(
             //        sub.goals.filter(g => g.goal).map<string>(g => g.goal || "")
