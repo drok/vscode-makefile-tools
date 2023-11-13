@@ -15,9 +15,14 @@ import * as telemetry from './telemetry';
 import * as tree from './tree';
 import * as ui from './ui';
 import * as util from './util';
+import { resolvePathToRoot, checkFileExistsSync } from './util';
 import * as vscode from 'vscode';
 import * as cpp from 'vscode-cpptools';
-import { AutoToolsTaskProvider } from './tasks';
+import { AutoToolsBuildTaskProvider,
+        AutoToolsTestTaskProvider,
+        AutoToolsCheckTaskProvider,
+        AutoToolsBootstrapTaskProvider,
+        MyTaskProvider } from './tasks';
 
 import * as nls from 'vscode-nls';
 nls.config({ messageFormat: nls.MessageFormat.bundle, bundleFormat: nls.BundleFormat.standalone })();
@@ -40,12 +45,33 @@ export class MakefileToolsExtension {
     private mementoState = new state.StateManager(this.extensionContext);
     private cppToolsAPI?: cpp.CppToolsApi;
     private cppConfigurationProviderRegister?: Promise<void>;
-    public taskProvider: AutoToolsTaskProvider;
+    private tasks: MyTaskProvider[];
+    private bootstrapTask: AutoToolsBootstrapTaskProvider;
+    private buildTasks: AutoToolsBuildTaskProvider;
     private compilerFullPath ?: string;
 
     public constructor(public readonly extensionContext: vscode.ExtensionContext) {
-        this.taskProvider = new AutoToolsTaskProvider();
+        this.bootstrapTask = new AutoToolsBootstrapTaskProvider();
+        this.buildTasks = new AutoToolsBuildTaskProvider();
+        this.tasks = [
+            this.bootstrapTask,
+            this.buildTasks,
+            new AutoToolsTestTaskProvider(),
+            new AutoToolsCheckTaskProvider(),
+        ];
+        extensionContext.subscriptions.push(vscode.commands.registerCommand('autotools.command.bootstrap', async () => {
+            await this.bootstrapTask.bootstrap();
+        }));
     }
+
+    public registerTasks(): void {
+        this.tasks.forEach((provider) => vscode.tasks.registerTaskProvider(provider.myType, provider));
+    }
+    public updateTasks(): void {
+        this.tasks.forEach((provider) => provider.update());
+    }
+    public bootstrap(): void { this.bootstrapTask.bootstrap(); }
+    public build(target: make.BuildTarget): void { this.buildTasks.build(target); }
 
     public updateMakefileFilePresent(newValue: boolean): void {
         vscode.commands.executeCommand("setContext", "autotools.makefileFilePresent", newValue);
@@ -291,11 +317,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         await openSettings("autotools.makefilePath");
     }));
 
-    context.subscriptions.push(vscode.commands.registerCommand('autotools.command.bootstrap', async () => {
-        await extension.taskProvider.bootstrap();
-    }));
-
-    vscode.tasks.registerTaskProvider(AutoToolsTaskProvider.myType, extension.taskProvider);
+    extension.registerTasks();
 
     if (configuration.getConfigureOnOpen() && extension.getFullFeatureSet()) {
         // Always clean configure on open
@@ -317,6 +339,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         telemetry.logEvent("settings", telemetryProperties);
     }
 }
+
 
 export async function deactivate(): Promise<void> {
     vscode.window.showInformationMessage(localize("extension.deactivated", "The extension {0} is de-activated.", "'vscode-makefile-tools'"));

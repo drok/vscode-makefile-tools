@@ -322,11 +322,12 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
             }
 
             extension.resetCppToolsProvider();
-            extension.taskProvider.foundTasks();
             // FIXME: Since dry-running failed, also unlink the configCache file
-        } else
+        } else {
             // All done, notify that new data is available
             extension.updateCppToolsProvider();
+            extension.updateTasks();
+        }
 
         curPID = -1;
         return {
@@ -720,7 +721,6 @@ async function loadConfigurationFromCache(progress: vscode.Progress<{}>, cancel:
 
             if (configurationCache.buildTargets?.size) {
                 configuration.setBuildTargets(configurationCache.buildTargets);
-                extension.taskProvider.foundTasks();
             }
 
             await util.scheduleTask(() => {
@@ -798,7 +798,6 @@ export async function doConfigure(progress: vscode.Progress<{}>, cancel: vscode.
         return subphaseStats;
     }
 
-    extension.taskProvider.foundTasks();
     // Configure build targets only if necessary:
     // if the caller considers we need a build target update
     if (updateTargets) {

@@ -19,11 +19,213 @@ import { extension } from './extension';
 nls.config({ messageFormat: nls.MessageFormat.bundle, bundleFormat: nls.BundleFormat.standalone })();
 const localize: nls.LocalizeFunc = nls.loadMessageBundle();
 
-export class AutoToolsTaskProvider implements TaskProvider {
-	static buildType = 'build';
-	static testType = 'test';
-	static checkType = 'check';
-	static bootstrapType = 'bootstrap';
+export class AutoToolsBuildTaskProvider implements MyTaskProvider {
+	readonly myType = 'build';
+	private myPromise: Thenable<Task[]> | undefined = undefined;
+
+	public provideTasks(): Thenable<Task[]> | undefined {
+		return this.myPromise;
+	}
+
+    public update() {
+        var targets: Task[] = [];
+        configuration.getAllBuildTargets().forEach((goals, dir) => {
+            goals
+                .filter((goal) => goal.flags & (
+                        Goal.Flags.Static_library |
+                        Goal.Flags.Linked_binary
+                        ))
+                .forEach((g) => {
+                    if (g.goal) {
+                        const kind: BuildTask = {
+                            type: this.myType,
+                            target: new BuildTarget(dir, g.goal)
+                        };
+                        var task = new Task(kind, TaskScope.Workspace, "make " + (g.goal || "blah-name"),
+                            localize("autotools.build.task", "autotools in {0}", dir),
+                            new ProcessExecution(
+                                configuration.getMakePath(),
+                                (dir ? ['-C', dir] : [])
+                                .concat(configuration.getConfigurationMakeArgs())
+                                .concat(g.goal)));
+                        task.group = TaskGroup.Build;
+                        task.detail =
+                            (g.flags & Goal.Flags.Linked_binary) ? localize("automake.program", "$(combine) $(file-binary) Build program") :
+                            (g.flags & Goal.Flags.Static_library) ? localize("automake.ranlib", "$(combine) $(library) Build static library") :
+                            localize("automake.build", "$(combine) Build");
+                        targets.push(task);
+                    }
+                })});
+        this.myPromise = Promise.resolve(targets);
+    }
+
+    public build(g : BuildTarget) : void {
+        const kind: BuildTask = {
+            type: this.myType,
+            target: g
+        };
+        let top_builddir = configuration.getCurrentMakefileConfiguration().top_builddir;
+        var task = new Task(kind, TaskScope.Workspace, "build '" + g.goal + "'",
+            "autotools",
+            new ProcessExecution(
+                configuration.getMakePath(),
+                (top_builddir ? ['-C', top_builddir] : [])
+                .concat(g.builddir ? ['-C', g.builddir] : [])
+                .concat(configuration.getCurrentMakefileConfiguration().makeArgs || [])
+                .concat(g.goal)));
+        task.group = TaskGroup.Build;
+        //task.detail =
+        //    (g.flags & Goal.Flags.Linked_binary) ? localize("automake.program", "$(combine) $(file-binary) Build program") :
+        //    (g.flags & Goal.Flags.Static_library) ? localize("automake.ranlib", "$(combine) $(library) Build static library") :
+        //    localize("automake.build", "$(combine) Build");
+        vscode.tasks.executeTask(task);
+    }
+	public resolveTask(_task: Task): Task | undefined {
+		const target = _task.definition.target;
+        if (!target)
+            return undefined;
+
+        // resolveTask requires that the same definition object be used.
+        const definition: BuildTask = <any>_task.definition;
+        return new Task(definition, _task.scope ?? TaskScope.Workspace, target.goal ?? t_all.goal,
+            this.myType,
+            new ProcessExecution(
+                configuration.getMakePath(),
+                (target.builddir ? ['-C', target.builddir] : [])
+                .concat(configuration.getConfigurationMakeArgs())
+                .concat(target.goal ?? t_all.goal)));
+	}
+}
+
+
+export class AutoToolsTestTaskProvider implements MyTaskProvider {
+	readonly myType = 'test';
+	private myPromise: Thenable<Task[]> | undefined = undefined;
+
+	public provideTasks(): Thenable<Task[]> | undefined {
+		return this.myPromise;
+	}
+
+    public update() {
+        var targets: Task[] = [];
+        configuration.getAllBuildTargets().forEach((goals, dir) => {
+            goals
+                .filter((goal) => goal.flags & (
+                        Goal.Flags.Test_Suite
+                        ))
+                .forEach((g) => {
+                    if (g.goal) {
+                        g.depends?.forEach((d) => {
+                            const kind: TestTask = {
+                                type: this.myType,
+                                test: new BuildTarget(dir, d)
+                            };
+                            var task = new Task(kind, TaskScope.Workspace, "run test \'" + d + "\' in " + dir,
+                            "autotools",
+                            new ProcessExecution(
+                                configuration.getMakePath(),
+                                (dir ? ['-C', dir] : [])
+                                // Treat the goal (test.log) a phony so it will always be remade.
+                                .concat("--eval=.PHONY: " + d.goal)
+                                .concat(configuration.getCurrentMakefileConfiguration().makeArgs || [])
+                                .concat(d)));
+                            task.group = TaskGroup.Test;
+                            task.detail = localize("automake.test", "$(check) Run test '" + path.basename(d, ".log") + "'");
+                            targets.push(task);
+                        });
+                    }
+                })});
+    
+        this.myPromise = Promise.resolve(targets);
+    }
+
+	public resolveTask(_task: Task): Task | undefined {
+		const test = _task.definition.test;
+        if (!test)
+            return undefined;
+
+        // resolveTask requires that the same definition object be used.
+        const definition: TestTask = <any>_task.definition;
+        return new Task(definition, _task.scope ?? TaskScope.Workspace, test.goal,
+            this.myType,
+            new ProcessExecution(
+                configuration.getMakePath(),
+                (test.builddir ? ['-C', test.builddir] : [])
+                // up-to-date test.log files might already exist, they need
+                // overwritten if the user runs the test again, hence
+                // --always-make, but Makefile must not be remade,
+                // because it means reconfiguration (infinite loop)
+                .concat("--always-make", "--assume-old=Makefile")
+                .concat(configuration.getConfigurationMakeArgs())
+                .concat(test.goal)));
+	}
+}
+
+export class AutoToolsCheckTaskProvider implements MyTaskProvider {
+	readonly myType = 'check';
+	private myPromise: Thenable<Task[]> | undefined = undefined;
+
+    provideTasks(): Thenable<Task[]> | undefined {
+		return this.myPromise;
+	}
+
+    update() {
+
+        var targets : Task[] = [];
+        configuration.getAllBuildTargets().forEach((goals, dir) => {
+            goals
+            .filter((goal) => goal.flags & (
+                    Goal.Flags.Test_Suite
+                    ))
+            .forEach((g) => {
+                const kind: CheckTask = {
+                    type: this.myType
+                };
+                var task = new Task(kind, TaskScope.Workspace, "run test suite in" + dir,
+                "autotools",
+                new ProcessExecution(
+                    configuration.getMakePath(),
+                    (dir ? ['-C', dir] : [])
+                    .concat(configuration.getConfigurationMakeArgs())
+                    .concat("check")));
+                task.group = TaskGroup.Test;
+                task.detail = localize("automake.check", "$(checklist) Test Suite");
+                targets.push(task);
+            });});
+        this.myPromise = Promise.resolve(targets);
+    }
+
+	public resolveTask(_task: Task): Task | undefined {
+		const check = _task.definition.check;
+        if (!check)
+            return undefined;
+
+        // resolveTask requires that the same definition object be used.
+        const definition: TestTask = <any>_task.definition;
+        return new Task(definition, _task.scope ?? TaskScope.Workspace, "check",
+            this.myType,
+            new ProcessExecution(
+                configuration.getMakePath(),
+                (check.builddir ? ['-C', check.builddir] : [])
+                // up-to-date test.log files might already exist, they need
+                // overwritten if the user runs the test again, hence
+                // --always-make, but Makefile must not be remade,
+                // because it means reconfiguration (infinite loop)
+                .concat("--always-make", "--assume-old=Makefile")
+                .concat(configuration.getConfigurationMakeArgs())
+                .concat(definition.target.goal)
+                .concat(check.TESTS ? 'TESTS=' +  check.TESTS.join(' ') : [])
+                .concat(check.TEST_SUITE_LOG ? 'TEST_SUITE_LOG=' +  check.TEST_SUITE_LOG : [])));
+	}
+}
+
+export interface MyTaskProvider extends TaskProvider {
+    readonly myType: string;
+    update(): void;
+}
+
+export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
+	readonly myType = 'bootstrap';
 	private myPromise: Thenable<Task[]> | undefined = undefined;
     public bootstrapTask?: vscode.Task;
 
@@ -31,65 +233,33 @@ export class AutoToolsTaskProvider implements TaskProvider {
         let b = this.bootstrap_cmd();
         if (b) {
             const kind: BootstrapTask = {
-                type: AutoToolsTaskProvider.bootstrapType,
-                task: "bootstrap"
+                type: this.myType
             };
-            this.bootstrapTask = new Task(kind, TaskScope.Workspace, "Bootstrap autotools",
-                localize("autotools.bootstrap.task", "Bootstrap"),
+            this.bootstrapTask = new Task(kind, TaskScope.Workspace, b.join(' '),
+                localize("autotools.bootstrap.task", "Bootstrap autotools"),
                 new ProcessExecution(b[0], b.slice(1)));
             this.bootstrapTask.group = TaskGroup.Build;
-            this.bootstrapTask.detail = localize("automake.bootstrap", "$(tools) Bootstrap project using '" + b.join(' ') + "'");
+            this.bootstrapTask.detail = localize("automake.bootstrap", "$(tools) Bootstrap project using '{0}'", b.join(' '));
+            this.myPromise = Promise.resolve([this.bootstrapTask]);
         }
     }
-	public provideTasks(): Thenable<Task[]> | undefined {
-		return this.myPromise;
+	provideTasks(): Thenable<Task[]> | undefined {
+        if (this.bootstrapTask) {
+            return this.myPromise;
+        }
+        return Promise.reject();
 	}
 
-    public foundTasks() {
-        this.myPromise = getTasks();
-    }
-
-	public resolveTask(_task: Task): Task | undefined {
-		const task = _task.definition.task;
-        if (!task) {
+	resolveTask(_task: Task): Task | undefined {
+        const definition: BootstrapTask = <any>_task.definition;
+        let b = this.bootstrap_cmd();
+        if (!b)
             return undefined;
-        }
-        switch (task) {
-		case "build": {
-			// resolveTask requires that the same definition object be used.
-            const definition: BuildTask = <any>_task.definition;
-			return new Task(definition, _task.scope ?? TaskScope.Workspace, definition.target.goal,
-                AutoToolsTaskProvider.myType,
-                new ProcessExecution(
-                    configuration.getMakePath(),
-                    (definition.target.builddir ? ['-C', definition.target.builddir] : [])
-                    .concat(configuration.getConfigurationMakeArgs())
-                    .concat(definition.target.goal)));
-            }
-            break;
-		case "test": {
-			// resolveTask requires that the same definition object be used.
-			const definition: TestTask = <any>_task.definition;
-			return new Task(definition, _task.scope ?? TaskScope.Workspace, definition.test.goal,
-                AutoToolsTaskProvider.myType,
-                new ProcessExecution(
-                    configuration.getMakePath(),
-                    (definition.target.builddir ? ['-C', definition.target.builddir] : [])
-                    // up-to-date test.log files might already exist, they need
-                    // overwritten if the user runs the test again, hence
-                    // --always-make, but Makefile must not be remade,
-                    // because it means reconfiguration (infinite loop)
-                    .concat("--always-make", "--assume-old=Makefile")
-                    .concat(configuration.getConfigurationMakeArgs())
-                    .concat(definition.target.goal)));
-            }
-            break;
-        case "bootstrap":
-            return this.bootstrapTask;
-    }
-
-		return undefined;
+        return new Task(definition, _task.scope ?? TaskScope.Workspace, "bootstrap",
+            this.myType,
+            new ProcessExecution(b[0], b.slice(1)));
 	}
+
     private bootstrap_cmd(): string[] | undefined {
         if (!checkFileExistsSync(resolvePathToRoot("configure.ac")) && !checkFileExistsSync(resolvePathToRoot("configure.in"))) {
             return undefined;
@@ -104,6 +274,7 @@ export class AutoToolsTaskProvider implements TaskProvider {
         }
         return ["autoreconf", "-fvi"];
     }
+    update(): void {}
 
     public async bootstrap(): Promise<void> {
         if (this.bootstrapTask) {
@@ -113,111 +284,30 @@ export class AutoToolsTaskProvider implements TaskProvider {
 }
 
 interface BuildTask extends TaskDefinition {
-    /**
-     * The task name
-     */
-    task: string;
-
     /*
      * The makefile goal that this task operates on
      */
-    target: BuildTarget;
+    target?: BuildTarget;
 };
 
 interface TestTask extends TaskDefinition {
-    /**
-     * The task name
-     */
-    task: string;
-
     /*
      * The test output log this task creates.
      */
-    test: BuildTarget;
+    test?: BuildTarget;
 };
+
+interface CheckTask extends TaskDefinition {
+    /*
+     * Test suite arguments (default: none, ie, run 'make check' )
+     */
+    check?: CheckTarget;
+};
+
+export class CheckTarget {
+    TESTS?: string[];
+    TEST_SUITE_LOG?: string;
+}
 
 interface BootstrapTask extends TaskDefinition {
-    /**
-     * The task name
-     */
-    task: string;
 };
-
-//     if (!checkFileExistsSync(resolvePathToRoot("configure"))) {
-
-async function getTasks(): Promise<Task[]> {
-    var targets : Task[] = [];
-    configuration.getAllBuildTargets().forEach((goals, dir) => {
-        goals
-            .filter((goal) => goal.flags & (
-                    Goal.Flags.Static_library |
-                    Goal.Flags.Linked_binary |
-                    Goal.Flags.Test_Suite
-                    ))
-            .forEach((g) => {
-                if (g.goal && (g.flags &
-                        (Goal.Flags.Static_library |
-                        Goal.Flags.Linked_binary))) {
-                    const kind: BuildTask = {
-                        type: AutoToolsTaskProvider.myType,
-                        task: "build",
-                        target: new BuildTarget(dir, g.goal)
-                    };
-                    var task = new Task(kind, TaskScope.Workspace, "make " + (g.goal || "blah-name"),
-                        localize("autotools.build.task", "autotools in {0}", dir),
-                        new ProcessExecution(
-                            configuration.getMakePath(),
-                            (dir ? ['-C', dir] : [])
-                            .concat(configuration.getConfigurationMakeArgs())
-                            .concat(g.goal)));
-                    task.group = TaskGroup.Build;
-                    task.detail =
-                        (g.flags & Goal.Flags.Linked_binary) ? localize("automake.program", "$(combine) $(file-binary) Build program") :
-                        (g.flags & Goal.Flags.Static_library) ? localize("automake.ranlib", "$(combine) $(library) Build static library") :
-                        localize("automake.build", "$(combine) Build");
-                    targets.push(task);
-                } else if (g.goal && g.flags & Goal.Flags.Test_Suite) {
-                    g.depends?.forEach((d) => {
-                        const kind: TestTask = {
-                            type: AutoToolsTaskProvider.myType,
-                            task: "test",
-                            test: new BuildTarget(dir, d)
-                        };
-                        var task = new Task(kind, TaskScope.Workspace, "run test " + (d || "blah-name"),
-                        localize("autotools.test.task", "autotools in {0}", dir),
-                        new ProcessExecution(
-                            configuration.getMakePath(),
-                            (dir ? ['-C', dir] : [])
-                            // up-to-date test.log files might already exist, they need
-                            // overwritten if the user runs the test again, hence
-                            // --always-make, but Makefile must not be remade,
-                            // because it means reconfiguration (infinite loop)
-                            .concat("--always-make", "--assume-old=Makefile")
-                            .concat(configuration.getConfigurationMakeArgs())
-                            .concat(d)));
-                        task.group = TaskGroup.Test;
-                        task.detail = localize("automake.test", "$(check) Run test '" + path.basename(kind.test.goal, ".log") + "'");
-                        targets.push(task);
-                    });
-                    const kind: TestTask = {
-                        type: AutoToolsTaskProvider.myType,
-                        task: "check",
-                        test: new BuildTarget(dir, "check")
-                    };
-                    var task = new Task(kind, TaskScope.Workspace, "run all tests",
-                    localize("autotools.test.task", "autotools in {0}", dir),
-                    new ProcessExecution(
-                        configuration.getMakePath(),
-                        (dir ? ['-C', dir] : [])
-                        .concat(configuration.getConfigurationMakeArgs())
-                        .concat(kind.test.goal)));
-                    task.group = TaskGroup.Test;
-                    task.detail = localize("automake.test", "$(checklist) Test Suite");
-                    targets.push(task);
-                }
-            })});
-    if (extension.taskProvider.bootstrapTask) {
-        targets.push(extension.taskProvider.bootstrapTask);
-    }
-    return targets;
-}
