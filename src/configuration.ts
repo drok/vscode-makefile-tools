@@ -18,6 +18,8 @@ import * as multiStep from './multiStepInput';
 import * as nls from 'vscode-nls';
 import { dir } from 'console';
 import { Disposable } from 'vscode-jsonrpc';
+import { AutoToolsBuildTaskProvider, BuildTask } from './tasks';
+import assert = require('assert');
 nls.config({ messageFormat: nls.MessageFormat.bundle, bundleFormat: nls.BundleFormat.standalone })();
 const localize: nls.LocalizeFunc = nls.loadMessageBundle();
 
@@ -248,12 +250,12 @@ export async function readExtensionLog(): Promise<void> {
     }
 }
 
-// The configuration cache is stored in ${makeDirectory}/.vscode/${currentTarget}.cache
+// The configuration cache is stored in ${makeDirectory}/.vscode/all.cache
 // Ie, each config is keyed to the configuration and target
 // TODO: The user should have the option to turn off the cache because it may become decoherent with the
 // workspace when the source is changed (eg, diff branch checked out) between vscode reloads.
 export function getConfigurationCachePath(): string {
-    let builddir = currentMakefileConfiguration.makeDirectory || getCurrentTarget().builddir;
+    let builddir = currentMakefileConfiguration.makeDirectory || util.getWorkspaceRoot();
     if (!path.isAbsolute(builddir)) {
         builddir = util.resolvePathToRoot(builddir);
     }
@@ -295,7 +297,7 @@ export async function readExcludeCompilerNames(): Promise<void> {
 }
 
 // Keep the dry-run output in the configuration directory?
-//   true : file will be saved as ${makeDirectory}/.vscode/${currentTarget}.dryrun.log
+//   true : file will be saved as ${makeDirectory}/.vscode/all.dryrun.log
 //   false: file will be not be saved
 let keepDryRuns: boolean;
 export function getKeepDryRuns(): boolean { return keepDryRuns; }
@@ -304,7 +306,7 @@ export async function readkeepDryRuns() : Promise<void> {
 }
 
 // Keep the configurationCache in the configuration directory?
-//   true : file will be saved as ${makeDirectory}/.vscode/${currentTarget}.cache,
+//   true : file will be saved as ${makeDirectory}/.vscode/all.cache,
 //          and loaded at next reload, before dry-running
 //   false: file will be not be saved
 let keepConfigurationCache: boolean;
@@ -515,28 +517,29 @@ export async function readMakefileConfigurations(currentConfigurationName : stri
     }
 }
 
-// Last target picked from the set of targets that are run by the makefiles
-// when building for the current configuration.
-// Saved into the settings storage. Also reflected in the configuration status bar button
-// Assume the well-known "all" target for the default goal
-let currentTarget: make.BuildTarget = make.t_all;
-export function getCurrentTarget(): make.BuildTarget { return currentTarget; }
-export function getCurrentTargetAsFilename() : string {
-    return currentTarget.goal.replace(/[^\w \(\)\[\]\{\}@\.\-\+]+/g,'_');
-}
-// Set the current target, or 'all' if none was given
-export function setCurrentTarget(target: make.BuildTarget = make.t_all): void { currentTarget = target; }
+// The current target is the read from the default built task,
+// or the first Linked_binary target
+export async function getCurrentTarget(): Promise<make.BuildTarget> {
+    let tasks = await vscode.tasks.fetchTasks({type: "build"});
 
-// Read current target from workspace state, update status bar item
-function readCurrentTarget(): void {
-    let buildTarget : BuildTarget | undefined = extension.getState().buildTarget;
-    setCurrentTarget(buildTarget?.builddir ? buildTarget : make.t_all);
-    if (!buildTarget) {
-        logger.message(`No target defined in the workspace state. Assuming '${currentTarget}'.`);
-    } else {
-        logger.message(`Reading current build target "${currentTarget}" from the workspace state.`);
+    // Find the default build task, and return its target
+    let default_build = tasks.find(task => task.definition?.target && task.group?.isDefault);
+    if (default_build) {
+        // assert(default_build.definition);
+        const definition: BuildTask = <any>default_build.definition;
+        assert(definition && definition.target);
+        return Promise.resolve(definition.target);
     }
-    statusBar.setTarget(currentTarget);
+
+    // If no default build task, return the make target that is a linked binary
+    for (const[dir, targets] of buildTargets) {
+        let binary = targets.find(t => t.goal && (t.flags & Goal.Flags.Linked_binary));
+        if (binary && binary.goal)
+            return Promise.resolve(new make.BuildTarget(dir, binary.goal));
+    }
+
+    // No current build target
+    return Promise.reject("No current build target");
 }
 
 let configureOnOpen: boolean | undefined;
@@ -578,7 +581,6 @@ export async function readIgnoreDirectoryCommands(): Promise<void> {
 // These can also be resetted via the makefile.resetState command.
 export function initFromState(): void {
    readCurrentMakefileConfiguration();
-   readCurrentTarget();
 }
 
 // Initialization from settings (or backup default rules).
@@ -621,7 +623,7 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
     // FIXME: seems wrong to do || make.t_all; this fn should probably be called
     // config arg after config is fully loaded.
     await extension._projectOutlineProvider.update(extension.getState().buildConfiguration,
-                                             currentTarget);
+                                             make.t_all); // FIXME: update with real target
 
     // Verify the dirty state of the IntelliSense config provider and update accordingly.
     // The makefile.configureOnEdit setting can be set to false when this behavior is inconvenient.
@@ -930,163 +932,6 @@ export async function setNewConfiguration(): Promise<void> {
             if (telemetryProperties && util.hasProperties(telemetryProperties)) {
                 telemetry.logEvent("settingsChanged", telemetryProperties);
             }
-        }
-    }
-}
-
-export async function setTargetByName(targetName: make.BuildTarget) : Promise<void> {
-    currentTarget = targetName;
-    let displayTarget: string = targetName.goal ? `${currentTarget.goal} @ ${currentTarget.builddir}`: "Default";
-    statusBar.setTarget(currentTarget);
-    logger.message(`Setting target ${displayTarget}`);
-    logger.message("Re-reading settings after target change.");
-    // Refresh settings, they may reference variables or commands reading state target var (${buildTarget}).
-    extension.getState().buildTarget = currentTarget;
-    await initFromSettings();
-    extension._projectOutlineProvider.updateBuildTarget(targetName);
-}
-
-const automake_names: { [key: string]: string } = {
-    "automake.target.desc.all": localize("automake.target.desc.all", "Build default targets ('all')"),
-    "automake.target.desc.check": localize("automake.target.desc.check", "Build and run test suite ('check')"),
-    "automake.target.desc.distcheck": localize("automake.target.desc.distcheck", "Test package distribution ('distcheck')"),
-    "automake.target.desc.install": localize("automake.target.desc.install", "Build and install ('install')"),
-};
-class TargetPickItem implements vscode.QuickPickItem {
-    label: string;
-    target: BuildTarget;
-    constructor(label: string, target: BuildTarget) {
-        this.label = label;
-        this.target = target;
-    }
-}
-// createQuickPick based on sample
-// https://github.com/microsoft/vscode-extension-samples/blob/main/quickinput-sample/src/quickOpen.ts
-// Open a quick pick to select target from the buildTargets Map
-async function selectBuildTarget() {
-    const disposable : Disposable[] = [];
-    try {
-        return await new  Promise<BuildTarget | undefined>((resolve, reject) => {
-            const quickPick = vscode.window.createQuickPick<TargetPickItem>();
-            quickPick.placeholder = 'Select a build goal';
-            quickPick.ignoreFocusOut = true;
-            quickPick.busy = true;
-
-            let items : TargetPickItem[] = [];
-            buildTargets.forEach((targets, dir) => {
-                targets.filter((target) => (target.flags & (
-                        Goal.Flags.Linked_binary |
-                        Goal.Flags.Automake_primary)))
-                .forEach((target) => {
-                    let label : string;
-                    switch (target.goal) {
-                        case "all": label = localize("automake.target.desc.all", "Build default targets ('all') in {0}", dir);
-                            break;
-                        case "check": label = localize("automake.target.desc.check", "Build and run test suite ('check') in {0}", dir);
-                            break;
-                        case "distcheck": label = localize("automake.target.desc.distcheck", "Test package distribution ('distcheck') in {0}", dir);
-                            break;
-                        case "install": label = localize("automake.target.desc.install", "Build and install ('install') in {0}", dir);
-                            break;
-                        default: label = `${target.goal} @ ${dir}`;
-                            break;
-                    }
-                    items.push(new TargetPickItem(label, new BuildTarget(dir, target.goal || "any")));
-                });
-            });
-            quickPick.items = items;
-            disposable.push(
-/* Implement some subselection HERE */
-/*
-                quickPick.onDidChangeValue(value => {
-                    if (!value) {
-                        quickPick.items = items;
-                        return;
-                    } else {
-                        quickPick.items = items.filter(item => item.target.dir.indexOf(value) != -1);
-                    }
-                }),
-*/
-                quickPick.onDidChangeSelection((selection) => {
-                    if (selection && selection[0]) {
-                        if (selection[0] instanceof TargetPickItem) {
-                            resolve(selection[0].target);
-                            quickPick.hide();
-                        }
-                    }
-                }),
-                quickPick.onDidHide(() => {
-                    resolve(undefined);
-                    quickPick.dispose();
-                })
-            );
-            quickPick.show();
-        });
-    } finally {
-        disposable.forEach(d => d.dispose());
-    }
-}
-
-// Fill a drop-down with all the target names run by building the makefile for the current configuration
-// Triggers a cpptools configuration provider update after selection.
-// TODO: change the UI list to multiple selections mode and store an array of current active targets
-export async function selectTarget(context: vscode.ExtensionContext): Promise<void> {
-    // Cannot select a new target if the project is currently building or (pre-)configuring.
-    if (make.blockedByOp(make.Operations.changeBuildTarget)) {
-        return;
-    }
-
-    // warn about an out of date configure state and configure if makefile.configureAfterCommand allows.
-    if (extension.getState().configureDirty ||
-        // The configure state might not be dirty from the last session but if the project is set to skip
-        // configure on open and no configure happened yet we still must warn.
-        (configureOnOpen === false && !extension.getCompletedConfigureInSession())) {
-        logger.message("The project needs a configure to populate the build targets correctly.");
-        if (configureAfterCommand) {
-            let retc: number = await make.configure(make.TriggeredBy.configureBeforeTargetChange);
-            if (retc !== make.ConfigureBuildReturnCodeTypes.success) {
-                logger.message("The build targets list may not be accurate because configure failed.");
-            }
-        }
-    }
-
-    let options: vscode.QuickPickOptions = {};
-    options.ignoreFocusOut = true; // so that the logger and the quick pick don't compete over focus
-
-    // Ensure "all" is always available as a target to select.
-    // There are scenarios when "all" might not be present in the list of available targets,
-    // for example when the extension is using a build log or dryrun cache of a previous state
-    // when a particular target was selected and a dryrun applied on that is producing a subset of targets,
-    // making it impossible to select "all" back again without resetting the Makefile Tools state
-    // or switching to a different makefile configuration or implementing an editable target quick pick.
-    // Another situation where "all" would inconveniently miss from the quick pick is when the user is
-    // providing a build log without the required verbosity for parsing targets (-p or --print-data-base switches).
-    // When the extension is not reading from build log or dryrun cache, we have logic to prevent
-    // "all" from getting lost: make sure the target is not appended to the make invocation
-    // whose output is used to parse the targets (as opposed to parsing for IntelliSense or launch targets
-    // when the current target must be appended to the make command).
-    // FIXME: commit this separately. "all" cannot be forced if the Makefile doesn't mention it.
-    // if (!buildTargets.includes("all")) {
-    //     buildTargets.push("all");
-    // }
-
-    const chosen = await selectBuildTarget();
-
-    if (!(chosen instanceof BuildTarget)) {
-        return;
-    }
-    if (chosen && chosen !== getCurrentTarget()) {
-        const telemetryProperties: telemetry.Properties = {
-            state: "buildTarget"
-        };
-        telemetry.logEvent("stateChanged", telemetryProperties);
-
-        await setTargetByName(chosen);
-
-        if (configureAfterCommand) {
-            // The set of build targets remains the same even if the current target has changed
-            logger.message("Automatically reconfiguring the project after a build target change.");
-            await make.cleanConfigure(make.TriggeredBy.configureAfterTargetChange, false);
         }
     }
 }

@@ -65,6 +65,7 @@ export class MakefileToolsExtension {
     }
 
     public registerTasks(): void {
+        // FIXME: Implement Disposable
         this.tasks.forEach((provider) => vscode.tasks.registerTaskProvider(provider.myType, provider));
     }
     public updateTasks(): void {
@@ -247,18 +248,20 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         return configuration.getCurrentMakefileConfiguration();
     }));
 
-    context.subscriptions.push(vscode.commands.registerCommand('autotools.setBuildTarget', async () => {
-       await configuration.selectTarget(context);
-    }));
-
     context.subscriptions.push(vscode.commands.registerCommand('autotools.goal', async () => {
         telemetry.logEvent("goal");
-        return configuration.getCurrentTarget().goal;
+        return (await configuration.getCurrentTarget()).goal;
     }));
 
     context.subscriptions.push(vscode.commands.registerCommand('autotools.builddir', async () => {
         telemetry.logEvent("builddir");
-        return configuration.getCurrentTarget().builddir;
+        return (await configuration.getCurrentTarget()).builddir;
+    }));
+
+    context.subscriptions.push(vscode.commands.registerCommand('autotools.default_program', async () => {
+        telemetry.logEvent("default_program");
+        let built = await configuration.getCurrentTarget();
+        return path.join(built.builddir ?? ".", built.goal);
     }));
 
     context.subscriptions.push(vscode.commands.registerCommand('autotools.makeBaseDirectory', () => {
@@ -285,10 +288,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         return vscode.commands.executeCommand("autotools.configure");
     }));
 
-
-    context.subscriptions.push(vscode.commands.registerCommand('autotools.outline.setBuildTarget', () => {
-        return vscode.commands.executeCommand("autotools.setBuildTarget");
-    }));
 
     context.subscriptions.push(vscode.commands.registerCommand('autotools.outline.buildTarget', () => {
         return vscode.commands.executeCommand("autotools.buildTarget");

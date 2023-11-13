@@ -76,7 +76,7 @@ export enum TriggeredBy {
     configureAfterConfigurationChange = "settings (configureAfterCommand), command pallette (setBuildConfiguration)",
     configureAfterEditorFocusChange = "configure dirty (editor focus change), settings (configureOnEdit)",
     configureBeforeTargetChange = "configure dirty (before target change), settings (configureAfterCommand)",
-    configureAfterTargetChange = "settings (configureAfterCommand), command pallette (setBuildTarget)",
+    configureAfterTargetChange = "settings (configureAfterCommand)",
     configureBeforeLaunchTargetChange = "configureDirty (before launch target change), settings (configureAfterCommand)",
     launch = "Launch (debug|run)",
     tests = "Makefile Tools Regression Tests"
@@ -174,7 +174,7 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
         // Problem is described here: https://stackoverflow.com/questions/3459476/how-to-append-to-a-file-in-node/43370201#43370201
         const lineEnding: string = (process.platform === "win32" && process.env.MSYSTEM === undefined) ? "\r\n" : "\n";
         let keepDryRuns: boolean = configuration.getKeepDryRuns();
-        let dryrunFile : string = configuration.getCurrentTargetAsFilename() + ".dryrun.log";
+        let dryrunFile : string = "all.dryrun.log";
         if (keepDryRuns) {
             dryrunFile = path.join(configuration.getConfigurationCachePath(), dryrunFile);
             logger.message(`Writing the dry-run output: ${dryrunFile}`);
@@ -491,17 +491,12 @@ export async function configure(triggeredBy: TriggeredBy, updateTargets: boolean
   // Identify for telemetry whether this configure will read configuration constructs from cache.
   let configurationCache: string =
         path.join(configuration.getConfigurationCachePath(),
-        configuration.getCurrentTargetAsFilename() + ".cache");
+        "all.cache");
   let readCache: boolean = configurationCache ?
     util.checkFileExistsSync(configurationCache) : false;
 
   let compileCommandsPath: string | undefined =
     configuration.getCompileCommandsPath();
-
-  // Identify for telemetry whether:
-  //   - this configure will need to double the workload, if it needs to analyze the build targets separately.
-  //   - this configure will need to reset the build target to the default, which will need a reconfigure.
-  let currentBuildTarget: BuildTarget = configuration.getCurrentTarget();
 
   // Start with the success assumption until later analysis.
   let retc: number = ConfigureBuildReturnCodeTypes.success;
@@ -656,7 +651,6 @@ export async function configure(triggeredBy: TriggeredBy, updateTargets: boolean
       extension.setCompletedConfigureInSession(true);
     }
 
-    telemetryProperties.buildTarget = processTargetForTelemetry(currentBuildTarget.goal);
     telemetry.logEvent("configure", telemetryProperties, telemetryMeasures);
 
     if (retc !== ConfigureBuildReturnCodeTypes.success) {
@@ -796,43 +790,6 @@ export async function doConfigure(progress: vscode.Progress<{}>, cancel: vscode.
     subphaseStats.generateParseContent = await generateParseContent(progress, cancel, recursiveDoConfigure);
     if (subphaseStats.generateParseContent.retc === ConfigureBuildReturnCodeTypes.cancelled) {
         return subphaseStats;
-    }
-
-    // Configure build targets only if necessary:
-    // if the caller considers we need a build target update
-    if (updateTargets) {
-        // Verify if the current build target is still part of the list and unset otherwise.
-        // By this point, configuration.getBuildTargets() contains a comlete list (old and new).
-        let currentBuildTarget: BuildTarget = configuration.getCurrentTarget();
-        if (currentBuildTarget.goal &&
-            configuration.getBuildTargets(currentBuildTarget.builddir).find((n) => n.goal == currentBuildTarget.goal)) {
-            logger.message(`Current build target ${currentBuildTarget} is no longer present in the available list.` +
-                ` Unsetting the current build target.`);
-
-            // Setting a new target by name is not triggering a configure
-            // (only its caller setBuildTarget, invoked by its command or status bar button).
-            // But we do need to configure again after a build target change,
-            // so call doConfigure here and not configure.
-            // We don't need to alter yet any dirty or pending states, this being an 'inner' call of configure.
-            // We don't need to consider autotools.configureAfterCommand: even if set to false
-            // (which would result in changing a build target without a following configure - in the normal scenario)
-            // now we need to configure because this build target reset was done under the covers
-            // by the extension and as a result of a configure (which can only be triggered by the user
-            // if autotools.configureAfterCommand is set to false).
-            // Calling doConfigure here will not result in extra telemetry (just extra logging).
-            // The recursive call to doConfigure will fall still under the same progress bar and cancel button
-            // as the caller and its result will be included into the telemetry information reported by that.
-            // There can be only one level of recursivity because once the target is reset to empty,
-            // it is impossible to get into the state of having a target that is not found in the available list.
-            await configuration.setTargetByName(t_none);
-            logger.message("Automatically reconfiguring the project after a build target change.");
-            recursiveDoConfigure = true;
-
-            // This one level recursive doConfigure will keep the same clean state as the caller
-            // since setConfigureIsClean runs before the caller configure and resets after
-            // the eventual recursive configure.
-            subphaseStats.recursiveConfigure = await doConfigure(progress, cancel, updateTargets, readCache, cacheFile, true);
-        }
     }
 
     // Let the caller collect and log all information regarding the subphases return codes.

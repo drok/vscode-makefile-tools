@@ -55,10 +55,6 @@
                 "title": "%autotools.command.makefile.setBuildConfiguration.title%"
             },
             {
-                "command": "autotools.setBuildTarget",
-                "title": "%autotools.command.makefile.setBuildTarget.title%"
-            },
-            {
                 "command": "autotools.configure",
                 "title": "%autotools.command.makefile.configure.title%"
             },
@@ -69,11 +65,6 @@
             {
                 "command": "autotools.outline.setBuildConfiguration",
                 "title": "%autotools.command.makefile.setBuildConfiguration.title%",
-                "icon": "$(notebook-edit)"
-            },
-            {
-                "command": "autotools.outline.setBuildTarget",
-                "title": "%autotools.command.makefile.setBuildTarget.title%",
                 "icon": "$(notebook-edit)"
             },
             {
@@ -310,13 +301,13 @@
                 },
                 "configurationSnippets": [
                     {
-                        "label": "Autotools: Launch current build target under gdb",
-                        "description": "Debug current build target with cppdbg. Uses variables",
+                        "label": "Autotools: Launch the default build target under cppdbg",
+                        "description": "Debug default build target with cppdbg. Uses variables",
                         "body": {
                             "type": "cppdbg",
                             "request": "launch",
                             "name": "${1:Launch current autotools build target}",
-                            "program": "^\"\\${command:autotools.builddir}/\\${command:autotools.goal}\"",
+                            "program": "^\"\\${command:autotools.default_program}\"",
                             "cwd": "^\"\\${workspaceFolder}\"",
                             "environment": [],
                             "args": [],
@@ -453,10 +444,6 @@
                     "when": "autotools:fullFeatureSet"
                 },
                 {
-                    "command": "autotools.setBuildTarget",
-                    "when": "autotools:fullFeatureSet"
-                },
-                {
                     "command": "autotools.outline.configure",
                     "when": "never"
                 },
@@ -466,10 +453,6 @@
                 },
                 {
                     "command": "autotools.outline.setBuildConfiguration",
-                    "when": "never"
-                },
-                {
-                    "command": "autotools.outline.setBuildTarget",
                     "when": "never"
                 }
             ],
@@ -499,11 +482,6 @@
                 {
                     "command": "autotools.outline.setBuildConfiguration",
                     "when": "view == autotools.outline && viewItem =~ /nodeType=configuration/",
-                    "group": "inline@1"
-                },
-                {
-                    "command": "autotools.outline.setBuildTarget",
-                    "when": "autotools:fullFeatureSet && view == autotools.outline && viewItem =~ /nodeType=buildTarget/",
                     "group": "inline@1"
                 }
             ]

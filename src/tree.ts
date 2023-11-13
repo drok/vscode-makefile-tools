@@ -145,6 +145,7 @@ export class ProjectOutlineProvider implements vscode.TreeDataProvider<BaseNode>
         this.updateTree();
     }
 
+    /* FIXME: REMOVE, not used */
     updateBuildTarget(buildTarget: BuildTarget): void {
         this._currentBuildTargetItem.update(buildTarget);
         this.updateTree();

@@ -375,7 +375,7 @@ suite('Fake dryrun parsing', /*async*/() => {
 
       configuration.prepareConfigurationsQuickPick();
       await configuration.setConfigurationByName("varexp");
-      await configuration.setTargetByName(make.t_all);
+      // FIXME: rework await configuration.setTargetByName(make.t_all);
 
       // Delete extension log a bit later than other tests. For this one, we only care to capture varexp.
       // All else that happens before, it was covered during the other tests in this suite.

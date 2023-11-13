@@ -283,7 +283,7 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
     }
 }
 
-interface BuildTask extends TaskDefinition {
+export interface BuildTask extends TaskDefinition {
     /*
      * The makefile goal that this task operates on
      */
