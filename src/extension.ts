@@ -323,7 +323,21 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }));
 
     context.subscriptions.push(vscode.commands.registerCommand('autotools.buildAll', async () => {
-        extension.build(make.t_all);
+        const kind:BuildTask = {
+            type: "build",
+            target: make.t_all
+        };
+        let top_builddir = configuration.getCurrentMakefileConfiguration().makeDirectory;
+        await vscode.tasks.executeTask(new vscode.Task(kind, vscode.TaskScope.Workspace, 'build all', 'autotools',
+            new vscode.ProcessExecution(configuration.getMakePath(),
+                (top_builddir ? ['-C', top_builddir] : [])
+                .concat(make.t_all.goal)
+            )));
+    }));
+
+    context.subscriptions.push(vscode.commands.registerCommand('autotools.makeBaseDirectory', () => {
+        telemetry.logEvent("makeBaseDirectory");
+        return configuration.makeBaseDirectory();
     }));
     /** End of commands that shouldn't be exposed in package.json, they are used for command substitution in launch.json and tasks.json. */
 
