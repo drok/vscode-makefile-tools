@@ -194,13 +194,6 @@
                     "default": true,
                     "scope": "resource"
                 },
-                "autotools.saveBeforeBuildOrConfigure": {
-                    "type": "boolean",
-                    "default": true,
-                    "description": "%autotools.configuration.makefile.saveBeforeBuildOrConfigure.description%",
-                    "scope": "resource"
-                },
-                },
                 "autotools.panel.visibility": {
                     "type": "object",
                     "default": null,
