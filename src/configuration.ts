@@ -488,6 +488,10 @@ export async function readMakefileConfigurations(currentConfigurationName : stri
 // The current target is the read from the default built task,
 // or the first Linked_binary target
 export async function getCurrentTarget(): Promise<make.BuildTarget> {
+    // FIXME: vscode bug. Initial vscode.tasks.fetchTasks does not resolve tasks.json
+    // Second run, it does. This means launch.json using ${command:autotools.default_program}
+    // debugs a different program (ie, the first binary) the first time as the second
+    // (the default task from tasks.json)
     let tasks = await vscode.tasks.fetchTasks({type: "build"});
 
     // Find the default build task, and return its target

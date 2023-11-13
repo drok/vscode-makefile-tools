@@ -22,6 +22,7 @@ import { AutoToolsBuildTaskProvider,
         AutoToolsTestTaskProvider,
         AutoToolsCheckTaskProvider,
         AutoToolsBootstrapTaskProvider,
+        BuildTask,
         MyTaskProvider } from './tasks';
 
 import * as nls from 'vscode-nls';
@@ -67,6 +68,14 @@ export class MakefileToolsExtension {
     public registerTasks(): void {
         // FIXME: Implement Disposable
         this.tasks.forEach((provider) => vscode.tasks.registerTaskProvider(provider.myType, provider));
+
+        // FIXME: This is a workaround for vscode not parsing tasks.json prior to fetchTasks()
+        const kind:BuildTask = {
+            type: "build",
+            target: new make.BuildTarget(".", "fetchTasks-bug-workaround")
+        };
+        vscode.tasks.executeTask(new vscode.Task(kind, vscode.TaskScope.Workspace, 'autotools', 'autotools',
+            new vscode.ProcessExecution("true", ["this-is-a-workaround-for-fetchTasks-bug-not-parsing-tasks-json"])));
     }
     public updateTasks(): void {
         this.tasks.forEach((provider) => provider.update());
