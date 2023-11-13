@@ -664,7 +664,7 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
     // More than one setting may be updated on one settings.json save,
     // so make sure to OR the dirty state when it's calculated by a formula (not a simple TRUE value).
     vscode.workspace.onDidChangeConfiguration(async e => {
-        if (vscode.workspace.workspaceFolders && e.affectsConfiguration('makefile')) {
+        if (vscode.workspace.workspaceFolders && e.affectsConfiguration('autotools')) {
             // We are interested in updating only some relevant properties.
             // A subset of these should also trigger an IntelliSense config provider update.
             // Avoid unnecessary updates (for example, when settings are modified via the extension quickPick).

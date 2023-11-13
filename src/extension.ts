@@ -31,9 +31,9 @@ const localize: nls.LocalizeFunc = nls.loadMessageBundle();
 
 let statusBar: ui.UI = ui.getUI();
 
-export let extension: MakefileToolsExtension;
+export let extension: Extension;
 
-export class MakefileToolsExtension {
+export class Extension {
     public readonly _projectOutlineProvider = new tree.ProjectOutlineProvider();
     private readonly _projectOutlineTreeView = vscode.window.createTreeView('autotools.outline', {
         treeDataProvider: this._projectOutlineProvider,
@@ -257,7 +257,7 @@ export class MakefileToolsExtension {
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
     statusBar = ui.getUI();
-    extension = new MakefileToolsExtension(context);
+    extension = new Extension(context);
     configuration.disableAllOptionallyVisibleCommands();
     await extension.setFullFeatureSet(false);
 
