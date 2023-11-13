@@ -523,14 +523,6 @@ export async function getCurrentTarget(): Promise<make.BuildTarget> {
     return Promise.reject("Testing - no current build target");
 }
 
-let configureOnEdit: boolean | undefined;
-export function getConfigureOnEdit(): boolean | undefined { return configureOnEdit; }
-export function setConfigureOnEdit(configure: boolean): void { configureOnEdit = configure; }
-export async function readConfigureOnEdit(): Promise<void> {
-    configureOnEdit = await util.getExpandedSetting<boolean>("configureOnEdit");
-    logger.message(`Configure on edit: ${configureOnEdit}`);
-}
-
 // This setting is useful for some repos where directory changing commands (cd, push, pop)
 // are missing or printed more than once, resulting in associating some IntelliSense information
 // with the wrong file or even with a non existent URL.
@@ -580,7 +572,6 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
     await readkeepDryRuns();
     await readkeepConfigurationCache();
     await readMakefileConfigurations(currentMakefileConfigurationName);
-    await readConfigureOnEdit();
     await readIgnoreDirectoryCommands();
 
     initOptionalFeatures();
@@ -593,51 +584,6 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
     // config arg after config is fully loaded.
     await extension._projectOutlineProvider.update(extension.getState().buildConfiguration,
                                              make.t_all); // FIXME: update with real target
-
-    // Verify the dirty state of the IntelliSense config provider and update accordingly.
-    // The makefile.configureOnEdit setting can be set to false when this behavior is inconvenient.
-    vscode.window.onDidChangeActiveTextEditor(async e => {
-        // FIXME: There is no need to reconfigure when focus changes.
-        let language: string = "";
-        if (e) {
-            language = e.document.languageId;
-        }
-
-        // It is too annoying to generate a configure on any kind of editor focus change
-        // (for example even searching in the logging window generates this event).
-        // Since all the operations are guarded by the configureDirty state,
-        // the only "operation" left that we need to make sure it's up to date
-        // is IntelliSense, so trigger a configure when we switch editor focus
-        // into C/C++ source code.
-        switch (language) {
-            case "c":
-            case "cpp":
-                // If configureDirty is already set from a previous VSCode session,
-                // at workspace load this event (onDidChangeActiveTextEditor) is triggered automatically
-                // and if autotools.configureOnOpen is true, there is a race between two configure operations,
-                // one of which being unnecessary. If configureOnOpen is false, there is no race
-                // but still we don't want to override the behavior desired by the user.
-                // Additionally, if anything dirtied the configure state during a (pre)configure or build,
-                // skip this clean configure, to avoid annoying "blocked operation" notifications.
-                // The configure state remains dirty and a new configure will be triggered eventually:
-                // (selecting a new configuration, target or launch, build, editor focus change).
-                // Guarding only for not being blocked is not enough. For example,
-                // in the first scenario explained above, the race happens when nothing looks blocked
-                // here, but leading to a block notification soon.
-                if (extension.getState().configureDirty && configureOnEdit) {
-                    if ((extension.getCompletedConfigureInSession())
-                        && !make.blockedByOp(make.Operations.configure, false)) {
-                        logger.message("Configuring after settings or makefile changes...");
-                        await make.configure(make.TriggeredBy.configureAfterEditorFocusChange); // this sets configureDirty back to false if it succeeds
-                    }
-                }
-
-                break;
-
-            default:
-                break;
-        }
-    });
 
     // Modifying any makefile should trigger an IntelliSense config provider update,
     // so make the dirty state true.
@@ -738,10 +684,6 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
                 updatedSettingsSubkeys.push(subKey);
             }
 
-            subKey = "configureOnEdit";
-            let updatedConfigureOnEdit : boolean | undefined = await util.getExpandedSetting<boolean>(subKey);
-            if (updatedConfigureOnEdit !== configureOnEdit) {
-                await readConfigureOnEdit();
                 updatedSettingsSubkeys.push(subKey);
             }
 
@@ -834,11 +776,6 @@ export function prepareConfigurationsQuickPick(): string[] {
 // Fill a drop-down with all the configuration names defined by the user in autotools.configurations setting.
 // Triggers a cpptools configuration provider update after selection.
 export async function setNewConfiguration(): Promise<void> {
-    // Cannot set a new makefile configuration if the project is currently building or (pre-)configuring.
-    if (make.blockedByOp(make.Operations.changeConfiguration)) {
-        return;
-    }
-
     const items: string[] = prepareConfigurationsQuickPick();
 
     let options: vscode.QuickPickOptions = {};

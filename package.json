@@ -188,12 +188,6 @@
                     "default": false,
                     "scope": "resource"
                 },
-                "autotools.configureOnEdit": {
-                    "type": "boolean",
-                    "default": true,
-                    "description": "%autotools.configuration.makefile.configureOnEdit.description%",
-                    "scope": "resource"
-                },
                 "autotools.configureAfterCommand": {
                     "type": "boolean",
                     "default": true,

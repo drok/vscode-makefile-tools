@@ -47,7 +47,6 @@ export const t_clean = new BuildTarget("", "clean");
 // Leave positive error codes for make exit values
 export enum ConfigureBuildReturnCodeTypes {
     success = 0,
-    blocked = -1,
     cancelled = -2,
     notFound = -3,
     outOfDate = -4,
@@ -72,7 +71,6 @@ export enum TriggeredBy {
     cleanConfigure = "command pallette (clean configure)",
     configureBeforeBuild = "configure dirty (before build), settings (configureAfterCommand)",
     configureAfterConfigurationChange = "settings (configureAfterCommand), command pallette (setBuildConfiguration)",
-    configureAfterEditorFocusChange = "configure dirty (editor focus change), settings (configureOnEdit)",
     configureBeforeTargetChange = "configure dirty (before target change), settings (configureAfterCommand)",
     configureAfterTargetChange = "settings (configureAfterCommand)",
     configureBeforeLaunchTargetChange = "configureDirty (before launch target change), settings (configureAfterCommand)",
@@ -163,7 +161,7 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
     // FIXME: also assume-old the configuration files listed
     // ./config.status --help
 
-    logger.messageNoCR(`Generating ${getConfigureIsInBackground() ? "in the background a new " : ""}configuration cache with command: `);
+    logger.messageNoCR(`Generating configuration cache with command: `);
 
     logger.message(`'${configuration.getMakePath()} ${makeArgs.join(" ")}'`);
 
@@ -476,14 +474,6 @@ export async function configure(triggeredBy: TriggeredBy): Promise<number> {
     return ConfigureBuildReturnCodeTypes.fullFeatureFalse;
   }
 
-  if (blockedByOp(Operations.configure)) {
-    return ConfigureBuildReturnCodeTypes.blocked;
-  }
-
-  if (!saveAll()) {
-    return ConfigureBuildReturnCodeTypes.saveFailed;
-  }
-
   // Same start time for configure and an eventual pre-configure.
   let configureStartTime: number = Date.now();
 
@@ -760,9 +750,6 @@ async function loadConfigurationFromCache(progress: vscode.Progress<{}>, cancel:
 export async function doConfigure(progress: vscode.Progress<{}>, cancel: vscode.CancellationToken, readCache: boolean, cacheFile: string, recursiveDoConfigure: boolean = false): Promise<ConfigureSubphasesStatus> {
     let subphaseStats: ConfigureSubphasesStatus = {};
 
-    // Configure does not start in the background (we have to load a configuration cache first).
-    setConfigureIsInBackground(false);
-
     // If available, load all the configure constructs via json from the cache file.
     // If this doConfigure is in level 1 of recursion, avoid loading the configuration cache again
     // since it's been done at recursion level 0.
@@ -775,10 +762,6 @@ export async function doConfigure(progress: vscode.Progress<{}>, cancel: vscode.
         subphaseStats.loadFromCache = await loadConfigurationFromCache(progress, cancel, cacheFile);
         if (subphaseStats.loadFromCache.retc === ConfigureBuildReturnCodeTypes.cancelled) {
             return subphaseStats;
-        } else if (subphaseStats.loadFromCache.retc === ConfigureBuildReturnCodeTypes.success) {
-            // In case of success, the following configure steps should not block any other operation
-            // and can be performed in the background.
-            setConfigureIsInBackground(true);
         }
     } else {
         logger.message("Loading configurations from cache is not necessary.", "Verbose");
