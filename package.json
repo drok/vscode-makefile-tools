@@ -181,12 +181,6 @@
                     "default": false,
                     "scope": "resource"
                 },
-                "autotools.ignoreDirectoryCommands": {
-                    "type": "boolean",
-                    "description": "%autotools.configuration.makefile.ignoreDirectoryCommands.description%",
-                    "default": true,
-                    "scope": "resource"
-                },
                 "autotools.panel.visibility": {
                     "type": "object",
                     "default": null,

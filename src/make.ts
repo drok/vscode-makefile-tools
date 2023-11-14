@@ -486,9 +486,6 @@ export async function configure(triggeredBy: TriggeredBy): Promise<number> {
   let readCache: boolean = configurationCache ?
     util.checkFileExistsSync(configurationCache) : false;
 
-  let compileCommandsPath: string | undefined =
-    configuration.getCompileCommandsPath();
-
   // Start with the success assumption until later analysis.
   let retc: number = ConfigureBuildReturnCodeTypes.success;
   let subphaseStats: ConfigureSubphasesStatus = {};
@@ -587,20 +584,6 @@ export async function configure(triggeredBy: TriggeredBy): Promise<number> {
         );
       }
 
-      // Export the compile_commands.json file if the option is enabled.
-      if (
-        compileCommandsPath &&
-        retc !== ConfigureBuildReturnCodeTypes.cancelled
-      ) {
-        let compileCommands: CompileCommand[] =
-          ConfigurationCache.customConfigurationProvider.fileIndex.map(
-            ([, { compileCommand }]) => compileCommand
-          );
-        util.writeFile(
-          compileCommandsPath,
-          JSON.stringify(compileCommands, undefined, 4)
-        );
-      }
     } else if (readCache) {
         // FIXME: 
         // util.deleteFileSync(configurationCache);
