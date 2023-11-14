@@ -29,7 +29,7 @@
         "vscode-test": "^0.4.1"
     },
     "dependencies": {
-        "@mergesium/shell-quote": "^2.0.1",
+        "@mergesium/shell-quote": "^2.0.3",
         "@types/glob": "^7.1.1",
         "glob": "^7.1.6",
         "module-alias": "^2.2.2",

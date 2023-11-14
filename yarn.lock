@@ -42,10 +42,10 @@
     normalize-path "^2.0.1"
     through2 "^2.0.3"
 
-"@mergesium/shell-quote@^2.0.1":
-  version "2.0.1"
-  resolved "https://registry.yarnpkg.com/@mergesium/shell-quote/-/shell-quote-2.0.1.tgz#4860facc2d92c080ff4ed4e150b92366716e209f"
-  integrity sha512-YaRiQh/kbfvPC/nVTwlev8ub+lD1fUcua2pNLoIdKWbCPOU5AMsE7GCTmxypfNNw70sGnm0fatD8cD54+5LFsA==
+"@mergesium/shell-quote@^2.0.3":
+  version "2.0.3"
+  resolved "https://registry.yarnpkg.com/@mergesium/shell-quote/-/shell-quote-2.0.3.tgz#2672e0b7c75f22f4a120e75d85022eaedd300ed5"
+  integrity sha512-qR5vGC8PufbtRGsVZDQNU1agztFDePV1hDjOUXZwl/SE3AIiMcRhdZcJR8+0jTHDBlSp3FGCMRQk9da8W96XNA==
 
 "@octokit/auth-token@^2.4.4":
   version "2.5.0"
