@@ -110,13 +110,7 @@ export class ProjectOutlineProvider implements vscode.TreeDataProvider<BaseNode>
         if (node) {
             return node.getChildren();
         }
-        if (configuration.isOptionalFeatureEnabled("debug") || configuration.isOptionalFeatureEnabled("run")) {
-            return [this._currentConfigurationItem,
-                    this._currentBuildTargetItem];
-        } else {
-            return [this._currentConfigurationItem,
-                    this._currentBuildTargetItem];
-        }
+        return [];
      }
 
     pathDisplayed(pathInSettings: string | undefined, kind: string, searchInPath: boolean, makeRelative: boolean): string {

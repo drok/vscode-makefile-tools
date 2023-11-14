@@ -31,8 +31,6 @@
    "autotools.configuration.promptClean.description": "Prompt to clean build directory when the build configuration changes.",
    "autotools.configuration.makefile.ignoreDirectoryCommands.description": "Don't analyze directory changing commands like cd, push, pop.",
    "autotools.configuration.makefile.compileCommandsPath.description": "The path to the compilation database file",
-   "autotools.configuration.makefile.panel.visibility.debug.description": "Enable debugging locally (in this host) images built by this extension",
-   "autotools.configuration.makefile.panel.visibility.run.description": "Enable running locally (in this host) images built by this extension",
    "autotools.taskDefinitions.task.bootstrap.markdownDescription": "Task bootstraps the autotools project (ie, creates the 'configure' file, see [bootstrap](https://www.gnu.org/software/automake/faq/autotools-faq.html#What-does-_002e_002fbootstrap-or-_002e_002fautogen_002esh-do_003f))",
    "autotools.taskDefinitions.task.build.description": "Task builds a make target (program, library, etc)",
    "autotools.taskDefinitions.task.test.description": "Task runs one test, named in the 'target' member",

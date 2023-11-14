@@ -186,22 +186,6 @@
                     "markdownDescription": "%autotools.configuration.promptClean.description%",
                     "default": true,
                     "scope": "resource"
-                },
-                "autotools.panel.visibility": {
-                    "type": "object",
-                    "default": null,
-                    "properties": {
-                        "debug": {
-                            "type": "boolean",
-                            "description": "%autotools.configuration.makefile.panel.visibility.debug.description%",
-                            "default": true
-                        },
-                        "run": {
-                            "type": "boolean",
-                            "description": "%autotools.configuration.makefile.panel.visibility.run.description%",
-                            "default": true
-                        }
-                    }
                 }
             }
         },

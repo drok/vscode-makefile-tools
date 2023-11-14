@@ -263,7 +263,6 @@ export async function openSettings(setting: string) : Promise<void> {
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
     statusBar = ui.getUI();
     extension = new Extension(context);
-    configuration.disableAllOptionallyVisibleCommands();
     await extension.setFullFeatureSet(false);
 
     telemetry.activate();
