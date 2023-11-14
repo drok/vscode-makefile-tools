@@ -722,10 +722,7 @@ export async function setNewConfiguration(): Promise<void> {
 
         await setConfigurationByName(chosen);
 
-        if (configureAfterCommand) {
-            logger.message("Automatically reconfiguring the project after a makefile configuration change.");
-            await make.configure(make.TriggeredBy.configureAfterConfigurationChange);
-        }
+        await make.configure(make.TriggeredBy.configureAfterConfigurationChange);
 
         // Refresh telemetry for this new makefile configuration
         // (this will find the corresponding item in the autotools.configurations array
