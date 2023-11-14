@@ -14,6 +14,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as telemetry from './telemetry';
 import * as multiStep from './multiStepInput';
+import { openSettings } from './extension';
 
 import * as nls from 'vscode-nls';
 import { dir } from 'console';
@@ -590,6 +591,23 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
                 // TODO: should call an onConfigurationUpdate(updatedConfiguration);
                 // so that not only build log, but other updated members can be handled
                 await readMakefileConfigurations(currentMakefileConfigurationName);
+                if (!util.areEqual(updatedConfiguration, currentMakefileConfiguration)) {
+                    setCurrentMakefileConfiguration(currentMakefileConfiguration.name);
+                    extension.getState().configureDirty = true;
+
+                    const cleanit: string = localize("autotools.cleanit", "Clean");
+                    const setit: string = localize("autotools.edit.setting", "Setting...");
+                    vscode.window.showWarningMessage(
+                        localize("autotools.should.clean", "Does this change require 'make clean'?"),
+                        cleanit, localize("autotools.no", "No"), setit)
+                    .then((value) => {
+                        if (value === cleanit) {
+                            extension.build(make.t_clean);
+                        } else if (value === setit) {
+                            openSettings("autotools.promptClean");
+                        }
+                    });
+                }
             }
 
             subKey = "keepDryRuns";

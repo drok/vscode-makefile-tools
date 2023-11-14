@@ -255,6 +255,11 @@ export class Extension {
     public getCompilerFullPath() : string | undefined { return this.compilerFullPath; }
 }
 
+export async function openSettings(setting: string) : Promise<void> {
+    await vscode.commands.executeCommand("workbench.action.openSettings", setting);
+    await vscode.commands.executeCommand("workbench.action.openWorkspaceSettings");
+}
+
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
     statusBar = ui.getUI();
     extension = new Extension(context);
@@ -363,11 +368,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     // becase the latter may use state info in variable expansion.
     configuration.initFromState();
     await configuration.initFromSettings(true);
-
-    const openSettings = async (setting: string) => {
-        await vscode.commands.executeCommand("workbench.action.openSettings", setting);
-        await vscode.commands.executeCommand("workbench.action.openWorkspaceSettings");
-    }
 
     const openFile = async (fileUri: vscode.Uri) => {
         await vscode.commands.executeCommand("vscode.open", fileUri);
