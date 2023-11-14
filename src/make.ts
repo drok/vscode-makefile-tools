@@ -131,6 +131,9 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
         makeArgs.push(...["-f", makefile]);
     }
 
+    let abs_top_builddir = util.resolvePathToRoot(dir || "");
+    let build_tree: Make = new Make(abs_top_builddir, abs_top_builddir);
+
     // Include all the make arguments defined in autotools.configurations.makeArgs
     makeArgs = makeArgs.concat(c.makeArgs || []);
 
@@ -182,8 +185,7 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
         }
         let completeErr: string = "";
         let heartBeat: number = Date.now();
-        let abs_top_builddir = util.resolvePathToRoot(dir || "");
-        let parserStack: Parser[] = [new Make(abs_top_builddir, abs_top_builddir)];
+        let parserStack: Parser[] = [build_tree];
         let linenumber: number = 0;
         let lineBuffer: string = "";
 

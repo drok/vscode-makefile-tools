@@ -462,20 +462,6 @@ export async function getCurrentTarget(): Promise<make.BuildTarget> {
     return Promise.reject("Testing - no current build target");
 }
 
-// This setting is useful for some repos where directory changing commands (cd, push, pop)
-// are missing or printed more than once, resulting in associating some IntelliSense information
-// with the wrong file or even with a non existent URL.
-// When this is set, the current path deduction relies only on --print-directory
-// (which prints the messages regarding "Entering direcory" and "Leaving directory"),
-// which is not perfect either for all repos.
-let ignoreDirectoryCommands: boolean | undefined;
-export function getIgnoreDirectoryCommands(): boolean | undefined { return ignoreDirectoryCommands; }
-export function setIgnoreDirectoryCommands(ignore: boolean): void { ignoreDirectoryCommands = ignore; }
-export async function readIgnoreDirectoryCommands(): Promise<void> {
-    ignoreDirectoryCommands = await util.getExpandedSetting<boolean>("ignoreDirectoryCommands");
-    logger.message(`Ignore directory commands: ${ignoreDirectoryCommands}`);
-}
-
 // Initialization from the state of the workspace.
 // The user does not have direct access to this data.
 // The extension sets state variables via user actions like:
@@ -511,7 +497,6 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
     await readkeepDryRuns();
     await readkeepConfigurationCache();
     await readMakefileConfigurations(currentMakefileConfigurationName);
-    await readIgnoreDirectoryCommands();
 
     initOptionalFeatures();
     await readFeaturesVisibility();
