@@ -619,7 +619,7 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
 
             subKey = "keepConfigurationCache";
             let updatedkeepConfigurationCache : boolean | undefined = await util.getExpandedSetting<boolean>(subKey);
-            if (keepConfigurationCache !== keepConfigurationCache) {
+            if (updatedkeepConfigurationCache !== keepConfigurationCache) {
                 await readkeepConfigurationCache();
                 updatedSettingsSubkeys.push(subKey);
             }
