@@ -17,7 +17,7 @@
    "autotools.debugger.launch.cwd.description": "Working directory",
    "autotools.debugger.launch.env.description": "Environment variables",
    "autotools.debugger.launch.stopAtEntry.description": "Stop at entry",
-   "autotools.configuration.makefile.configurations.description": "The user defined makefile configurations",
+   "autotools.configuration.makefile.configurations.description": "Build configurations (eg, Debug, Release, etc)",
    "autotools.configuration.makefile.configurations.name.description": "The name of the makefile configuration",
    "autotools.configurations.top_builddir.markdownDescription": "The relative name of the top level of the current build tree. See [GNU autoconf](https://www.gnu.org/software/autoconf/manual/autoconf-2.67/html_node/Preset-Output-Variables.html/)",
    "autotools.configuration.makefile.configurations.makeArgs.description": "Arguments to pass to the make command",
