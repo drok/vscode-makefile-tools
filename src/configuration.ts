@@ -328,6 +328,7 @@ export async function getCommandForConfiguration(): Promise<void> {
     // store the found makefile for display in the outline
     setConfigurationMakefile(makefileExists ? relativeMakefile : undefined);
     extension.updateMakefileFilePresent(makefileExists);
+    statusBar.setStatus(makefileExists ? ui.UIStatus.OK : ui.UIStatus.NO_MAKEFILE);
 
     // Validation and warnings about properly defining the makefile and make tool.
     if (!makefileExists) {
@@ -344,6 +345,7 @@ export async function getCommandForConfiguration(): Promise<void> {
         telemetry.logEvent("makefileNotFound", telemetryProperties);
         await extension.setFullFeatureSet(false);
         disableAllOptionallyVisibleCommands();
+        statusBar.setLoading(false);
     } else {
         await extension.setFullFeatureSet(true);
         enableOptionallyVisibleCommands();

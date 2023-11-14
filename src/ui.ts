@@ -1,84 +1,79 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT license.
 
-// Deprecated UI support for buttons and quickpicks.
-// Replaced by autotools.outline view in the left side bar.
-// To be removed, hidden for now.
-
 import * as vscode from 'vscode';
-import { BuildTarget } from './make';
+
+import * as nls from 'vscode-nls';
+nls.config({ messageFormat: nls.MessageFormat.bundle, bundleFormat: nls.BundleFormat.standalone })();
+const localize: nls.LocalizeFunc = nls.loadMessageBundle();
+const recursiveString = localize("recursive", "(recursive)");
 
 let ui: UI;
 
+export enum UIStatus {
+    OK = 0,
+    WARN = 1,
+    ERR = 2,
+    /* Bugs like thrown exceptions */
+    RUNTIME = 3,
+    /* Other error conditions */
+    NO_MAKEFILE = 4,
+}
+
 export class UI {
+    private configuration: string;
     private configurationButton: vscode.StatusBarItem;
-    private targetButton: vscode.StatusBarItem;
-    private launchConfigurationButton: vscode.StatusBarItem;
-    private buildButton: vscode.StatusBarItem;
-    private debugButton: vscode.StatusBarItem;
-    private runButton: vscode.StatusBarItem;
+    static colors: vscode.ThemeColor[] = [
+        new vscode.ThemeColor("statusBar.background"),
+        new vscode.ThemeColor("statusBarItem.warningBackground"),
+        new vscode.ThemeColor("statusBarItem.errorBackground"),
+        new vscode.ThemeColor("statusBarItem.errorBackground"),
+        new vscode.ThemeColor("statusBarItem.errorBackground"),
+    ];
+    static fgcolors: vscode.ThemeColor[] = [
+        new vscode.ThemeColor("statusBar.foreground"), /* OK */
+        new vscode.ThemeColor("statusBarItem.warningForeground"), /* WARN */
+        new vscode.ThemeColor("statusBarItem.errorForeground"), /* ERR */
+        new vscode.ThemeColor("statusBarItem.errorForeground"), /* RUNTIME */
+        new vscode.ThemeColor("statusBarItem.errorForeground"), /* NO_MAKEFILE */
+    ];
 
+    /* When a new configuration is set, it is shown as 'loading' */
     public setConfiguration(configuration: string): void {
-        this.configurationButton.text = "$(settings) Build configuration: " + configuration;
+        this.configuration = configuration;
+        this.configurationButton.text = '$(loading~spin) ' + configuration;
     }
 
-    public setTarget(target: BuildTarget): void {
-        this.targetButton.text = "$(tag) Target to build: " + target.goal + "@" + target.builddir;
-    }
-
-    public setLaunchConfiguration(launchConfigurationStr: string | undefined): void {
-        if (launchConfigurationStr) {
-            this.launchConfigurationButton.text = "$(rocket) Launch configuration: ";
-            this.launchConfigurationButton.text += "[";
-            this.launchConfigurationButton.text += launchConfigurationStr;
-            this.launchConfigurationButton.text += "]";
-        } else {
-            this.launchConfigurationButton.text = "No launch configuration set";
+    public setStatus(status: UIStatus): void {
+        this.configurationButton.backgroundColor = UI.colors[status];
+        this.configurationButton.color = UI.fgcolors[status];
+        switch (status) {
+            case UIStatus.NO_MAKEFILE:
+                this.configurationButton.tooltip = localize("autotools.report.no.makefine", "The configuration is not initialized; There is no Makefile.");
+                break;
+            case UIStatus.RUNTIME:
+                this.configurationButton.tooltip = localize("autotools.report.bug", "Runtime Error; please report bug.");
+                this.configurationButton.text = "$(tools) $(bug)";
+                break;
         }
     }
 
+    public setLoading(loading: boolean): void {
+        this.configurationButton.text = (loading ? '$(loading~spin) ' : '$(tools) ') + this.configuration;
+    }
+
     public constructor() {
+        this.configuration = '...'
         this.configurationButton = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 4.6);
         this.configurationButton.command = "autotools.setBuildConfiguration";
-        this.configurationButton.tooltip = "Click to select the workspace make configuration";
-        this.configurationButton.hide();
-
-        this.targetButton = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 4.5);
-        this.targetButton.command = "autotools.setBuildTarget";
-        this.targetButton.tooltip = "Click to select the target to be run by make";
-        this.targetButton.hide();
-
-        this.buildButton = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 4.4);
-        this.buildButton.command = "autotools.buildTarget";
-        this.buildButton.tooltip = "Click to build the selected target";
-        this.buildButton.text = "$(gear) Build";
-        this.buildButton.hide();
-
-        this.launchConfigurationButton = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 4.3);
-        this.launchConfigurationButton.command = "autotools.setLaunchConfiguration";
-        this.launchConfigurationButton.tooltip = "Click to select the make launch configuration (binary, args and current path)";
-        this.launchConfigurationButton.hide();
-
-        this.debugButton = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 4.2);
-        this.debugButton.command = "autotools.launchDebug";
-        this.debugButton.tooltip = "Click to debug the selected executable";
-        this.debugButton.text = "$(bug) Debug";
-        this.debugButton.hide();
-
-        this.runButton = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 4.1);
-        this.runButton.command = "autotools.launchRun";
-        this.runButton.tooltip = "Click to launch the selected executable";
-        this.runButton.text = "$(terminal) Run";
-        this.runButton.hide();
+        this.configurationButton.tooltip = localize("autotools.click.setconfig", "Click to select another build configuration");
+        this.configurationButton.backgroundColor = UI.colors[UIStatus.OK];
+        this.configurationButton.color = UI.fgcolors[UIStatus.OK];
+        this.configurationButton.show();
     }
 
     public dispose(): void {
         this.configurationButton.dispose();
-        this.targetButton.dispose();
-        this.launchConfigurationButton.dispose();
-        this.buildButton.dispose();
-        this.debugButton.dispose();
-        this.runButton.dispose();
     }
 }
 

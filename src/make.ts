@@ -20,6 +20,7 @@ import * as path from 'path';
 import * as util from './util';
 import * as telemetry from './telemetry';
 import * as vscode from 'vscode';
+import * as ui from './ui';
 import { quote } from '@mergesium/shell-quote';
 
 import * as nls from 'vscode-nls';
@@ -327,6 +328,7 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
             extension.updateCppToolsProvider();
             extension.updateTasks();
         }
+        ui.getUI().setStatus(result.returnCode !== ConfigureBuildReturnCodeTypes.success ? ui.UIStatus.ERR : ui.UIStatus.OK);
 
         curPID = -1;
         return {
@@ -335,6 +337,7 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
         };
     } catch (error) {
         logger.message("Parsing the configuration failed due to: " + error);
+        ui.getUI().setStatus(ui.UIStatus.RUNTIME);
         return {
             retc: ConfigureBuildReturnCodeTypes.notFound,
             elapsed: util.elapsedTimeSince(startTime)
@@ -534,6 +537,7 @@ export async function configure(triggeredBy: TriggeredBy): Promise<number> {
       }
     );
 
+    ui.getUI().setLoading(false);
     // If not cancelled already, analyze all doConfigure subphases
     // to decide how we should look at the final configure outcome.
     // retc is set to cancel in onCancellationRequested
