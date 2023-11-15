@@ -15,6 +15,11 @@ import * as path from 'path';
 // import {CustomConfigProviderItem} from '../cpptools';
 import {Parser, ParserDisp, EmptyLine } from '../parser';
 import { Executing } from './shell';
+import { Node } from '../tree';
+
+import * as nls from 'vscode-nls';
+nls.config({ messageFormat: nls.MessageFormat.bundle, bundleFormat: nls.BundleFormat.standalone })();
+const localize: nls.LocalizeFunc = nls.loadMessageBundle();
 
 const chunkSize: number = 100;
 
@@ -324,7 +329,7 @@ const GoalsEndRe = /^# files hash-table stats:$/;
  * (eg, whether it is up-to-date). Calls the Recipe to parse the build recipe
  * if any.
  */
-export class Goal implements Parser {
+export class Goal extends Node implements Parser {
     public static readonly Flags = {
         None: 0,
         /* Flags gathered from Make (phony, etc) */
@@ -420,9 +425,23 @@ export class Goal implements Parser {
     push(sub: Parser) {
         return undefined; /* The end of the Recipe is the end of the Goal */
     }
+    getChildren(): Node[] {
+        return [];
+    }
+    getTreeItem(): vscode.TreeItem {
+        const item: vscode.TreeItem = new vscode.TreeItem(this.goal || "unk");
+        item.collapsibleState = vscode.TreeItemCollapsibleState.None;
+        item.tooltip = localize("automake.goal.tooltip", "FIXME: better tooltip");
+        item.contextValue = [
+            `nodeType=buildTarget`,
+        ].join(',');
+        return item;
+    }
+
     goal: string | undefined = undefined;
     flags: number = Goal.Flags.None;
     depends: string[] | undefined = undefined;
+    task: vscode.Task | undefined;
 }
 
 const LinkerRe = /\$\(LINK\)\s/;

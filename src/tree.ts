@@ -7,10 +7,12 @@ import * as configuration from './configuration';
 import * as path from 'path';
 import * as util from './util';
 import { BuildTarget, t_none } from './make';
+import { Make, Goal } from './parser/gnumake';
 import * as vscode from 'vscode';
 
 import * as nls from 'vscode-nls';
 import { extension } from './extension';
+import { assert } from 'console';
 nls.config({ messageFormat: nls.MessageFormat.bundle, bundleFormat: nls.BundleFormat.standalone })();
 const localize: nls.LocalizeFunc = nls.loadMessageBundle();
 
@@ -18,100 +20,212 @@ interface NamedItem {
     name: string;
 }
 
-abstract class BaseNode {
-    constructor(public readonly id: string) { }
+export abstract class Node {
+    // constructor(public readonly id: string) { }
     abstract getTreeItem(): vscode.TreeItem;
-    abstract getChildren(): BaseNode[];
+    abstract getChildren(): Node[];
 }
 
-export class BuildTargetNode extends BaseNode {
+export class SubNode extends Node {
+    constructor(private submake: Make, private flag: number) {
+        super();
+    }
+
+    getChildren(): Node[] {
+        let goals : Node[] = this.submake.goals
+            .filter(goal => goal.flags & this.flag)
+            .map(goal => new TaskNode(goal));
+        goals.push(...this.submake.submake
+            .map(sub => new SubNode(sub, this.flag)));
+        return goals;
+    }
+
+    getTreeItem(): vscode.TreeItem {
+        //if (!this.submake.)
+        //    throw new Error("Unexpected null goal");
+        const item: vscode.TreeItem = new vscode.TreeItem('dir: ' + this.submake.dir);
+        item.collapsibleState = this.submake.submake.length || this.submake.goals.length ?
+            vscode.TreeItemCollapsibleState.Collapsed :
+            vscode.TreeItemCollapsibleState.None;
+        item.tooltip = localize("makefile.target.currently.selected.for.build", "The target currently selected for build.");
+        item.contextValue = [
+            `nodeType=submake`,
+        ].join(',');
+        return item;
+    }
+}
+
+export class TaskNode extends Node {
+    constructor(private goal: Goal) {
+        super();
+    }
+
+    getChildren(): Node[] {
+        return [];
+    }
+
+    getTreeItem(): vscode.TreeItem {
+        if (!this.goal.goal)
+            throw new Error("Unexpected null goal");
+        const item: vscode.TreeItem = new vscode.TreeItem('node: ' + this.goal.goal);
+        item.collapsibleState = vscode.TreeItemCollapsibleState.None;
+        item.tooltip = localize("makefile.target.currently.selected.for.build", "The target currently selected for build.");
+        item.contextValue = [
+            `nodeType=buildTarget`,
+        ].join(',');
+        return item;
+    }
+}
+
+
+export class TaskSection extends Node {
+    constructor(build_tree: Make, name: string, flag: number) {
+        super();
+        this.tree = build_tree;
+        this._name = name;
+        this.flag = flag;
+    }
+
+    tree: Make;
+    flag: number;
+    _name: string;
+
+//    update(targetName: BuildTarget): void {
+//        this._name = localize("tree.build.target", "Build target: {0}", `[${targetName.goal} @ ${targetName.builddir}]`);
+//    }
+
+    getChildren(): Node[] {
+        let goals : Node[] = this.tree.goals
+            .filter(goal => goal.flags & this.flag)
+            .map(goal => new TaskNode(goal));
+        goals.push(...this.tree.submake
+            .map(sub => new SubNode(sub, this.flag)));
+        return goals;
+    }
+
+    getTreeItem(): vscode.TreeItem {
+        const item: vscode.TreeItem = new vscode.TreeItem(this._name);
+        item.collapsibleState = vscode.TreeItemCollapsibleState.Expanded;
+        // item.tooltip = localize("makefile.target.currently.selected.for.build", "The target currently selected for build.");
+        item.contextValue = [
+            `nodeType=section.` + this._name,
+        ].join(',');
+        return item;
+    }
+}
+
+export class CheckNode extends Node {
     constructor(targetName: BuildTarget) {
-        super(`buildTarget:${targetName.goal}@${targetName.builddir}`);
+        super();
         this._name = targetName.goal;
     }
 
     _name: string;
 
     update(targetName: BuildTarget): void {
-        this._name = localize("tree.build.target", "Build target: {0}", `[${targetName.goal} @ ${targetName.builddir}]`);
+        this._name = localize("tree.check.target", "Check target: {0}", `[${targetName.goal} @ ${targetName.builddir}]`);
     }
 
-    getChildren(): BaseNode[] {
+    getChildren(): Node[] {
         return [];
     }
 
     getTreeItem(): vscode.TreeItem {
-        try {
-            const item: vscode.TreeItem = new vscode.TreeItem(this._name);
-            item.collapsibleState = vscode.TreeItemCollapsibleState.None;
-            item.tooltip = localize("makefile.target.currently.selected.for.build", "The target currently selected for build.");
-            item.contextValue = [
-                `nodeType=buildTarget`,
-            ].join(',');
-            return item;
-        } catch (e) {
-            return new vscode.TreeItem(localize("issue.rendering.item", "{0} (there was an issue rendering this item)", this._name));
-        }
+        const item: vscode.TreeItem = new vscode.TreeItem(this._name);
+        item.collapsibleState = vscode.TreeItemCollapsibleState.None;
+        item.tooltip = localize("makefile.target.currently.selected.for.build", "The target currently selected for build.");
+        item.contextValue = [
+            `nodeType=buildTarget`,
+        ].join(',');
+        return item;
     }
-
 }
 
-export class ConfigurationNode extends BaseNode {
+export class ConfigurationNode extends Node {
     constructor(configurationName: string) {
-        super(`configuration:${configurationName}`);
+        super();
+        // super(`configuration:${configurationName}`);
         this._name = configurationName;
     }
 
     _name: string;
+    build_tree: Make | undefined;
 
     update(configurationName: string): void {
         this._name = localize("tree.configuration", "Configuration: {0}", `[${configurationName}]`);
     }
 
-    getChildren(): BaseNode[] {
-        return [];
+    updateTargets(build_tree: Make) : void {
+        this.build_tree = build_tree;
+    }
+
+//    private hasGoalKind(flag: number) : boolean {
+//        
+//    }
+    getChildren(): Node[] {
+        let children: Node[] = [];
+        if (!this.build_tree)
+            return children;
+        //if (true)
+        return [
+            new TaskSection(this.build_tree, 'Programs', Goal.Flags.Linked_binary),
+        // if (this.build_tree.goals.some(goal => goal.goal == "check"))
+            new TaskSection(this.build_tree, 'Test Suites', Goal.Flags.Test_Suite),
+        ];
+        //return children;
+    }
+    public getParent(element: Node): Node | undefined {
+        //const parent = element. resource.with({ path: dirname(element.resource.path) });
+        // return parent.path !== '//' ? { resource: parent, isDirectory: true } : undefined;
+        return {} as Node;
     }
 
     getTreeItem(): vscode.TreeItem {
-        try {
-            const item: vscode.TreeItem = new vscode.TreeItem(this._name);
-            item.collapsibleState = vscode.TreeItemCollapsibleState.None;
-            item.tooltip = "The makefile configuration currently selected from settings ('autotools.configurations').";
-            item.contextValue = [
-                `nodeType=configuration`,
-            ].join(',');
-            return item;
-        } catch (e) {
-            return new vscode.TreeItem(localize("issue.rendering.item", "{0} (there was an issue rendering this item)", this._name));
-        }
+        const item: vscode.TreeItem = new vscode.TreeItem(this._name);
+        item.collapsibleState = this.build_tree ? vscode.TreeItemCollapsibleState.Expanded : vscode.TreeItemCollapsibleState.None;
+        item.tooltip = "The makefile configuration currently selected from settings ('autotools.configurations').";
+        item.contextValue = [
+            `nodeType=configuration`,
+        ].join(',');
+        return item;
     }
 
 }
 
-export class ProjectOutlineProvider implements vscode.TreeDataProvider<BaseNode> {
-    private readonly _changeEvent = new vscode.EventEmitter<BaseNode | null>();
-    private readonly _unsetString = localize("Unset", "Unset");
+export class ProjectOutlineProvider implements vscode.TreeDataProvider<Node> {
+    private readonly _changeEvent = new vscode.EventEmitter<Node | null>();
+    //private readonly _unsetString = localize("Unset", "Unset");
 
-    constructor() {
-        this._currentConfigurationItem = new ConfigurationNode(this._unsetString);
-        this._currentBuildTargetItem = new BuildTargetNode(t_none);
+    constructor(configuration: string) {
+        this._currentConfigurationItem = new ConfigurationNode(configuration);
     }
 
     private _currentConfigurationItem: ConfigurationNode;
-    private _currentBuildTargetItem: BuildTargetNode;
+
+    public refresh(): any {
+        this._changeEvent.fire(this._currentConfigurationItem);
+    }
 
     get onDidChangeTreeData(): any {
         return this._changeEvent.event;
     }
-    async getTreeItem(node: BaseNode): Promise<vscode.TreeItem> {
+    async getTreeItem(node: Node): Promise<vscode.TreeItem> {
         return node.getTreeItem();
     }
-    getChildren(node?: BaseNode): BaseNode[] {
+    getChildren(node?: Node): Node[] {
         if (node) {
+            //throw new Error("Unexpected request for children of ProjectOutlineProvider");
             return node.getChildren();
         }
-        return [];
+        return [this._currentConfigurationItem];
      }
+    public getParent(element: Node): Node | undefined {
+        //const parent = element. resource.with({ path: dirname(element.resource.path) });
+        // return parent.path !== '//' ? { resource: parent, isDirectory: true } : undefined;
+        if (!(element instanceof ConfigurationNode))
+            throw new Error("Unexpected request for parent of non-ConfigurationNode");
+        return element instanceof ConfigurationNode ? undefined : {} as Node;
+    }
 
     pathDisplayed(pathInSettings: string | undefined, kind: string, searchInPath: boolean, makeRelative: boolean): string {
        if (!pathInSettings) {
@@ -126,10 +240,8 @@ export class ProjectOutlineProvider implements vscode.TreeDataProvider<BaseNode>
        return (!checkFileExists ? `${kind} (not found)` : `${kind}`) + `: [${makeRelative ? util.makeRelPath(finalPath, util.getWorkspaceRoot()) : finalPath}]`;
     }
 
-    async update(configuration: string | undefined,
-                 buildTarget: BuildTarget): Promise<void> {
-        this._currentConfigurationItem.update(configuration || this._unsetString);
-        this._currentBuildTargetItem.update(buildTarget);
+    async update(configuration: string): Promise<void> {
+        this._currentConfigurationItem.update(configuration);
 
         this.updateTree();
     }
@@ -139,9 +251,8 @@ export class ProjectOutlineProvider implements vscode.TreeDataProvider<BaseNode>
         this.updateTree();
     }
 
-    /* FIXME: REMOVE, not used */
-    updateBuildTarget(buildTarget: BuildTarget): void {
-        this._currentBuildTargetItem.update(buildTarget);
+    updateTargets(build_tree: Make) : void {
+        this._currentConfigurationItem.updateTargets(build_tree);
         this.updateTree();
     }
 

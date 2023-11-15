@@ -9,6 +9,7 @@ import * as fs from 'fs';
 import * as logger from './logger';
 import * as make from './make';
 import * as toolParser from './parser/tool';
+import * as gnumake from './parser/gnumake';
 import * as path from 'path';
 import * as state from './state';
 import * as telemetry from './telemetry';
@@ -34,7 +35,8 @@ let statusBar: ui.UI = ui.getUI();
 export let extension: Extension;
 
 export class Extension {
-    public readonly _projectOutlineProvider = new tree.ProjectOutlineProvider();
+    private mementoState = new state.StateManager(this.extensionContext);
+    public readonly _projectOutlineProvider = new tree.ProjectOutlineProvider(this.mementoState.buildConfiguration || 'Default');
     private readonly _projectOutlineTreeView = vscode.window.createTreeView('autotools.outline', {
         treeDataProvider: this._projectOutlineProvider,
         showCollapseAll: false
@@ -43,7 +45,6 @@ export class Extension {
     private readonly cppConfigurationProvider = new cpptools.CppConfigurationProvider();
     public getCppConfigurationProvider(): cpptools.CppConfigurationProvider { return this.cppConfigurationProvider; }
 
-    private mementoState = new state.StateManager(this.extensionContext);
     private cppToolsAPI?: cpp.CppToolsApi;
     private cppConfigurationProviderRegister?: Promise<void>;
     private tasks: MyTaskProvider[];
@@ -92,8 +93,11 @@ export class Extension {
         vscode.tasks.executeTask(new vscode.Task(kind, vscode.TaskScope.Workspace, 'autotools', 'autotools',
             new vscode.ProcessExecution("true", ["this-is-a-workaround-for-fetchTasks-bug-not-parsing-tasks-json"])));
     }
-    public updateTasks(): void {
+    public updateTasks(build_tree: gnumake.Make): void {
         this.tasks.forEach((provider) => provider.update());
+        this._projectOutlineProvider.updateTargets(build_tree);
+        this._projectOutlineTreeView.reveal(this._projectOutlineProvider.getChildren(undefined)[0],
+            { select: false, focus: false, expand: true, } );
     }
     public bootstrap(): void { this.bootstrapTask.bootstrap(); }
     public build(target: make.BuildTarget): void { this.buildTasks.build(target); }

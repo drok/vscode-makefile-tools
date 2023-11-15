@@ -409,8 +409,7 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
 
     // FIXME: seems wrong to do || make.t_all; this fn should probably be called
     // config arg after config is fully loaded.
-    await extension._projectOutlineProvider.update(extension.getState().buildConfiguration,
-                                             make.t_all); // FIXME: update with real target
+    // await extension._projectOutlineProvider.update(extension.getState().buildConfiguration); // FIXME: update with real target
 
     // Modifying any makefile should trigger an IntelliSense config provider update,
     // so make the dirty state true.

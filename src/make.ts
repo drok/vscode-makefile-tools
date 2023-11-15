@@ -22,6 +22,7 @@ import * as telemetry from './telemetry';
 import * as vscode from 'vscode';
 import * as ui from './ui';
 import { quote } from '@mergesium/shell-quote';
+// import { updateTree } from './tree';
 
 import * as nls from 'vscode-nls';
 nls.config({ messageFormat: nls.MessageFormat.bundle, bundleFormat: nls.BundleFormat.standalone })();
@@ -328,7 +329,7 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
         } else {
             // All done, notify that new data is available
             extension.updateCppToolsProvider();
-            extension.updateTasks();
+            extension.updateTasks(build_tree);
         }
         ui.getUI().setStatus(result.returnCode !== ConfigureBuildReturnCodeTypes.success ? ui.UIStatus.ERR : ui.UIStatus.OK);
 
