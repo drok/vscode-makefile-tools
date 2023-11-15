@@ -43,6 +43,7 @@ export class BuildTarget {
 
 // Predefined, well known build targets
 export const t_none = new BuildTarget("", "");
+export const t_all_recursive = new BuildTarget("", "all-recursive");
 export const t_all = new BuildTarget("", "all");
 export const t_clean = new BuildTarget("", "clean");
 
@@ -138,7 +139,11 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
     // Include all the make arguments defined in autotools.configurations.makeArgs
     makeArgs = makeArgs.concat(c.makeArgs || []);
 
-    makeArgs.push(t_all.goal);
+    // the all-recursive target avoids the rules that make $(CONFIG_HEADER)
+    // because no need to parse that recipe, and want the shortest output
+    // possible.
+    // But, FIXME for non-automake projects, they don't have the all-recursive target
+    makeArgs.push(t_all_recursive.goal);
 
     // Assemble command line options from the requirements of each parser stage.
     makeArgs.push(...Make.makeArgs());
