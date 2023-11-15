@@ -151,14 +151,15 @@ export class Make implements Parser {
                 targets.set(this.dir, sub.goals);
             }
             this.goals = sub.goals;
+            this.test_suite = sub.test_suite;
             sub.variables.some((v) => {
                 switch (v.variable?.name) {
-                    case "TESTS":
+                    case "CONFIG_HEADER":
                         // Targets with spaces in their names are not supported
                         // because make doesn't support them, at least not without
                         // significant song and dance. If you need to support
                         // tests with spaces in their names, please send PR.
-                        this.tests = v.variable?.value.split(' ');
+                        this.config_header = v.variable?.value.split(' ');
                         return true;
                 }
                 return false;
@@ -188,8 +189,9 @@ export class Make implements Parser {
     section: MakeSection;
     file: string | undefined;
     goals: Goal[] = [];
-    tests: string[] | undefined;
+    config_header: string[] | undefined;
     submake: Make[] = [];
+    test_suite: Goal | undefined;
 }
 
 const DatabaseRE = /^# Make data base, printed on (.*)$/;
@@ -217,9 +219,24 @@ export class Database implements Parser {
                 return undefined;
             } else {
                 /* Don't store automake auxiliary targets, they are thus
-                 * unavailable for target selection */
-                if (!(sub.flags & Goal.Flags.Automake_auxiliary))
+                 * unavailable for target selection
+                 * Also skip noise targets because they are marginally useful, but
+                 * nothing is implemented for them.
+                 * Also skip not-targets (these are source files, not targets)
+                 * Also skip targets without any flags
+                 */
+                if (sub.flags && !(sub.flags & (Goal.Flags.Automake_auxiliary |
+                        Goal.Flags.Not_a_target |
+                        Goal.Flags.Automake_noise
+                        )))
                     this.goals.push(sub);
+                if (sub.flags & Goal.Flags.Test_Suite) {
+                    this.test_suite = sub;
+                }
+                // binaries that follow a test suite are always test programs
+                // TODO: check automake source code. is this guaranteed?
+                if (this.test_suite && (sub.flags & Goal.Flags.Linked_binary))
+                    sub.flags |= Goal.Flags.Test_Progam;
                 return new Goal(); /* look for more Goals */
             }
         } else if (sub instanceof Variable) {
@@ -235,7 +252,7 @@ export class Database implements Parser {
     }
     goals : Goal[] = [];
     variables : Variable[] = [];
-    tests : string[] = [];
+    test_suite : Goal | undefined;
 }
 
 // Lines which have variable content, but I don't need them
@@ -313,13 +330,15 @@ const GNUMakeAuxiliaryRe = new RegExp('^\.(?:' +
     '(PHONY|SUFFIXES|PRECIOUS|NOEXPORT|MAKE)' +
     ')$');
 /* Auxiliary goals are internally used by automake. They are dropped by the parser */
-const AutomakeAuxRe = /(?:-recursive|-am|config.status|Makefile|stamp-h1|am--refresh|^\.deps\/.*|^\.DEFAULT|^\.obj|^\.c|^\.o|depcomp|compile|missing|install-sh|Makefile.am)$/;
+const AutomakeAuxRe = /(?:-recursive|-am|config.status|Makefile|stamp-h1|^am--.*|^\.deps\/.*|^\.DEFAULT|^\.obj|^\.c|^\.o|^\.c\.o|^\.c\.obj|^\.trs|^\.log\.trs|.*\.trs|depcomp|compile|missing|install-sh|Makefile.am)$/;
 /* Noise targets are those a user most likely never wants to build from a gui */
 const AutomakeNoiseRe = new RegExp('^(' +
-    'ID|GTAGS|TAGS|CTAGS|tags|ctags|cscope|cscope\.files|cscopelist|' +
-    'installdirs|distcleancheck|distuninstallcheck|distdir' +
+    'ID|GTAGS|TAGS|CTAGS|tags|ctags|cscope|cscope\\.files|cscopelist|' +
+    'installdirs|distcleancheck|distuninstallcheck|distdir|' +
     'mostlyclean|maintainer-clean-generic|mostlyclean-generic|clean-cscope|clean|' +
-    'dist.*|uninstall-.*|install-.*|maintainer-.*|distclean-.*|' +
+    'dist.*|uninstall-.*|install-.*|maintainer-.*|distclean-.*|installcheck|check-TESTS|' +
+    'ps|html|pdf|clean-.*|info|mostlyclean|dvi|' +
+    '.*\\.o|.*\\.h|' +
     'Makefile.in)$');
 const GoalRecipeRe = /^recipe to execute \(from '(.*)', line (\d+)\):/;
 const GoalsEndRe = /^# files hash-table stats:$/;
@@ -345,6 +364,7 @@ export class Goal extends Node implements Parser {
         Linked_binary: 256,
         Static_library: 512,
         Test_Suite: 1024,
+        Test_Progam: 2048,
     };
     static makeArgs(): string[] { return [
         // Nothing. The goals are output when the Database is output
