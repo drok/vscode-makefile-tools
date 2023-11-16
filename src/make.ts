@@ -359,7 +359,6 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
 }
 
 interface ConfigurationCache {
-    buildTargets: Map<string, Goal[]> | undefined;
     customConfigurationProvider: {
         workspaceBrowse: cpp.WorkspaceBrowseConfiguration;
         fileIndex: [string, {
@@ -371,7 +370,7 @@ interface ConfigurationCache {
 }
 
 function isConfigurationEmpty(configurationCache: ConfigurationCache): boolean {
-    if (!configurationCache.buildTargets && configurationCache.customConfigurationProvider.workspaceBrowse.browsePath.length === 0) {
+    if (configurationCache.customConfigurationProvider.workspaceBrowse.browsePath.length === 0) {
         return true;
     }
     return false;
@@ -578,7 +577,6 @@ export async function configure(triggeredBy: TriggeredBy): Promise<number> {
       .getCppConfigurationProvider()
       .getCustomConfigurationProvider();
     let ConfigurationCache: ConfigurationCache = {
-      buildTargets: configuration.getAllBuildTargets(),
       customConfigurationProvider: {
         workspaceBrowse: provider.workspaceBrowse,
         // trick to serialize a map in a JSON
@@ -610,9 +608,6 @@ export async function configure(triggeredBy: TriggeredBy): Promise<number> {
     let configureElapsedTime: number =
       util.elapsedTimeSince(configureStartTime);
     const telemetryMeasures: telemetry.Measures = {
-      // FIXME: expensive counting
-      // FIXME: this only counts top_builddir targets
-      numberBuildTargets: Array.from(configuration.getBuildTargets("")).length,
       numberIndexedSourceFiles: provider.fileIndex.size,
       numberMakefileConfigurations:
         configuration.getMakefileConfigurations().length,
@@ -674,7 +669,6 @@ async function loadConfigurationFromCache(progress: vscode.Progress<{}>, cancel:
             progress.report({ increment: 1, message: localize("make.configure.cache", "Importing cached configuration") });
             logger.message(`Configuring from cache: ${cacheFile}`);
             let configurationCache: ConfigurationCache = {
-                buildTargets: undefined,
                 customConfigurationProvider: {
                     workspaceBrowse: {
                         browsePath: []
@@ -692,21 +686,7 @@ async function loadConfigurationFromCache(progress: vscode.Progress<{}>, cancel:
                 configurationCache.customConfigurationProvider.fileIndex.forEach(i => {
                     i[1].uri = vscode.Uri.file(i[0]);
                 });
-                let targets : Array<[string, Goal[]]> = new Array();
-                // If json["buildTargets"] is an array of arrays
-                if (Array.isArray(json["buildTargets"]) && json["buildTargets"].length && Array.isArray(json["buildTargets"][0])) {
-                    json["buildTargets"]?.forEach((i : [string, Goal[]]) => {
-                        targets.push([i[0], i[1].map<Goal>(j =>
-                            Object.assign(new Goal(), j)
-                        )]);
-                    });
-                }
-                configurationCache.buildTargets = new Map(targets);
             });
-
-            if (configurationCache.buildTargets?.size) {
-                configuration.setBuildTargets(configurationCache.buildTargets);
-            }
 
             await util.scheduleTask(() => {
                 // The configurations saved in the cache are read directly into the final file index.

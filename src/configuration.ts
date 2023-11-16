@@ -656,6 +656,5 @@ export async function setNewConfiguration(): Promise<void> {
 // (like any object produced by the compiler from a source code file).
 // TODO: filter only the relevant targets (binaries, libraries, etc...) from this list.
 let buildTargets: Map<string, Goal[]> = new Map();
-export function getBuildTargets(dir: string): Goal[] { return buildTargets.get(dir) || []; }
 export function setBuildTargets(targets: Map<string, Goal[]>): void { buildTargets = targets; }
 export function getAllBuildTargets(): Map<string, Goal[]> { return buildTargets; }
