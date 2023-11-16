@@ -17,7 +17,7 @@ import { parse, quote } from '@mergesium/shell-quote';
 // import  from '../extension';
 import { extension } from '../extension';
 import { Making } from './tool';
-import { Make } from './gnumake';
+import { Make, EnteringRE, CopyrightRE } from './gnumake';
 
 export interface PreprocessDryRunOutputReturnType {
     retc: number;
@@ -318,12 +318,27 @@ export class Executing implements Parser {
             line = this.linebuf + line;
             this.linebuf = "";
         }
+        let entering = EnteringRE.exec(line);
+        if (entering)
+            return [ParserDisp.Enter, new Make(entering[1], this.make.root)];
+        let copyright = CopyrightRE.test(line);
+        if (copyright) {
+            this.make.finish();
+            return [ParserDisp.Leave, this];
+        }
+
+        // FIXME: line could be emitted by a script snippet, and it could throw the parser. try Catch here.
         let makes = new Making(parseToolCmd(line), this);
         if (makes.done())
             this.makes.push(makes);
         return [ParserDisp.Leave, this];
     }
     push(sub: Parser) {
+        if (sub instanceof Make) {
+            // push the submakes to the parent make.
+            //this.makes.forEach(m => this.make.push(m));
+            this.make.push(sub);
+        }
         return undefined;
     }
     // currentdir getter

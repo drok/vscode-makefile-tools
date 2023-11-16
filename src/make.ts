@@ -44,6 +44,7 @@ export class BuildTarget {
 // Predefined, well known build targets
 export const t_none = new BuildTarget("", "");
 export const t_all_recursive = new BuildTarget("", "all-recursive");
+export const t_check_recursive = new BuildTarget("", "check-recursive");
 export const t_all = new BuildTarget("", "all");
 export const t_clean = new BuildTarget("", "clean");
 
@@ -144,6 +145,10 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
     // possible.
     // But, FIXME for non-automake projects, they don't have the all-recursive target
     makeArgs.push(t_all_recursive.goal);
+
+    // The check-recursive gets compile options for test programs too.
+    // They are not included in 'all'
+    makeArgs.push(t_check_recursive.goal);
 
     // Assemble command line options from the requirements of each parser stage.
     makeArgs.push(...Make.makeArgs());

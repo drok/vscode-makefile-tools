@@ -30,12 +30,12 @@ enum MakeSection {
     Database, /* --print-data-base dump */
     Padding, /* Extra output I don't care about */
 }
-const EnteringRE = /^# make(?:\[\d+\])?: Entering directory '(.*)'$/;
+export const EnteringRE = /^# make(?:\[\d+\])?: Entering directory '(.*)'$/;
 const LeavingRE = /^# make(?:\[\d+\])?: Leaving directory '(.*)'$/;
 const NothingRE = /^make(?:\[\d+\])?: Nothing to be done for '(.*)'\.$/;
 const ExecutingRE = /^(.+):(\d+): (?:update target '(.*)' due to: (?:.*)|target '(.*)' does not exist)$/;
 const UptodateRE = /^make(?:\[\d+\])?: '(.*)' is up to date\.$/;
-const CopyrightRE = /^# GNU Make/;
+export const CopyrightRE = /^# GNU Make/;
 const RecursingRE = /^Making (.*) in (.*)$/;
 /**
  * Parse the stdout of a GNU make run, and expect a Dumped database,
@@ -45,10 +45,10 @@ const RecursingRE = /^Making (.*) in (.*)$/;
  * and Make to parse submake output.
  */
 export class Make implements Parser {
-    constructor(dir: string, private root: string)
+    constructor(dir: string, public root: string)
     {
         this.dir = path.relative(root, dir);
-        this.section = dir ? MakeSection.Making : MakeSection.Starting;
+        this.section = MakeSection.Starting;
     }
     static makeArgs(): string[] { return [
         // take precedence over other parallel executions
@@ -74,18 +74,11 @@ export class Make implements Parser {
                 if (leaving) {
                     return [ParserDisp.Leave, this];
                 }
-                break;
+            break;
+            case MakeSection.Starting:
+                this.section = MakeSection.Making;
+                /* intentional fall-through */
             case MakeSection.Making:
-                // --assume-old targets are reported as nothing to be done.
-                let nothing = NothingRE.test(line);
-                if (nothing) {
-                    return [ParserDisp.Continue, this];
-                }
-                let copyright = CopyrightRE.test(line);
-                if (copyright) {
-                    this.section = MakeSection.Copyright;
-                    return [ParserDisp.Continue, this];
-                }
                 let executing = ExecutingRE.exec(line);
                 if (executing) {
                     this.file = executing[3] || executing[4];
@@ -99,33 +92,18 @@ export class Make implements Parser {
                 let uptodate = UptodateRE.exec(line);
                 if (uptodate)
                     return [ParserDisp.Continue, this];
-                /* intentional fall-through, allows recursing subdirs */
-            case MakeSection.Starting:
+                let nothing = NothingRE.test(line);
+                if (nothing)
+                    return [ParserDisp.Continue, this];
                 let entering = EnteringRE.exec(line);
-                if (entering) {
-                    this.section = MakeSection.Making;
+                if (entering) { // This should only happen once at the top of the stack
+                    // this.section = MakeSection.Making;
                     return [ParserDisp.Enter, new Make(entering[1], this.root)];
                 }
-                // this is for the 2nd and later script lines for a target
-                if (this.section == MakeSection.Making) {
-                    /* echo "Making $target in $subdir" is a script snippet of automake
-                     * used to recurse into a subdir. The snipped is executed even in
-                     * --dry-run mode. It's not make's output, but a shell command's stdout.
-                     * Simply skip it and don't parse it as a shell execution line.
-                     * No need to capture the target and directory (relative subdir), because
-                     * the next "Entering" line will contain the full dir (make's output)
-                     * the target name is an automake auxiliary target, and this hint could be
-                     * used to exclude it from the subdir's target list
-                     */
-                    let recursing = RecursingRE.exec(line);
-                    if (recursing)
-                        return [ParserDisp.Continue, this];
-                    let nextcmd = new Executing(this);
-                    let [disp,next] = nextcmd.ingest(line);
-                    if (disp == ParserDisp.Leave)
-                        // The command is done. Look for more in the same make run.
-                        return [ParserDisp.Continue, this];
-                    return [disp, next];
+                let copyright = CopyrightRE.test(line);
+                if (copyright) {
+                    this.section = MakeSection.Copyright;
+                    return [ParserDisp.Continue, this];
                 }
                 break;
             case MakeSection.Copyright:
@@ -172,10 +150,13 @@ export class Make implements Parser {
                 this.submake.push(sub);
             return this;
         } else if (sub instanceof Executing) {
-            if (sub.makes.length) {
+            if (this.section == MakeSection.Copyright) {
                 // Do something about the collected command lines?
+                // this.section == Copyright if Executing found the copyright. Ie,
+                // Executions are complete.
+                return this;
             }
-            return this; // continue looking for more Executes
+            return new Executing(this);
         } else if (sub instanceof EmptyLine) { return undefined; }
         throw new Error(`Unexpected push in Make ${sub}`);
     }
@@ -185,6 +166,7 @@ export class Make implements Parser {
     public getDir(): string {
         return path.join(this.root, this.dir);
     }
+    public finish(): void { this.section = MakeSection.Copyright; }
     dir: string;
     section: MakeSection;
     file: string | undefined;
