@@ -12,7 +12,6 @@ import * as make from '../make';
 import * as util from '../util';
 import * as vscode from 'vscode';
 import * as path from 'path';
-// import {CustomConfigProviderItem} from '../cpptools';
 import {Parser, ParserDisp, EmptyLine } from '../parser';
 import { Executing } from './shell';
 import { Node } from '../tree';
@@ -123,9 +122,6 @@ export class Make implements Parser {
             // Can the work of parsing additional enterings be avoided?
             // only save data for the all-recursive target
             if (!targets.has(this.dir) && this.file == 'all-recursive') {
-            //    let goals = new Set<string>(
-            //        sub.goals.filter(g => g.goal).map<string>(g => g.goal || "")
-            //    );
                 targets.set(this.dir, sub.goals);
                 this.goals = sub.goals;
                 this.test_suite = sub.test_suite;
