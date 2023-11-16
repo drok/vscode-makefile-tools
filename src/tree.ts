@@ -32,11 +32,11 @@ export class SubNode extends Node {
     }
 
     getChildren(): Node[] {
-        let goals : Node[] = this.submake.goals
+        let goals : Node[] = [...this.submake.submake.values()]
+            .map(sub => new SubNode(sub, this.flags));
+        goals.push(...[...this.submake.goals.values()]
             .filter(goal => goal.flags & this.flags)
-            .map(goal => new TaskNode(goal));
-        goals.push(...this.submake.submake
-            .map(sub => new SubNode(sub, this.flags)));
+            .map(goal => new TaskNode(goal)));
         if ((this.flags & Goal.Flags.Test_Log) && this.submake.test_suite?.depends)
             goals.push(...this.submake.test_suite.depends
                     .map(test => new TaskNode(test)));
@@ -47,7 +47,7 @@ export class SubNode extends Node {
         //if (!this.submake.)
         //    throw new Error("Unexpected null goal");
         const item: vscode.TreeItem = new vscode.TreeItem('dir: ' + this.submake.dir);
-        item.collapsibleState = this.submake.submake.length || this.submake.goals.length ?
+        item.collapsibleState = this.submake.submake.size || this.submake.goals.size ?
             vscode.TreeItemCollapsibleState.Collapsed :
             vscode.TreeItemCollapsibleState.None;
         item.tooltip = localize("makefile.target.currently.selected.for.build", "The target currently selected for build.");
@@ -107,11 +107,11 @@ export class TaskSection extends Node {
 //    }
 
     getChildren(): Node[] {
-        let goals : Node[] = this.tree.goals
-            .filter(goal => goal.flags & this.flag)
-            .map(goal => new TaskNode(goal));
-        goals.push(...this.tree.submake
-            .map(sub => new SubNode(sub, this.flag)));
+            let goals : Node[] = [...this.tree.submake.values()]
+                .map(sub => new SubNode(sub, this.flag));
+            goals.push(...[...this.tree.goals.values()]
+                .filter(goal => goal.flags & this.flag)
+                .map(goal => new TaskNode(goal)));
         return goals;
     }
 

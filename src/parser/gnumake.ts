@@ -48,6 +48,13 @@ export class Make implements Parser {
     {
         this.dir = path.relative(root, dir);
         this.section = MakeSection.Starting;
+        let foundGoals = configuration.getAllBuildTargets().get(this.dir);
+        if (foundGoals) {
+            this.goals = foundGoals;
+        } else {
+            this.goals = new Map<string, Goal>();
+            configuration.getAllBuildTargets().set(this.dir, this.goals);
+        }
     }
     static makeArgs(): string[] { return [
         // take precedence over other parallel executions
@@ -109,7 +116,7 @@ export class Make implements Parser {
                 let database = DatabaseRE.test(line);
                 if (database) {
                     this.section = MakeSection.Database;
-                    return [ParserDisp.Enter, new EmptyLine(new Database())];
+                    return [ParserDisp.Enter, new EmptyLine(new Database(this))];
                 }
                 break;
         }
@@ -121,7 +128,7 @@ export class Make implements Parser {
             // FIXME: GNU make enters several times the same directory during --dry-run
             // Can the work of parsing additional enterings be avoided?
             // only save data for the all-recursive target
-            if (!targets.has(this.dir) && this.file == 'all-recursive') {
+            if (!targets.has(this.dir) || true) {
                 targets.set(this.dir, sub.goals);
                 this.goals = sub.goals;
                 this.test_suite = sub.test_suite;
@@ -132,7 +139,7 @@ export class Make implements Parser {
                             // because make doesn't support them, at least not without
                             // significant song and dance. If you need to support
                             // tests with spaces in their names, please send PR.
-                            this.config_header = v.variable?.value.split(' ');
+                            this.config_header = new Set(v.variable?.value.split(' '));
                             return true;
                     }
                     return false;
@@ -142,8 +149,17 @@ export class Make implements Parser {
         } else if (sub instanceof Make) {
             if (this == sub)
                 throw new Error(`Unexpected push in Make ${sub}`);
-            if (sub.file == 'all-recursive')
-                this.submake.push(sub);
+            if (sub.dir == this.dir) {
+                // Submakes in the same directory are removed, but parsed info merged into
+                // this make.
+                // config_header not merged because it's an automake Variable, should be
+                // the same as automake does not do conditional headers.
+
+                this.test_suite = this.test_suite || sub.test_suite;
+
+                this.mergeSubmake(sub);
+            } else
+                this.submake.set(sub.dir, sub);
             return this;
         } else if (sub instanceof Executing) {
             if (this.section == MakeSection.Copyright) {
@@ -156,6 +172,17 @@ export class Make implements Parser {
         } else if (sub instanceof EmptyLine) { return undefined; }
         throw new Error(`Unexpected push in Make ${sub}`);
     }
+
+    // recursively merge a submake into my submake
+    mergeSubmake(other: Make) {
+        other.submake.forEach((submake,dir) => {
+            var mysub = this.submake.get(dir);
+            if (mysub) {
+                mysub.mergeSubmake(submake);
+            } else
+                this.submake.set(dir, submake)
+        })
+    }
     public getFile(): string | undefined {
         return this.file;
     }
@@ -163,12 +190,12 @@ export class Make implements Parser {
         return path.join(this.root, this.dir);
     }
     public finish(): void { this.section = MakeSection.Copyright; }
-    dir: string;
+    dir: string = 'first';
     section: MakeSection;
     file: string | undefined;
-    goals: Goal[] = [];
-    config_header: string[] | undefined;
-    submake: Make[] = [];
+    goals: Map<string,Goal>;
+    config_header: Set<string> | undefined;
+    submake: Map<string, Make> = new Map();
     test_suite: Goal | undefined;
 }
 
@@ -180,6 +207,9 @@ const VariablesRE = /^# Variables$/;
  */
 export class Database implements Parser {
     // constructor() { this.goals = []; }
+    constructor (make: Make) {
+        this.goals = make.goals;
+    }
     static makeArgs(): string[] { return [
         "--print-data-base",
     ];};
@@ -207,7 +237,8 @@ export class Database implements Parser {
                         Goal.Flags.Not_a_target |
                         Goal.Flags.Automake_noise
                         )))
-                    this.goals.push(sub);
+                    this.goals.set(sub.goal, sub);
+
                 if (sub.flags & Goal.Flags.Test_Suite) {
                     this.test_suite = sub;
                 }
@@ -228,7 +259,7 @@ export class Database implements Parser {
         } else if (sub instanceof EmptyLine) { return undefined; }
         throw new Error(`Unexpected push in ${sub}`);
     }
-    goals : Goal[] = [];
+    goals : Map<string,Goal>;
     variables : Variable[] = [];
     test_suite : Goal | undefined;
 }

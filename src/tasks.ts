@@ -31,12 +31,8 @@ export class AutoToolsBuildTaskProvider implements MyTaskProvider {
         var targets: Task[] = [];
         let top_builddir = configuration.getCurrentMakefileConfiguration().top_builddir;
         configuration.getAllBuildTargets().forEach((goals, dir) => {
-            goals
-                .filter((goal) => goal.flags & (
-                        Goal.Flags.Static_library |
-                        Goal.Flags.Linked_binary
-                        ))
-                .forEach((g) => {
+            for (let g of goals.values()) {
+                if (g.flags & (Goal.Flags.Static_library | Goal.Flags.Linked_binary)) {
                     if (g.goal) {
                         const kind: BuildTask = {
                             type: this.myType,
@@ -57,7 +53,9 @@ export class AutoToolsBuildTaskProvider implements MyTaskProvider {
                             localize("automake.build", "$(combine) Build");
                         targets.push(g.task);
                     }
-                })});
+                }
+            }
+        });
         this.myPromise = Promise.resolve(targets);
     }
 
@@ -114,11 +112,8 @@ export class AutoToolsTestTaskProvider implements MyTaskProvider {
         var targets: Task[] = [];
         let top_builddir = configuration.getCurrentMakefileConfiguration().top_builddir;
         configuration.getAllBuildTargets().forEach((goals, dir) => {
-            goals
-                .filter((goal) => goal.flags & (
-                        Goal.Flags.Test_Suite
-                        ))
-                .forEach((g) => {
+            for (let g of goals.values()) {
+                if (g.flags & Goal.Flags.Test_Suite) {
                     if (g.goal) {
                         g.depends?.forEach((d) => {
                             if(!d.goal)
@@ -140,8 +135,8 @@ export class AutoToolsTestTaskProvider implements MyTaskProvider {
                             targets.push(d.task);
                         });
                     }
-                })});
-    
+                }
+            }});
         this.myPromise = Promise.resolve(targets);
     }
 
@@ -180,11 +175,8 @@ export class AutoToolsCheckTaskProvider implements MyTaskProvider {
         var targets : Task[] = [];
         let top_builddir = configuration.getCurrentMakefileConfiguration().top_builddir;
         configuration.getAllBuildTargets().forEach((goals, dir) => {
-            goals
-            .filter((goal) => goal.flags & (
-                    Goal.Flags.Test_Suite
-                    ))
-            .forEach((g) => {
+            for (let g of goals.values()) {
+                if (g.flags & (Goal.Flags.Test_Suite)) {
                 const kind: CheckTask = {
                     type: this.myType
                 };
@@ -199,7 +191,7 @@ export class AutoToolsCheckTaskProvider implements MyTaskProvider {
                 g.task.group = TaskGroup.Test;
                 g.task.detail = localize("automake.check", "$(checklist) Test Suite");
                 targets.push(g.task);
-            });});
+            }}});
         this.myPromise = Promise.resolve(targets);
     }
 

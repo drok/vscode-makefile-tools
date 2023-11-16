@@ -350,9 +350,12 @@ export async function getCurrentTarget(): Promise<make.BuildTarget> {
 
     // If no default build task, return the make target that is a linked binary
     for (const[dir, targets] of buildTargets) {
-        let binary = targets.find(t => t.goal && (t.flags & Goal.Flags.Linked_binary));
-        if (binary && binary.goal)
-            return Promise.resolve(new make.BuildTarget(dir, binary.goal));
+        for (let [name, goal] of targets) {
+            if (goal.flags & Goal.Flags.Linked_binary) {
+                assert(goal.task);
+                return Promise.resolve(goal.task.definition.target);
+            }
+        }
     }
 
     // No current build target
@@ -655,6 +658,6 @@ export async function setNewConfiguration(): Promise<void> {
 // Currently, this list contains any abstract intermediate target
 // (like any object produced by the compiler from a source code file).
 // TODO: filter only the relevant targets (binaries, libraries, etc...) from this list.
-let buildTargets: Map<string, Goal[]> = new Map();
-export function setBuildTargets(targets: Map<string, Goal[]>): void { buildTargets = targets; }
-export function getAllBuildTargets(): Map<string, Goal[]> { return buildTargets; }
+let buildTargets: Map<string, Map<string,Goal>> = new Map();
+export function setBuildTargets(targets: Map<string, Map<string,Goal>>): void { buildTargets = targets; }
+export function getAllBuildTargets(): Map<string, Map<string,Goal>> { return buildTargets; }
