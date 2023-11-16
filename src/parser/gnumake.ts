@@ -45,10 +45,9 @@ const RecursingRE = /^Making (.*) in (.*)$/;
  * and Make to parse submake output.
  */
 export class Make implements Parser {
-    constructor(dir: string, root: string)
+    constructor(dir: string, private root: string)
     {
         this.dir = path.relative(root, dir);
-        this.root = root;
         this.section = dir ? MakeSection.Making : MakeSection.Starting;
     }
     static makeArgs(): string[] { return [
@@ -144,31 +143,33 @@ export class Make implements Parser {
             let targets = configuration.getAllBuildTargets();
             // FIXME: GNU make enters several times the same directory during --dry-run
             // Can the work of parsing additional enterings be avoided?
-            if (!targets.has(this.dir)) {
+            // only save data for the all-recursive target
+            if (!targets.has(this.dir) && this.file == 'all-recursive') {
             //    let goals = new Set<string>(
             //        sub.goals.filter(g => g.goal).map<string>(g => g.goal || "")
             //    );
                 targets.set(this.dir, sub.goals);
+                this.goals = sub.goals;
+                this.test_suite = sub.test_suite;
+                sub.variables.some((v) => {
+                    switch (v.variable?.name) {
+                        case "CONFIG_HEADER":
+                            // Targets with spaces in their names are not supported
+                            // because make doesn't support them, at least not without
+                            // significant song and dance. If you need to support
+                            // tests with spaces in their names, please send PR.
+                            this.config_header = v.variable?.value.split(' ');
+                            return true;
+                    }
+                    return false;
+                });
             }
-            this.goals = sub.goals;
-            this.test_suite = sub.test_suite;
-            sub.variables.some((v) => {
-                switch (v.variable?.name) {
-                    case "CONFIG_HEADER":
-                        // Targets with spaces in their names are not supported
-                        // because make doesn't support them, at least not without
-                        // significant song and dance. If you need to support
-                        // tests with spaces in their names, please send PR.
-                        this.config_header = v.variable?.value.split(' ');
-                        return true;
-                }
-                return false;
-            });
             return this;
         } else if (sub instanceof Make) {
             if (this == sub)
                 throw new Error(`Unexpected push in Make ${sub}`);
-            this.submake.push(sub);
+            if (sub.file == 'all-recursive')
+                this.submake.push(sub);
             return this;
         } else if (sub instanceof Executing) {
             if (sub.makes.length) {
@@ -185,7 +186,6 @@ export class Make implements Parser {
         return path.join(this.root, this.dir);
     }
     dir: string;
-    root: string;
     section: MakeSection;
     file: string | undefined;
     goals: Goal[] = [];
@@ -365,6 +365,7 @@ export class Goal extends Node implements Parser {
         Static_library: 512,
         Test_Suite: 1024,
         Test_Progam: 2048,
+        Test_Log: 4096,
     };
     static makeArgs(): string[] { return [
         // Nothing. The goals are output when the Database is output
@@ -435,7 +436,8 @@ export class Goal extends Node implements Parser {
                 this.goal = goal[1];
                 if (this.goal == "test-suite.log") {
                     this.flags |= Goal.Flags.Test_Suite;
-                    this.depends = goal[2].split(' ');
+                    this.depends = goal[2].split(' ')
+                        .map(s => new Goal(s, Goal.Flags.Test_Log));
                 }
                 return [ParserDisp.Continue, this];
             }
@@ -458,9 +460,11 @@ export class Goal extends Node implements Parser {
         return item;
     }
 
-    goal: string | undefined = undefined;
-    flags: number = Goal.Flags.None;
-    depends: string[] | undefined = undefined;
+    constructor(public goal: string | undefined = undefined,
+        public flags: number = Goal.Flags.None) {
+        super();
+    }
+    depends: Goal[] | undefined = undefined;
     task: vscode.Task | undefined;
 }
 

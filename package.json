@@ -51,6 +51,26 @@
                 "title": "%autotools.command.makefile.buildAll.title%"
             },
             {
+                "command": "autotools.check",
+                "icon": "$(checklist)",
+                "title": "%autotools.command.check.title%"
+            },
+            {
+                "command": "autotools.build",
+                "icon": "$(combine)",
+                "title": "%autotools.command.build.title%"
+            },
+            {
+                "command": "autotools.editMakefileAm",
+                "icon": "$(go-to-file)",
+                "title": "%autotools.command.editMakefileAm.title%"
+            },
+            {
+                "command": "autotools.test",
+                "icon": "$(testing-run-icon)",
+                "title": "%autotools.command.test.title%"
+            },
+            {
                 "command": "autotools.setBuildConfiguration",
                 "title": "%autotools.command.makefile.setBuildConfiguration.title%"
             },
@@ -402,6 +422,26 @@
                 }
             ],
             "view/item/context": [
+                {
+                    "command": "autotools.build",
+                    "when": "view == autotools.outline && viewItem =~ /nodeType=build/",
+                    "group": "inline@1"
+                },
+                {
+                    "command": "autotools.test",
+                    "when": "view == autotools.outline && viewItem =~ /nodeType=test/",
+                    "group": "inline@2"
+                },
+                {
+                    "command": "autotools.check",
+                    "when": "view == autotools.outline && viewItem =~ /nodeType=check/",
+                    "group": "inline@3"
+                },
+                {
+                    "command": "autotools.editMakefileAm",
+                    "when": "view == autotools.outline && viewItem =~ /nodeType=sub/",
+                    "group": "inline@4"
+                },
                 {
                     "command": "autotools.outline.configure",
                     "when": "view == autotools.outline && viewItem =~ /nodeType=configuration/",

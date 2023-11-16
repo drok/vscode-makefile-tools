@@ -7,7 +7,7 @@ import * as fs from 'fs';
 import * as cp from 'child_process';
 import { Task, TaskDefinition, TaskScope, TaskGroup, TaskProvider, ProcessExecution, workspace } from 'vscode';
 import { Goal } from './parser/gnumake';
-import { error } from 'console';
+import { assert, error } from 'console';
 import * as configuration from './configuration';
 import { BuildTarget, t_all, t_none } from './make';
 import { resolvePathToRoot, checkFileExistsSync } from './util';
@@ -42,7 +42,7 @@ export class AutoToolsBuildTaskProvider implements MyTaskProvider {
                             type: this.myType,
                             target: new BuildTarget(dir, g.goal)
                         };
-                        var task = new Task(kind, TaskScope.Workspace, "build '" + g.goal + "' in " + dir,
+                        g.task = new Task(kind, TaskScope.Workspace, "build '" + g.goal + "' in " + dir,
                             "autotools",
                             new ProcessExecution(
                                 configuration.getMakePath(),
@@ -50,12 +50,12 @@ export class AutoToolsBuildTaskProvider implements MyTaskProvider {
                                 .concat(dir ? ['-C', dir] : [])
                                 .concat(configuration.getCurrentMakefileConfiguration().makeArgs || [])
                                 .concat(g.goal)));
-                        task.group = TaskGroup.Build;
-                        task.detail =
+                        g.task.group = TaskGroup.Build;
+                        g.task.detail =
                             (g.flags & Goal.Flags.Linked_binary) ? localize("automake.program", "$(combine) $(file-binary) Build program") :
                             (g.flags & Goal.Flags.Static_library) ? localize("automake.ranlib", "$(combine) $(library) Build static library") :
                             localize("automake.build", "$(combine) Build");
-                        targets.push(task);
+                        targets.push(g.task);
                     }
                 })});
         this.myPromise = Promise.resolve(targets);
@@ -121,29 +121,23 @@ export class AutoToolsTestTaskProvider implements MyTaskProvider {
                 .forEach((g) => {
                     if (g.goal) {
                         g.depends?.forEach((d) => {
+                            if(!d.goal)
+                                throw new Error("Invalid test.depends");
                             const kind: TestTask = {
                                 type: this.myType,
-                                test: new BuildTarget(dir, d)
+                                test: new BuildTarget(dir, d.goal)
                             };
-                            var task = new Task(kind, TaskScope.Workspace, "run test \'" + d + "\' in " + dir,
+                            d.task = new Task(kind, TaskScope.Workspace, "run test \'" + d.goal + "\' in " + dir,
                             "autotools",
                             new ProcessExecution(
                                 configuration.getMakePath(),
                                 // Treat the goal (test.log) a phony so it will always be remade.
                                 .concat("--eval=.PHONY: " + d.goal)
                                 .concat(configuration.getCurrentMakefileConfiguration().makeArgs || [])
-                                (top_builddir ? ['-C', top_builddir] : [])
-                                .concat(dir ? ['-C', dir] : [])
-                                // up-to-date test.log files might already exist, they need
-                                // overwritten if the user runs the test again, hence
-                                // --always-make, but Makefile must not be remade,
-                                // because it means reconfiguration (infinite loop)
-                                .concat("--always-make", "--assume-old=Makefile")
-                                .concat(configuration.getCurrentMakefileConfiguration().makeArgs || [])
-                                .concat(d)));
-                            task.group = TaskGroup.Test;
-                            task.detail = localize("automake.test", "$(check) Run test '" + path.basename(d, ".log") + "'");
-                            targets.push(task);
+                                .concat(d.goal)));
+                            d.task.group = TaskGroup.Test;
+                            d.task.detail = localize("automake.test", "$(check) Run test '{0}'", path.basename(d.goal, ".log"));
+                            targets.push(d.task);
                         });
                     }
                 })});
@@ -194,7 +188,7 @@ export class AutoToolsCheckTaskProvider implements MyTaskProvider {
                 const kind: CheckTask = {
                     type: this.myType
                 };
-                var task = new Task(kind, TaskScope.Workspace, "run test suite in" + dir,
+                g.task = new Task(kind, TaskScope.Workspace, "run test suite in " + dir,
                 "autotools",
                 new ProcessExecution(
                     configuration.getMakePath(),
@@ -202,9 +196,9 @@ export class AutoToolsCheckTaskProvider implements MyTaskProvider {
                     .concat(dir ? ['-C', dir] : [])
                     .concat(configuration.getCurrentMakefileConfiguration().makeArgs || [])
                     .concat("check")));
-                task.group = TaskGroup.Test;
-                task.detail = localize("automake.check", "$(checklist) Test Suite");
-                targets.push(task);
+                g.task.group = TaskGroup.Test;
+                g.task.detail = localize("automake.check", "$(checklist) Test Suite");
+                targets.push(g.task);
             });});
         this.myPromise = Promise.resolve(targets);
     }

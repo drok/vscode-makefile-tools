@@ -27,16 +27,19 @@ export abstract class Node {
 }
 
 export class SubNode extends Node {
-    constructor(private submake: Make, private flag: number) {
+    constructor(public submake: Make, private flags: number) {
         super();
     }
 
     getChildren(): Node[] {
         let goals : Node[] = this.submake.goals
-            .filter(goal => goal.flags & this.flag)
+            .filter(goal => goal.flags & this.flags)
             .map(goal => new TaskNode(goal));
         goals.push(...this.submake.submake
-            .map(sub => new SubNode(sub, this.flag)));
+            .map(sub => new SubNode(sub, this.flags)));
+        if ((this.flags & Goal.Flags.Test_Log) && this.submake.test_suite?.depends)
+            goals.push(...this.submake.test_suite.depends
+                    .map(test => new TaskNode(test)));
         return goals;
     }
 
@@ -48,15 +51,22 @@ export class SubNode extends Node {
             vscode.TreeItemCollapsibleState.Collapsed :
             vscode.TreeItemCollapsibleState.None;
         item.tooltip = localize("makefile.target.currently.selected.for.build", "The target currently selected for build.");
-        item.contextValue = [
-            `nodeType=submake`,
-        ].join(',');
+        item.contextValue = ["nodeType=sub"]
+            .concat((this.submake.test_suite) ? ['nodeType=check'] : [])
+            .concat((this.flags & Goal.Flags.Linked_binary) ? ['nodeType=build'] : [])
+            .join(',');
         return item;
+    }
+    makefile() : string {
+        if (this.submake.dir)
+            // If a relative directory, make it absolute wrt. root of workspace
+            path.join('', path.join(this.submake.dir, 'Makefile.am'));
+        return path.join(this.submake.dir, 'Makefile.am');
     }
 }
 
 export class TaskNode extends Node {
-    constructor(private goal: Goal) {
+    constructor(public goal: Goal) {
         super();
     }
 
@@ -70,9 +80,11 @@ export class TaskNode extends Node {
         const item: vscode.TreeItem = new vscode.TreeItem('node: ' + this.goal.goal);
         item.collapsibleState = vscode.TreeItemCollapsibleState.None;
         item.tooltip = localize("makefile.target.currently.selected.for.build", "The target currently selected for build.");
-        item.contextValue = [
-            `nodeType=buildTarget`,
-        ].join(',');
+        item.contextValue = ["nodeType=task"]
+            .concat((this.goal.flags & Goal.Flags.Linked_binary) ? ['nodeType=build'] : [])
+//            .concat((this.goal.flags & Goal.Flags.Test_Progam) ? ['nodeType=test'] : [])
+            .concat((this.goal.flags & Goal.Flags.Test_Log) ? ['nodeType=test'] : [])
+            .join(',');
         return item;
     }
 }
@@ -170,7 +182,7 @@ export class ConfigurationNode extends Node {
         return [
             new TaskSection(this.build_tree, 'Programs', Goal.Flags.Linked_binary),
         // if (this.build_tree.goals.some(goal => goal.goal == "check"))
-            new TaskSection(this.build_tree, 'Test Suites', Goal.Flags.Test_Suite),
+            new TaskSection(this.build_tree, 'Test Suites', Goal.Flags.Test_Log),
         ];
         //return children;
     }

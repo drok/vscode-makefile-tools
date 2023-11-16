@@ -363,6 +363,42 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         return vscode.commands.executeCommand("autotools.buildTarget");
     }));
 
+    context.subscriptions.push(vscode.commands.registerCommand('autotools.build', async (sub: tree.TaskNode) => {
+        telemetry.logEvent("build");
+        if (!sub.goal.task)
+            throw new Error("Missing build task on TaskNode");
+        return await vscode.tasks.executeTask(sub.goal.task);
+    }));
+
+    context.subscriptions.push(vscode.commands.registerCommand('autotools.check', async (sub: tree.SubNode) => {
+        telemetry.logEvent("check");
+        if (!sub.submake.test_suite)
+            throw new Error("Missing test suite on SubNode");
+        if (!sub.submake.test_suite.task)
+            throw new Error("Missing check task on SubNode");
+        return await vscode.tasks.executeTask(sub.submake.test_suite.task);
+    }));
+
+    context.subscriptions.push(vscode.commands.registerCommand('autotools.editMakefileAm', async (sub: tree.SubNode) => {
+        telemetry.logEvent("editMakefileAm");
+        await vscode.workspace.findFiles(sub.makefile(), undefined, 1).then(
+            files => {
+                if (files.length > 0) {
+                    vscode.workspace.openTextDocument(files[0]).then(
+                        doc => vscode.window.showTextDocument(doc, { preview: true})
+                        );
+                }
+            }
+        )
+    }));
+
+    context.subscriptions.push(vscode.commands.registerCommand('autotools.test', async (sub: tree.TaskNode) => {
+        telemetry.logEvent("test");
+        if (!sub.goal.task)
+            throw new Error("Missing test task on TaskNode");
+        return await vscode.tasks.executeTask(sub.goal.task);
+    }));
+
     context.subscriptions.push(vscode.commands.registerCommand('autotools.outline.setBuildConfiguration', () => {
         return vscode.commands.executeCommand("autotools.setBuildConfiguration");
     }));
