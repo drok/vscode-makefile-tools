@@ -264,6 +264,18 @@ export async function openSettings(setting: string) : Promise<void> {
     await vscode.commands.executeCommand("workbench.action.openWorkspaceSettings");
 }
 
+async function openEditor(file: string) {
+    await vscode.workspace.findFiles(file, undefined, 1).then(
+        files => {
+            if (files.length > 0) {
+                vscode.workspace.openTextDocument(files[0]).then(
+                    doc => vscode.window.showTextDocument(doc, { preview: true})
+                    );
+            }
+        }
+    )
+}
+
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
     statusBar = ui.getUI();
     extension = new Extension(context);
@@ -381,15 +393,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
     context.subscriptions.push(vscode.commands.registerCommand('autotools.editMakefileAm', async (sub: tree.SubNode) => {
         telemetry.logEvent("editMakefileAm");
-        await vscode.workspace.findFiles(sub.makefile(), undefined, 1).then(
-            files => {
-                if (files.length > 0) {
-                    vscode.workspace.openTextDocument(files[0]).then(
-                        doc => vscode.window.showTextDocument(doc, { preview: true})
-                        );
-                }
-            }
-        )
+        await openEditor(sub.makefile());
+    }));
+
+    context.subscriptions.push(vscode.commands.registerCommand('autotools.editConfigureAc', async (sub: tree.SubNode) => {
+        telemetry.logEvent("editConfigureAc");
+        await openEditor("configure.ac");
     }));
 
     context.subscriptions.push(vscode.commands.registerCommand('autotools.test', async (sub: tree.TaskNode) => {

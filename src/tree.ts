@@ -52,7 +52,7 @@ export class SubNode extends Node {
             vscode.TreeItemCollapsibleState.None;
         item.tooltip = localize("makefile.target.currently.selected.for.build", "The target currently selected for build.");
         item.contextValue = ["nodeType=sub"]
-            .concat((this.submake.test_suite) ? ['nodeType=check'] : [])
+            .concat(((this.flags & Goal.Flags.Test_Log) && this.submake.test_suite) ? ['nodeType=check'] : [])
             .concat((this.flags & Goal.Flags.Linked_binary) ? ['nodeType=build'] : [])
             .join(',');
         return item;

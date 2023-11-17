@@ -66,6 +66,11 @@
                 "title": "%autotools.command.editMakefileAm.title%"
             },
             {
+                "command": "autotools.editConfigureAc",
+                "icon": "$(tools)",
+                "title": "%autotools.command.editConfigureAc.title%"
+            },
+            {
                 "command": "autotools.test",
                 "icon": "$(testing-run-icon)",
                 "title": "%autotools.command.test.title%"
@@ -80,8 +85,8 @@
             },
             {
                 "command": "autotools.outline.setBuildConfiguration",
-                "title": "%autotools.command.makefile.setBuildConfiguration.title%",
-                "icon": "$(notebook-edit)"
+                "title": "%autotools.command.setBuildConfiguration.title%",
+                "icon": "$(arrow-swap)"
             },
             {
                 "command": "autotools.outline.configure",
@@ -399,7 +404,24 @@
         "menus": {
             "commandPalette": [
                 {
-                    "command": "autotools.command.bootstrap"
+                    "command": "autotools.check",
+                    "when": "never"
+                },
+                {
+                    "command": "autotools.build",
+                    "when": "never"
+                },
+                {
+                    "command": "autotools.test",
+                    "when": "never"
+                },
+                {
+                    "command": "autotools.editMakefileAm",
+                    "when": "never"
+                },
+                {
+                    "command": "autotools.editConfigureAc",
+                    "when": "never"
                 },
                 {
                     "command": "autotools.buildAll",
@@ -425,22 +447,27 @@
                 {
                     "command": "autotools.build",
                     "when": "view == autotools.outline && viewItem =~ /nodeType=build/",
-                    "group": "inline@1"
+                    "group": "inline@10"
                 },
                 {
                     "command": "autotools.test",
                     "when": "view == autotools.outline && viewItem =~ /nodeType=test/",
-                    "group": "inline@2"
+                    "group": "inline@10"
                 },
                 {
                     "command": "autotools.check",
                     "when": "view == autotools.outline && viewItem =~ /nodeType=check/",
-                    "group": "inline@3"
+                    "group": "inline@11"
                 },
                 {
                     "command": "autotools.editMakefileAm",
                     "when": "view == autotools.outline && viewItem =~ /nodeType=sub/",
-                    "group": "inline@4"
+                    "group": "inline@1"
+                },
+                {
+                    "command": "autotools.editConfigureAc",
+                    "when": "view == autotools.outline && viewItem =~ /nodeType=configuration/",
+                    "group": "inline@5"
                 },
                 {
                     "command": "autotools.outline.configure",
@@ -450,7 +477,7 @@
                 {
                     "command": "autotools.outline.setBuildConfiguration",
                     "when": "view == autotools.outline && viewItem =~ /nodeType=configuration/",
-                    "group": "inline@1"
+                    "group": "inline@10"
                 }
             ]
         }
