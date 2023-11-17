@@ -31,6 +31,7 @@ import { SuiteDecorations } from './suite-decorator';
 
 import * as nls from 'vscode-nls';
 import { allowedNodeEnvironmentFlags } from 'process';
+import { assert } from 'console';
 nls.config({ messageFormat: nls.MessageFormat.bundle, bundleFormat: nls.BundleFormat.standalone })();
 const localize: nls.LocalizeFunc = nls.loadMessageBundle();
 
@@ -89,7 +90,7 @@ export class Extension {
             let task = e.execution.task;
             if (task) {
                 const definition: TestTask = <any>task.definition;
-                if (definition.test) {
+                if (definition.type == "test" && definition.test) {
                     let suite = configuration.getAllBuildTargets()
                         ?.get(definition.test.builddir)
                         ?.get('test-suite.log');
@@ -108,6 +109,31 @@ export class Extension {
                                 goal.flags |= result;
                                 this.suiteDecorator.update(vscode.Uri.from(
                                     {authority: Extension.whoami, scheme: 'test', path: '/' + definition.test.builddir, query: definition.test.goal}));
+                            }
+                        }
+                    }
+                } else if (definition.type == "check" && definition.builddir) {
+                    let suite = configuration.getAllBuildTargets()
+                        ?.get(definition.builddir)
+                        ?.get('test-suite.log');
+                    if (suite) {
+                        let result: make.TRS = e.exitCode ? make.TRS.FAIL : make.TRS.PASS;
+                        if (result != (suite.flags & Goal.Flags.Test_Result_Mask)) {
+                            suite.flags &= ~Goal.Flags.Test_Result_Mask;
+                            suite.flags |= result;
+                            this.suiteDecorator.update(vscode.Uri.from(
+                                {authority: Extension.whoami, scheme: 'check', path: '/' + definition.builddir, query: suite.goal}));
+                        }
+                        if (suite.depends)
+                        for (let test of suite.depends) {
+                            if (test.task) {
+                                result = make.readTRS(test.task.definition.test);
+                                if (result != (test.flags & Goal.Flags.Test_Result_Mask)) {
+                                    test.flags &= ~Goal.Flags.Test_Result_Mask;
+                                    test.flags |= result;
+                                    this.suiteDecorator.update(vscode.Uri.from(
+                                        {authority: Extension.whoami, scheme: 'test', path: '/' + definition.builddir, query: test.goal}));
+                                }
                             }
                         }
                     }
@@ -329,7 +355,7 @@ function openLog(selected: tree.Node): Thenable<vscode.TextDocument> {
         let uri = vscode.Uri.file(path.join(top_builddir, logfile));
         return vscode.workspace.openTextDocument(uri).then((e) =>
             vscode.window.showTextDocument(e,
-                    {preview: true, viewColumn: vscode.ViewColumn.One})
+                    {preview: true, viewColumn: vscode.ViewColumn.One, preserveFocus: true})
             .then((e) =>
                 {
                     return vscode.commands.executeCommand("workbench.action.files.setActiveEditorReadonlyInSession");

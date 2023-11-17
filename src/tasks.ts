@@ -178,7 +178,8 @@ export class AutoToolsCheckTaskProvider implements MyTaskProvider {
             for (let g of goals.values()) {
                 if (g.flags & (Goal.Flags.Test_Suite)) {
                 const kind: CheckTask = {
-                    type: this.myType
+                    type: this.myType,
+                    builddir: dir
                 };
                 g.task = new Task(kind, TaskScope.Workspace, "run test suite in " + dir,
                 "autotools",

@@ -37,10 +37,10 @@ export class SuiteDecorations implements vscode.FileDecorationProvider {
                 .get(uri.path.substring(1));
             let test = sub?.get(uri.query);
             if (test)
-                return  { tooltip: "pass: 100/2000", badge: "99",
+                return  { /* tooltip: "pass: 100/2000", badge: "99", */
                     color: ((test?.flags & Goal.Flags.Test_Result_Mask) == TRS.PASS) ? undefined :  SuiteDecorations.check_err };
             else
-                return { badge: '  ' };
+                return { };
         } else if (uri.scheme == "test") {
             let goals = configuration.getAllBuildTargets();
             let g = goals

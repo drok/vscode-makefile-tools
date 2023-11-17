@@ -82,6 +82,7 @@ export class SubNode extends Node {
                     query: 'test-suite.log'
                 });
         }
+        item.tooltip =  this.submake.dir;
         return item;
     }
     makefile() : string {
@@ -184,16 +185,19 @@ export class TaskSection extends Node {
             .concat((this.flag & Goal.Flags.Test_Log) ? ['nodeType=check'] : [])
             .concat((this.flag & Goal.Flags.Linked_binary) ? ['nodeType=build'] : [])
             .join(',');
-            if (this.flag & Goal.Flags.Test_Log) {
-                item.description = localize("autotools.subnode.suite", "{0} tests in {1} subdirs",
-                    ...countSuiteTests(this.tree));
-                item.resourceUri = vscode.Uri.from({
-                        scheme: "check",
-                        authority: Extension.whoami,
-                        path: '/',
-                        query: 'test-suite.log'
-                    });
-            }
+        if (this.flag & Goal.Flags.Test_Log) {
+            item.description = localize("autotools.subnode.suite", "{0} tests in {1} subdirs",
+                ...countSuiteTests(this.tree));
+            item.resourceUri = vscode.Uri.from({
+                    scheme: "check",
+                    authority: Extension.whoami,
+                    path: '/',
+                    query: 'test-suite.log'
+                });
+            item.tooltip = new vscode.MarkdownString("[Test suite](https://www.gnu.org/software/automake/manual/html_node/Parallel-Test-Harness.html) logs");
+        } else {
+            item.tooltip = new vscode.MarkdownString("[Built programs](https://www.gnu.org/software/automake/manual/html_node/Program-Sources.html)");
+        }
         return item;
     }
     makefile() : string {
