@@ -290,7 +290,7 @@ export interface BuildTask extends TaskDefinition {
     target?: BuildTarget;
 };
 
-interface TestTask extends TaskDefinition {
+export interface TestTask extends TaskDefinition {
     /*
      * The test output log this task creates.
      */

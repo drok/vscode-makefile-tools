@@ -8,6 +8,7 @@ import * as path from 'path';
 import * as util from './util';
 import { BuildTarget, t_none } from './make';
 import { Make, Goal } from './parser/gnumake';
+import { TestTask } from './tasks';
 import * as vscode from 'vscode';
 
 import * as nls from 'vscode-nls';
@@ -46,7 +47,7 @@ export class SubNode extends Node {
     getTreeItem(): vscode.TreeItem {
         //if (!this.submake.)
         //    throw new Error("Unexpected null goal");
-        const item: vscode.TreeItem = new vscode.TreeItem('dir: ' + this.submake.dir);
+        const item: vscode.TreeItem = new vscode.TreeItem(this.submake.dir);
         item.collapsibleState = this.submake.submake.size || this.submake.goals.size ?
             vscode.TreeItemCollapsibleState.Collapsed :
             vscode.TreeItemCollapsibleState.None;
@@ -55,6 +56,16 @@ export class SubNode extends Node {
             .concat(((this.flags & Goal.Flags.Test_Log) && this.submake.test_suite) ? ['nodeType=check'] : [])
             .concat((this.flags & Goal.Flags.Linked_binary) ? ['nodeType=build'] : [])
             .join(',');
+        if (this.flags & Goal.Flags.Test_Log) {
+            item.description = "5ms";
+            item.resourceUri = vscode.Uri.from(
+                {
+                    scheme: "check",
+                    authority: "autotools",
+                    path: '/' + this.submake.dir,
+                    query: 'test-suite.log'
+                });
+        }
         return item;
     }
     makefile() : string {
@@ -77,7 +88,7 @@ export class TaskNode extends Node {
     getTreeItem(): vscode.TreeItem {
         if (!this.goal.goal)
             throw new Error("Unexpected null goal");
-        const item: vscode.TreeItem = new vscode.TreeItem('node: ' + this.goal.goal);
+        const item: vscode.TreeItem = new vscode.TreeItem(this.goal.goal);
         item.collapsibleState = vscode.TreeItemCollapsibleState.None;
         item.tooltip = localize("makefile.target.currently.selected.for.build", "The target currently selected for build.");
         item.contextValue = ["nodeType=task"]
@@ -85,6 +96,18 @@ export class TaskNode extends Node {
 //            .concat((this.goal.flags & Goal.Flags.Test_Progam) ? ['nodeType=test'] : [])
             .concat((this.goal.flags & Goal.Flags.Test_Log) ? ['nodeType=test'] : [])
             .join(',');
+        if (!this.goal.task)
+            return item;
+
+        if (this.goal.flags & Goal.Flags.Test_Log) {
+            const definition: TestTask = <any>this.goal.task.definition;
+            item.resourceUri = vscode.Uri.from({
+                scheme: "test",
+                authority: "autotools",
+                path: '/' +  definition.test?.builddir,
+                query:  this.goal.goal,
+            });
+        }
         return item;
     }
 }
@@ -128,6 +151,16 @@ export class TaskSection extends Node {
             .concat((this.flag & Goal.Flags.Test_Log) ? ['nodeType=check'] : [])
             .concat((this.flag & Goal.Flags.Linked_binary) ? ['nodeType=build'] : [])
             .join(',');
+            if (this.flag & Goal.Flags.Test_Log) {
+                item.description = "5ms";
+                item.resourceUri = vscode.Uri.from(
+                    {
+                        scheme: "check",
+                        authority: "autotools",
+                        path: '/',
+                        query: 'test-suite.log'
+                    });
+            }
         return item;
     }
     makefile() : string {

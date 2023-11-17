@@ -25,6 +25,7 @@ import { AutoToolsBuildTaskProvider,
         AutoToolsBootstrapTaskProvider,
         BuildTask,
         MyTaskProvider } from './tasks';
+import { SuiteDecorations } from './suite-decorator';
 
 import * as nls from 'vscode-nls';
 nls.config({ messageFormat: nls.MessageFormat.bundle, bundleFormat: nls.BundleFormat.standalone })();
@@ -41,6 +42,7 @@ export class Extension {
         treeDataProvider: this._projectOutlineProvider,
         showCollapseAll: false
     });
+    public readonly suiteDecorator = new SuiteDecorations();
 
     private readonly cppConfigurationProvider = new cpptools.CppConfigurationProvider();
     public getCppConfigurationProvider(): cpptools.CppConfigurationProvider { return this.cppConfigurationProvider; }
@@ -427,6 +429,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }));
 
     extension.registerTasks();
+
+    vscode.window.registerFileDecorationProvider(extension.suiteDecorator);
 
     await make.configure(make.TriggeredBy.cleanConfigure);
 

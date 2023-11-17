@@ -375,7 +375,12 @@ export class Goal extends Node implements Parser {
         Test_Suite: 1024,
         Test_Progam: 2048,
         Test_Log: 4096,
+
+        /* Test status, filled when task runs */
+        Test_Passed: 8192,
+        Test_Failed: 16384,
     };
+
     static makeArgs(): string[] { return [
         // Nothing. The goals are output when the Database is output
     ];};
