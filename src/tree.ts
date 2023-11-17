@@ -28,6 +28,22 @@ export abstract class Node {
     abstract logfile(): string | undefined;
 }
 
+// Should this recursive count be cached? Is this an expensive call?
+// Easy, but would require 1 number stored per make.
+function countSuiteTests(sub: Make): number[] {
+    let total : number = 0;
+    let num_dirs : number = 0;
+    for (let submake of sub.submake.values()) {
+        let [t, n] = countSuiteTests(submake);
+        total += t;
+        num_dirs += n;
+    }
+    return [
+        total + (sub.goals.get("test-suite.log")?.depends?.length ?? 0),
+        num_dirs + 1
+    ];
+}
+
 export class SubNode extends Node {
     constructor(public submake: Make, private flags: number) {
         super();
@@ -52,15 +68,14 @@ export class SubNode extends Node {
         item.collapsibleState = this.submake.submake.size || this.submake.goals.size ?
             vscode.TreeItemCollapsibleState.Collapsed :
             vscode.TreeItemCollapsibleState.None;
-        item.tooltip = localize("makefile.target.currently.selected.for.build", "The target currently selected for build.");
         item.contextValue = ["nodeType=sub"]
             .concat(((this.flags & Goal.Flags.Test_Log) && this.submake.test_suite) ? ['nodeType=check'] : [])
             .concat((this.flags & Goal.Flags.Linked_binary) ? ['nodeType=build'] : [])
             .join(',');
         if (this.flags & Goal.Flags.Test_Log) {
-            item.description = "5ms";
-            item.resourceUri = vscode.Uri.from(
-                {
+            item.description = localize("autotools.subnode.suite", "{0} tests, {1} subdirs",
+                ...countSuiteTests(this.submake));
+            item.resourceUri = vscode.Uri.from({
                     scheme: "check",
                     authority: Extension.whoami,
                     path: '/' + this.submake.dir,
@@ -170,9 +185,9 @@ export class TaskSection extends Node {
             .concat((this.flag & Goal.Flags.Linked_binary) ? ['nodeType=build'] : [])
             .join(',');
             if (this.flag & Goal.Flags.Test_Log) {
-                item.description = "5ms";
-                item.resourceUri = vscode.Uri.from(
-                    {
+                item.description = localize("autotools.subnode.suite", "{0} tests in {1} subdirs",
+                    ...countSuiteTests(this.tree));
+                item.resourceUri = vscode.Uri.from({
                         scheme: "check",
                         authority: Extension.whoami,
                         path: '/',

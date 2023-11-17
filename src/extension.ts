@@ -10,6 +10,7 @@ import * as logger from './logger';
 import * as make from './make';
 import * as toolParser from './parser/tool';
 import * as gnumake from './parser/gnumake';
+import { Goal } from './parser/gnumake';
 import * as path from 'path';
 import * as state from './state';
 import * as telemetry from './telemetry';
@@ -24,6 +25,7 @@ import { AutoToolsBuildTaskProvider,
         AutoToolsCheckTaskProvider,
         AutoToolsBootstrapTaskProvider,
         BuildTask,
+        TestTask,
         MyTaskProvider } from './tasks';
 import { SuiteDecorations } from './suite-decorator';
 
@@ -82,6 +84,34 @@ export class Extension {
     public registerTasks(): void {
         // FIXME: Implement Disposable
         this.tasks.forEach((provider) => vscode.tasks.registerTaskProvider(provider.myType, provider));
+
+        vscode.tasks.onDidEndTaskProcess((e) => {
+            let task = e.execution.task;
+            if (task) {
+                const definition: TestTask = <any>task.definition;
+                if (definition.test) {
+                    let suite = configuration.getAllBuildTargets()
+                        ?.get(definition.test.builddir)
+                        ?.get('test-suite.log');
+                    if (suite) {
+                        let goal = suite.depends?.find((d) => d.goal === definition.test?.goal);
+                        if (goal) {
+                            let oldflags = goal.flags;
+                            if (e.exitCode) {
+                                goal.flags |= Goal.Flags.Test_Failed;
+                                goal.flags &= ~Goal.Flags.Test_Passed;
+                            } else {
+                                goal.flags &= ~Goal.Flags.Test_Failed;
+                                goal.flags |= Goal.Flags.Test_Passed;
+                            }
+                            if (oldflags != goal.flags)
+                                this.suiteDecorator.update(vscode.Uri.from(
+                                    {authority: Extension.whoami, scheme: 'test', path: '/' + definition.test.builddir, query: definition.test.goal}));
+                        }
+                    }
+                }
+            }
+        });
 
         if (!this.bootstrapTask.isBootstrapped()) {
             let cmd = this.bootstrapTask.bootstrap_cmd();

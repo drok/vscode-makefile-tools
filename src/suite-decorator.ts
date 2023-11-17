@@ -5,7 +5,7 @@
 import * as vscode from 'vscode';
 import * as configuration from './configuration';
 import { Extension  } from './extension';
-import { Goal } from './parser/gnumake';
+import { Goal, Make } from './parser/gnumake';
 
 import * as nls from 'vscode-nls';
 import { PassThrough } from 'stream';
@@ -26,17 +26,19 @@ export class SuiteDecorations implements vscode.FileDecorationProvider {
 		uri: vscode.Uri,
 		_token: vscode.CancellationToken,
 	): vscode.ProviderResult<vscode.FileDecoration> {
-        if (uri.authority != Extension.whoami) {
+        if (uri.authority != Extension.whoami)
             return undefined;
-        }
 		// const query = fromFileChangeNodeUri(uri);
         let test : Goal | undefined;
         if (uri.scheme == "check") {
-            let goals = configuration.getAllBuildTargets();
-            let g = goals
+            let sub = configuration.getAllBuildTargets()
                 .get(uri.path.substring(1));
-            test = g
-                ?.get(uri.query);
+            let test = sub?.get(uri.query);
+            if (test)
+                return  { tooltip: "pass: 100/2000", badge: "99",
+                    color: ((test?.flags & Goal.Flags.Test_Result_Mask) == TRS.PASS) ? undefined :  SuiteDecorations.check_err };
+            else
+                return { badge: '  ' };
         } else if (uri.scheme == "test") {
             let goals = configuration.getAllBuildTargets();
             let g = goals
@@ -46,7 +48,7 @@ export class SuiteDecorations implements vscode.FileDecorationProvider {
                 ?.depends?.find(t => t.goal == uri.query);
         }
         if (!test)
-            return {}; // This will log an error in ExtensionHost about invalid/empty deco
+            return Promise.reject();
         if (test.flags & Goal.Flags.Test_Passed)
             return SuiteDecorations.pass;
         else if (test.flags & Goal.Flags.Test_Failed)
