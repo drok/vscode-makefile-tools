@@ -96,17 +96,19 @@ export class Extension {
                     if (suite) {
                         let goal = suite.depends?.find((d) => d.goal === definition.test?.goal);
                         if (goal) {
-                            let oldflags = goal.flags;
+                            let result : make.TRS;
                             if (e.exitCode) {
-                                goal.flags |= Goal.Flags.Test_Failed;
-                                goal.flags &= ~Goal.Flags.Test_Passed;
+                                // Test did not run
+                                result = make.TRS.ERROR;
                             } else {
-                                goal.flags &= ~Goal.Flags.Test_Failed;
-                                goal.flags |= Goal.Flags.Test_Passed;
+                                result = make.readTRS(definition.test);
                             }
-                            if (oldflags != goal.flags)
+                            if (result != (goal.flags & Goal.Flags.Test_Result_Mask)) {
+                                goal.flags &= ~Goal.Flags.Test_Result_Mask;
+                                goal.flags |= result;
                                 this.suiteDecorator.update(vscode.Uri.from(
                                     {authority: Extension.whoami, scheme: 'test', path: '/' + definition.test.builddir, query: definition.test.goal}));
+                            }
                         }
                     }
                 }

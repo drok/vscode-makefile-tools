@@ -9,11 +9,13 @@ import { Goal, Make } from './parser/gnumake';
 
 import * as nls from 'vscode-nls';
 import { PassThrough } from 'stream';
+import { BuildTarget, TRS, TRS_Info } from './make';
+import { makeFullPath } from './util';
 nls.config({ messageFormat: nls.MessageFormat.bundle, bundleFormat: nls.BundleFormat.standalone })();
 const localize: nls.LocalizeFunc = nls.loadMessageBundle();
 
 export class SuiteDecorations implements vscode.FileDecorationProvider {
-    static check_err = new vscode.ThemeColor("testing.message.error.decorationForeground");
+            
 	update(resourceUri: vscode.Uri): void {
 		this._onDidChangeFileDecorations.fire(resourceUri);
 	}
@@ -48,12 +50,8 @@ export class SuiteDecorations implements vscode.FileDecorationProvider {
                 ?.depends?.find(t => t.goal == uri.query);
         }
         if (!test)
-            return Promise.reject();
-        if (test.flags & Goal.Flags.Test_Passed)
-            return SuiteDecorations.pass;
-        else if (test.flags & Goal.Flags.Test_Failed)
-            return SuiteDecorations.fail;
-        return SuiteDecorations.unk;
+            return {}; // This will log an error in ExtensionHost about invalid/empty deco
+        return TRS_Info[test.flags & Goal.Flags.Test_Result_Mask];
 	}
 
 }

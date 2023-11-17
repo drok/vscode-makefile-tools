@@ -360,13 +360,16 @@ const GoalsEndRe = /^# files hash-table stats:$/;
 export class Goal extends Node implements Parser {
     public static readonly Flags = {
         None: 0,
+        /* Test status, filled when task runs. 3-bits = make.TRS */
+        Test_Result_Mask: 7,
+
         /* Flags gathered from Make (phony, etc) */
-        Not_a_target: 1,
+        Not_a_target: 8,
 
         /* Well-known automake targets */
-        Automake_primary: 2,
-        Automake_auxiliary: 4,
-        Automake_noise: 8,
+        Automake_primary: 16,
+        Automake_auxiliary: 32,
+        Automake_noise: 64,
 
 
         /* Flags gathered from automake (recipe hints like $(LINK) */
@@ -375,10 +378,6 @@ export class Goal extends Node implements Parser {
         Test_Suite: 1024,
         Test_Progam: 2048,
         Test_Log: 4096,
-
-        /* Test status, filled when task runs */
-        Test_Passed: 8192,
-        Test_Failed: 16384,
     };
 
     static makeArgs(): string[] { return [

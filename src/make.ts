@@ -769,3 +769,54 @@ export async function doConfigure(progress: vscode.Progress<{}>, cancel: vscode.
     extension.getState().configureDirty = false;
     return subphaseStats;
 }
+
+export enum TRS {
+    XPASS = 1,
+    PASS = 2,
+    SKIP = 3,
+    ERROR = 4,
+    FAIL = 5,
+    XFAIL = 6
+}
+
+export const TRS_Info: { [key: number]: vscode.FileDecoration } = {
+    [0]: { tooltip: 'UNK',   badge: '❔' },
+    [TRS.XPASS]: { tooltip: 'XPASS', badge: '☑️' },
+    [TRS.PASS]:  { tooltip: 'PASS',  badge: '✔️' },
+    [TRS.SKIP]:  { tooltip: 'SKIP',  badge: '🔳' },
+    [TRS.ERROR]: { tooltip: 'ERROR', badge: '❓' },
+    [TRS.FAIL]:  { tooltip: 'FAIL',  badge: '❌' },
+    [TRS.XFAIL]: { tooltip: 'XFAIL', badge: '🏳️' },
+    [7]: { tooltip: 'THROW',   badge: '⁉️' },
+  };
+
+export function readTRS(b: BuildTarget) : TRS
+{
+    let top_builddir = configuration.getCurrentMakefileConfiguration().top_builddir;
+    if (!top_builddir)
+        return TRS.ERROR;
+
+    let trs = path.join(top_builddir, b.builddir, path.basename(b.goal, ".log") + ".trs");
+    const fileContent = fs.readFileSync(trs, 'utf8');
+    const lines = fileContent.split('\n');
+
+    let testResult = '';
+    let globalTestResult = '';
+
+    for (const line of lines) {
+        if (line.startsWith(':test-result:')) {
+            testResult = line.split(':test-result:')[1].trim();
+        } else if (line.startsWith(':global-test-result:')) {
+            globalTestResult = line.split(':global-test-result:')[1].trim();
+        }
+    }
+    switch (testResult || globalTestResult) {
+        case "XPASS": return TRS.XPASS;
+        case "PASS": return TRS.PASS;
+        case "SKIP": return TRS.SKIP;
+        case "ERROR": return TRS.ERROR;
+        case "FAIL": return TRS.FAIL;
+        case "XFAIL": return TRS.XFAIL;
+        default: return TRS.ERROR;
+    }
+}
