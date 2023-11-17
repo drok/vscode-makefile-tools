@@ -4,6 +4,7 @@
  */
 import * as vscode from 'vscode';
 import * as configuration from './configuration';
+import { Extension  } from './extension';
 import { Goal } from './parser/gnumake';
 
 import * as nls from 'vscode-nls';
@@ -25,8 +26,9 @@ export class SuiteDecorations implements vscode.FileDecorationProvider {
 		uri: vscode.Uri,
 		_token: vscode.CancellationToken,
 	): vscode.ProviderResult<vscode.FileDecoration> {
-        if (uri.authority != 'autotools')
+        if (uri.authority != Extension.whoami) {
             return undefined;
+        }
 		// const query = fromFileChangeNodeUri(uri);
         let test : Goal | undefined;
         if (uri.scheme == "check") {
@@ -44,7 +46,7 @@ export class SuiteDecorations implements vscode.FileDecorationProvider {
                 ?.depends?.find(t => t.goal == uri.query);
         }
         if (!test)
-            return undefined;
+            return {}; // This will log an error in ExtensionHost about invalid/empty deco
         if (test.flags & Goal.Flags.Test_Passed)
             return SuiteDecorations.pass;
         else if (test.flags & Goal.Flags.Test_Failed)

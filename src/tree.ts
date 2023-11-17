@@ -12,7 +12,7 @@ import { TestTask } from './tasks';
 import * as vscode from 'vscode';
 
 import * as nls from 'vscode-nls';
-import { extension } from './extension';
+import { Extension, extension } from './extension';
 import { assert } from 'console';
 nls.config({ messageFormat: nls.MessageFormat.bundle, bundleFormat: nls.BundleFormat.standalone })();
 const localize: nls.LocalizeFunc = nls.loadMessageBundle();
@@ -25,6 +25,7 @@ export abstract class Node {
     // constructor(public readonly id: string) { }
     abstract getTreeItem(): vscode.TreeItem;
     abstract getChildren(): Node[];
+    abstract logfile(): string | undefined;
 }
 
 export class SubNode extends Node {
@@ -61,7 +62,7 @@ export class SubNode extends Node {
             item.resourceUri = vscode.Uri.from(
                 {
                     scheme: "check",
-                    authority: "autotools",
+                    authority: Extension.whoami,
                     path: '/' + this.submake.dir,
                     query: 'test-suite.log'
                 });
@@ -73,6 +74,12 @@ export class SubNode extends Node {
             // If a relative directory, make it absolute wrt. root of workspace
             path.join('', path.join(this.submake.dir, 'Makefile.am'));
         return path.join(this.submake.dir, 'Makefile.am');
+    }
+    logfile() : string | undefined {
+        if ((this.flags & Goal.Flags.Test_Log) && this.submake.dir) {
+            return path.join(this.submake.dir, 'test-suite.log');
+        }
+        return undefined;
     }
 }
 
@@ -103,13 +110,24 @@ export class TaskNode extends Node {
             const definition: TestTask = <any>this.goal.task.definition;
             item.resourceUri = vscode.Uri.from({
                 scheme: "test",
-                authority: "autotools",
+                authority: Extension.whoami,
                 path: '/' +  definition.test?.builddir,
                 query:  this.goal.goal,
             });
         }
         return item;
     }
+    logfile() : string | undefined {
+        if (!this.goal.task)
+            return undefined;
+        if ((this.goal.flags & Goal.Flags.Test_Log)) {
+            const definition: TestTask = <any>this.goal.task.definition;
+            if (definition.test)
+                return path.join(definition.test.builddir, definition.test.goal);
+        }
+        return undefined;
+    }
+
 }
 
 
@@ -156,7 +174,7 @@ export class TaskSection extends Node {
                 item.resourceUri = vscode.Uri.from(
                     {
                         scheme: "check",
-                        authority: "autotools",
+                        authority: Extension.whoami,
                         path: '/',
                         query: 'test-suite.log'
                     });
@@ -169,32 +187,10 @@ export class TaskSection extends Node {
             path.join('', path.join(this.tree.dir, 'Makefile.am'));
         return path.join(this.tree.dir, 'Makefile.am');
     }
-}
-
-export class CheckNode extends Node {
-    constructor(targetName: BuildTarget) {
-        super();
-        this._name = targetName.goal;
-    }
-
-    _name: string;
-
-    update(targetName: BuildTarget): void {
-        this._name = localize("tree.check.target", "Check target: {0}", `[${targetName.goal} @ ${targetName.builddir}]`);
-    }
-
-    getChildren(): Node[] {
-        return [];
-    }
-
-    getTreeItem(): vscode.TreeItem {
-        const item: vscode.TreeItem = new vscode.TreeItem(this._name);
-        item.collapsibleState = vscode.TreeItemCollapsibleState.None;
-        item.tooltip = localize("makefile.target.currently.selected.for.build", "The target currently selected for build.");
-        item.contextValue = [
-            `nodeType=buildTarget`,
-        ].join(',');
-        return item;
+    logfile() : string | undefined {
+        if ((this.flag & Goal.Flags.Test_Log))
+            return path.join(this.tree.dir, 'test-suite.log');
+        return undefined;
     }
 }
 
@@ -246,7 +242,9 @@ export class ConfigurationNode extends Node {
         ].join(',');
         return item;
     }
-
+    logfile(): string | undefined {
+        return undefined;
+    }
 }
 
 export class ProjectOutlineProvider implements vscode.TreeDataProvider<Node> {

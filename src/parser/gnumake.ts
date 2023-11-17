@@ -473,6 +473,9 @@ export class Goal extends Node implements Parser {
         ].join(',');
         return item;
     }
+    logfile(): string | undefined {
+        return undefined;
+    }
 
     constructor(public goal: string | undefined = undefined,
         public flags: number = Goal.Flags.None) {

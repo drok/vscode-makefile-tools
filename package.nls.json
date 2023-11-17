@@ -6,6 +6,7 @@
    "autotools.command.build.title": "Build",
    "autotools.command.test.title": "Run test",
    "autotools.command.check.title": "Run test suite",
+   "autotools.command.openLog.title": "View Test Suite Log",
    "autotools.command.editMakefileAm.title": "Edit Makefile.am",
    "autotools.command.editConfigureAc.title": "Edit configure.ac",
    "workbench.action.openWorkspaceSettings.title": "Preferences: Open Workspace Settings",

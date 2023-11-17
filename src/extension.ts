@@ -28,6 +28,7 @@ import { AutoToolsBuildTaskProvider,
 import { SuiteDecorations } from './suite-decorator';
 
 import * as nls from 'vscode-nls';
+import { allowedNodeEnvironmentFlags } from 'process';
 nls.config({ messageFormat: nls.MessageFormat.bundle, bundleFormat: nls.BundleFormat.standalone })();
 const localize: nls.LocalizeFunc = nls.loadMessageBundle();
 
@@ -36,6 +37,8 @@ let statusBar: ui.UI = ui.getUI();
 export let extension: Extension;
 
 export class Extension {
+    static readonly whoami: string = "mergesium.autotools";
+
     private mementoState = new state.StateManager(this.extensionContext);
     public readonly _projectOutlineProvider = new tree.ProjectOutlineProvider(this.mementoState.buildConfiguration || 'Default');
     private readonly _projectOutlineTreeView = vscode.window.createTreeView('autotools.outline', {
@@ -66,6 +69,14 @@ export class Extension {
         extensionContext.subscriptions.push(vscode.commands.registerCommand('autotools.command.bootstrap', async () => {
             await this.bootstrapTask.bootstrap();
         }));
+        this._projectOutlineTreeView.onDidChangeSelection((e) => {
+            if (e.selection.length > 0) {
+                let selected = e.selection[0];
+                if (selected instanceof tree.Node && !(selected instanceof tree.SubNode)) {
+                    return openLog(selected);
+                }
+            }
+        })
     }
 
     public registerTasks(): void {
@@ -278,6 +289,25 @@ async function openEditor(file: string) {
     )
 }
 
+function openLog(selected: tree.Node): Thenable<vscode.TextDocument> {
+    let top_builddir =
+        configuration.getCurrentMakefileConfiguration().top_builddir;
+    let logfile = selected.logfile();
+    if (logfile && top_builddir) {
+        let uri = vscode.Uri.file(path.join(top_builddir, logfile));
+        return vscode.workspace.openTextDocument(uri).then((e) =>
+            vscode.window.showTextDocument(e,
+                    {preview: true, viewColumn: vscode.ViewColumn.One})
+            .then((e) =>
+                {
+                    return vscode.commands.executeCommand("workbench.action.files.setActiveEditorReadonlyInSession");
+                }
+            )
+        );
+    }
+    return Promise.reject();
+}
+
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
     statusBar = ui.getUI();
     extension = new Extension(context);
@@ -410,6 +440,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         return await vscode.tasks.executeTask(sub.goal.task);
     }));
 
+    context.subscriptions.push(vscode.commands.registerCommand('autotools.openLog', async (sub: tree.SubNode) => {
+        telemetry.logEvent("openLog");
+        return Promise.resolve(openLog(sub));
+    }));
+
     context.subscriptions.push(vscode.commands.registerCommand('autotools.outline.setBuildConfiguration', () => {
         return vscode.commands.executeCommand("autotools.setBuildConfiguration");
     }));
@@ -449,7 +484,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         telemetry.logEvent("settings", telemetryProperties);
     }
 }
-
 
 export async function deactivate(): Promise<void> {
     vscode.window.showInformationMessage(localize("extension.deactivated", "The extension {0} is de-activated.", "'vscode-makefile-tools'"));
