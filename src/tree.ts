@@ -112,7 +112,10 @@ export class TaskSection extends Node {
             goals.push(...[...this.tree.goals.values()]
                 .filter(goal => goal.flags & this.flag)
                 .map(goal => new TaskNode(goal)));
-        return goals;
+            if ((this.flag & Goal.Flags.Test_Log) && this.tree.test_suite?.depends)
+                goals.push(...this.tree.test_suite.depends
+                    .map(test => new TaskNode(test)));
+            return goals;
     }
 
     getTreeItem(): vscode.TreeItem {
@@ -121,8 +124,17 @@ export class TaskSection extends Node {
         // item.tooltip = localize("makefile.target.currently.selected.for.build", "The target currently selected for build.");
         item.contextValue = [
             `nodeType=section.` + this._name,
-        ].join(',');
+            "nodeType=sub"]
+            .concat((this.flag & Goal.Flags.Test_Log) ? ['nodeType=check'] : [])
+            .concat((this.flag & Goal.Flags.Linked_binary) ? ['nodeType=build'] : [])
+            .join(',');
         return item;
+    }
+    makefile() : string {
+        if (this.tree.dir)
+            // If a relative directory, make it absolute wrt. root of workspace
+            path.join('', path.join(this.tree.dir, 'Makefile.am'));
+        return path.join(this.tree.dir, 'Makefile.am');
     }
 }
 
