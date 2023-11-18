@@ -771,6 +771,7 @@ export async function doConfigure(progress: vscode.Progress<{}>, cancel: vscode.
 }
 
 export enum TRS {
+    NONE = 0, /* test result n/a */
     XPASS = 1,
     PASS = 2,
     SKIP = 3,
@@ -780,7 +781,7 @@ export enum TRS {
 }
 
 export const TRS_Info: { [key: number]: vscode.FileDecoration } = {
-    [0]: { tooltip: 'UNK',   badge: '❔' },
+    [TRS.NONE]:  { tooltip: 'n/a',   badge: '❔' },
     [TRS.XPASS]: { tooltip: 'XPASS', badge: '☑️' },
     [TRS.PASS]:  { tooltip: 'PASS',  badge: '✔️' },
     [TRS.SKIP]:  { tooltip: 'SKIP',  badge: '🔳' },
@@ -797,26 +798,31 @@ export function readTRS(b: BuildTarget) : TRS
         return TRS.ERROR;
 
     let trs = path.join(top_builddir, b.builddir, path.basename(b.goal, ".log") + ".trs");
-    const fileContent = fs.readFileSync(trs, 'utf8');
-    const lines = fileContent.split('\n');
+    try {
+        const fileContent = fs.readFileSync(trs, 'utf8');
+        const lines = fileContent.split('\n');
 
-    let testResult = '';
-    let globalTestResult = '';
+        let testResult = '';
+        let globalTestResult = '';
 
-    for (const line of lines) {
-        if (line.startsWith(':test-result:')) {
-            testResult = line.split(':test-result:')[1].trim();
-        } else if (line.startsWith(':global-test-result:')) {
-            globalTestResult = line.split(':global-test-result:')[1].trim();
+        for (const line of lines) {
+            if (line.startsWith(':test-result:')) {
+                testResult = line.split(':test-result:')[1].trim();
+            } else if (line.startsWith(':global-test-result:')) {
+                globalTestResult = line.split(':global-test-result:')[1].trim();
+            }
+        }
+        switch (testResult || globalTestResult) {
+            case "XPASS": return TRS.XPASS;
+            case "PASS": return TRS.PASS;
+            case "SKIP": return TRS.SKIP;
+            case "ERROR": return TRS.ERROR;
+            case "FAIL": return TRS.FAIL;
+            case "XFAIL": return TRS.XFAIL;
+            default: return TRS.ERROR;
         }
     }
-    switch (testResult || globalTestResult) {
-        case "XPASS": return TRS.XPASS;
-        case "PASS": return TRS.PASS;
-        case "SKIP": return TRS.SKIP;
-        case "ERROR": return TRS.ERROR;
-        case "FAIL": return TRS.FAIL;
-        case "XFAIL": return TRS.XFAIL;
-        default: return TRS.ERROR;
+    catch (e) {
+        return TRS.NONE; // File does not exist
     }
 }

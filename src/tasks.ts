@@ -9,7 +9,7 @@ import { Task, TaskDefinition, TaskScope, TaskGroup, TaskProvider, ProcessExecut
 import { Goal } from './parser/gnumake';
 import { assert, error } from 'console';
 import * as configuration from './configuration';
-import { BuildTarget, t_all, t_none } from './make';
+import { BuildTarget, t_all, t_none, readTRS } from './make';
 import { resolvePathToRoot, checkFileExistsSync } from './util';
 import * as vscode from 'vscode';
 
@@ -118,9 +118,10 @@ export class AutoToolsTestTaskProvider implements MyTaskProvider {
                         g.depends?.forEach((d) => {
                             if(!d.goal)
                                 throw new Error("Invalid test.depends");
+                            let test = new BuildTarget(dir, d.goal);
                             const kind: TestTask = {
                                 type: this.myType,
-                                test: new BuildTarget(dir, d.goal)
+                                test: test
                             };
                             d.task = new Task(kind, TaskScope.Workspace, "run test \'" + d.goal + "\' in " + dir,
                             "autotools",
@@ -133,6 +134,9 @@ export class AutoToolsTestTaskProvider implements MyTaskProvider {
                             d.task.group = TaskGroup.Test;
                             d.task.detail = localize("automake.test", "$(check) Run test '{0}'", path.basename(d.goal, ".log"));
                             targets.push(d.task);
+
+                            /* Read existing TRS file to show correct last known status in the outline */
+                            d.flags |= readTRS(test);
                         });
                     }
                 }
