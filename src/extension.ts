@@ -44,10 +44,7 @@ export class Extension {
 
     private mementoState = new state.StateManager(this.extensionContext);
     public readonly _projectOutlineProvider = new tree.ProjectOutlineProvider(this.mementoState.buildConfiguration || 'Default');
-    private readonly _projectOutlineTreeView = vscode.window.createTreeView('autotools.outline', {
-        treeDataProvider: this._projectOutlineProvider,
-        showCollapseAll: false
-    });
+    private _projectOutlineTreeView : vscode.TreeView<tree.Node> | undefined;
     public readonly suiteDecorator = new SuiteDecorations();
 
     private readonly cppConfigurationProvider = new cpptools.CppConfigurationProvider();
@@ -72,14 +69,21 @@ export class Extension {
         extensionContext.subscriptions.push(vscode.commands.registerCommand('autotools.command.bootstrap', async () => {
             await this.bootstrapTask.bootstrap();
         }));
-        this._projectOutlineTreeView.onDidChangeSelection((e) => {
+    }
+    public createPanel(extensionContext: vscode.ExtensionContext) : void {
+        this._projectOutlineTreeView = vscode.window.createTreeView('autotools.outline', {
+            treeDataProvider: this._projectOutlineProvider,
+            showCollapseAll: false
+
+        });
+        extensionContext.subscriptions.push(this._projectOutlineTreeView.onDidChangeSelection((e) => {
             if (e.selection.length > 0) {
                 let selected = e.selection[0];
                 if (selected instanceof tree.Node && !(selected instanceof tree.SubNode)) {
                     return openLog(selected);
                 }
             }
-        })
+        }));
     }
 
     public registerTasks(): void {
@@ -166,9 +170,11 @@ export class Extension {
     }
     public updateTasks(build_tree: gnumake.Make): void {
         this.tasks.forEach((provider) => provider.update());
-        this._projectOutlineProvider.updateTargets(build_tree);
-        this._projectOutlineTreeView.reveal(this._projectOutlineProvider.getChildren(undefined)[0],
-            { select: false, focus: false, expand: true, } );
+        if (this._projectOutlineTreeView) {
+            this._projectOutlineProvider.updateTargets(build_tree);
+            this._projectOutlineTreeView.reveal(this._projectOutlineProvider.getChildren(undefined)[0],
+                { select: false, focus: false, expand: true, } );
+        }
     }
     public bootstrap(): void { this.bootstrapTask.bootstrap(); }
     public build(target: make.BuildTarget): void { this.buildTasks.build(target); }
@@ -180,7 +186,7 @@ export class Extension {
     public getState(): state.StateManager { return this.mementoState; }
 
     public dispose(): void {
-        this._projectOutlineTreeView.dispose();
+        this._projectOutlineTreeView?.dispose();
         if (this.cppToolsAPI) {
             this.cppToolsAPI.dispose();
         }
@@ -522,6 +528,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }));
 
     extension.registerTasks();
+    extension.createPanel();
 
     vscode.window.registerFileDecorationProvider(extension.suiteDecorator);
 
