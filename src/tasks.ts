@@ -29,7 +29,7 @@ export class AutoToolsBuildTaskProvider implements MyTaskProvider {
 
     public update() {
         var targets: Task[] = [];
-        let top_builddir = configuration.getCurrentMakefileConfiguration().top_builddir;
+        let c = configuration.getCurrentMakefileConfiguration();
         configuration.getAllBuildTargets().forEach((goals, dir) => {
             for (let g of goals.values()) {
                 if (g.flags & (Goal.Flags.Static_library | Goal.Flags.Linked_binary)) {
@@ -42,9 +42,9 @@ export class AutoToolsBuildTaskProvider implements MyTaskProvider {
                             "autotools",
                             new ProcessExecution(
                                 configuration.getMakePath(),
-                                (top_builddir ? ['-C', top_builddir] : [])
+                                (c.top_builddir ? ['-C', c.top_builddir] : [])
                                 .concat(dir ? ['-C', dir] : [])
-                                .concat(configuration.getCurrentMakefileConfiguration().makeArgs || [])
+                                .concat(c.makeArgs || [])
                                 .concat(g.goal)));
                         g.task.group = TaskGroup.Build;
                         g.task.detail =
@@ -64,14 +64,14 @@ export class AutoToolsBuildTaskProvider implements MyTaskProvider {
             type: this.myType,
             target: g
         };
-        let top_builddir = configuration.getCurrentMakefileConfiguration().top_builddir;
+        let c = configuration.getCurrentMakefileConfiguration();
         var task = new Task(kind, TaskScope.Workspace, "build '" + g.goal + "'",
             "autotools",
             new ProcessExecution(
                 configuration.getMakePath(),
-                (top_builddir ? ['-C', top_builddir] : [])
+                (c.top_builddir ? ['-C', c.top_builddir] : [])
                 .concat(g.builddir ? ['-C', g.builddir] : [])
-                .concat(configuration.getCurrentMakefileConfiguration().makeArgs || [])
+                .concat(c.makeArgs || [])
                 .concat(g.goal)));
         task.group = TaskGroup.Build;
         //task.detail =
@@ -87,14 +87,14 @@ export class AutoToolsBuildTaskProvider implements MyTaskProvider {
 
         // resolveTask requires that the same definition object be used.
         const definition: BuildTask = <any>_task.definition;
-        let top_builddir = configuration.getCurrentMakefileConfiguration().top_builddir;
+        let c = configuration.getCurrentMakefileConfiguration();
         return new Task(definition, _task.scope ?? TaskScope.Workspace, target.goal ?? t_all.goal,
             this.myType,
             new ProcessExecution(
                 configuration.getMakePath(),
-                (top_builddir ? ['-C', top_builddir] : [])
+                (c.top_builddir ? ['-C', c.top_builddir] : [])
                 .concat(target.builddir ? ['-C', target.builddir] : [])
-                .concat(configuration.getCurrentMakefileConfiguration().makeArgs || [])
+                .concat(c.makeArgs || [])
                 .concat(target.goal ?? t_all.goal)));
 	}
 }
@@ -110,7 +110,7 @@ export class AutoToolsTestTaskProvider implements MyTaskProvider {
 
     public update() {
         var targets: Task[] = [];
-        let top_builddir = configuration.getCurrentMakefileConfiguration().top_builddir;
+        let c = configuration.getCurrentMakefileConfiguration();
         configuration.getAllBuildTargets().forEach((goals, dir) => {
             for (let g of goals.values()) {
                 if (g.flags & Goal.Flags.Test_Suite) {
@@ -127,10 +127,23 @@ export class AutoToolsTestTaskProvider implements MyTaskProvider {
                             "autotools",
                             new ProcessExecution(
                                 configuration.getMakePath(),
+                                (c.top_builddir ? ['-C', c.top_builddir] : [])
+                                .concat(dir ? ['-C', dir] : [])
                                 // Treat the goal (test.log) a phony so it will always be remade.
-                                .concat("--eval=.PHONY: " + d.goal)
-                                .concat(configuration.getCurrentMakefileConfiguration().makeArgs || [])
-                                .concat(d.goal)));
+                                .concat(c.makeArgs || [])
+                                .concat(["-esi",
+                                    "check",
+                                    "TEST_LOGS=" + test.goal
+                                ]), {
+                                    // These options are static, and not relevant to the end-user. Avoid displaying them to the user
+                                    env: {
+                                        // FIXME: generate a proper tmpfile with extension .tmp and make it
+                                        // readonly, This prevents the test suite summary being printed.
+                                        "TEST_SUITE_LOG": "/tmp/tmp-suite-log",
+                                        "SUBDIRS": ""
+                                }
+                                }
+                                ));
                             d.task.group = TaskGroup.Test;
                             d.task.detail = localize("automake.test", "$(check) Run test '{0}'", path.basename(d.goal, ".log"));
                             targets.push(d.task);
@@ -151,17 +164,17 @@ export class AutoToolsTestTaskProvider implements MyTaskProvider {
 
         // resolveTask requires that the same definition object be used.
         const definition: TestTask = <any>_task.definition;
-        let top_builddir = configuration.getCurrentMakefileConfiguration().top_builddir;
+        let c = configuration.getCurrentMakefileConfiguration();
         return new Task(definition, _task.scope ?? TaskScope.Workspace, test.goal,
             this.myType,
             new ProcessExecution(
                 configuration.getMakePath(),
-                (top_builddir ? ['-C', top_builddir] : [])
+                (c.top_builddir ? ['-C', c.top_builddir] : [])
                 .concat(test.builddir ? ['-C', test.builddir] : [])
                 // Treat the goal (test.log) a phony so it will always be remade.
                 // The Makefile will be refreshed only if necessary
                 .concat("--eval=.PHONY: " + test.goal)
-                .concat(configuration.getCurrentMakefileConfiguration().makeArgs || [])
+                .concat(c.makeArgs || [])
                 .concat(test.goal)));
 	}
 }
@@ -177,7 +190,7 @@ export class AutoToolsCheckTaskProvider implements MyTaskProvider {
     update() {
 
         var targets : Task[] = [];
-        let top_builddir = configuration.getCurrentMakefileConfiguration().top_builddir;
+        let c = configuration.getCurrentMakefileConfiguration();
         configuration.getAllBuildTargets().forEach((goals, dir) => {
             for (let g of goals.values()) {
                 if (g.flags & (Goal.Flags.Test_Suite)) {
@@ -189,9 +202,9 @@ export class AutoToolsCheckTaskProvider implements MyTaskProvider {
                 "autotools",
                 new ProcessExecution(
                     configuration.getMakePath(),
-                    (top_builddir ? ['-C', top_builddir] : [])
+                    (c.top_builddir ? ['-C', c.top_builddir] : [])
                     .concat(dir ? ['-C', dir] : [])
-                    .concat(configuration.getCurrentMakefileConfiguration().makeArgs || [])
+                    .concat(c.makeArgs || [])
                     .concat("check")));
                 g.task.group = TaskGroup.Test;
                 g.task.detail = localize("automake.check", "$(checklist) Test Suite");
@@ -207,14 +220,14 @@ export class AutoToolsCheckTaskProvider implements MyTaskProvider {
 
         // resolveTask requires that the same definition object be used.
         const definition: TestTask = <any>_task.definition;
-        let top_builddir = configuration.getCurrentMakefileConfiguration().top_builddir;
+        let c = configuration.getCurrentMakefileConfiguration();
         return new Task(definition, _task.scope ?? TaskScope.Workspace, "check",
             this.myType,
             new ProcessExecution(
                 configuration.getMakePath(),
-                (top_builddir ? ['-C', top_builddir] : [])
+                (c.top_builddir ? ['-C', c.top_builddir] : [])
                 .concat(check.builddir ? ['-C', check.builddir] : [])
-                .concat(configuration.getCurrentMakefileConfiguration().makeArgs || [])
+                .concat(c.makeArgs || [])
                 .concat(definition.target.goal)
                 .concat(check.TESTS ? 'TESTS=' +  check.TESTS.join(' ') : [])
                 .concat(check.TEST_SUITE_LOG ? 'TEST_SUITE_LOG=' +  check.TEST_SUITE_LOG : [])));

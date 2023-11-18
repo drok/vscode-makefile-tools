@@ -793,11 +793,11 @@ export const TRS_Info: { [key: number]: vscode.FileDecoration } = {
 
 export function readTRS(b: BuildTarget) : TRS
 {
-    let top_builddir = configuration.getCurrentMakefileConfiguration().top_builddir;
-    if (!top_builddir)
+    let c = configuration.getCurrentMakefileConfiguration();
+    if (!c.top_builddir)
         return TRS.ERROR;
 
-    let trs = path.join(top_builddir, b.builddir, path.basename(b.goal, ".log") + ".trs");
+    let trs = path.join(c.top_builddir, b.builddir, path.basename(b.goal, ".log") + ".trs");
     try {
         const fileContent = fs.readFileSync(trs, 'utf8');
         const lines = fileContent.split('\n');
