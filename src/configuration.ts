@@ -15,12 +15,15 @@ import * as path from 'path';
 import * as telemetry from './telemetry';
 import * as multiStep from './multiStepInput';
 import { openSettings } from './extension';
+import * as fs from 'fs';
 
 import * as nls from 'vscode-nls';
 import { dir } from 'console';
 import { Disposable } from 'vscode-jsonrpc';
 import { AutoToolsBuildTaskProvider, BuildTask } from './tasks';
 import assert = require('assert');
+import { fstat } from 'fs';
+import G = require('glob');
 nls.config({ messageFormat: nls.MessageFormat.bundle, bundleFormat: nls.BundleFormat.standalone })();
 const localize: nls.LocalizeFunc = nls.loadMessageBundle();
 
@@ -53,6 +56,9 @@ export interface MakefileConfiguration {
     // is this a default configuration?
     isDefault: boolean;
 
+    // unwriteable file used to block autmake TEST_SUITE outputting summaries for indiv. tests
+    nolog: vscode.ProcessExecutionOptions;
+
     // TODO: investigate how flexible this is to integrate with other build systems than the MAKE family
     // (basically anything that can produce a dry-run output is sufficient)
     // Implement set-able dry-run, verbose, change-directory and always-make switches
@@ -70,11 +76,38 @@ export async function setCurrentMakefileConfigurationName(configuration: string 
 let currentMakefileConfiguration: MakefileConfiguration;
 export function getCurrentMakefileConfiguration(): MakefileConfiguration { return currentMakefileConfiguration; }
 export async function setCurrentMakefileConfiguration(configuration: string | undefined): Promise<void> {
+    // Create a read-only file used to block autmake TEST_SUITE outputting summaries for indiv. tests.
+    // Used in tasks.ts with
     currentMakefileConfiguration = (configuration && getMakefileConfiguration(configuration)) || {
         name: "Default",
         top_builddir: (vscode.workspace.workspaceFolders ? vscode.workspace.workspaceFolders[0].name : ""),
-        isDefault: true
-    };
+        isDefault: true,
+        nolog: {}
+    }
+    let nolog_file = path.join(currentMakefileConfiguration.top_builddir??'',"no-partial-suite-log");
+    let tmp = nolog_file + '.tmp';
+    try {
+        fs.stat(tmp, (err) => {
+            if (err?.code === 'ENOENT') {
+                fs.createWriteStream(tmp, {flags: 'w'})
+                .on('close', () => fs.chmodSync(tmp, "0444"))
+                .close();
+            }
+        });
+    } catch (err) {
+        // Ignore. If chmod failed, the summary will be printed when single tests are run.
+        // Ugly, but no reason to alarm the user.
+    }
+    currentMakefileConfiguration.nolog ={
+        // These options are static, and not relevant to the end-user. Avoid displaying them to the user
+        env: {
+            // FIXME: generate a proper tmpfile with extension .tmp and make it
+            // readonly, This prevents the test suite summary being printed.
+            "TEST_SUITE_LOG": nolog_file,
+            "SUBDIRS": "",
+            // Suppress bash's error message "/bin/bash: line 74: /tmp/tmp-suite-log.tmp: Permission denied" to stderr
+            "am__sh_e_setup": 'set +e; exec 2> /dev/null'
+    }};
     statusBar.setConfiguration(currentMakefileConfiguration.name);
 }
 

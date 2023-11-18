@@ -111,7 +111,7 @@ export class AutoToolsTestTaskProvider implements MyTaskProvider {
     public update() {
         var targets: Task[] = [];
         let c = configuration.getCurrentMakefileConfiguration();
-        configuration.getAllBuildTargets().forEach((goals, dir) => {
+            configuration.getAllBuildTargets().forEach((goals, dir) => {
             for (let g of goals.values()) {
                 if (g.flags & Goal.Flags.Test_Suite) {
                     if (g.goal) {
@@ -129,21 +129,11 @@ export class AutoToolsTestTaskProvider implements MyTaskProvider {
                                 configuration.getMakePath(),
                                 (c.top_builddir ? ['-C', c.top_builddir] : [])
                                 .concat(dir ? ['-C', dir] : [])
-                                // Treat the goal (test.log) a phony so it will always be remade.
                                 .concat(c.makeArgs || [])
                                 .concat(["-esi",
                                     "check",
                                     "TEST_LOGS=" + test.goal
-                                ]), {
-                                    // These options are static, and not relevant to the end-user. Avoid displaying them to the user
-                                    env: {
-                                        // FIXME: generate a proper tmpfile with extension .tmp and make it
-                                        // readonly, This prevents the test suite summary being printed.
-                                        "TEST_SUITE_LOG": "/tmp/tmp-suite-log",
-                                        "SUBDIRS": ""
-                                }
-                                }
-                                ));
+                                ]), c.nolog));
                             d.task.group = TaskGroup.Test;
                             d.task.detail = localize("automake.test", "$(check) Run test '{0}'", path.basename(d.goal, ".log"));
                             targets.push(d.task);
@@ -171,11 +161,11 @@ export class AutoToolsTestTaskProvider implements MyTaskProvider {
                 configuration.getMakePath(),
                 (c.top_builddir ? ['-C', c.top_builddir] : [])
                 .concat(test.builddir ? ['-C', test.builddir] : [])
-                // Treat the goal (test.log) a phony so it will always be remade.
-                // The Makefile will be refreshed only if necessary
-                .concat("--eval=.PHONY: " + test.goal)
                 .concat(c.makeArgs || [])
-                .concat(test.goal)));
+                .concat(["-esi",
+                    "check",
+                    "TEST_LOGS=" + test.goal
+                ]), c.nolog));
 	}
 }
 
