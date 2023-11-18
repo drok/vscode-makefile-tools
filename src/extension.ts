@@ -532,10 +532,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         await vscode.commands.executeCommand("workbench.files.action.showActiveFileInExplorer");
     }
 
-    context.subscriptions.push(vscode.commands.registerCommand('autotools.outline.openMakefilePathSetting', async () => {
-        await openSettings("autotools.makefilePath");
-    }));
-
     extension.registerTasks();
 
     context.subscriptions.push(vscode.workspace.createFileSystemWatcher('**/Makefile.am')
