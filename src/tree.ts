@@ -113,7 +113,7 @@ export class TaskNode extends Node {
             throw new Error("Unexpected null goal");
         const item: vscode.TreeItem = new vscode.TreeItem(this.goal.goal);
         item.collapsibleState = vscode.TreeItemCollapsibleState.None;
-        item.tooltip = localize("makefile.target.currently.selected.for.build", "The target currently selected for build.");
+        item.tooltip = this.goal.goal;
         item.contextValue = ["nodeType=task"]
             .concat((this.goal.flags & Goal.Flags.Linked_binary) ? ['nodeType=build'] : [])
 //            .concat((this.goal.flags & Goal.Flags.Test_Progam) ? ['nodeType=test'] : [])
@@ -255,7 +255,7 @@ export class ConfigurationNode extends Node {
     getTreeItem(): vscode.TreeItem {
         const item: vscode.TreeItem = new vscode.TreeItem(this._name);
         item.collapsibleState = this.build_tree ? vscode.TreeItemCollapsibleState.Expanded : vscode.TreeItemCollapsibleState.None;
-        item.tooltip = "The makefile configuration currently selected from settings ('autotools.configurations').";
+        item.tooltip = "top_builddir = " + configuration.getCurrentMakefileConfiguration().top_builddir;
         item.contextValue = [
             `nodeType=configuration`,
         ].join(',');
