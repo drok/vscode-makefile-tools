@@ -230,22 +230,24 @@ export interface MyTaskProvider extends TaskProvider {
 }
 
 export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
-	readonly myType = 'bootstrap';
+	readonly myType = 'autotools';
 	private myPromise: Thenable<Task[]> | undefined = undefined;
     public bootstrapTask?: vscode.Task;
+    public regenTask?: vscode.Task;
+    private working: boolean = false;
 
     constructor() {
         let b = this.bootstrap_cmd();
         if (b) {
-            const kind: BootstrapTask = {
-                type: this.myType
+            const kind: AutotoolsTask = {
+                type: this.myType,
+                action: 'bootstrap'
             };
             this.bootstrapTask = new Task(kind, TaskScope.Workspace, b.join(' '),
                 localize("autotools.bootstrap.task", "Bootstrap autotools"),
                 new ProcessExecution(b[0], b.slice(1)));
             this.bootstrapTask.group = TaskGroup.Build;
             this.bootstrapTask.detail = localize("automake.bootstrap", "$(tools) Bootstrap project using '{0}'", b.join(' '));
-            this.myPromise = Promise.resolve([this.bootstrapTask]);
         }
     }
 	provideTasks(): Thenable<Task[]> | undefined {
@@ -256,13 +258,11 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
 	}
 
 	resolveTask(_task: Task): Task | undefined {
-        const definition: BootstrapTask = <any>_task.definition;
-        let b = this.bootstrap_cmd();
-        if (!b)
-            return undefined;
-        return new Task(definition, _task.scope ?? TaskScope.Workspace, "bootstrap",
-            this.myType,
-            new ProcessExecution(b[0], b.slice(1)));
+        const definition: AutotoolsTask = <any>_task.definition;
+        if (definition.action === 'bootstrap')
+            return this.bootstrapTask;
+        if (definition.action === 'regen')
+            return this.regenTask;
 	}
 
     public bootstrap_cmd(): string[] | undefined {
@@ -282,12 +282,44 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
     public isBootstrapped(): boolean {
         return checkFileExistsSync(resolvePathToRoot("configure"));
     }
-    update(): void {}
+    update(): void {
+        let c = configuration.getCurrentMakefileConfiguration();
+
+        const regenkind: AutotoolsTask = {
+            type: this.myType,
+            action: 'regen'
+        };
+        this.regenTask = new Task(regenkind, TaskScope.Workspace, "Update Makefiles and headers",
+            localize("autotools.update.task", "Configuration update"),
+            new ProcessExecution(configuration.getMakePath(),
+                (c.top_builddir ? ['-C', c.top_builddir] : [])
+                .concat('stamp-h1')));
+        this.regenTask.group = TaskGroup.Build;
+        this.regenTask.detail = localize("automake.update", "$(sync) Update Makefiles and headers. See [Autoconf output](https://www.gnu.org/software/autoconf/manual/autoconf-2.69/html_node/Output.html)");
+
+        this.myPromise = Promise.resolve([this.regenTask]
+            .concat(this.bootstrapTask ?? []));
+    }
 
     public async bootstrap(): Promise<void> {
-        if (this.bootstrapTask) {
-            vscode.tasks.executeTask(this.bootstrapTask);
+        if (this.bootstrapTask && !this.working) {
+            vscode.tasks.executeTask(this.bootstrapTask).then(() => {
+                this.working = true;
+            });
         }
+    }
+    public async regen(): Promise<void> {
+        // Use regenWorking to avoid restarting when already running.
+        // Eg, Makefile.in is updated in the workspace, which triggers
+        // a separate, unnecesary update.
+        if (this.regenTask && !this.working) {
+            vscode.tasks.executeTask(this.regenTask).then(() => {
+                this.working = true;
+            });
+        }
+    }
+    public async autotoolsDone(): Promise<void> {
+        this.working = false;
     }
 }
 
@@ -317,5 +349,6 @@ export class CheckTarget {
     TEST_SUITE_LOG?: string;
 }
 
-interface BootstrapTask extends TaskDefinition {
+export interface AutotoolsTask extends TaskDefinition {
+    "action": string;
 };

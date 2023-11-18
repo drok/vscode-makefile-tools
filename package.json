@@ -71,6 +71,10 @@
                 "title": "%autotools.command.openLog.title%"
             },
             {
+                "command": "autotools.command.regen",
+                "title": "%autotools.command.regen.title%"
+            },
+            {
                 "command": "autotools.editConfigureAc",
                 "icon": "$(tools)",
                 "title": "%autotools.command.editConfigureAc.title%"
@@ -394,7 +398,7 @@
                 }
             },
             {
-                "type": "bootstrap",
+                "type": "autotools",
                 "when": "processExecutionSupported && autotools.makefileFilePresent",
                 "required": ["label"],
                 "properties": {
@@ -402,6 +406,12 @@
                         "type": "string",
                         "description": "%autotools.taskDefinitions.label.description%",
                         "default": "Bootstrap autotools"
+                    },
+                    "action": {
+                        "type": "string",
+                        "enum": ["bootstrap", "update"],
+                        "default": "update",
+                        "description": "%autotools.taskDefinitions.action.description%"
                     }
                 }
             }

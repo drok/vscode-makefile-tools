@@ -24,6 +24,7 @@ import { AutoToolsBuildTaskProvider,
         AutoToolsTestTaskProvider,
         AutoToolsCheckTaskProvider,
         AutoToolsBootstrapTaskProvider,
+        AutotoolsTask,
         BuildTask,
         TestTask,
         MyTaskProvider } from './tasks';
@@ -53,21 +54,24 @@ export class Extension {
     private cppToolsAPI?: cpp.CppToolsApi;
     private cppConfigurationProviderRegister?: Promise<void>;
     private tasks: MyTaskProvider[];
-    private bootstrapTask: AutoToolsBootstrapTaskProvider;
+    private autotoolsTask: AutoToolsBootstrapTaskProvider;
     private buildTasks: AutoToolsBuildTaskProvider;
     private compilerFullPath ?: string;
 
     public constructor(public readonly extensionContext: vscode.ExtensionContext) {
-        this.bootstrapTask = new AutoToolsBootstrapTaskProvider();
+        this.autotoolsTask = new AutoToolsBootstrapTaskProvider();
         this.buildTasks = new AutoToolsBuildTaskProvider();
         this.tasks = [
-            this.bootstrapTask,
+            this.autotoolsTask,
             this.buildTasks,
             new AutoToolsTestTaskProvider(),
             new AutoToolsCheckTaskProvider(),
         ];
         extensionContext.subscriptions.push(vscode.commands.registerCommand('autotools.command.bootstrap', async () => {
-            await this.bootstrapTask.bootstrap();
+            await this.autotoolsTask.bootstrap();
+        }));
+        extensionContext.subscriptions.push(vscode.commands.registerCommand('autotools.command.regen', async () => {
+            await this.autotoolsTask.regen();
         }));
     }
     public createPanel(extensionContext: vscode.ExtensionContext) : void {
@@ -141,12 +145,16 @@ export class Extension {
                             }
                         }
                     }
+                } else if (definition.type == "autotools") {
+                    const definition: AutotoolsTask = <any>task.definition;
+                    if (definition?.action == "regen")
+                        this.autotoolsTask.autotoolsDone();
                 }
             }
         });
 
-        if (!this.bootstrapTask.isBootstrapped()) {
-            let cmd = this.bootstrapTask.bootstrap_cmd();
+        if (!this.autotoolsTask.isBootstrapped()) {
+            let cmd = this.autotoolsTask.bootstrap_cmd();
             if (cmd) {
                 const doit: string = localize("autotools.bootstrap.me", "Bootstrap");
                 vscode.window.showErrorMessage(
@@ -154,7 +162,7 @@ export class Extension {
                     doit,
                     localize("autotools.cancel", "Cancel")).then((value) => {
                     if (value === doit) {
-                        this.bootstrapTask.bootstrap();
+                        this.autotoolsTask.bootstrap();
                     }
                 });
             }
@@ -176,7 +184,8 @@ export class Extension {
                 { select: false, focus: false, expand: true, } );
         }
     }
-    public bootstrap(): void { this.bootstrapTask.bootstrap(); }
+    public bootstrap(): void { this.autotoolsTask.bootstrap(); }
+    public regen(): void { this.autotoolsTask.regen(); }
     public build(target: make.BuildTarget): void { this.buildTasks.build(target); }
 
     public updateMakefileFilePresent(newValue: boolean): void {
@@ -528,6 +537,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }));
 
     extension.registerTasks();
+
+    context.subscriptions.push(vscode.workspace.createFileSystemWatcher('**/Makefile.am')
+        .onDidChange((e) => { extension.regen(); }));
+    context.subscriptions.push(vscode.workspace.createFileSystemWatcher('**/configure.ac')
+        .onDidChange((e) => {  extension.regen(); }));
+    context.subscriptions.push(vscode.workspace.createFileSystemWatcher('**/*.in')
+        .onDidChange((e) => {  extension.regen(); }));
+
+
     extension.createPanel();
 
     vscode.window.registerFileDecorationProvider(extension.suiteDecorator);
