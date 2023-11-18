@@ -549,7 +549,7 @@ export async function configure(triggeredBy: TriggeredBy): Promise<number> {
       }
     );
 
-    ui.getUI().setLoading(false);
+    ui.getUI().setLoading(ui.UIStatus.OK);
     // If not cancelled already, analyze all doConfigure subphases
     // to decide how we should look at the final configure outcome.
     // retc is set to cancel in onCancellationRequested

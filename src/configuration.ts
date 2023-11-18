@@ -285,7 +285,7 @@ export async function getCommandForConfiguration(): Promise<void> {
 
         telemetry.logEvent("makefileNotFound", telemetryProperties);
         await extension.setFullFeatureSet(false);
-        statusBar.setLoading(false);
+        statusBar.setLoading(ui.UIStatus.NO_MAKEFILE);
     } else {
         await extension.setFullFeatureSet(true);
     }

@@ -18,6 +18,9 @@ export enum UIStatus {
     RUNTIME = 3,
     /* Other error conditions */
     NO_MAKEFILE = 4,
+    /* Updating makefiles */
+    REGEN = 5,
+    LOADING = 6,
 }
 
 export class UI {
@@ -29,6 +32,8 @@ export class UI {
         new vscode.ThemeColor("statusBarItem.errorBackground"),
         new vscode.ThemeColor("statusBarItem.errorBackground"),
         new vscode.ThemeColor("statusBarItem.errorBackground"),
+        new vscode.ThemeColor("statusBar.background"),
+        new vscode.ThemeColor("statusBar.background"),
     ];
     static fgcolors: vscode.ThemeColor[] = [
         new vscode.ThemeColor("statusBar.foreground"), /* OK */
@@ -36,12 +41,14 @@ export class UI {
         new vscode.ThemeColor("statusBarItem.errorForeground"), /* ERR */
         new vscode.ThemeColor("statusBarItem.errorForeground"), /* RUNTIME */
         new vscode.ThemeColor("statusBarItem.errorForeground"), /* NO_MAKEFILE */
+        new vscode.ThemeColor("statusBar.foreground"), /* REGEN */
+        new vscode.ThemeColor("statusBar.foreground"), /* LOADING */
     ];
 
     /* When a new configuration is set, it is shown as 'loading' */
     public setConfiguration(configuration: string): void {
         this.configuration = configuration;
-        this.configurationButton.text = '$(loading~spin) ' + configuration;
+        this.setLoading(UIStatus.LOADING);
     }
 
     public setStatus(status: UIStatus): void {
@@ -58,8 +65,18 @@ export class UI {
         }
     }
 
-    public setLoading(loading: boolean): void {
-        this.configurationButton.text = (loading ? '$(loading~spin) ' : '$(tools) ') + this.configuration;
+    public setLoading(loading: UIStatus): void {
+        switch (loading) {
+            case UIStatus.LOADING:
+                this.configurationButton.text = '$(loading~spin) ' + this.configuration;
+                break;
+            case UIStatus.REGEN:
+                this.configurationButton.text = '$(sync~spin) ' + this.configuration;
+                break;
+            default:
+                this.configurationButton.text = '$(tools) ' + this.configuration;
+                break;
+        }
     }
 
     public constructor() {
