@@ -117,15 +117,45 @@ export class Extension {
             this.testTasks.numSuspect++;
     }
 
+    trsChange(c: configuration.MakefileConfiguration, uri: vscode.Uri) : void {
+        if (!c.top_builddir)
+            return;
+
+        let dir = path.relative(c.top_builddir, path.dirname(uri.path));
+        let log = path.basename(uri.path, ".trs") + ".log";
+        let goal = configuration.getAllBuildTargets()
+            ?.get(dir)
+            ?.get('test-suite.log')
+            ?.depends?.find((d) => d.goal === log);
+
+        if (goal) {
+            let oldresult = goal.flags & Goal.Flags.Test_Result_Mask;
+            let result = make.readTRS(new make.BuildTarget(dir, log));
+            if (oldresult != result) {
+                goal.flags &= ~Goal.Flags.Test_Result_Mask;
+                goal.flags |= result;
+                this.suiteDecorator.update(vscode.Uri.from(
+                    {authority: Extension.whoami, scheme: 'test', path: '/' + dir, query: log}));
+                this.suiteDecorator.update(vscode.Uri.from(
+                    {authority: Extension.whoami, scheme: 'check', path: '/' + dir, query: 'test-suite.log'}));
+                this.failStatUpdate(oldresult, result);
+                this.updateOutlineBadge();
+            }
+        }
+    }
+
+
     public registerTasks(): void {
         // FIXME: Implement Disposable
         this.tasks.forEach((provider) => vscode.tasks.registerTaskProvider(provider.myType, provider));
-
+        // It's possible that the fileWatcher takes too many descriptors, so
+        // it might be replaced with waiting for exit codes.
+        // Monitoring exit codes is blind to the user manually doing "make clean" or "make check"
         vscode.tasks.onDidEndTaskProcess((e) => {
             let task = e.execution.task;
             if (task) {
                 const definition: TestTask = <any>task.definition;
-                if (definition.type == "test" && definition.test) {
+                if (definition.type == "test:-standby-code" && definition.test) {
                     let suite = configuration.getAllBuildTargets()
                         ?.get(definition.test.builddir)
                         ?.get('test-suite.log');
@@ -152,7 +182,7 @@ export class Extension {
                             }
                         }
                     }
-                } else if (definition.type == "check" && definition.builddir) {
+                } else if (definition.type == "check:-standby-code" && definition.builddir) {
                     let suite = configuration.getAllBuildTargets()
                         ?.get(definition.builddir)
                         ?.get('test-suite.log');
@@ -244,8 +274,10 @@ export class Extension {
         }
     }
 
+    private configDisposables : vscode.Disposable[] = [];
     public updateTasks(build_tree: gnumake.Make): void {
-        this.tasks.forEach((provider) => provider.update());
+        this.configDisposables.forEach((d) => d.dispose());
+        this.tasks.forEach((provider) => provider.update(this.configDisposables));
         if (this._projectOutlineTreeView) {
             this._projectOutlineProvider.updateTargets(build_tree);
             this._projectOutlineTreeView.reveal(this._projectOutlineProvider.getChildren(undefined)[0],
@@ -609,7 +641,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         .onDidChange((e) => {  extension.regen(); }));
     context.subscriptions.push(vscode.workspace.createFileSystemWatcher('**/*.in')
         .onDidChange((e) => {  extension.regen(); }));
-
 
     extension.createPanel(context);
 

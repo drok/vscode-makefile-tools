@@ -27,7 +27,7 @@ export class AutoToolsBuildTaskProvider implements MyTaskProvider {
 		return this.myPromise;
 	}
 
-    public update() {
+    public update(disposables: vscode.Disposable[]) {
         var targets: Task[] = [];
         let c = configuration.getCurrentMakefileConfiguration();
         configuration.getAllBuildTargets().forEach((goals, dir) => {
@@ -112,7 +112,7 @@ export class AutoToolsTestTaskProvider implements MyTaskProvider {
 		return this.myPromise;
 	}
 
-    public update() {
+    public update(disposables: vscode.Disposable[]) {
         var targets: Task[] = [];
         this.numFails = 0;
         this.numTests = 0;
@@ -122,8 +122,17 @@ export class AutoToolsTestTaskProvider implements MyTaskProvider {
             configuration.getAllBuildTargets().forEach((goals, dir) => {
             for (let g of goals.values()) {
                 if (g.flags & Goal.Flags.Test_Suite) {
-                    if (g.goal) {
-                        g.depends?.forEach((d) => {
+                    if (g.goal && g.depends) {
+                        let rel = new vscode.RelativePattern(vscode.Uri.file(path.join(c.top_builddir || '', dir)), '*.trs');
+                        let watcher =   vscode.workspace.createFileSystemWatcher(rel);
+                        disposables.push(watcher
+                            .onDidChange((uri) => { extension.trsChange(c, uri); }));
+                        disposables.push(watcher
+                            .onDidDelete((uri) => { extension.trsChange(c, uri); }));
+                        disposables.push(watcher
+                            .onDidCreate((uri) => { extension.trsChange(c, uri); }));
+
+                        g.depends.forEach((d) => {
                             if(!d.goal)
                                 throw new Error("Invalid test.depends");
                             let test = new BuildTarget(dir, d.goal);
@@ -190,7 +199,7 @@ export class AutoToolsCheckTaskProvider implements MyTaskProvider {
 		return this.myPromise;
 	}
 
-    update() {
+    update(disposables: vscode.Disposable[]) {
 
         var targets : Task[] = [];
         let c = configuration.getCurrentMakefileConfiguration();
@@ -239,7 +248,7 @@ export class AutoToolsCheckTaskProvider implements MyTaskProvider {
 
 export interface MyTaskProvider extends TaskProvider {
     readonly myType: string;
-    update(): void;
+    update(disposables: vscode.Disposable[]): void;
 }
 
 export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
@@ -295,7 +304,7 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
     public isBootstrapped(): boolean {
         return checkFileExistsSync(resolvePathToRoot("configure"));
     }
-    update(): void {
+    update(disposables: vscode.Disposable[]): void {
         let c = configuration.getCurrentMakefileConfiguration();
 
         const regenkind: AutotoolsTask = {
