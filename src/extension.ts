@@ -604,7 +604,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
     context.subscriptions.push(vscode.commands.registerCommand('autotools.editConfigureAc', async (sub: tree.SubNode) => {
         telemetry.logEvent("editConfigureAc");
-        await openEditor("configure.ac");
+        let configureAc = configuration.getConfigureAc();
+        if (configureAc)
+            await openEditor(configureAc);
     }));
 
     context.subscriptions.push(vscode.commands.registerCommand('autotools.test', async (sub: tree.TaskNode) => {
@@ -642,12 +644,17 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
     extension.registerTasks();
 
-    context.subscriptions.push(vscode.workspace.createFileSystemWatcher('**/Makefile.am')
-        .onDidChange((e) => { extension.regen(); }));
-    context.subscriptions.push(vscode.workspace.createFileSystemWatcher('**/configure.ac')
-        .onDidChange((e) => {  extension.regen(); }));
-    context.subscriptions.push(vscode.workspace.createFileSystemWatcher('**/*.in')
-        .onDidChange((e) => {  extension.regen(); }));
+    let configureAc = configuration.getConfigureAc();
+    if (configureAc) {
+        context.subscriptions.push(vscode.workspace.createFileSystemWatcher('**/Makefile.am')
+            .onDidChange((e) => { extension.regen(); }));
+        if (!configureAc.endsWith(".in")) {
+            context.subscriptions.push(vscode.workspace.createFileSystemWatcher(configureAc)
+                .onDidChange((e) => { extension.regen(); }));
+        }
+        context.subscriptions.push(vscode.workspace.createFileSystemWatcher('**/*.in')
+            .onDidChange((e) => {  extension.regen(); }));
+    }
 
     extension.createPanel(context);
 

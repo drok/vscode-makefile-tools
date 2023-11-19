@@ -134,6 +134,12 @@ async function readMakePath(): Promise<void> {
     setMakePath(await util.getExpandedSetting<string>("makePath"));
 }
 
+let configureAc: string | undefined;
+export function setConfigureAc(file : string | undefined): void {
+    configureAc = file;
+}
+export function getConfigureAc(): string | undefined { return configureAc; }
+
 let loggingLevel: string | undefined;
 export function getLoggingLevel(): string | undefined { return loggingLevel; }
 export function setLoggingLevel(logLevel: string): void { loggingLevel = logLevel; }

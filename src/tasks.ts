@@ -257,7 +257,10 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
     public bootstrapTask?: vscode.Task;
     public regenTask?: vscode.Task;
     private working: boolean = false;
-
+    static manifests: string[] = [
+            "configure.ac",
+            "configure.in",
+    ];
     constructor() {
         let b = this.bootstrap_cmd();
         if (b) {
@@ -288,7 +291,8 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
 	}
 
     public bootstrap_cmd(): string[] | undefined {
-        if (!checkFileExistsSync(resolvePathToRoot("configure.ac")) && !checkFileExistsSync(resolvePathToRoot("configure.in"))) {
+        let configureAc = AutoToolsBootstrapTaskProvider.manifests.find((m) => checkFileExistsSync(resolvePathToRoot(m)));
+        if (!configureAc) {
             return undefined;
         } else {
             let script = resolvePathToRoot("bootstrap");
@@ -298,6 +302,7 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
             script = resolvePathToRoot("autogen.sh");
             if (checkFileExistsSync(script))
                 return [script];
+            configuration.setConfigureAc(configureAc);
         }
         return ["autoreconf", "-fvi"];
     }
