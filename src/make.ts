@@ -785,12 +785,16 @@ export const TRS_Info: { [key: number]: vscode.FileDecoration } = {
     [TRS.XPASS]: { tooltip: 'XPASS', badge: '☑️' },
     [TRS.PASS]:  { tooltip: 'PASS',  badge: '✔️' },
     [TRS.SKIP]:  { tooltip: 'SKIP',  badge: '🔳' },
-    [TRS.ERROR]: { tooltip: 'ERROR', badge: '❓' },
+    [TRS.ERROR]: { tooltip: 'ERROR', badge: /* '⭕' */ '💣️'},
     [TRS.FAIL]:  { tooltip: 'FAIL',  badge: '❌' },
     [TRS.XFAIL]: { tooltip: 'XFAIL', badge: '🏳️' },
     [7]: { tooltip: 'THROW',   badge: '⁉️' },
   };
 
+export function isSuspect(trs: TRS) : boolean
+{
+    return trs === TRS.ERROR || trs === TRS.XFAIL || trs === TRS.XPASS;
+}
 export function readTRS(b: BuildTarget) : TRS
 {
     let c = configuration.getCurrentMakefileConfiguration();

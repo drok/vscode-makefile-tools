@@ -9,7 +9,7 @@ import { Task, TaskDefinition, TaskScope, TaskGroup, TaskProvider, ProcessExecut
 import { Goal } from './parser/gnumake';
 import { assert, error } from 'console';
 import * as configuration from './configuration';
-import { BuildTarget, t_all, t_none, readTRS } from './make';
+import { BuildTarget, t_all, t_none, readTRS, TRS, isSuspect } from './make';
 import { resolvePathToRoot, checkFileExistsSync } from './util';
 import * as vscode from 'vscode';
 
@@ -103,6 +103,10 @@ export class AutoToolsBuildTaskProvider implements MyTaskProvider {
 export class AutoToolsTestTaskProvider implements MyTaskProvider {
 	readonly myType = 'test';
 	private myPromise: Thenable<Task[]> | undefined = undefined;
+    public numFails : number = 0;
+    public numTests : number = 0;
+    public numUnknown : number = 0;
+    public numSuspect : number = 0;
 
 	public provideTasks(): Thenable<Task[]> | undefined {
 		return this.myPromise;
@@ -110,6 +114,10 @@ export class AutoToolsTestTaskProvider implements MyTaskProvider {
 
     public update() {
         var targets: Task[] = [];
+        this.numFails = 0;
+        this.numTests = 0;
+        this.numUnknown = 0;
+        this.numSuspect = 0;
         let c = configuration.getCurrentMakefileConfiguration();
             configuration.getAllBuildTargets().forEach((goals, dir) => {
             for (let g of goals.values()) {
@@ -139,7 +147,12 @@ export class AutoToolsTestTaskProvider implements MyTaskProvider {
                             targets.push(d.task);
 
                             /* Read existing TRS file to show correct last known status in the outline */
-                            d.flags |= readTRS(test);
+                            let trs = readTRS(test);
+                            d.flags |= trs;
+                            this.numFails += (trs == TRS.FAIL ? 1 : 0);
+                            this.numUnknown += ((trs == TRS.NONE || trs == TRS.ERROR) ? 1 : 0);
+                            this.numSuspect += (isSuspect(trs) ? 1 : 0);
+                            this.numTests++;
                         });
                     }
                 }

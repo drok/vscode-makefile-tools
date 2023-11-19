@@ -33,6 +33,7 @@ import { SuiteDecorations } from './suite-decorator';
 import * as nls from 'vscode-nls';
 import { allowedNodeEnvironmentFlags } from 'process';
 import { assert } from 'console';
+import { SlowBuffer } from 'buffer';
 nls.config({ messageFormat: nls.MessageFormat.bundle, bundleFormat: nls.BundleFormat.standalone })();
 const localize: nls.LocalizeFunc = nls.loadMessageBundle();
 
@@ -56,15 +57,17 @@ export class Extension {
     private tasks: MyTaskProvider[];
     private autotoolsTask: AutoToolsBootstrapTaskProvider;
     private buildTasks: AutoToolsBuildTaskProvider;
+    private testTasks: AutoToolsTestTaskProvider;
     private compilerFullPath ?: string;
 
     public constructor(public readonly extensionContext: vscode.ExtensionContext) {
         this.autotoolsTask = new AutoToolsBootstrapTaskProvider();
         this.buildTasks = new AutoToolsBuildTaskProvider();
+        this.testTasks = new AutoToolsTestTaskProvider();
         this.tasks = [
             this.autotoolsTask,
             this.buildTasks,
-            new AutoToolsTestTaskProvider(),
+            this.testTasks,
             new AutoToolsCheckTaskProvider(),
         ];
         extensionContext.subscriptions.push(vscode.commands.registerCommand('autotools.command.bootstrap', async () => {
@@ -88,6 +91,30 @@ export class Extension {
                 }
             }
         }));
+        this._projectOutlineTreeView.description = "outline description";
+        // this._projectOutlineTreeView.message = "outline message";
+//        this._projectOutlineTreeView.badge = {tooltip: '🧰', value: 42};
+//        this._projectOutlineTreeView.badge = {tooltip: '🧰', value: 42};
+    }
+
+    failStatUpdate(oldresult: make.TRS, result: make.TRS) {
+        assert(oldresult != result);
+        if ((result == make.TRS.NONE || result == make.TRS.ERROR) &&
+            !(oldresult == make.TRS.NONE || oldresult == make.TRS.ERROR))
+            this.testTasks.numUnknown++;
+        else if ((oldresult == make.TRS.NONE || oldresult == make.TRS.ERROR) &&
+                !(result == make.TRS.NONE || result == make.TRS.ERROR))
+            this.testTasks.numUnknown--;
+
+        if (oldresult == make.TRS.FAIL)
+            this.testTasks.numFails--;
+        else if (result == make.TRS.FAIL)
+            this.testTasks.numFails++;
+
+        if (make.isSuspect(oldresult))
+            this.testTasks.numSuspect--;
+        else if (make.isSuspect(result))
+            this.testTasks.numSuspect++;
     }
 
     public registerTasks(): void {
@@ -112,11 +139,16 @@ export class Extension {
                             } else {
                                 result = make.readTRS(definition.test);
                             }
-                            if (result != (goal.flags & Goal.Flags.Test_Result_Mask)) {
+                            let oldresult = goal.flags & Goal.Flags.Test_Result_Mask;
+                            if (result != oldresult) {
                                 goal.flags &= ~Goal.Flags.Test_Result_Mask;
                                 goal.flags |= result;
                                 this.suiteDecorator.update(vscode.Uri.from(
                                     {authority: Extension.whoami, scheme: 'test', path: '/' + definition.test.builddir, query: definition.test.goal}));
+                                this.suiteDecorator.update(vscode.Uri.from(
+                                    {authority: Extension.whoami, scheme: 'check', path: '/' + definition.test.builddir, query: 'test-suite.log'}));
+                                this.failStatUpdate(oldresult, result);
+                                this.updateOutlineBadge();
                             }
                         }
                     }
@@ -124,6 +156,7 @@ export class Extension {
                     let suite = configuration.getAllBuildTargets()
                         ?.get(definition.builddir)
                         ?.get('test-suite.log');
+                    let hasUpdates = false;
                     if (suite) {
                         let result: make.TRS = e.exitCode ? make.TRS.FAIL : make.TRS.PASS;
                         if (result != (suite.flags & Goal.Flags.Test_Result_Mask)) {
@@ -136,14 +169,18 @@ export class Extension {
                         for (let test of suite.depends) {
                             if (test.task) {
                                 result = make.readTRS(test.task.definition.test);
-                                if (result != (test.flags & Goal.Flags.Test_Result_Mask)) {
+                                let oldresult = test.flags & Goal.Flags.Test_Result_Mask;
+                                if (result != oldresult) {
                                     test.flags &= ~Goal.Flags.Test_Result_Mask;
                                     test.flags |= result;
                                     this.suiteDecorator.update(vscode.Uri.from(
                                         {authority: Extension.whoami, scheme: 'test', path: '/' + definition.builddir, query: test.goal}));
+                                    hasUpdates = true;
+                                    this.failStatUpdate(oldresult, result);
                                 }
                             }
                         }
+                        if (hasUpdates) this.updateOutlineBadge();
                     }
                 } else if (definition.type == "autotools") {
                     const definition: AutotoolsTask = <any>task.definition;
@@ -176,12 +213,44 @@ export class Extension {
         vscode.tasks.executeTask(new vscode.Task(kind, vscode.TaskScope.Workspace, 'autotools', 'autotools',
             new vscode.ProcessExecution("true", ["this-is-a-workaround-for-fetchTasks-bug-not-parsing-tasks-json"])));
     }
+    updateOutlineBadge() : void {
+        if (!this._projectOutlineTreeView) {
+            return;
+        }
+        if (this.testTasks.numFails) {
+            this._projectOutlineTreeView.badge =
+                {tooltip:
+                    localize("autotools.failing.tests", "{0}/{1} tests FAIL",
+                        this.testTasks.numFails, this.testTasks.numTests),
+                value: this.testTasks.numFails};
+        } else if (this.testTasks.numSuspect) {
+            this._projectOutlineTreeView.badge =
+                {tooltip:
+                    localize("autotools.suspect.tests", "{0}/{1} tests are suspect (XPASS/XFAIL/ERROR)",
+                        this.testTasks.numSuspect, this.testTasks.numTests),
+                value: this.testTasks.numSuspect};
+        } else if (this.testTasks.numTests && this.testTasks.numUnknown) {
+            this._projectOutlineTreeView.badge =
+                {tooltip:
+                    localize("autotools.unknown.tests", "{0}/{1} tests are available/not yet run",
+                        this.testTasks.numUnknown, this.testTasks.numTests),
+                value: this.testTasks.numUnknown};
+        } else {
+            this._projectOutlineTreeView.badge =
+                {tooltip:
+                    localize("autotools.no.tests", "No tests available"),
+                value: 0
+            };
+        }
+    }
+
     public updateTasks(build_tree: gnumake.Make): void {
         this.tasks.forEach((provider) => provider.update());
         if (this._projectOutlineTreeView) {
             this._projectOutlineProvider.updateTargets(build_tree);
             this._projectOutlineTreeView.reveal(this._projectOutlineProvider.getChildren(undefined)[0],
                 { select: false, focus: false, expand: true, } );
+            this.updateOutlineBadge();
         }
     }
     public bootstrap(): void { this.autotoolsTask.bootstrap(); }
@@ -542,7 +611,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         .onDidChange((e) => {  extension.regen(); }));
 
 
-    extension.createPanel();
+    extension.createPanel(context);
 
     vscode.window.registerFileDecorationProvider(extension.suiteDecorator);
 
