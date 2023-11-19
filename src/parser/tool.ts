@@ -55,10 +55,10 @@ export class Making implements Parser {
         /* FIXME: this isCompiler() functionality is a placeholder */
         if(ObjectFileRE.test(caller.currentTarget)) {
             if (compilers.includes(path.basename(tool.fullPath)))
-                 this.handleCompilerCommand(tool, caller.currentDir).then(() => {});
+                 this.handleCompilerCommand(tool, caller.currentDir);
         } else {
             if (linkers.includes(path.basename(tool.fullPath)))
-                this.handleLinkerCommand(tool, caller.currentDir).then(() => {});
+                this.handleLinkerCommand(tool, caller.currentDir);
         }
     }
     ingest (line: string) : [ParserDisp, Parser] {
