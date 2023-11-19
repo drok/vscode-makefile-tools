@@ -52,10 +52,11 @@ export class SubNode extends Node {
     getChildren(): Node[] {
         let goals : Node[] = [...this.submake.submake.values()]
             .map(sub => new SubNode(sub, this.flags));
-        goals.push(...[...this.submake.goals.values()]
-            .filter(goal => goal.flags & this.flags)
-            .map(goal => new TaskNode(goal)));
-        if ((this.flags & Goal.Flags.Test_Log) && this.submake.test_suite?.depends)
+        if (!(this.flags & Goal.Flags.Test_Suite)) {
+            goals.push(...[...this.submake.goals.values()]
+                .filter(goal => goal.flags & this.flags)
+                .map(goal => new TaskNode(goal)));
+        } else if (this.submake.test_suite?.depends)
             goals.push(...this.submake.test_suite.depends
                     .map(test => new TaskNode(test)));
         return goals;
@@ -118,6 +119,9 @@ export class TaskNode extends Node {
             .concat((this.goal.flags & Goal.Flags.Linked_binary) ? ['nodeType=build'] : [])
 //            .concat((this.goal.flags & Goal.Flags.Test_Progam) ? ['nodeType=test'] : [])
             .concat((this.goal.flags & Goal.Flags.Test_Log) ? ['nodeType=test'] : [])
+            .concat((this.goal.flags & Goal.Flags.Test_Log) &&
+                // Add different kind of supported test programs here
+                (this.goal.depends && (this.goal.depends[0].flags & Goal.Flags.Linked_binary)) ? ['nodeType=bintest'] : [])
             .join(',');
         if (!this.goal.task)
             return item;
@@ -169,7 +173,7 @@ export class TaskSection extends Node {
             goals.push(...[...this.tree.goals.values()]
                 .filter(goal => goal.flags & this.flag)
                 .map(goal => new TaskNode(goal)));
-            if ((this.flag & Goal.Flags.Test_Log) && this.tree.test_suite?.depends)
+            if ((this.flag & Goal.Flags.Test_Suite) && this.tree.test_suite?.depends)
                 goals.push(...this.tree.test_suite.depends
                     .map(test => new TaskNode(test)));
             return goals;
@@ -182,10 +186,10 @@ export class TaskSection extends Node {
         item.contextValue = [
             `nodeType=section.` + this._name,
             "nodeType=sub"]
-            .concat((this.flag & Goal.Flags.Test_Log) ? ['nodeType=check'] : [])
+            .concat((this.flag & Goal.Flags.Test_Suite) ? ['nodeType=check'] : [])
             .concat((this.flag & Goal.Flags.Linked_binary) ? ['nodeType=build'] : [])
             .join(',');
-        if (this.flag & Goal.Flags.Test_Log) {
+        if (this.flag & Goal.Flags.Test_Suite) {
             item.description = localize("autotools.subnode.suite", "{0} tests in {1} subdirs",
                 ...countSuiteTests(this.tree));
             item.resourceUri = vscode.Uri.from({
@@ -242,7 +246,7 @@ export class ConfigurationNode extends Node {
         return [
             new TaskSection(this.build_tree, 'Programs', Goal.Flags.Linked_binary),
         // if (this.build_tree.goals.some(goal => goal.goal == "check"))
-            new TaskSection(this.build_tree, 'Test Suites', Goal.Flags.Test_Log),
+            new TaskSection(this.build_tree, 'Test Suites', Goal.Flags.Test_Suite),
         ];
         //return children;
     }

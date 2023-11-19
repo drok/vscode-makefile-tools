@@ -614,6 +614,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         return await vscode.tasks.executeTask(sub.goal.task);
     }));
 
+    context.subscriptions.push(vscode.commands.registerCommand('autotools.debug', async (sub: tree.TaskNode) => {
+        telemetry.logEvent("debug");
+        if (!sub.goal.task)
+            throw new Error("Missing test task on TaskNode");
+        return await vscode.tasks.executeTask(sub.goal.task);
+    }));
+
     context.subscriptions.push(vscode.commands.registerCommand('autotools.openLog', async (sub: tree.SubNode) => {
         telemetry.logEvent("openLog");
         return Promise.resolve(openLog(sub));

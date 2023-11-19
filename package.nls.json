@@ -6,6 +6,7 @@
    "autotools.command.setBuildConfiguration.title": "Set the current build configuration",
    "autotools.command.build.title": "Build",
    "autotools.command.test.title": "Run test",
+   "autotools.command.debug.title": "Debug test",
    "autotools.command.check.title": "Run test suite",
    "autotools.command.openLog.title": "View Test Suite Log",
    "autotools.command.editMakefileAm.title": "Edit Makefile.am",
