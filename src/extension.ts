@@ -76,6 +76,9 @@ export class Extension {
         extensionContext.subscriptions.push(vscode.commands.registerCommand('autotools.command.regen', async () => {
             await this.autotoolsTask.regen();
         }));
+        extensionContext.subscriptions.push(vscode.commands.registerCommand('autotools.configure.help', async () => {
+            await this.autotoolsTask.help();
+        }));
     }
     public createPanel(extensionContext: vscode.ExtensionContext) : void {
         this._projectOutlineTreeView = vscode.window.createTreeView('autotools.outline', {

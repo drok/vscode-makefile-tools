@@ -103,6 +103,10 @@
                 "icon": "$(arrow-swap)"
             },
             {
+                "command": "autotools.configure.help",
+                "title": "%autotools.command.configure.help.title%"
+            },
+            {
                 "command": "autotools.outline.configure",
                 "title": "%autotools.command.makefile.configure.title%",
                 "icon": "$(settings)"
@@ -507,6 +511,10 @@
                     "command": "autotools.outline.configure",
                     "when": "view == autotools.outline && viewItem =~ /nodeType=configuration/",
                     "group": "1_stateActions@1"
+                },
+                {
+                    "command": "autotools.configure.help",
+                    "when": "autotools:haveManifest"
                 },
                 {
                     "command": "autotools.outline.setBuildConfiguration",

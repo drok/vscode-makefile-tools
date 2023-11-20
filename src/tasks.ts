@@ -256,6 +256,7 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
 	private myPromise: Thenable<Task[]> | undefined = undefined;
     public bootstrapTask?: vscode.Task;
     public regenTask?: vscode.Task;
+    public helpTask?: vscode.Task;
     private working: boolean = false;
     static manifests: string[] = [
             "configure.ac",
@@ -273,6 +274,16 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
                 new ProcessExecution(b[0], b.slice(1)));
             this.bootstrapTask.group = TaskGroup.Build;
             this.bootstrapTask.detail = localize("automake.bootstrap", "$(tools) Bootstrap project using '{0}'", b.join(' '));
+
+            const helpkind: AutotoolsTask = {
+                type: this.myType,
+                action: 'help'
+            };
+            this.helpTask = new Task(helpkind, TaskScope.Workspace,
+                localize("autotools.configure.help.task", "Display package configuration options"),
+                "Autotools task",
+                new ProcessExecution("./configure", ["--help"]));
+            this.helpTask.detail = localize("automake.configure.help", "$(tools) Output package configuration options using 'configure --help'");
         }
     }
 	provideTasks(): Thenable<Task[]> | undefined {
@@ -288,10 +299,13 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
             return this.bootstrapTask;
         if (definition.action === 'regen')
             return this.regenTask;
+        if (definition.action === 'help')
+            return this.helpTask;
 	}
 
     public bootstrap_cmd(): string[] | undefined {
         let configureAc = AutoToolsBootstrapTaskProvider.manifests.find((m) => checkFileExistsSync(resolvePathToRoot(m)));
+        configuration.setConfigureAc(configureAc);
         if (!configureAc) {
             return undefined;
         } else {
@@ -341,6 +355,13 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
         // a separate, unnecesary update.
         if (this.regenTask && !this.working) {
             vscode.tasks.executeTask(this.regenTask).then(() => {
+                this.working = true;
+            });
+        }
+    }
+    public async help(): Promise<void> {
+        if (this.helpTask) {
+            vscode.tasks.executeTask(this.helpTask).then(() => {
                 this.working = true;
             });
         }
