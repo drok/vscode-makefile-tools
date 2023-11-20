@@ -605,6 +605,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         await openEditor(sub.makefile());
     }));
 
+    context.subscriptions.push(vscode.commands.registerCommand('autotools.newConfiguration', async (sub: tree.Node | undefined) => {
+        telemetry.logEvent("newConfiguration");
+        openSettings("autotools.configurations");
+    }));
+
     context.subscriptions.push(vscode.commands.registerCommand('autotools.editConfigureAc', async (sub: tree.SubNode) => {
         telemetry.logEvent("editConfigureAc");
         let configureAc = configuration.getConfigureAc();

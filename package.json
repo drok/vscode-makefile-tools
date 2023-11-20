@@ -75,6 +75,10 @@
                 "title": "%autotools.command.regen.title%"
             },
             {
+                "command": "autotools.newConfiguration",
+                "title": "%autotools.palette.newConfiguration.title%"
+            },
+            {
                 "command": "autotools.editConfigureAc",
                 "icon": "$(tools)",
                 "title": "%autotools.command.editConfigureAc.title%"
@@ -434,6 +438,10 @@
                 {
                     "command": "autotools.build",
                     "when": "never"
+                },
+                {
+                    "command": "autotools.newConfiguration",
+                    "when": "autotools:haveManifest"
                 },
                 {
                     "command": "autotools.test",
