@@ -2,7 +2,7 @@
    "autotools.command.bootstrap.title": "Autotools: Bootstrap",
    "autotools.command.regen.title": "Autotools: Update Makefiles and Headers",
    "autotools.command.makefile.buildAll.title": "Autotools: Build 'all'",
-   "autotools.command.makefile.setBuildConfiguration.title": "Autotools: Set the current build configuration",
+   "autotools.command.makefile.setBuildConfiguration.title": "Autotools: Select a build configuration",
    "autotools.command.setBuildConfiguration.title": "Set the current build configuration",
    "autotools.command.configure.title": "Autotools: Configure",
    "autotools.command.build.title": "Build",
