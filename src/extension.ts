@@ -58,6 +58,7 @@ export class Extension {
     private autotoolsTask: AutoToolsBootstrapTaskProvider;
     private buildTasks: AutoToolsBuildTaskProvider;
     private testTasks: AutoToolsTestTaskProvider;
+    private needTaskFetchBugWorkaround: boolean = true;
     private compilerFullPath ?: string;
 
     public constructor(public readonly extensionContext: vscode.ExtensionContext) {
@@ -238,13 +239,15 @@ export class Extension {
             }
         }
 
-        // FIXME: This is a workaround for vscode not parsing tasks.json prior to fetchTasks()
-        const kind:BuildTask = {
-            type: "build",
-            target: new make.BuildTarget(".", "fetchTasks-bug-workaround")
-        };
-        vscode.tasks.executeTask(new vscode.Task(kind, vscode.TaskScope.Workspace, 'autotools', 'autotools',
-            new vscode.ProcessExecution("true", ["this-is-a-workaround-for-fetchTasks-bug-not-parsing-tasks-json"])));
+        if (this.needTaskFetchBugWorkaround) {
+            // FIXME: This is a workaround for vscode not parsing tasks.json prior to fetchTasks()
+            const kind:BuildTask = {
+                type: "build",
+                target: new make.BuildTarget(".", "fetchTasks-bug-workaround")
+            };
+            vscode.tasks.executeTask(new vscode.Task(kind, vscode.TaskScope.Workspace, 'autotools', 'autotools',
+                new vscode.ProcessExecution("true", ["this-is-a-workaround-for-fetchTasks-bug-not-parsing-tasks-json"])));
+        }
     }
     updateOutlineBadge() : void {
         if (!this._projectOutlineTreeView) {
@@ -291,6 +294,11 @@ export class Extension {
     public bootstrap(): void { this.autotoolsTask.bootstrap(); }
     public regen(): void { this.autotoolsTask.regen(); }
     public build(target: make.BuildTarget): void { this.buildTasks.build(target); }
+    public async configure(): Promise<boolean> {
+        this.needTaskFetchBugWorkaround = false;
+        return await this.autotoolsTask.configure();
+    };
+    public isBootstrapped(): boolean { return this.autotoolsTask.isBootstrapped(); }
 
     public updateMakefileFilePresent(newValue: boolean): void {
         vscode.commands.executeCommand("setContext", "autotools.makefileFilePresent", newValue);
@@ -565,7 +573,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }));
     /** End of commands that shouldn't be exposed in package.json, they are used for command substitution in launch.json and tasks.json. */
 
-    context.subscriptions.push(vscode.commands.registerCommand('autotools.configure', async () => {
+    context.subscriptions.push(vscode.commands.registerCommand('autotools.exportToIntelisense', async () => {
         await make.configure(make.TriggeredBy.configure);
     }));
 
@@ -575,8 +583,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         extension.getState().reset();
     }));
 
-    context.subscriptions.push(vscode.commands.registerCommand('autotools.outline.configure', () => {
-        return vscode.commands.executeCommand("autotools.configure");
+    //context.subscriptions.push(vscode.commands.registerCommand('autotools.outline.configure', () => {
+    //    return vscode.commands.executeCommand("autotools.configure");
+    //}));
+
+    context.subscriptions.push(vscode.commands.registerCommand('autotools.configure', async () => {
+        telemetry.logEvent("configure");
+        extension.configure();
     }));
 
 
@@ -640,6 +653,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         return vscode.commands.executeCommand("autotools.setBuildConfiguration");
     }));
 
+    vscode.commands.executeCommand("setContext", "autotools.isBootstrapped", extension.isBootstrapped());
+
     // Read from the workspace state before reading from settings,
     // becase the latter may use state info in variable expansion.
     configuration.initFromState();
@@ -668,8 +683,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
     vscode.window.registerFileDecorationProvider(extension.suiteDecorator);
 
-    await make.configure(make.TriggeredBy.cleanConfigure);
-
     // Analyze settings for type validation and telemetry
     let workspaceConfiguration: vscode.WorkspaceConfiguration = vscode.workspace.getConfiguration("autotools");
     let telemetryProperties: telemetry.Properties | null = {};
@@ -684,6 +697,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     if (telemetryProperties && util.hasProperties(telemetryProperties)) {
         telemetry.logEvent("settings", telemetryProperties);
     }
+
+    if (!configuration.getConfigurationMakefile()) {
+        ui.getUI().setLoading(ui.UIStatus.ERR);
+        return;
+    }
+    await make.configure(make.TriggeredBy.cleanConfigure);
 }
 
 export async function deactivate(): Promise<void> {

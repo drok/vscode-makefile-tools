@@ -128,10 +128,10 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
     if (dir) {
         makeArgs.push(...["-C", dir]);
     }
-    let makefile = configuration.getConfigurationMakefile();
-    if (makefile) {
+    let topMakefile = configuration.gettopMakefile();
+    if (topMakefile) {
         // FIXME: this refers to the configuration makefile, not the target's makefile
-        makeArgs.push(...["-f", makefile]);
+        makeArgs.push(...["-f", topMakefile]);
     }
 
     let abs_top_builddir = util.resolvePathToRoot(dir || "");
@@ -178,9 +178,7 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
     // FIXME: also assume-old the configuration files listed
     // ./config.status --help
 
-    logger.messageNoCR(`Generating configuration cache with command: `);
-
-    logger.message(`'${configuration.getMakePath()} ${makeArgs.join(" ")}'`);
+    logger.message(`Export Intellisense Info from: '${configuration.getMakePath()} ${makeArgs.join(" ")}'`);
 
     try {
         // TODO: Use stream writes

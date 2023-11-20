@@ -50,6 +50,9 @@ export interface MakefileConfiguration {
     // don't use more than one argument in a string
     makeArgs?: string[];
 
+    // configure arguments
+    configureArgs?: string[];
+
     // list of problem matcher names to be used when building the current target
     problemMatchers?: string[];
 
@@ -137,6 +140,7 @@ async function readMakePath(): Promise<void> {
 let configureAc: string | undefined;
 export function setConfigureAc(file : string | undefined): void {
     configureAc = file;
+    vscode.commands.executeCommand('setContext', "autotools:haveManifest", file ? true : false);
 }
 export function getConfigureAc(): string | undefined { return configureAc; }
 
@@ -212,6 +216,13 @@ let configurationMakefile: string | undefined;
 export function getConfigurationMakefile(): string | undefined { return configurationMakefile; }
 export function setConfigurationMakefile(makefilePath: string | undefined): void { configurationMakefile = makefilePath; }
 
+
+// the topMakefile is the GNUMakefile or Makefile which would be used when running "make"
+// This can be different than the ConfigurationMakefile (automake output, always Makefile)
+let topMakefile: string | undefined;
+export function gettopMakefile(): string | undefined { return topMakefile; }
+export function settopMakefile(makefilePath: string | undefined): void { topMakefile = makefilePath; }
+
 let configurationProblemMatchers: string[] = [];
 export function getConfigurationProblemMatchers(): string[] { return configurationProblemMatchers; }
 export function setConfigurationProblemMatchers(problemMatchers: string[]): void { configurationProblemMatchers = problemMatchers; }
@@ -220,7 +231,27 @@ export function setConfigurationProblemMatchers(problemMatchers: string[]): void
 // according to various merging rules and decide what make command and build log
 // apply to the current makefile configuration.
 async function analyzeConfigureParams(): Promise<void> {
-    await getCommandForConfiguration();
+    let relativeMakefile = findMakefile();
+    let reason : string = "ok";
+    if (!relativeMakefile) {
+        if (await extension.configure()) {
+            relativeMakefile = findMakefile();
+            if (!relativeMakefile) {
+                logger.message('Configuration succeeded but there is no makefile for');
+                reason = "configured-noMakefile"
+            }
+        } else {
+            reason = "configure-failed";
+            logger.message('Configuring the project failed.');
+        }
+    }
+
+    if (relativeMakefile)
+        logMakeCmd(relativeMakefile);
+
+    await extension.setFullFeatureSet(relativeMakefile ? true : false);
+
+    telemetry.logEvent(reason, { reason: "init" });
     getProblemMatchersForConfiguration();
 }
 
@@ -232,10 +263,7 @@ function getMakefileConfiguration(configuration: string): MakefileConfiguration 
   });
 }
 
-// Helper to find in the array of MakefileConfiguration which command/args correspond to a configuration name.
-// Higher level settings (like autotools.makePath, autotools.configurations.top_builddir)
-// also have an additional effect on the final command.
-export async function getCommandForConfiguration(): Promise<void> {
+function findMakefile(): string | undefined {
     // top_builddir is resolved to either a subdirectory of the workspace or an absolute path.
     let abs_top_builddir: string = util.resolvePathToRoot(currentMakefileConfiguration.top_builddir || "");
 
@@ -243,58 +271,39 @@ export async function getCommandForConfiguration(): Promise<void> {
     // and is named "Makefile" or "makefile" or "GNUmakefile".
     let makeFileTest: string | undefined;
     // filename of makefile relative to top_builddir
+    let topMakefile: string | undefined;
     let relativeMakefile: string | undefined;
     let makefileExists : boolean = false;
     relativeMakefile = "GNUmakefile";
     makeFileTest = path.join(abs_top_builddir, relativeMakefile);
     makefileExists = util.checkFileExistsSync(makeFileTest);
-    if (!makefileExists) {
-        relativeMakefile = "Makefile";
-        makeFileTest = path.join(abs_top_builddir, relativeMakefile);
-        makefileExists = util.checkFileExistsSync(makeFileTest);
-    }
+    if (makefileExists)
+        topMakefile = relativeMakefile;
+
+    relativeMakefile = "Makefile";
+    makeFileTest = path.join(abs_top_builddir, relativeMakefile);
+    makefileExists = util.checkFileExistsSync(makeFileTest);
+
     if (!makefileExists) {
         relativeMakefile = "makefile";
         makeFileTest = path.join(abs_top_builddir, relativeMakefile);
         makefileExists = util.checkFileExistsSync(makeFileTest);
     }
-
-    // if we found the makefile add it to command line to ensure make has the same understanding
-    // of which makefile is the correct one.
-    // TODO: If the installed make _is_ GNU, then GNUmakefile should be prefered. Need to detect if
-    // make is GNU or not.
-    if (makefileExists) {
-        configurationMakefile = relativeMakefile;
-        if (currentMakefileConfiguration.makeArgs)
-            logger.message(`Deduced command '${makePath} ${currentMakefileConfiguration.makeArgs.join(" ")}' for configuration "${currentMakefileConfiguration.name}"`);
-        else
-            logger.message(`Deduced command '${makePath}' for configuration "${currentMakefileConfiguration.name}"`);
-    } else {
-        logger.message(`A makefile was not found for configuration "${currentMakefileConfiguration.name}"`);
-    }
-    // store the found makefile for display in the outline
-    setConfigurationMakefile(makefileExists ? relativeMakefile : undefined);
     extension.updateMakefileFilePresent(makefileExists);
     statusBar.setStatus(makefileExists ? ui.UIStatus.OK : ui.UIStatus.NO_MAKEFILE);
+    if (!makefileExists)
+        relativeMakefile = topMakefile;
+    settopMakefile(topMakefile);
+    setConfigurationMakefile(relativeMakefile);
 
-    // Validation and warnings about properly defining the makefile and make tool.
-    if (!makefileExists) {
-        logger.message("The makefile entry point was not found. " +
-            "Make sure it exists at the location defined by " +
-            "autotools.configurations[].top_builddir");
+    return relativeMakefile;
+}
 
-        // we may need more advanced ability to process settings
-        // insight into different project structures
-        const telemetryProperties: telemetry.Properties = {
-            reason: "no Makefile"
-        };
-
-        telemetry.logEvent("makefileNotFound", telemetryProperties);
-        await extension.setFullFeatureSet(false);
-        statusBar.setLoading(ui.UIStatus.NO_MAKEFILE);
-    } else {
-        await extension.setFullFeatureSet(true);
-    }
+export function logMakeCmd(relativeMakefile: string): void {
+    if (currentMakefileConfiguration.makeArgs)
+        logger.message(`Make cmd (${relativeMakefile}): '${makePath} ${currentMakefileConfiguration.makeArgs.join(" ")}' for configuration "${currentMakefileConfiguration.name}"`);
+    else
+        logger.message(`Make cmd (${relativeMakefile}): '${makePath}' for configuration "${currentMakefileConfiguration.name}"`);
 }
 
 // Helper to find in the array of MakefileConfiguration which problemMatchers correspond to a configuration name
@@ -314,6 +323,9 @@ export async function readMakefileConfigurations(currentConfigurationName : stri
     makefileConfigurations = workspaceConfiguration.get<MakefileConfiguration[]>("configurations") || [];
     let detectedUnnamedConfigurations: boolean = false;
     let unnamedConfigurationId: number = 0;
+
+    vscode.commands.executeCommand('setContext', "autotools:haveConfigurations",
+        makefileConfigurations.length ? true : false);
 
     // Collect unnamed configurations (probably) defined by the extension earlier,
     // to make sure we avoid duplicates in case any new configuration is in need of a name.
@@ -354,7 +366,7 @@ export async function readMakefileConfigurations(currentConfigurationName : stri
         return k.name;
     }));
     if (makefileConfigurationNames.length > 0) {
-        logger.message("Found the following configurations defined in autotools.configurations setting: " + makefileConfigurationNames.join(";"));
+        logger.message("Defined autotools.configurations: " + makefileConfigurationNames.join(";"));
     }
 
     // Verify if the current makefile configuration (check against the expanded values)

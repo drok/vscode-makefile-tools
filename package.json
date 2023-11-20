@@ -99,16 +99,20 @@
             },
             {
                 "command": "autotools.configure",
-                "title": "%autotools.command.makefile.configure.title%"
+                "title": "%autotools.command.configure.title%"
+            },
+            {
+                "command": "autotools.exportToIntelisense",
+                "title": "%autotools.exportToIntelisense.title%"
+            },
+            {
+                "command": "autotools.configure.help",
+                "title": "%autotools.command.configure.help.title%"
             },
             {
                 "command": "autotools.outline.setBuildConfiguration",
                 "title": "%autotools.command.setBuildConfiguration.title%",
                 "icon": "$(arrow-swap)"
-            },
-            {
-                "command": "autotools.configure.help",
-                "title": "%autotools.command.configure.help.title%"
             },
             {
                 "command": "autotools.outline.configure",
@@ -157,7 +161,60 @@
                     "description": "%autotools.configuration.makefile.configurations.description%",
                     "items": {
                         "type": "object",
-                        "default": null,
+                        "required": ["name", "top_builddir"],
+                        "title": "%autotools.configurations.title%",
+                        "default": {
+                            "name": "Debug",
+                            "top_builddir": "build/Debug",
+                            "configureArgs": [
+                                "CFLAGS=-ggdb3 -O0",
+                                "CXXFLAGS=-ggdb3 -O0"
+                            ]
+                        },
+                        "$comment": "--enable-option-checking is to avoid silent ignoring arg mistakes. See  https://www.gnu.org/software/autoconf/manual/autoconf-2.67/html_node/Option-Checking.html",
+                        "examples": [
+                            {
+                                "name": "Defaults - in-tree",
+                                "top_builddir": ""
+                            },
+                            {
+                                "name": "Debug w/ Valgrind support",
+                                "top_builddir": "build/Valgrind",
+                                "configureArgs": [
+                                    "--enable-option-checking",
+                                    "--enable-valgrind"
+                                ]
+                            },
+                            {
+                                "name": "Lunar Config",
+                                "top_builddir": "build/Lunar",
+                                "configureArgs": [
+                                    "--enable-option-checking",
+                                    "--enable-option1",
+                                    "--with-option2=something",
+                                    "CFLAGS=-D_FORTIFY_SOURCE=2"
+                                ]
+                            },
+                            {
+                                "name": "Lunar Config - Debug",
+                                "top_builddir": "build/Lunar-Debug",
+                                "configureArgs": [
+                                    "--enable-option-checking",
+                                    "--enable-option1",
+                                    "--with-option2=something",
+                                    "CFLAGS=-ggdb3 -O0 -Wall -Werror -pg -fprofile-arcs --coverage -ftest-coverage -fstack-protector-strong"
+                                ]
+                            },
+                            {
+                                "name": "Alpine Config",
+                                "top_builddir": "build/Alpine",
+                                "configureArgs": [
+                                    "--enable-option-checking",
+                                    "--disable-option1",
+                                    "CFLAGS=-flto -g -O2 -fPIC -fstack-protector-strong"
+                                ]
+                            }
+                        ],
                         "properties": {
                             "name": {
                                 "type": "string",
@@ -165,11 +222,24 @@
                             },
                             "top_builddir": {
                               "type": "string",
-                              "description": "%autotools.configurations.top_builddir.description%"
+                              "markdownDescription": "%autotools.configurations.top_builddir.markdownDescription%"
+                            },
+                            "configureArgs": {
+                                "type": "array",
+                                "markdownDescription": "%autotools.configurations.configureArgs.markdownDescription%",
+                                "title": "%autotools.configurations.configureArgs.title%",
+                                "examples": [
+                                    ["--prefix=$HOME/bin"],
+                                    ["--enable-debug"],
+                                    ["--with-package=something"],
+                                    ["CXX=g++-13"],
+                                    ["CC=gcc-13"],
+                                    ["RANLIB=gcc-ranlib-13"]
+                                ]
                             },
                             "makeArgs": {
                                 "type": "array",
-                                "description": "%autotools.configuration.makefile.configurations.makeArgs.description%",
+                                "markdownDescription": "%autotools.configurations.makeArgs.markdownDescription%",
                                 "items": {
                                     "type": "string"
                                 },
@@ -440,8 +510,28 @@
                     "when": "never"
                 },
                 {
+                    "command": "autotools.exportToIntelisense",
+                    "when": "autotools:fullFeatureSet"
+                },
+                {
+                    "command": "autotools.command.bootstrap",
+                    "when": "!autotools.isBootstrapped"
+                },
+                {
+                    "command": "autotools.configure",
+                    "when": "autotools.isBootstrapped && !autotools.makefileFilePresent"
+                },
+                {
+                    "command": "autotools.command.regen",
+                    "when": "autotools:fullFeatureSet"
+                },
+                {
                     "command": "autotools.newConfiguration",
                     "when": "autotools:haveManifest"
+                },
+                {
+                    "command": "autotools.setBuildConfiguration",
+                    "when": "autotools:haveConfigurations"
                 },
                 {
                     "command": "autotools.test",
@@ -466,6 +556,10 @@
                 {
                     "command": "autotools.outline.configure",
                     "when": "never"
+                },
+                {
+                    "command": "autotools.configure.help",
+                    "when": "autotools:haveManifest"
                 },
                 {
                     "command": "autotools.outline.setBuildConfiguration",
@@ -519,10 +613,6 @@
                     "command": "autotools.outline.configure",
                     "when": "view == autotools.outline && viewItem =~ /nodeType=configuration/",
                     "group": "1_stateActions@1"
-                },
-                {
-                    "command": "autotools.configure.help",
-                    "when": "autotools:haveManifest"
                 },
                 {
                     "command": "autotools.outline.setBuildConfiguration",

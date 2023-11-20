@@ -10,7 +10,7 @@ import { Goal } from './parser/gnumake';
 import { assert, error } from 'console';
 import * as configuration from './configuration';
 import { BuildTarget, t_all, t_none, readTRS, TRS, isSuspect } from './make';
-import { resolvePathToRoot, checkFileExistsSync } from './util';
+import { resolvePathToRoot, checkFileExistsSync, createDirectorySync } from './util';
 import * as vscode from 'vscode';
 
 import * as nls from 'vscode-nls';
@@ -365,6 +365,44 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
                 this.working = true;
             });
         }
+    }
+    public async configure(): Promise<boolean> {
+        let c = configuration.getCurrentMakefileConfiguration();
+        let success = false;
+
+        const configurekind: AutotoolsTask = {
+            type: this.myType,
+            action: 'configure'
+        };
+        let destdir = c.top_builddir ? resolvePathToRoot(c.top_builddir) : undefined;
+        try {
+            if (destdir)
+                createDirectorySync(destdir);
+
+            let task = new Task(configurekind, TaskScope.Workspace,
+                localize("autotools.configure.task", "Prepare build directory"),
+                "Autotools task",
+                new ProcessExecution(resolvePathToRoot("configure"), c.configureArgs || [],
+                    destdir ? {cwd : destdir} : undefined ));
+            task.detail = localize("automake.configure.help", "$(tools) Configure build directory");
+
+            vscode.tasks.executeTask(task)
+                .then((e) => {
+                    this.working = e.task.execution ? true : false;
+            });
+
+            success = await new Promise<boolean>(resolve => {
+                let disposable = vscode.tasks.onDidEndTaskProcess(e => {
+                    if (e.execution.task.definition == configurekind) {
+                        disposable.dispose();
+                        resolve(e.exitCode === 0);
+                    }
+                });
+            });
+        } catch (e) {
+            success = false;
+        }
+        return Promise.resolve(success);
     }
     public async autotoolsDone(): Promise<void> {
         this.working = false;
