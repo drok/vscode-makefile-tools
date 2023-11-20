@@ -306,6 +306,23 @@
                 }
             }
         },
+        "viewsWelcome": [
+            {
+                "view": "autotools.outline",
+                "contents": "%autotools.welcome.markdownDescription%",
+                "when": "autotools:haveManifest && !autotools:haveConfigurations"
+            },
+            {
+                "view": "autotools.outline",
+                "contents": "%autotools.welcome.convert.markdownDescription%",
+                "when": "!autotools:haveManifest"
+            },
+            {
+                "view": "debug",
+                "contents": "%autotools.welcome.debug.markdownDescription%",
+                "when": "autotools:haveManifest && !autotools:haveConfigurations"
+            }
+        ],
         "debuggers": [
             {
                 "type": "cppdbg",
