@@ -16,8 +16,7 @@ import * as state from './state';
 import * as telemetry from './telemetry';
 import * as tree from './tree';
 import * as ui from './ui';
-import * as util from './util';
-import { resolvePathToRoot, checkFileExistsSync } from './util';
+import { resolvePathToRoot } from './util';
 import * as vscode from 'vscode';
 import * as cpp from 'vscode-cpptools';
 import { AutoToolsBuildTaskProvider,
@@ -534,20 +533,21 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         // were EACCESS.
         let cpptools_stat_bug = true;
         let goal_path = path.join(built.builddir ?? '.', built.goal);
+        let c = configuration.getCurrentMakefileConfiguration();
         // goal_path can be absolute if the builddir in task.json is absolute
         // automatic tasks have a relative builddir
         if (cpptools_stat_bug) {
-            let builddir = configuration.getCurrentMakefileConfiguration().top_builddir || '.';
+            let builddir = c.top_builddir;
             let abs_builddir =
                 path.isAbsolute(builddir) ? builddir :
-                util.resolvePathToRoot(configuration.getCurrentMakefileConfiguration().top_builddir || "");
+                resolvePathToRoot(c.top_builddir);
             return path.isAbsolute(goal_path) ?
                 goal_path :
                 path.join(abs_builddir, goal_path).normalize();
         }
         return path.isAbsolute(goal_path) ?
             goal_path :
-            path.join(configuration.getCurrentMakefileConfiguration().top_builddir || '.', goal_path).normalize();
+            path.join(c.top_builddir, goal_path).normalize();
     }));
 
     // Return the name of the build task that would build the default_program. It is meant to be

@@ -44,7 +44,7 @@ export interface MakefileConfiguration {
     name: string;
 
     // a folder path (full or relative) containing the entrypoint makefile
-    top_builddir?: string;
+    top_builddir: string;
 
     // options used in the build invocation
     // don't use more than one argument in a string
@@ -83,11 +83,11 @@ export async function setCurrentMakefileConfiguration(configuration: string | un
     // Used in tasks.ts with
     currentMakefileConfiguration = (configuration && getMakefileConfiguration(configuration)) || {
         name: "Default",
-        top_builddir: (vscode.workspace.workspaceFolders ? vscode.workspace.workspaceFolders[0].name : ""),
+        top_builddir: defaultBuildFolder(),
         isDefault: true,
         nolog: {}
     }
-    let nolog_file = path.join(currentMakefileConfiguration.top_builddir??'',"no-partial-suite-log");
+    let nolog_file = path.join(currentMakefileConfiguration.top_builddir,"no-partial-suite-log");
     let tmp = nolog_file + '.tmp';
     try {
         fs.stat(tmp, (err) => {
@@ -263,9 +263,14 @@ function getMakefileConfiguration(configuration: string): MakefileConfiguration 
   });
 }
 
+function defaultBuildFolder(): string {
+    let config_status = util.resolvePathToRoot("config.status");
+    return util.checkFileExistsSync(config_status) ? '' : 'build/Default';
+}
+
 function findMakefile(): string | undefined {
     // top_builddir is resolved to either a subdirectory of the workspace or an absolute path.
-    let abs_top_builddir: string = util.resolvePathToRoot(currentMakefileConfiguration.top_builddir || "");
+    let abs_top_builddir: string = util.resolvePathToRoot(currentMakefileConfiguration.top_builddir);
 
     // The make file is in top_builddir
     // and is named "Makefile" or "makefile" or "GNUmakefile".

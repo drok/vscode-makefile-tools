@@ -123,7 +123,7 @@ export class AutoToolsTestTaskProvider implements MyTaskProvider {
             for (let g of goals.values()) {
                 if (g.flags & Goal.Flags.Test_Suite) {
                     if (g.goal && g.depends) {
-                        let rel = new vscode.RelativePattern(vscode.Uri.file(path.join(c.top_builddir || '', dir)), '*.trs');
+                        let rel = new vscode.RelativePattern(vscode.Uri.file(path.join(c.top_builddir, dir)), '*.trs');
                         let watcher =   vscode.workspace.createFileSystemWatcher(rel);
                         disposables.push(watcher
                             .onDidChange((uri) => { extension.trsChange(c, uri); }));
@@ -374,7 +374,7 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
             type: this.myType,
             action: 'configure'
         };
-        let destdir = c.top_builddir ? resolvePathToRoot(c.top_builddir) : undefined;
+        let destdir = resolvePathToRoot(c.top_builddir);
         try {
             if (destdir)
                 createDirectorySync(destdir);
@@ -383,7 +383,7 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
                 localize("autotools.configure.task", "Prepare build directory"),
                 "Autotools task",
                 new ProcessExecution(resolvePathToRoot("configure"), c.configureArgs || [],
-                    destdir ? {cwd : destdir} : undefined ));
+                    {cwd : destdir}));
             task.detail = localize("automake.configure.help", "$(tools) Configure build directory");
 
             vscode.tasks.executeTask(task)

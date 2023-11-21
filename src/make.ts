@@ -796,8 +796,6 @@ export function isSuspect(trs: TRS) : boolean
 export function readTRS(b: BuildTarget) : TRS
 {
     let c = configuration.getCurrentMakefileConfiguration();
-    if (!c.top_builddir)
-        return TRS.ERROR;
 
     let trs = path.join(c.top_builddir, b.builddir, path.basename(b.goal, ".log") + ".trs");
     try {

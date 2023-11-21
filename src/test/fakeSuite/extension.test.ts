@@ -376,6 +376,7 @@ suite('Fake dryrun parsing', /*async*/() => {
       let tmpConfigurations: configuration.MakefileConfiguration[] = [{
          name: "MyTmpName",
          isDefault: false,
+         top_builddir: "",
          nolog: {},
          makeArgs: ["${command:makefile.getLaunchTargetPath}",
                     "${SomeUnsupportedVar}",
