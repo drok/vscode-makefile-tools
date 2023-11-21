@@ -52,13 +52,16 @@ export class Making implements Parser {
         // Nothing
     ];};
     constructor(tool : ToolInvocation, caller: Executing) {
-        /* FIXME: this isCompiler() functionality is a placeholder */
-        if(ObjectFileRE.test(caller.currentTarget)) {
-            if (compilers.includes(path.basename(tool.fullPath)))
-                 this.handleCompilerCommand(tool, caller.currentDir);
-        } else {
-            if (linkers.includes(path.basename(tool.fullPath)))
-                this.handleLinkerCommand(tool, caller.currentDir);
+        if (typeof tool.fullPath == "string") {
+            //throw new Error("compilerTool.fullPath is not a string (eg, subshell)");
+            /* FIXME: this isCompiler() functionality is a placeholder */
+            if(ObjectFileRE.test(caller.currentTarget)) {
+                if (compilers.includes(path.basename(tool.fullPath)))
+                    this.handleCompilerCommand(tool, caller.currentDir);
+            } else {
+                if (linkers.includes(path.basename(tool.fullPath)))
+                    this.handleLinkerCommand(tool, caller.currentDir);
+            }
         }
     }
     ingest (line: string) : [ParserDisp, Parser] {
