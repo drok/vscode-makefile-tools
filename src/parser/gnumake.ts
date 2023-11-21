@@ -439,6 +439,9 @@ export class Goal extends Node implements Parser {
                         case "Precious file (prerequisite of .PRECIOUS).":
                         case "Successfully updated.":
                             return [ParserDisp.Continue, this];
+                        case "Failed to be updated.":
+                            /* FIXME: This should be handled */
+                            return [ParserDisp.Continue, this];
                         default:
                             if(GoalAckInfoRe.test(info[1]))
                                 return [ParserDisp.Continue, this];
