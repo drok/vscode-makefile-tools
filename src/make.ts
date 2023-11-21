@@ -242,6 +242,8 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
                         } else if (disp == ParserDisp.Enter) {
                             parserStack.push(parser);
                             parserStack.push(next);
+                            if (!(parser instanceof Goal))
+                                logger.message(' '.repeat(parserStack.length *2) + `+ line ${linenumber}: ${s}`, "Debug");
                         } else {
                             let next = parserStack[parserStack.length - 1].push(parser);
                             if (next)  {
@@ -249,6 +251,8 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
                                     // when subsection which list, this adds a new element to the list
                                     // and continues parsing.
                                     parserStack.push(next);
+                                } else {
+                                    logger.message(' '.repeat(parserStack.length *2) + `- line ${linenumber}: ${s}`, "Debug");
                                 }
                             } else {
                                 while (!next && parserStack.length) {
@@ -261,6 +265,8 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
                                     // After a subsection is complete, this allows the parent to continue
                                     // with a new subsection.
                                     parserStack.push(next);
+                                } else {
+                                    logger.message(' '.repeat(parserStack.length *2) + `/ ${linenumber}: ${s}`, "Debug");
                                 } // else parent continues
                             }
                         }
