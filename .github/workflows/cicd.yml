@@ -42,7 +42,7 @@ jobs:
         if: runner.os == 'Linux'
       - name: Update homebrew
         run: |
-          brew install autoconf automake libtool autopoint
+          brew install autoconf automake libtool gettext
         if: runner.os == 'macOS'
       - name: Update msys
         uses: msys2/setup-msys2@v2
