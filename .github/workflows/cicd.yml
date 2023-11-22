@@ -23,7 +23,7 @@ jobs:
       fail-fast: true
       matrix:
         config:
-          - { os: ubuntu-16.04, name: linux }
+          - { os: ubuntu-18.04, name: linux }
           - { os: macos-latest, name: darwin }
           # - { os: windows-latest, name: win32 }
         arch:
@@ -61,7 +61,7 @@ jobs:
         with:
           submodules: true
       - name: Install Node ${{ matrix.node }}
-        uses: actions/setup-node@v1
+        uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node }}
       - name: Install Dependencies
@@ -125,7 +125,7 @@ jobs:
       # - name: Checkout Source
       #   uses: actions/checkout@v4
       # - name: Install Node v16
-      #   uses: actions/setup-node@v1
+      #   uses: actions/setup-node@v4
       #   with:
       #     node-version: 16
       # - name: Install Dependencies
