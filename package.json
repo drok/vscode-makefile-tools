@@ -664,7 +664,7 @@
         "vscode:prepublish": "yarn compile-production",
         "bootstrap": "cd vendor/gnumake && autoreconf -fvi",
         "configure": "mkdir -p build/make && cd build/make && ../../vendor/gnumake/configure --disable-dependency-tracking --with-guile=no 'INSTALL_PROGRAM=install -cs' 'CFLAGS=-g0 -O2' --disable-nls --prefix=$PWD/../..",
-        "compile": "make -j -C build/make install-binPROGRAMS && yarn install && tsc -p ./",
+        "compile": "make -j -C build/make all install-binPROGRAMS && yarn install && tsc -p ./",
         "compile-production": "yarn install && yarn run translations-generate",
         "translations-export": "gulp translations-export",
         "translations-generate": "gulp translations-generate",
