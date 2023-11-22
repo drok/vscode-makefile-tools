@@ -42,7 +42,7 @@ jobs:
         if: runner.os == 'Linux'
       - name: Update homebrew
         run: |
-          brew install aclocal
+          brew install automake
         if: runner.os == 'macOS'
       - name: Update msys
         uses: msys2/setup-msys2@v2
