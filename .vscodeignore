@@ -31,7 +31,7 @@ vendor/
 # esbundler means these should not be packaged
 # out/
 node_modules/
-out/src/**/*.js
+out/src
 !out/src/extension.js
 .git
 .gitmodules
