@@ -35,6 +35,22 @@ jobs:
       vsixPath: ${{ steps.packageExtension.outputs.vsixPath }}
       target: ${{ matrix.config.name }}-${{ matrix.arch }}
     steps:
+      - uses: awalsh128/cache-apt-pkgs-action@latest
+        with:
+          packages: autopoint
+          version: 1.0      
+        if: runner.os == 'Linux'
+      - name: Update homebrew
+        run: |
+          brew install autoconf automake libtool autopoint
+        if: runner.os == 'macOS'
+      - name: Update msys
+        uses: msys2/setup-msys2@v2
+        with:
+          update: true
+          install: >-
+            autoconf automake libtool autopoint
+        if: runner.os == 'Windows'
       - name: Setup GIT for Windows
         run: |
           git config --global core.autocrlf false
