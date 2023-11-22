@@ -71,7 +71,7 @@ export class SubNode extends Node {
             vscode.TreeItemCollapsibleState.None;
         item.contextValue = ["nodeType=sub"]
             .concat(((this.flags & Goal.Flags.Test_Log) && this.submake.test_suite) ? ['nodeType=check'] : [])
-            .concat((this.flags & Goal.Flags.Linked_binary) ? ['nodeType=build'] : [])
+            .concat((this.flags & Goal.Flags.Linked_binary) ? ['nodeType=allbuild'] : [])
             .join(',');
         if (this.flags & Goal.Flags.Test_Log) {
             item.description = localize("autotools.subnode.suite", "{0} tests, {1} subdirs",
@@ -186,8 +186,8 @@ export class TaskSection extends Node {
         item.contextValue = [
             `nodeType=section.` + this._name,
             "nodeType=sub"]
-            .concat((this.flag & Goal.Flags.Test_Suite) ? ['nodeType=check'] : [])
-            .concat((this.flag & Goal.Flags.Linked_binary) ? ['nodeType=build'] : [])
+            .concat((this.flag & Goal.Flags.Test_Suite) ? ['nodeType=allcheck'] : [])
+            .concat((this.flag & Goal.Flags.Linked_binary) ? ['nodeType=allbuild'] : [])
             .join(',');
         if (this.flag & Goal.Flags.Test_Suite) {
             item.description = localize("autotools.subnode.suite", "{0} tests in {1} subdirs",

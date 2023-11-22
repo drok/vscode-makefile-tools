@@ -558,6 +558,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         let built = await configuration.getCurrentTarget();
         return 'autotools: build \'' + built.goal + '\' in ' + built.builddir;
     }));
+    /** End of commands that shouldn't be exposed in package.json, they are used for command substitution in launch.json and tasks.json. */
 
     context.subscriptions.push(vscode.commands.registerCommand('autotools.buildAll', async () => {
         const kind:BuildTask = {
@@ -571,7 +572,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
                 .concat(make.t_all.goal)
             )));
     }));
-    /** End of commands that shouldn't be exposed in package.json, they are used for command substitution in launch.json and tasks.json. */
 
     context.subscriptions.push(vscode.commands.registerCommand('autotools.exportToIntelisense', async () => {
         await make.configure(make.TriggeredBy.configure);
@@ -592,6 +592,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         extension.configure();
     }));
 
+    context.subscriptions.push(vscode.commands.registerCommand('autotools.build', async (sub: tree.TaskNode) => {
+        telemetry.logEvent("build");
+        if (!sub.goal?.task)
+            throw new Error("Missing build task on TaskNode");
+        return await vscode.tasks.executeTask(sub.goal.task);
+    }));
 
     context.subscriptions.push(vscode.commands.registerCommand('autotools.outline.buildTarget', () => {
         return vscode.commands.executeCommand("autotools.buildTarget");
@@ -606,21 +612,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
     context.subscriptions.push(vscode.commands.registerCommand('autotools.check', async (sub: tree.SubNode) => {
         telemetry.logEvent("check");
-        if (sub instanceof tree.TaskSection) {
-            /* If there is no defined test suite, just run the 'check' goal */
-            let topcheck = sub.tree.test_suite?.task ||
-                sub.tree.goals.get('check')?.task;
-            if (!topcheck)
-                throw new Error("Missing test suite or check goal at top");
-                return await vscode.tasks.executeTask(topcheck);
-        } else {
-            /* Must be a SubNode */
-            if (!sub.submake.test_suite)
-                throw new Error("Missing test suite on SubNode");
-            if (!sub.submake.test_suite.task)
-                throw new Error("Missing check task on SubNode");
-            return await vscode.tasks.executeTask(sub.submake.test_suite.task);
-        }
+        /* Must be a SubNode */
+        if (!sub.submake.test_suite)
+            throw new Error("Missing test suite on SubNode");
+        if (!sub.submake.test_suite.task)
+            throw new Error("Missing check task on SubNode");
+        return await vscode.tasks.executeTask(sub.submake.test_suite.task);
     }));
 
     context.subscriptions.push(vscode.commands.registerCommand('autotools.editMakefileAm', async (sub: tree.SubNode) => {

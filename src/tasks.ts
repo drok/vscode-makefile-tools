@@ -140,7 +140,7 @@ export class AutoToolsTestTaskProvider implements MyTaskProvider {
                                 type: this.myType,
                                 test: test
                             };
-                            d.task = new Task(kind, TaskScope.Workspace, "run test \'" + d.goal + "\' in " + dir,
+                            d.task = new Task(kind, TaskScope.Workspace, "run test \'" + d.goal + "\' " + (dir ? ('in ' + dir) : 'at the top'),
                             "autotools",
                             new ProcessExecution(
                                 configuration.getMakePath(),
@@ -210,7 +210,7 @@ export class AutoToolsCheckTaskProvider implements MyTaskProvider {
                     type: this.myType,
                     builddir: dir
                 };
-                g.task = new Task(kind, TaskScope.Workspace, "run test suite in " + dir,
+                g.task = new Task(kind, TaskScope.Workspace, 'run test suite ' + (dir ? ('in ' + dir) : 'at the top'),
                 "autotools",
                 new ProcessExecution(
                     configuration.getMakePath(),
@@ -222,36 +222,6 @@ export class AutoToolsCheckTaskProvider implements MyTaskProvider {
                 g.task.detail = localize("automake.check", "$(checklist) Test Suite");
                 targets.push(g.task);
             }}});
-        if (!configuration.getAllBuildTargets()
-            .get('')
-            ?.get('test-suite.log')) {
-            /* The top directory has no test-suite.log target.
-             * Add a top check task, which runs all available tests,
-             * and covers projects with only custom test (not using maketools)
-             */
-            let g = configuration.getAllBuildTargets()
-            .get('')
-            ?.get('check');
-            if (g) {
-                const kind: CheckTask = {
-                    type: this.myType,
-                    builddir: ''
-                };
-                g.task = new Task(kind, TaskScope.Workspace, "run 'check' at the top",
-                "autotools",
-                new ProcessExecution(
-                    configuration.getMakePath(),
-                    (c.top_builddir ? ['-C', c.top_builddir] : [])
-                    .concat(c.makeArgs || [])
-                    .concat("check")));
-                g.task.group = TaskGroup.Test;
-                g.task.detail = targets.length ?
-                    localize("automake.check.all", "$(checklist) All Tests") :
-                    localize("automake.check.no-test-suite", "$(checklist) All Tests - no TESTS defined");
-                targets.push(g.task);
-            }
-        }
-
         this.myPromise = Promise.resolve(targets);
     }
 

@@ -45,6 +45,7 @@ export class BuildTarget {
 export const t_none = new BuildTarget("", "");
 export const t_all_recursive = new BuildTarget("", "all-recursive");
 export const t_check_recursive = new BuildTarget("", "check-recursive");
+export const t_check = new BuildTarget("", "check");
 export const t_all = new BuildTarget("", "all");
 export const t_clean = new BuildTarget("", "clean");
 

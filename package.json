@@ -48,7 +48,14 @@
             },
             {
                 "command": "autotools.buildAll",
+                "icon": "$(combine)",
                 "title": "%autotools.command.makefile.buildAll.title%"
+
+            },
+            {
+                "command": "autotools.checkAll",
+                "icon": "$(checklist)",
+                "title": "%autotools.checkAll.title%"
             },
             {
                 "command": "autotools.check",
@@ -571,6 +578,10 @@
                     "when": "autotools:fullFeatureSet"
                 },
                 {
+                    "command": "autotools.checkAll",
+                    "when": "autotools:fullFeatureSet"
+                },
+                {
                     "command": "autotools.outline.configure",
                     "when": "never"
                 },
@@ -597,6 +608,11 @@
                     "group": "inline@10"
                 },
                 {
+                    "command": "autotools.buildAll",
+                    "when": "view == autotools.outline && viewItem =~ /nodeType=allbuild/",
+                    "group": "inline@10"
+                },
+                {
                     "command": "autotools.test",
                     "when": "view == autotools.outline && viewItem =~ /nodeType=test/",
                     "group": "inline@10"
@@ -609,6 +625,11 @@
                 {
                     "command": "autotools.check",
                     "when": "view == autotools.outline && viewItem =~ /nodeType=check/",
+                    "group": "inline@11"
+                },
+                {
+                    "command": "autotools.checkAll",
+                    "when": "view == autotools.outline && viewItem =~ /nodeType=allcheck/",
                     "group": "inline@11"
                 },
                 {
