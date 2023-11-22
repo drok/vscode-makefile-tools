@@ -59,7 +59,7 @@ export class Make implements Parser {
     static makeArgs(): string[] { return [
         // take precedence over other parallel executions
         // specified in makefiles
-        "-j1", "--output-sync=recurse",
+        "-j1", "--output-sync=none",
         "--print-directory",
         // automake makefiles don't rely on builtin rules, so this makes the evaluation
         // a little faster, but the user could force custom rules which do rely on
@@ -76,15 +76,20 @@ export class Make implements Parser {
                 this.section = MakeSection.Padding;
                 /* intentional fall-through, allows leaving immediately past Database */
             case MakeSection.Padding:
-                let leaving = LeavingRE.test(line);
-                if (leaving) {
-                    return [ParserDisp.Leave, this];
+                let finished = DatabaseFinishedRE.test(line);
+                if (finished) {
+                    this.section = MakeSection.Making;
+                    return [ParserDisp.Continue, this];
                 }
             break;
             case MakeSection.Starting:
                 this.section = MakeSection.Making;
                 /* intentional fall-through */
             case MakeSection.Making:
+                let leaving = LeavingRE.test(line);
+                if (leaving) {
+                    return [ParserDisp.Leave, this];
+                }
                 let executing = ExecutingRE.exec(line);
                 if (executing) {
                     this.file = executing[3] || executing[4];
@@ -220,6 +225,7 @@ export class Make implements Parser {
 }
 
 const DatabaseRE = /^# Make data base, printed on (.*)$/;
+const DatabaseFinishedRE = /^# Finished Make data base on (.*)$/;
 const FilesRE = /^# Files$/;
 const VariablesRE = /^# Variables$/;
 /**

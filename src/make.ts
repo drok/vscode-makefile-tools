@@ -165,7 +165,17 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
     makeArgs.push(`--assume-old=${makefilePath}`);
     makeArgs.push(makefilePath);
     // stamp-h1 avoids trying to regen config.h (config headers) if configure.ac has changed
-    makeArgs.push("AM_MAKEFLAGS=--assume-old=Makefile --assume-old=stamp-h1 Makefile");
+    makeArgs.push("AM_MAKEFLAGS=--assume-old=Makefile --assume-old=stamp-h1 " +
+        "--assume-old='\\$\\$(top_srcdir)/configure' " +
+        "--assume-old=configure " +
+        "--assume-old='\\$\\$(top_srcdir)/config.status' " +
+        "--assume-old=config.status " +
+        "Makefile");
+    if (!dir)
+        makeArgs.push("--assume-old=configure"); // Only works in-tree
+    else
+        makeArgs.push("--assume-old=" + path.join(dir, "configure")); // Only works in-tree
+    makeArgs.push("--assume-old=config.status");
     makeArgs.push("--assume-old=stamp-h1");
 
     makeArgs.push(
