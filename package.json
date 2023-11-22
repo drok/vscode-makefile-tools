@@ -39,7 +39,7 @@
     "activationEvents": [
         "onStartupFinished"
     ],
-    "main": "./out/src/extension.js",
+    "main": "./out/main.js",
     "contributes": {
         "commands": [
             {
@@ -662,15 +662,18 @@
     },
     "scripts": {
         "vscode:prepublish": "yarn compile-production && npm run esbuild-base -- --minify",
-        "bootstrap": "cd vendor/gnumake && autoreconf -fvi",
-        "configure": "mkdir -p build/make && cd build/make && ../../vendor/gnumake/configure --disable-dependency-tracking --with-guile=no 'INSTALL_PROGRAM=install -cs' 'CFLAGS=-g0 -O2' --disable-nls --prefix=$PWD/../..",
+        "bootstrap": "cd vendor/gnumake && [ -f configure ] || autoreconf -fvi",
+        "preconfigure": "yarn run bootstrap",
+        "configure": "mkdir -p build/make && cd build/make && [ -f config.status ] || ../../vendor/gnumake/configure --disable-dependency-tracking --with-guile=no --disable-job-server 'INSTALL_PROGRAM=install -cs' 'CFLAGS=-g0 -O2' --disable-nls --prefix=$PWD/../..",
+        "precompile": "yarn run configure",
         "compile": "make -j -C build/make all install-binPROGRAMS && yarn install && tsc -p ./",
+        "precompile-production": "yarn run compile",
         "compile-production": "yarn install && yarn run translations-generate",
         "translations-export": "gulp translations-export",
         "translations-generate": "gulp translations-generate",
         "translations-import": "gulp translations-import",
 
-        "esbuild-base": "esbuild ./src/extension.ts --bundle --outfile=out/main.js --external:vscode --format=cjs --platform=node",
+        "esbuild-base": "esbuild ./src/extension.ts --bundle --outfile=out/main.js --external:vscode --platform=node",
         "esbuild": "npm run esbuild-base -- --sourcemap",
         "test-compile": "tsc -p ./",
 

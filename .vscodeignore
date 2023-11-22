@@ -29,12 +29,8 @@ scripts/
 vendor/
 
 # esbundler means these should not be packaged
-# out/
 node_modules/
 out/src
-!out/src/extension.js
 .git
 .gitmodules
-
-# -out/main.js
-# ^out/src/extension.js
+package.nls.*.json

@@ -10,3 +10,6 @@ OneLocBuild
 **/nls.*.json
 **/*.nls.json
 **/package.nls.*.json
+/build
+/bin
+/src/test/fakeSuite/Repros/.vscode/compile_commands.json
