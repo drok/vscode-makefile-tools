@@ -23,7 +23,7 @@ jobs:
       fail-fast: true
       matrix:
         config:
-          - { os: ubuntu-18.04, name: linux }
+          - { os: ubuntu-20.04, name: linux }
           - { os: macos-latest, name: darwin }
           # - { os: windows-latest, name: win32 }
         arch:
