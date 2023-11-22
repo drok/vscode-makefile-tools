@@ -661,7 +661,7 @@
         }
     },
     "scripts": {
-        "vscode:prepublish": "yarn compile-production",
+        "vscode:prepublish": "yarn compile-production && npm run esbuild-base -- --minify",
         "bootstrap": "cd vendor/gnumake && autoreconf -fvi",
         "configure": "mkdir -p build/make && cd build/make && ../../vendor/gnumake/configure --disable-dependency-tracking --with-guile=no 'INSTALL_PROGRAM=install -cs' 'CFLAGS=-g0 -O2' --disable-nls --prefix=$PWD/../..",
         "compile": "make -j -C build/make all install-binPROGRAMS && yarn install && tsc -p ./",
@@ -669,6 +669,11 @@
         "translations-export": "gulp translations-export",
         "translations-generate": "gulp translations-generate",
         "translations-import": "gulp translations-import",
+
+        "esbuild-base": "esbuild ./src/extension.ts --bundle --outfile=out/main.js --external:vscode --format=cjs --platform=node",
+        "esbuild": "npm run esbuild-base -- --sourcemap",
+        "test-compile": "tsc -p ./",
+
         "watch": "tsc -watch -p ./",
         "package": "echo Do something like vsce package --pre-release --target linux-x64 --yarn -o autotools.vsix",
         "publish": "vsce publish --pre-release --yarn -i autotools.vsix",
@@ -687,6 +692,7 @@
         "chai": "^4.3.0",
         "chai-as-promised": "^7.1.1",
         "chai-string": "^1.5.0",
+        "esbuild": "^0.19.7",
         "gulp": "^4.0.2",
         "gulp-eslint": "^6.0.0",
         "gulp-filter": "^6.0.0",

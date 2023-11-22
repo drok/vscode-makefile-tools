@@ -26,3 +26,15 @@ jobs/
 build/
 docs/
 scripts/
+vendor/
+
+# esbundler means these should not be packaged
+# out/
+node_modules/
+out/src/**/*.js
+!out/src/extension.js
+.git
+.gitmodules
+
+# -out/main.js
+# ^out/src/extension.js
