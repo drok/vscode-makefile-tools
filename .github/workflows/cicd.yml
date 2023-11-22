@@ -16,7 +16,7 @@ on:
 
 jobs:
   build-lint-test:
-    name: Node ${{ matrix.node }} on ${{ matrix.config.os }}-${{ matrix.config.arch}}
+    name: Node ${{ matrix.node }} on ${{ matrix.config.os }}-${{ matrix.arch }}
     runs-on: ${{ matrix.config.os }}
     timeout-minutes: 5
     strategy:
@@ -94,11 +94,11 @@ jobs:
         with:
           pat: stub
           dryRun: true
-          target: ${{ matrix.config.name }}-${{ matrix.config.arch }}
+          target: ${{ matrix.config.name }}-${{ matrix.arch }}
       - name: Upload Extension Package as Artifact
         uses: actions/upload-artifact@v3
         with:
-          name: ${{ matrix.config.os }}-${{ matrix.config.arch }}
+          name: ${{ matrix.config.name }}-${{ matrix.arch }}
           path: ${{ steps.packageExtension.outputs.vsixPath }}
 
   # coverage:
