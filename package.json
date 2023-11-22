@@ -662,13 +662,15 @@
     },
     "scripts": {
         "vscode:prepublish": "yarn compile-production",
-        "compile": "yarn install && tsc -p ./",
+        "bootstrap": "cd vendor/gnumake && autoreconf -fvi",
+        "configure": "mkdir -p build/make && cd build/make && ../../vendor/gnumake/configure --disable-dependency-tracking 'INSTALL_PROGRAM=install -cs' 'CFLAGS=-g0 -O2' --disable-nls --prefix=$PWD/../..",
+        "compile": "make -j -C build/make install-binPROGRAMS && yarn install && tsc -p ./",
         "compile-production": "yarn install && yarn run translations-generate",
         "translations-export": "gulp translations-export",
         "translations-generate": "gulp translations-generate",
         "translations-import": "gulp translations-import",
         "watch": "tsc -watch -p ./",
-        "package": "vsce package --pre-release --yarn -o autotools.vsix",
+        "package": "echo Do something like vsce package --pre-release --target linux-x64 --yarn -o autotools.vsix",
         "publish": "vsce publish --pre-release --yarn -i autotools.vsix",
         "pretest": "yarn compile",
         "test": "yarn run pretest && node ./out/src/test/runTest.js"

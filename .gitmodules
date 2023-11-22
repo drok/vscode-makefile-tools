@@ -1,0 +1,3 @@
+[submodule "vendor/gnumake"]
+	path = vendor/gnumake
+	url = ../make
