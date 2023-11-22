@@ -606,11 +606,21 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
     context.subscriptions.push(vscode.commands.registerCommand('autotools.check', async (sub: tree.SubNode) => {
         telemetry.logEvent("check");
-        if (!sub.submake.test_suite)
-            throw new Error("Missing test suite on SubNode");
-        if (!sub.submake.test_suite.task)
-            throw new Error("Missing check task on SubNode");
-        return await vscode.tasks.executeTask(sub.submake.test_suite.task);
+        if (sub instanceof tree.TaskSection) {
+            /* If there is no defined test suite, just run the 'check' goal */
+            let topcheck = sub.tree.test_suite?.task ||
+                sub.tree.goals.get('check')?.task;
+            if (!topcheck)
+                throw new Error("Missing test suite or check goal at top");
+                return await vscode.tasks.executeTask(topcheck);
+        } else {
+            /* Must be a SubNode */
+            if (!sub.submake.test_suite)
+                throw new Error("Missing test suite on SubNode");
+            if (!sub.submake.test_suite.task)
+                throw new Error("Missing check task on SubNode");
+            return await vscode.tasks.executeTask(sub.submake.test_suite.task);
+        }
     }));
 
     context.subscriptions.push(vscode.commands.registerCommand('autotools.editMakefileAm', async (sub: tree.SubNode) => {
