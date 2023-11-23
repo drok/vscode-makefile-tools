@@ -74,8 +74,13 @@ jobs:
         run: yarn bootstrap
       - name: Configure externals
         run: yarn configure
+      - name: Configure externals
+        run: mkdir -p build/make && cd build/make && [ -f config.status ] || ../../vendor/gnumake/configure --disable-dependency-tracking --with-guile=no --disable-job-server --disable-load 'INSTALL_PROGRAM=install -cs' 'CFLAGS=-g0 -O2' LIBS=-lrt --disable-nls --prefix=$PWD/../..
+        if: runner.os == 'Linux'
       - name: Build Extension
         run: yarn compile
+      - name: Check make symbols
+        run: objdump -T build/make/make
       # - name: Run Unit Tests on Windows or macOS
       #   run: npm run test
       #   if: runner.os != 'Linux'
