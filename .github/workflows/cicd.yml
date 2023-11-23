@@ -37,7 +37,7 @@ jobs:
     steps:
       - uses: awalsh128/cache-apt-pkgs-action@latest
         with:
-          packages: autopoint
+          packages: autopoint libbsd-resource-perl
           version: 1.0      
         if: runner.os == 'Linux'
       - name: Update homebrew
