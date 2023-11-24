@@ -93,7 +93,7 @@ export class Make implements Parser {
                 let executing = ExecutingRE.exec(line);
                 if (executing) {
                     this.file = executing[3] || executing[4];
-                    if (this.file == "config.status") {
+                    if (this.file == "config.status" && false) { // FIXME: implement recursive detection. a single refresh is ok if configure.ac is newer
                         // For some reason, reconfig was triggerred, meaning
                         // --dry-run was not respected. Abort. this is a bug.
                         throw new Error(`Unexpected reconfig in Make ${this.dir}. This is a bug.`);
