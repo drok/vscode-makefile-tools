@@ -112,6 +112,7 @@ export async function setCurrentMakefileConfiguration(configuration: string | un
             "am__sh_e_setup": 'set +e; exec 2> /dev/null'
     }};
     statusBar.setConfiguration(currentMakefileConfiguration.name);
+    extension.onConfigurationSelect(currentMakefileConfiguration);
 }
 
 // Read the current configuration from workspace state, update status bar item

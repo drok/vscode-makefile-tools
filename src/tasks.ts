@@ -5,7 +5,9 @@
 import * as path from 'path';
 import * as fs from 'fs';
 import * as cp from 'child_process';
-import { Task, TaskDefinition, TaskScope, TaskGroup, TaskProvider, ProcessExecution, workspace } from 'vscode';
+import { Task, TaskDefinition, TaskScope, TaskGroup, TaskProvider,
+    ProcessExecution, ShellExecution,
+    workspace } from 'vscode';
 import { Goal } from './parser/gnumake';
 import { assert, error } from 'console';
 import * as configuration from './configuration';
@@ -57,6 +59,9 @@ export class AutoToolsBuildTaskProvider implements MyTaskProvider {
             }
         });
         this.myPromise = Promise.resolve(targets);
+    }
+    changeConfiguration(c: configuration.MakefileConfiguration, disposables: vscode.Disposable[]) {
+        this.myPromise = Promise.resolve([]);
     }
 
     public build(g : BuildTarget) : void {
@@ -168,6 +173,9 @@ export class AutoToolsTestTaskProvider implements MyTaskProvider {
             }});
         this.myPromise = Promise.resolve(targets);
     }
+    changeConfiguration(c: configuration.MakefileConfiguration, disposables: vscode.Disposable[]) {
+        this.myPromise = Promise.resolve([]);
+    }
 
 	public resolveTask(_task: Task): Task | undefined {
 		const test = _task.definition.test;
@@ -224,6 +232,9 @@ export class AutoToolsCheckTaskProvider implements MyTaskProvider {
             }}});
         this.myPromise = Promise.resolve(targets);
     }
+    changeConfiguration(c: configuration.MakefileConfiguration, disposables: vscode.Disposable[]) {
+        this.myPromise = Promise.resolve([]);
+    }
 
 	public resolveTask(_task: Task): Task | undefined {
 		const check = _task.definition.check;
@@ -249,6 +260,7 @@ export class AutoToolsCheckTaskProvider implements MyTaskProvider {
 export interface MyTaskProvider extends TaskProvider {
     readonly myType: string;
     update(disposables: vscode.Disposable[]): void;
+    changeConfiguration(c: configuration.MakefileConfiguration, disposables: vscode.Disposable[]): void;
 }
 
 export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
@@ -256,6 +268,7 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
 	private myPromise: Thenable<Task[]> | undefined = undefined;
     public bootstrapTask?: vscode.Task;
     public regenTask?: vscode.Task;
+    public recheckTask?: vscode.Task;
     public helpTask?: vscode.Task;
     private working: boolean = false;
     static manifests: string[] = [
@@ -324,24 +337,39 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
         return checkFileExistsSync(resolvePathToRoot("configure"));
     }
     update(disposables: vscode.Disposable[]): void {
-        let c = configuration.getCurrentMakefileConfiguration();
-
-        const regenkind: AutotoolsTask = {
-            type: this.myType,
-            action: 'regen'
-        };
-        this.regenTask = new Task(regenkind, TaskScope.Workspace, "Update Makefiles and headers",
-            localize("autotools.update.task", "Configuration update"),
-            new ProcessExecution(configuration.getMakePath(),
-                (c.top_builddir ? ['-C', c.top_builddir] : [])
-                .concat('stamp-h1')));
-        this.regenTask.group = TaskGroup.Build;
-        this.regenTask.detail = localize("automake.update", "$(sync) Update Makefiles and headers. See [Autoconf output](https://www.gnu.org/software/autoconf/manual/autoconf-2.69/html_node/Output.html)");
-
-        this.myPromise = Promise.resolve([this.regenTask]
-            .concat(this.bootstrapTask ?? []));
     }
+    changeConfiguration(c: configuration.MakefileConfiguration, disposables: vscode.Disposable[])
+    {
+        if (this.bootstrapTask) {
 
+            this.regenTask = new Task({type: this.myType, action: 'regen'},
+                    TaskScope.Workspace, "Update Makefiles and headers",
+                localize("autotools.update.task", "Configuration output"),
+                new ShellExecution(
+                    c.top_builddir ? `automake && CDPATH= cd ${c.top_builddir} && ./config.status` :
+                        'automake && ./config.status'),
+                        "$configureAc");
+            this.regenTask.group = TaskGroup.Build;
+            this.regenTask.detail = localize("autotools.update", "$(sync) Regenerate Makefiles and headers. See [Autoconf output](https://www.gnu.org/software/autoconf/manual/autoconf-2.69/html_node/Output.html)");
+    
+            this.recheckTask = new Task({type: this.myType, action: 'recheck'},
+                TaskScope.Workspace, "Re-check configuration",
+                localize("autotools.recheck.task", "Configuration update"),
+                new ShellExecution(
+                    c.top_builddir ? `automake && CDPATH= cd ${c.top_builddir} && ./config.status --recheck && ./config.status` :
+                        'automake && ./config.status --recheck && ./config.status'));
+            this.recheckTask.group = TaskGroup.Build;
+            this.recheckTask.detail = localize("autotools.recheck", "$(sync) Update configuration. See [config.status invocation - --recheck](https://www.gnu.org/software/autoconf/manual/autoconf-2.69/html_node/config_002estatus-Invocation.html)");
+
+            this.myPromise = Promise.resolve([this.regenTask]
+                .concat(this.bootstrapTask ?? []));
+                this.myPromise = Promise.resolve([
+                    this.bootstrapTask,
+                    this.regenTask,
+                    this.recheckTask
+                ]);
+        }
+    }
     public async bootstrap(): Promise<void> {
         if (this.bootstrapTask && !this.working) {
             vscode.tasks.executeTask(this.bootstrapTask).then(() => {
@@ -355,6 +383,16 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
         // a separate, unnecesary update.
         if (this.regenTask && !this.working) {
             vscode.tasks.executeTask(this.regenTask).then(() => {
+                this.working = true;
+            });
+        }
+    }
+    public async recheck(): Promise<void> {
+        // Use regenWorking to avoid restarting when already running.
+        // Eg, Makefile.in is updated in the workspace, which triggers
+        // a separate, unnecesary update.
+        if (this.recheckTask && !this.working) {
+            vscode.tasks.executeTask(this.recheckTask).then(() => {
                 this.working = true;
             });
         }

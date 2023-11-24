@@ -577,12 +577,13 @@ export function sortAndRemoveDuplicates(src: string[]) : string[] {
 }
 
 export function reportDryRunError(dryrunOutputFile: string): void {
-    logger.message(`You can see the detailed dry-run output at ${dryrunOutputFile}`);
-    logger.message("Make sure that the extension is invoking the same make command as in your development prompt environment.");
-    logger.message("You may need to define or tweak a custom makefile configuration in settings via 'autotools.configurations' like described here: [link]");
-    logger.message("Also make sure your code base does not have any known issues with the dry-run switches used by this extension (autotools.dryrunSwitches).");
-    logger.message("If you are not able to fix the dry-run, open a GitHub issue in Makefile Tools repo: "
-        + "https://github.com/Mergesium/vscode-makefile-tools/issues");
+    logger.message('Dry-running the project failed. Fix the errors and attempt again. Possibilities:');
+    logger.message("  1. Corrupt Makefiles can be re-output with 'Update Makefiles and Headers'");
+    logger.message("  2. ./configure can be re-run with the same configureArgs with 'Autotools: Configure'");
+    logger.message("  3. Once makefiles are valid, you can 'Export configuration to Intellisense'");
+    logger.message("It should be enough to correct the issue and save the offending file (configure.ac or Makefile.am)");
+    logger.message("The extension will re-generate the Makefiles on save");
+    logger.message("If this is not helpful, please report a bug at https://github.com/Mergesium/autotools/issues");
 }
 
 // Helper to make paths absolute until the extension handles variables expansion.

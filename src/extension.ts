@@ -30,9 +30,7 @@ import { AutoToolsBuildTaskProvider,
 import { SuiteDecorations } from './suite-decorator';
 
 import * as nls from 'vscode-nls';
-import { allowedNodeEnvironmentFlags } from 'process';
 import { assert } from 'console';
-import { SlowBuffer } from 'buffer';
 nls.config({ messageFormat: nls.MessageFormat.bundle, bundleFormat: nls.BundleFormat.standalone })();
 const localize: nls.LocalizeFunc = nls.loadMessageBundle();
 
@@ -59,6 +57,7 @@ export class Extension {
     private testTasks: AutoToolsTestTaskProvider;
     private needTaskFetchBugWorkaround: boolean = true;
     private compilerFullPath ?: string;
+    public readonly dryRunner : string;
 
     public constructor(public readonly extensionContext: vscode.ExtensionContext) {
         this.autotoolsTask = new AutoToolsBootstrapTaskProvider();
@@ -70,6 +69,8 @@ export class Extension {
             this.testTasks,
             new AutoToolsCheckTaskProvider(),
         ];
+        this.dryRunner = path.join(extensionContext.extensionPath, "bin/make" + (process.platform === 'win32' ? ".exe" : ""));
+
         extensionContext.subscriptions.push(vscode.commands.registerCommand('autotools.command.bootstrap', async () => {
             await this.autotoolsTask.bootstrap();
         }));
@@ -217,8 +218,12 @@ export class Extension {
                     }
                 } else if (definition.type == "autotools") {
                     const definition: AutotoolsTask = <any>task.definition;
-                    if (definition?.action == "regen")
+                    if (definition?.action == "regen" || definition?.action == "recheck")
                         this.autotoolsTask.autotoolsDone();
+                        ui.getUI().setStatus(e.exitCode ? ui.UIStatus.ERR : ui.UIStatus.OK);
+                        if (!e.exitCode) {
+                            make.configure(make.TriggeredBy.configureAfterConfigurationChange);
+                        }
                 }
             }
         });
@@ -290,8 +295,14 @@ export class Extension {
             this.updateOutlineBadge();
         }
     }
+    public onConfigurationSelect(c: configuration.MakefileConfiguration) : void {
+        this.tasks.forEach((provider) => provider.changeConfiguration(c, this.configDisposables));
+    }
     public bootstrap(): void { this.autotoolsTask.bootstrap(); }
+    // config.status (just re-output)
     public regen(): void { this.autotoolsTask.regen(); }
+    // config.status --recheck
+    public recheck(): void { this.autotoolsTask.recheck(); }
     public build(target: make.BuildTarget): void { this.buildTasks.build(target); }
     public async configure(): Promise<boolean> {
         this.needTaskFetchBugWorkaround = false;
@@ -677,10 +688,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     let configureAc = configuration.getConfigureAc();
     if (configureAc) {
         context.subscriptions.push(vscode.workspace.createFileSystemWatcher('**/Makefile.am')
-            .onDidChange((e) => { extension.regen(); }));
+            .onDidChange((e) => {  extension.regen(); }));
         if (!configureAc.endsWith(".in")) {
             context.subscriptions.push(vscode.workspace.createFileSystemWatcher(configureAc)
-                .onDidChange((e) => { extension.regen(); }));
+                .onDidChange((e) => { extension.recheck(); }));
         }
         context.subscriptions.push(vscode.workspace.createFileSystemWatcher('**/*.in')
             .onDidChange((e) => {  extension.regen(); }));

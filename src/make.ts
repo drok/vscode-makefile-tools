@@ -22,6 +22,7 @@ import * as telemetry from './telemetry';
 import * as vscode from 'vscode';
 import * as ui from './ui';
 import { quote } from '@mergesium/shell-quote';
+import * as os from 'os';
 // import { updateTree } from './tree';
 
 import * as nls from 'vscode-nls';
@@ -162,21 +163,10 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
     makeArgs.push(...Executing.makeArgs());
 
     makeArgs.push("--dry-run");
-    makeArgs.push(`--assume-old=${makefilePath}`);
-    makeArgs.push(makefilePath);
-    // stamp-h1 avoids trying to regen config.h (config headers) if configure.ac has changed
-    makeArgs.push("AM_MAKEFLAGS=--assume-old=Makefile --assume-old=stamp-h1 " +
-        "--assume-old='\\$\\$(top_srcdir)/configure' " +
-        "--assume-old=configure " +
-        "--assume-old='\\$\\$(top_srcdir)/config.status' " +
-        "--assume-old=config.status " +
-        "Makefile");
+    makeArgs.push("'--assume-old=\\$(top_srcdir)/configure'",
+        "'--assume-old=\\$(top_builddir)/config.status'");
     if (!dir)
         makeArgs.push("--assume-old=configure"); // Only works in-tree
-    else
-        makeArgs.push("--assume-old=" + path.join(dir, "configure")); // Only works in-tree
-    makeArgs.push("--assume-old=config.status");
-    makeArgs.push("--assume-old=stamp-h1");
 
     makeArgs.push(
     // rejecting GNU make's builtin variables and rules because automake
@@ -189,7 +179,7 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
     // FIXME: also assume-old the configuration files listed
     // ./config.status --help
 
-    logger.message(`Export Intellisense Info from: '${configuration.getMakePath()} ${makeArgs.join(" ")}'`);
+    logger.message(`Export Intellisense Info from: 'make ${makeArgs.join(" ")}'`, "debug");
 
     try {
         // TODO: Use stream writes
@@ -200,7 +190,7 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
         if (keepDryRuns) {
             dryrunFile = path.join(configuration.getConfigurationCachePath(), dryrunFile);
             logger.message(`Writing the dry-run output: ${dryrunFile}`);
-            let quoted_cmd = quote([configuration.getMakePath()].concat(makeArgs));
+            let quoted_cmd = quote([extension.dryRunner].concat(makeArgs));
             util.writeFile(dryrunFile, `${quoted_cmd}${lineEnding}`);
         }
         let completeErr: string = "";
@@ -316,7 +306,9 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
         }, 5 * 1000);
 
         // The dry-run analysis should operate on english.
-        const result: util.SpawnProcessResult = await util.spawnChildProcess(configuration.getMakePath(), makeArgs, util.getWorkspaceRoot(), true, true, stdout, stderr);
+        const result: util.SpawnProcessResult = await util.spawnChildProcess(
+                extension.dryRunner,
+                makeArgs, util.getWorkspaceRoot(), true, true, stdout, stderr);
         if (keepDryRuns && completeErr) {
             fs.appendFileSync(dryrunFile,
                 lineEnding +

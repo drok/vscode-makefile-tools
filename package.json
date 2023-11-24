@@ -133,6 +133,22 @@
         ],
         "problemMatchers": [
             {
+                "name": "configureAc",
+                "source": "autotools",
+                "owner": "autotools",
+                "fileLocation":[
+                    "relative",
+                    "${workspaceFolder}"
+                ],
+                "pattern": {
+                    "regexp": "^(.*?):(\\d+):\\s+(warning|error):\\s+(.*)$",
+                    "file": 1,
+                    "line": 2,
+                    "severity": 3,
+                    "message": 4
+                }
+            },
+            {
               "name": "gcc",
               "source": "gcc",
               "owner": "autotools",
