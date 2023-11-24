@@ -519,7 +519,7 @@ export async function configure(triggeredBy: TriggeredBy): Promise<number> {
         title: localize("make.configuring.title", "Importing autotools configuration '{0}'", configuration.getCurrentMakefileConfiguration().name),
         cancellable: true,
       },
-      (progress, cancel) => {
+      async (progress, cancel) => {
         cancel.onCancellationRequested(async () => {
           if (curPID !== -1) {
             logger.message(
@@ -552,7 +552,9 @@ export async function configure(triggeredBy: TriggeredBy): Promise<number> {
           retc = ConfigureBuildReturnCodeTypes.cancelled;
         });
 
-        return doConfigure(progress, cancel, readCache, configurationCache);
+        let r = await doConfigure(progress, cancel, readCache, configurationCache);
+        extension.autotoolsDone();
+        return r;
       }
     );
 

@@ -343,7 +343,7 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
         if (this.bootstrapTask) {
 
             this.regenTask = new Task({type: this.myType, action: 'regen'},
-                    TaskScope.Workspace, "Update Makefiles and headers",
+                    TaskScope.Workspace, "Update Makefiles and config headers",
                 localize("autotools.update.task", "Configuration output"),
                 new ShellExecution(
                     c.top_builddir ? `automake && CDPATH= cd ${c.top_builddir} && ./config.status` :

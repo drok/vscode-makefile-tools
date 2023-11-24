@@ -222,6 +222,15 @@ export class Make implements Parser {
     config_header: Set<string> | undefined;
     submake: Map<string, Make> = new Map();
     test_suite: Goal | undefined;
+    stats: {
+        tests: number;
+        programs: number;
+        subdirs: number;
+    } = {
+        tests: 0,
+        programs: 0,
+        subdirs: 0
+    };
 }
 
 const DatabaseRE = /^# Make data base, printed on (.*)$/;

@@ -28,19 +28,24 @@ export abstract class Node {
     abstract logfile(): string | undefined;
 }
 
-// Should this recursive count be cached? Is this an expensive call?
-// Easy, but would require 1 number stored per make.
-function countSuiteTests(sub: Make): number[] {
-    let total : number = 0;
-    let num_dirs : number = 0;
+function countStats(sub: Make): number[] {
+    // let total : number = 0;
+    // let num_dirs : number = 0;
+    sub.stats.subdirs = sub.submake.size;
     for (let submake of sub.submake.values()) {
-        let [t, n] = countSuiteTests(submake);
-        total += t;
-        num_dirs += n;
+        let [t, n, s] = countStats(submake);
+        sub.stats.programs += t;
+        sub.stats.tests += n;
+        sub.stats.subdirs += s;
     }
+    for (let [goal, g] of sub.goals)
+        sub.stats.programs += ((g.flags & Goal.Flags.Linked_binary)
+            && !(g.flags & Goal.Flags.Test_Program)) ? 1 : 0;
+
     return [
-        total + (sub.goals.get("test-suite.log")?.depends?.length ?? 0),
-        num_dirs + 1
+        sub.stats.programs,
+        sub.stats.tests + (sub.goals.get("test-suite.log")?.depends?.length ?? 0),
+        sub.submake.size
     ];
 }
 
@@ -54,7 +59,8 @@ export class SubNode extends Node {
             .map(sub => new SubNode(sub, this.flags));
         if (!(this.flags & Goal.Flags.Test_Suite)) {
             goals.push(...[...this.submake.goals.values()]
-                .filter(goal => goal.flags & this.flags)
+                // Bit of a hack to hardcode excluding test_program
+                .filter(goal => (goal.flags & this.flags) && !(goal.flags & Goal.Flags.Test_Program))
                 .map(goal => new TaskNode(goal)));
         } else if (this.submake.test_suite?.depends)
             goals.push(...this.submake.test_suite.depends
@@ -63,25 +69,24 @@ export class SubNode extends Node {
     }
 
     getTreeItem(): vscode.TreeItem {
-        //if (!this.submake.)
-        //    throw new Error("Unexpected null goal");
         const item: vscode.TreeItem = new vscode.TreeItem(this.submake.dir);
-        item.collapsibleState = this.submake.submake.size || this.submake.goals.size ?
-            vscode.TreeItemCollapsibleState.Collapsed :
-            vscode.TreeItemCollapsibleState.None;
         item.contextValue = ["nodeType=sub"]
             .concat(((this.flags & Goal.Flags.Test_Log) && this.submake.test_suite) ? ['nodeType=check'] : [])
             .concat((this.flags & Goal.Flags.Linked_binary) ? ['nodeType=allbuild'] : [])
             .join(',');
-        if (this.flags & Goal.Flags.Test_Log) {
+        item.collapsibleState = vscode.TreeItemCollapsibleState.Collapsed;
+        if (this.flags & Goal.Flags.Test_Suite) {
             item.description = localize("autotools.subnode.suite", "{0} tests, {1} subdirs",
-                ...countSuiteTests(this.submake));
+                this.submake.stats.tests, this.submake.stats.subdirs);
             item.resourceUri = vscode.Uri.from({
                     scheme: "check",
                     authority: Extension.whoami,
                     path: '/' + this.submake.dir,
                     query: 'test-suite.log'
                 });
+        } else {
+            item.description = localize("autotools.subnode.programs", "{0} programs, {1} subdirs",
+                this.submake.stats.programs, this.submake.stats.subdirs);
         }
         item.tooltip =  this.submake.dir;
         return item;
@@ -181,7 +186,6 @@ export class TaskSection extends Node {
 
     getTreeItem(): vscode.TreeItem {
         const item: vscode.TreeItem = new vscode.TreeItem(this._name);
-        item.collapsibleState = vscode.TreeItemCollapsibleState.Expanded;
         // item.tooltip = localize("makefile.target.currently.selected.for.build", "The target currently selected for build.");
         item.contextValue = [
             `nodeType=section.` + this._name,
@@ -190,8 +194,12 @@ export class TaskSection extends Node {
             .concat((this.flag & Goal.Flags.Linked_binary) ? ['nodeType=allbuild'] : [])
             .join(',');
         if (this.flag & Goal.Flags.Test_Suite) {
-            item.description = localize("autotools.subnode.suite", "{0} tests in {1} subdirs",
-                ...countSuiteTests(this.tree));
+            item.description = localize("autotools.subnode.suite", "{0} tests, {1} subdirs",
+                this.tree.stats.tests, this.tree.stats.subdirs);
+            item.collapsibleState =
+                this.tree.stats.tests ?
+                    vscode.TreeItemCollapsibleState.Expanded :
+                    vscode.TreeItemCollapsibleState.Collapsed;
             item.resourceUri = vscode.Uri.from({
                     scheme: "check",
                     authority: Extension.whoami,
@@ -200,6 +208,12 @@ export class TaskSection extends Node {
                 });
             item.tooltip = new vscode.MarkdownString("[Test suite](https://www.gnu.org/software/automake/manual/html_node/Parallel-Test-Harness.html) logs");
         } else {
+            item.description = localize("autotools.subnode.programs", "{0} programs, {1} subdirs",
+                this.tree.stats.programs, this.tree.stats.subdirs);
+            item.collapsibleState =
+                this.tree.stats.programs ?
+                    vscode.TreeItemCollapsibleState.Expanded :
+                    vscode.TreeItemCollapsibleState.Collapsed;
             item.tooltip = new vscode.MarkdownString("[Built programs](https://www.gnu.org/software/automake/manual/html_node/Program-Sources.html)");
         }
         return item;
@@ -233,6 +247,7 @@ export class ConfigurationNode extends Node {
 
     updateTargets(build_tree: Make) : void {
         this.build_tree = build_tree;
+        countStats(build_tree);
     }
 
 //    private hasGoalKind(flag: number) : boolean {
