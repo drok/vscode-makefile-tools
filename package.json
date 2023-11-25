@@ -346,11 +346,31 @@
                 "when": "autotools:haveManifest && !autotools:haveConfigurations"
             }
         ],
+        "languages": [
+            {
+            "filenames": ["Makefile.am", "Makefile.in"],
+            "aliases": ["am"],
+            "icon": {
+                "light": "tools",
+                "dark": "tools"
+            },
+            "id": "automake"
+        },
+        {
+            "filenames": ["configure.ac", "configure.in"],
+            "aliases": ["ac"],
+            "icon": {
+                "light": "tools",
+                "dark": "tools"
+            },
+            "id": "autoconf"
+        }
+        ],
         "debuggers": [
             {
                 "type": "cppdbg",
                 "label": "Autotools Debug",
-                "languages": ["c", "cpp"],
+                "languages": ["c", "cpp", "am", "ac", ""],
                 "configurationAttributes": {
                     "launch": {
                         "properties": {
