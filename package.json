@@ -373,7 +373,7 @@
         ],
         "debuggers": [
             {
-                "type": "cppdbg",
+                "type": "autotools",
                 "label": "Autotools Debug",
                 "languages": ["c", "cpp", "am", "ac", ""],
                 "configurationAttributes": {

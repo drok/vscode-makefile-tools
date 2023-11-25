@@ -19,6 +19,8 @@ import * as ui from './ui';
 import { resolvePathToRoot } from './util';
 import * as vscode from 'vscode';
 import * as cpp from 'vscode-cpptools';
+import * as debugProvider from './debug';
+
 import { AutoToolsBuildTaskProvider,
         AutoToolsTestTaskProvider,
         AutoToolsCheckTaskProvider,
@@ -80,6 +82,7 @@ export class Extension {
         extensionContext.subscriptions.push(vscode.commands.registerCommand('autotools.configure.help', async () => {
             await this.autotoolsTask.help();
         }));
+        debugProvider.activate(extensionContext);
     }
     public createPanel(extensionContext: vscode.ExtensionContext) : void {
         this._projectOutlineTreeView = vscode.window.createTreeView('autotools.outline', {
@@ -295,6 +298,63 @@ export class Extension {
             this.updateOutlineBadge();
         }
     }
+
+    // goal is the *.log goal. The executable will be read from .depends[0]
+    debugGoal(goal: Goal, builddir: string) : void {
+        if (goal?.depends?.length && goal.depends[0].goal) {
+            let c = configuration.getCurrentMakefileConfiguration();
+            let dopt : vscode.DebugSessionOptions = {
+                compact: true
+            };
+
+
+            if ((goal.depends[0].flags & Goal.Flags.Linked_binary))  {
+                var success : boolean = false;
+                await vscode.debug.startDebugging(
+                    vscode.workspace.workspaceFolders?.[0],
+                    new DebugNow(c, {goal: goal.depends[0].goal, builddir: builddir},
+                            !!(goal.depends[0].flags & Goal.Flags.Linked_binary), env),
+                    dopt)
+                .then((z) => success = z);
+                if (success)
+                    return Promise.resolve();
+                return Promise.reject();
+            } else if (true) {
+                var srcprog = path.join(builddir, goal.depends[0].goal);
+                var ok = localize("autotools.ok", "OK");
+                var open = localize("autotools.open", "Open in Editor");
+                var wantEdit = false;
+                await vscode.window.showWarningMessage(
+                    localize("autotools.wip.debug.all", "Debugging {0} is not yet supported", srcprog),
+                    ok, open)
+                .then((value) => {
+                    wantEdit = (value === open);
+                });
+                wantEdit && await openEditor(srcprog);
+            } else {
+                /* WIP: select debugger based on language */
+                /*
+                var ds : vscode.DocumentSelector = {
+                    language: "shellscript"
+                };
+
+                var srcprog = path.join(builddir, goal.depends[0].goal);
+                await vscode.workspace.findFiles(srcprog, undefined, 1).then(
+                    files => {
+                        if (files.length > 0) {
+                            vscode.workspace.openTextDocument(files[0]).then(
+                                doc => {
+                                    var m = vscode.languages.match(ds, doc);
+                                    logger.message("match: " + m);
+                            });
+                        }
+                    }
+                );
+                */
+            }
+        }
+    }
+
     public onConfigurationSelect(c: configuration.MakefileConfiguration) : void {
         this.tasks.forEach((provider) => provider.changeConfiguration(c, this.configDisposables));
     }
@@ -526,6 +586,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         return (await configuration.getCurrentTarget()).goal;
     }));
 
+    /* also need top_builddir */
     context.subscriptions.push(vscode.commands.registerCommand('autotools.builddir', async () => {
         telemetry.logEvent("builddir");
         return (await configuration.getCurrentTarget()).builddir;
@@ -661,7 +722,56 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         telemetry.logEvent("debug");
         if (!sub.goal.task)
             throw new Error("Missing test task on TaskNode");
-        return await vscode.tasks.executeTask(sub.goal.task);
+        let dopt : vscode.DebugSessionOptions = {
+            compact: true
+        };
+        const definition: TestTask = <any>sub.goal.task.definition;
+        if (definition?.type == 'test' && sub?.goal?.depends?.length && sub.goal.depends[0].goal) {
+            let program :string;
+            let testdir : string;
+            let c = configuration.getCurrentMakefileConfiguration();
+            let srcdir = resolvePathToRoot(definition?.test?.builddir || "");
+            if (definition.test?.builddir) {
+                testdir = path.join(c.top_builddir, definition.test.builddir);
+                program = path.join(definition.test.builddir, sub.goal.depends[0].goal);
+            } else {
+                testdir = c.top_builddir;
+                program = sub.goal.depends[0].goal;
+            }
+            if (c.top_builddir)
+                program = path.join(c.top_builddir, program);
+
+            vscode.debug.startDebugging(
+                vscode.workspace.workspaceFolders?.[0],
+                {type: "autotools",
+                    name: "Autotools Test: " + sub.goal.depends[0].goal,
+                    request: "launch",
+                    stopAtEntry: true,
+                    cwd: testdir,
+                    environment: [{
+                        name: "srcdir",
+                        value: srcdir
+                    }],
+                    program: program,
+                    externalConsole: true,
+
+                    setupCommands: [{
+                        "description": "Set source directory",
+                        "text": "-environment-directory " + srcdir,
+                        "ignoreFailures": false
+                    },
+                    {
+                        "description": "Enable pretty-printing for gdb",
+                        "text": "-enable-pretty-printing",
+                        "ignoreFailures": true
+                    }
+                    ]
+                    // FIXME: TESTS_ENVIRONMENT
+                    },
+                dopt)
+            .then((z) => console.log(z));
+        }
+        // return await vscode.tasks.executeTask(sub.goal.task);
     }));
 
     context.subscriptions.push(vscode.commands.registerCommand('autotools.openLog', async (sub: tree.SubNode) => {

@@ -1,34 +1,181 @@
+import * as path from 'path';
 import * as vscode from 'vscode';
-import * as configuration from './configuration';
+import { getCurrentTarget,
+        getCurrentMakefileConfiguration,
+        MakefileConfiguration } from './configuration';
+import { BuildTarget } from './make';
 import { DebugConfigurationProvider, WorkspaceFolder, DebugConfiguration, ProviderResult } from 'vscode';
+import { resolvePathToRoot } from './util';
+
+let defaultSetupCommands = [{
+    "description": "Set source directory",
+    "text": "-environment-directory ${workspaceFolder}",
+    "ignoreFailures": false
+},
+{
+    "description": "Enable pretty-printing for gdb",
+    "text": "-enable-pretty-printing",
+    "ignoreFailures": true
+}
+];
+
+class MyConfiguration implements vscode.DebugConfiguration {
+    constructor(built: BuildTarget) {
+        this.$comment = [
+            "Debug a hardcoded target in any build configuration; customize environment and args as needed",
+            "The 'cwd' is set automatically to demonstrate how",
+            "This is a (carefully designed) template, but it can be editted as needed"
+        ];
+        this.type = "cppdbg";
+        this.name = "Debug '" + built.goal + "'" +
+            (built.builddir ? " in " + built.builddir : "");
+        this.request = "launch";
+        this.program = "$(command:autotools.builddir)/" +
+            (built.builddir ? path.join(built.builddir, built.goal) :
+            built.goal);
+        this.environment = [];
+        this.args = [];
+        this.stopAtEntry = true;
+        this.preLaunchTask = "autotools: build '" + built.goal + "'" +
+            (built.builddir ? " in " + built.builddir : "");
+        this.cwd = "$(command:autotools.builddir)";
+        this.setupCommands = defaultSetupCommands;
+    }
+    $comment: string[];
+    name: string;
+    type: string;
+    request: string;
+    program: string;
+    environment: { name: string, value: string }[];
+    args: string[];
+    stopAtEntry: boolean;
+    preLaunchTask: string;
+    cwd: string;
+    setupCommands: { description: string, text: string, ignoreFailures: boolean }[];
+}
+
+/* this configuration is used when "Run and Debug" is clicked.
+ * the builddir is pre-populated
+ */
+class DebugNow implements vscode.DebugConfiguration {
+    constructor(c: MakefileConfiguration, built: BuildTarget) {
+        this.$comment = [
+            "Debug a hardcoded target in any build configuration; customize environment and args as needed",
+            "The 'cwd' is set automatically to demonstrate how",
+            "This is a (carefully designed) template, but it can be editted as needed"
+        ];
+        this.type = "cppdbg";
+        this.name = "Debug '" + built.goal + "'" +
+            (built.builddir ? " in " + built.builddir : "");
+        this.request = "launch";
+        this.program =
+            resolvePathToRoot(
+                path.join(c.top_builddir, (built.builddir ? path.join(built.builddir, built.goal) :
+            built.goal)));
+        this.environment = [{
+            name: "srcdir",
+            value: resolvePathToRoot(built.builddir)
+        }];
+        this.args = [];
+        this.stopAtEntry = true;
+        this.preLaunchTask = "autotools: build '" + built.goal + "'" +
+            (built.builddir ? " in " + built.builddir : "");
+        this.cwd = path.join(c.top_builddir, built.builddir);
+        this.setupCommands = defaultSetupCommands;
+    }
+    $comment: string[];
+    name: string;
+    type: string;
+    request: string;
+    program: string;
+    environment: { name: string, value: string }[];
+    args: string[];
+    stopAtEntry: boolean;
+    preLaunchTask: string;
+    cwd: string;
+    setupCommands: { description: string, text: string, ignoreFailures: boolean }[];
+}
 
 class MyDebugProvider implements DebugConfigurationProvider {
+
   provideDebugConfigurations(folder: WorkspaceFolder | undefined): ProviderResult<DebugConfiguration[]> {
     // Return an array of debug configurations
-    return [
-      {
-        type: 'autotools',
-        name: 'Autotool Test Debug',
-        request: 'launch',
-        program: "zzz", // configuration.getDebugProgram(), // Get the program to be debugged
-        // Additional configuration properties specific to cppdbg debugger
-      }
-    ];
+    // let c = getCurrentMakefileConfiguration();
+    return getCurrentTarget()
+        .then(goal => {
+            return [new MyConfiguration(goal),
+            {
+                $comment: [
+                    "Select the build target with 'Configure Default Build Task'",
+                    "Note that debugging tests is built in, does not use launch.json"
+                ],
+                type: 'cppdbg',
+                name: 'Autotools: Debug the default build target',
+                request: 'launch',
+                args: [],
+                environment: [],
+                program: "^\"\\${command:autotools.default_program}\"",
+                preLaunchTask: "^\"\\${command:autotools.default_program_build_task}\"",
+                cwd: "^\"\\${workspaceFolder}\"",
+                stopAtEntry: true,
+                setupCommands: defaultSetupCommands
+            }];
+        });
+//    let r : DebugConfiguration;
+//    r = Promise.resolve(t.then(goal =>
+//        r = new MyConfiguration(goal.builddir, goal.goal)));
+    //return[new MyConfiguration(t.builddir, t.goal)];
+//    return [
+//        {
+//            type: 'autotools',
+//            name: 'Autotool Test Debug 2',
+//            request: 'launch',
+//            program: "zzz-2", // configuration.getDebugProgram(), // Get the program to be debugged
+//            // Additional configuration properties specific to cppdbg debugger
+//        },
+//        {
+//        type: 'autotools',
+//        name: 'Autotool Test Debug',
+//        request: 'launch',
+//        program: "zzz", // configuration.getDebugProgram(), // Get the program to be debugged
+//        // Additional configuration properties specific to cppdbg debugger
+//      }
+//    ];
   }
 
   resolveDebugConfiguration(folder: WorkspaceFolder | undefined, config: DebugConfiguration): ProviderResult<DebugConfiguration> {
     // If needed, modify the debug configuration before launching the debug session
+    if (config.type === undefined) {
+        return getCurrentTarget()
+            .then(goal => new DebugNow(getCurrentMakefileConfiguration(), goal));
+        //return null;
+        // return new MyConfiguration("dir-name", "test-name");
+    }
     if (config.type != "autotools")
         return undefined;
-    config.type = "cppdbg";
+    // config.type = "cppdbg";
     return config;
   }
+
+  resolveDebugConfigurationWithSubstitutedVariables?(folder: WorkspaceFolder | undefined,
+        debugConfiguration: DebugConfiguration, token?: vscode.CancellationToken): ProviderResult<DebugConfiguration> {
+    // return this.resolveDebugConfiguration(folder, debugConfiguration);
+    //debugConfiguration.type = "cppdbg";
+    return debugConfiguration;
+  }
+
 }
 
 export function activate(context: vscode.ExtensionContext) {
-  const provider = new MyDebugProvider();
+  const providers = [
+    new MyDebugProvider()
+    // new MyDebugProvider()
+  ];
+
+//  const provider = new MyDebugProvider();
   // Register the debug configuration provider
+  providers.forEach((provider) =>
   context.subscriptions.push(
     vscode.debug.registerDebugConfigurationProvider('autotools', provider,
-        vscode.DebugConfigurationProviderTriggerKind.Dynamic));
+        vscode.DebugConfigurationProviderTriggerKind.Initial)));
 }
