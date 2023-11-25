@@ -342,6 +342,11 @@
             },
             {
                 "view": "debug",
+                "contents": "%autotools.welcome.debug.auto.markdownDescription%",
+                "when": "autotools:haveConfigurations"
+            },
+            {
+                "view": "debug",
                 "contents": "%autotools.welcome.debug.markdownDescription%",
                 "when": "autotools:haveManifest && !autotools:haveConfigurations"
             }
