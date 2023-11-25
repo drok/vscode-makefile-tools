@@ -525,6 +525,7 @@ export class Goal extends Node implements Parser {
     }
     depends: Goal[] | undefined = undefined;
     task: vscode.Task | undefined;
+    test: vscode.TestItem | undefined;
 }
 
 const LinkerRe = /\$\(LINK\)\s/;

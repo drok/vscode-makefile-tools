@@ -20,7 +20,7 @@ import { resolvePathToRoot } from './util';
 import * as vscode from 'vscode';
 import * as cpp from 'vscode-cpptools';
 import * as debugProvider from './debug';
-
+import { MyTestController } from './test';
 import { AutoToolsBuildTaskProvider,
         AutoToolsTestTaskProvider,
         AutoToolsCheckTaskProvider,
@@ -60,6 +60,7 @@ export class Extension {
     private needTaskFetchBugWorkaround: boolean = true;
     private compilerFullPath ?: string;
     public readonly dryRunner : string;
+    public testController : MyTestController;
 
     public constructor(public readonly extensionContext: vscode.ExtensionContext) {
         this.autotoolsTask = new AutoToolsBootstrapTaskProvider();
@@ -83,6 +84,9 @@ export class Extension {
             await this.autotoolsTask.help();
         }));
         debugProvider.activate(extensionContext);
+
+        this.testController = new MyTestController(
+            "mergesium.autotools", "Autotools tests");
     }
     public createPanel(extensionContext: vscode.ExtensionContext) : void {
         this._projectOutlineTreeView = vscode.window.createTreeView('autotools.outline', {
@@ -146,6 +150,9 @@ export class Extension {
                 this.suiteDecorator.update(vscode.Uri.from(
                     {authority: Extension.whoami, scheme: 'check', path: '/' + dir, query: 'test-suite.log'}));
                 this.failStatUpdate(oldresult, result);
+                // Don't update the test suites. They are auto summarized
+                if (goal.test && !(goal.flags & Goal.Flags.Test_Suite))
+                    this.testController.trsChange(goal.test);
                 this.updateOutlineBadge();
             }
         }
@@ -296,6 +303,25 @@ export class Extension {
             this._projectOutlineTreeView.reveal(this._projectOutlineProvider.getChildren(undefined)[0],
                 { select: false, focus: false, expand: true, } );
             this.updateOutlineBadge();
+        }
+        if (build_tree.test_suite?.test) {
+            this.updateTestSuite(build_tree);
+            this.testController.update(build_tree, build_tree.test_suite.test);
+        }
+    }
+    updateTestSuite(sub: gnumake.Make): void {
+        if (!sub.test_suite?.test)
+            return;
+        for (let submake of sub.submake.values()) {
+            if (!submake.test_suite?.test)
+                continue;
+            submake.test_suite.depends?.forEach((test) => {
+                if (submake.test_suite?.test)
+                    extension.testController.addTest(submake.test_suite.test, test, test.flags & Goal.Flags.Test_Result_Mask);
+
+            });
+            extension.testController.addSubTest(sub.test_suite.test, submake.test_suite.test);
+            this.updateTestSuite(submake);
         }
     }
 
@@ -796,6 +822,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }
 
     extension.registerTasks();
+
+    extension.testController.activate();
 
     let configureAc = configuration.getConfigureAc();
     if (configureAc) {

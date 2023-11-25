@@ -375,7 +375,7 @@
             {
                 "type": "autotools",
                 "label": "Autotools Debug",
-                "languages": ["c", "cpp", "am", "ac", ""],
+                "languages": ["c", "cpp", "am", "ac", "*"],
                 "configurationAttributes": {
                     "launch": {
                         "properties": {

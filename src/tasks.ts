@@ -123,10 +123,12 @@ export class AutoToolsTestTaskProvider implements MyTaskProvider {
         this.numTests = 0;
         this.numUnknown = 0;
         this.numSuspect = 0;
+        let tc = extension.testController;
         let c = configuration.getCurrentMakefileConfiguration();
             configuration.getAllBuildTargets().forEach((goals, dir) => {
             for (let g of goals.values()) {
                 if (g.flags & Goal.Flags.Test_Suite) {
+                    g.test || tc.addSuite(dir, g);
                     if (g.goal && g.depends) {
                         let rel = new vscode.RelativePattern(vscode.Uri.file(path.join(c.top_builddir, dir)), '*.trs');
                         let watcher =   vscode.workspace.createFileSystemWatcher(rel);
@@ -167,6 +169,8 @@ export class AutoToolsTestTaskProvider implements MyTaskProvider {
                             this.numUnknown += ((trs == TRS.NONE || trs == TRS.ERROR) ? 1 : 0);
                             this.numSuspect += (isSuspect(trs) ? 1 : 0);
                             this.numTests++;
+
+                            // tc.addTest(suite, d, trs);
                         });
                     }
                 }
