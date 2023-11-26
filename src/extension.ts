@@ -20,6 +20,7 @@ import { resolvePathToRoot } from './util';
 import * as vscode from 'vscode';
 import * as cpp from 'vscode-cpptools';
 import * as debugProvider from './debug';
+import { DebugNow } from './debug';
 import { MyTestController } from './test';
 import { AutoToolsBuildTaskProvider,
         AutoToolsTestTaskProvider,
@@ -169,31 +170,35 @@ export class Extension {
             let task = e.execution.task;
             if (task) {
                 const definition: TestTask = <any>task.definition;
-                if (definition.type == "test:-standby-code" && definition.test) {
+                if (definition.type == "test" && definition.test) {
                     let suite = configuration.getAllBuildTargets()
                         ?.get(definition.test.builddir)
                         ?.get('test-suite.log');
                     if (suite) {
                         let goal = suite.depends?.find((d) => d.goal === definition.test?.goal);
                         if (goal) {
-                            let result : make.TRS;
-                            if (e.exitCode) {
-                                // Test did not run
-                                result = make.TRS.ERROR;
-                            } else {
-                                result = make.readTRS(definition.test);
-                            }
-                            let oldresult = goal.flags & Goal.Flags.Test_Result_Mask;
-                            if (result != oldresult) {
-                                goal.flags &= ~Goal.Flags.Test_Result_Mask;
-                                goal.flags |= result;
-                                this.suiteDecorator.update(vscode.Uri.from(
-                                    {authority: Extension.whoami, scheme: 'test', path: '/' + definition.test.builddir, query: definition.test.goal}));
-                                this.suiteDecorator.update(vscode.Uri.from(
-                                    {authority: Extension.whoami, scheme: 'check', path: '/' + definition.test.builddir, query: 'test-suite.log'}));
-                                this.failStatUpdate(oldresult, result);
-                                this.updateOutlineBadge();
-                            }
+//                            let result : make.TRS;
+//                            if (e.exitCode) {
+//                                // Test did not run
+//                                result = make.TRS.ERROR;
+//                            } else {
+//                                result = make.readTRS(definition.test);
+//                            }
+//                            goal.flags &= ~Goal.Flags.Test_Result_Mask;
+//                            goal.flags |= result;
+//                            let oldresult = goal.flags & Goal.Flags.Test_Result_Mask;
+//                            if (result != oldresult) {
+//                                goal.flags &= ~Goal.Flags.Test_Result_Mask;
+//                                goal.flags |= result;
+//                                this.suiteDecorator.update(vscode.Uri.from(
+//                                    {authority: Extension.whoami, scheme: 'test', path: '/' + definition.test.builddir, query: definition.test.goal}));
+//                                this.suiteDecorator.update(vscode.Uri.from(
+//                                    {authority: Extension.whoami, scheme: 'check', path: '/' + definition.test.builddir, query: 'test-suite.log'}));
+//                                this.failStatUpdate(oldresult, result);
+//                                this.updateOutlineBadge();
+//                            }
+                            // Should wait for tasks.trsChange()
+                            definition.test && goal.test && this.testController.testCompleted(goal.test, definition.test);
                         }
                     }
                 } else if (definition.type == "check:-standby-code" && definition.builddir) {
@@ -234,6 +239,11 @@ export class Extension {
                             make.configure(make.TriggeredBy.configureAfterConfigurationChange);
                         } else
                             this.autotoolsTask.autotoolsDone();
+//                } else if (definition.type == "test-NOPE" && definition.test) {
+//                    let suite = configuration.getAllBuildTargets()
+//                        ?.get(definition.test.builddir)
+//                        ?.get('test-suite.log');
+//                    this.testController.testCompleted(definition.goal.test);
                 }
             }
         });
@@ -332,52 +342,11 @@ export class Extension {
             let dopt : vscode.DebugSessionOptions = {
                 compact: true
             };
-
-
-            if ((goal.depends[0].flags & Goal.Flags.Linked_binary))  {
-                var success : boolean = false;
-                await vscode.debug.startDebugging(
-                    vscode.workspace.workspaceFolders?.[0],
-                    new DebugNow(c, {goal: goal.depends[0].goal, builddir: builddir},
-                            !!(goal.depends[0].flags & Goal.Flags.Linked_binary), env),
-                    dopt)
-                .then((z) => success = z);
-                if (success)
-                    return Promise.resolve();
-                return Promise.reject();
-            } else if (true) {
-                var srcprog = path.join(builddir, goal.depends[0].goal);
-                var ok = localize("autotools.ok", "OK");
-                var open = localize("autotools.open", "Open in Editor");
-                var wantEdit = false;
-                await vscode.window.showWarningMessage(
-                    localize("autotools.wip.debug.all", "Debugging {0} is not yet supported", srcprog),
-                    ok, open)
-                .then((value) => {
-                    wantEdit = (value === open);
-                });
-                wantEdit && await openEditor(srcprog);
-            } else {
-                /* WIP: select debugger based on language */
-                /*
-                var ds : vscode.DocumentSelector = {
-                    language: "shellscript"
-                };
-
-                var srcprog = path.join(builddir, goal.depends[0].goal);
-                await vscode.workspace.findFiles(srcprog, undefined, 1).then(
-                    files => {
-                        if (files.length > 0) {
-                            vscode.workspace.openTextDocument(files[0]).then(
-                                doc => {
-                                    var m = vscode.languages.match(ds, doc);
-                                    logger.message("match: " + m);
-                            });
-                        }
-                    }
-                );
-                */
-            }
+            vscode.debug.startDebugging(
+                vscode.workspace.workspaceFolders?.[0],
+                new DebugNow(c, {goal: goal.depends[0].goal, builddir: builddir},),
+                dopt)
+            .then((z) => console.log(z));
         }
     }
 
@@ -560,7 +529,7 @@ export async function openSettings(setting: string) : Promise<void> {
     await vscode.commands.executeCommand("workbench.action.openWorkspaceSettings");
 }
 
-async function openEditor(file: string) {
+export async function openEditor(file: string) {
     await vscode.workspace.findFiles(file, undefined, 1).then(
         files => {
             if (files.length > 0) {
@@ -748,55 +717,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         telemetry.logEvent("debug");
         if (!sub.goal.task)
             throw new Error("Missing test task on TaskNode");
-        let dopt : vscode.DebugSessionOptions = {
-            compact: true
-        };
         const definition: TestTask = <any>sub.goal.task.definition;
-        if (definition?.type == 'test' && sub?.goal?.depends?.length && sub.goal.depends[0].goal) {
-            let program :string;
-            let testdir : string;
-            let c = configuration.getCurrentMakefileConfiguration();
-            let srcdir = resolvePathToRoot(definition?.test?.builddir || "");
-            if (definition.test?.builddir) {
-                testdir = path.join(c.top_builddir, definition.test.builddir);
-                program = path.join(definition.test.builddir, sub.goal.depends[0].goal);
-            } else {
-                testdir = c.top_builddir;
-                program = sub.goal.depends[0].goal;
-            }
-            if (c.top_builddir)
-                program = path.join(c.top_builddir, program);
-
-            vscode.debug.startDebugging(
-                vscode.workspace.workspaceFolders?.[0],
-                {type: "autotools",
-                    name: "Autotools Test: " + sub.goal.depends[0].goal,
-                    request: "launch",
-                    stopAtEntry: true,
-                    cwd: testdir,
-                    environment: [{
-                        name: "srcdir",
-                        value: srcdir
-                    }],
-                    program: program,
-                    externalConsole: true,
-
-                    setupCommands: [{
-                        "description": "Set source directory",
-                        "text": "-environment-directory " + srcdir,
-                        "ignoreFailures": false
-                    },
-                    {
-                        "description": "Enable pretty-printing for gdb",
-                        "text": "-enable-pretty-printing",
-                        "ignoreFailures": true
-                    }
-                    ]
-                    // FIXME: TESTS_ENVIRONMENT
-                    },
-                dopt)
-            .then((z) => console.log(z));
-        }
+        if (definition?.type == 'test' && sub.goal && definition.test)
+            extension.debugGoal(sub.goal, definition.test.builddir);
         // return await vscode.tasks.executeTask(sub.goal.task);
     }));
 

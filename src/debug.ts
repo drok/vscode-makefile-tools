@@ -26,7 +26,7 @@ class MyConfiguration implements vscode.DebugConfiguration {
             "The 'cwd' is set automatically to demonstrate how",
             "This is a (carefully designed) template, but it can be editted as needed"
         ];
-        this.type = "cppdbg";
+        this.type = "autotools";
         this.name = "Debug '" + built.goal + "'" +
             (built.builddir ? " in " + built.builddir : "");
         this.request = "launch";
@@ -57,14 +57,14 @@ class MyConfiguration implements vscode.DebugConfiguration {
 /* this configuration is used when "Run and Debug" is clicked.
  * the builddir is pre-populated
  */
-class DebugNow implements vscode.DebugConfiguration {
+export class DebugNow implements vscode.DebugConfiguration {
     constructor(c: MakefileConfiguration, built: BuildTarget) {
         this.$comment = [
             "Debug a hardcoded target in any build configuration; customize environment and args as needed",
             "The 'cwd' is set automatically to demonstrate how",
             "This is a (carefully designed) template, but it can be editted as needed"
         ];
-        this.type = "cppdbg";
+        this.type = "autotools";
         this.name = "Debug '" + built.goal + "'" +
             (built.builddir ? " in " + built.builddir : "");
         this.request = "launch";
@@ -109,7 +109,7 @@ class MyDebugProvider implements DebugConfigurationProvider {
                     "Select the build target with 'Configure Default Build Task'",
                     "Note that debugging tests is built in, does not use launch.json"
                 ],
-                type: 'cppdbg',
+                type: 'autotools',
                 name: 'Autotools: Debug the default build target',
                 request: 'launch',
                 args: [],
@@ -153,7 +153,7 @@ class MyDebugProvider implements DebugConfigurationProvider {
     }
     if (config.type != "autotools")
         return undefined;
-    // config.type = "cppdbg";
+    config.type = "cppdbg";
     return config;
   }
 
