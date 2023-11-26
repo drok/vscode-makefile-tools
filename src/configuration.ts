@@ -516,43 +516,39 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
                 // Not very likely, but it is safe to consider that a different make tool
                 // may produce a different dry-run output with potential impact on IntelliSense,
                 // so trigger an update (unless we read from a build log).
-                extension.getState().configureDirty = extension.getState().configureDirty;
+                extension.getState().configureDirty = true;
                 await readMakePath();
                 updatedSettingsSubkeys.push(subKey);
             }
 
             subKey = "configurations";
             let updatedMakefileConfigurations : MakefileConfiguration[] | undefined = await util.getExpandedSetting<MakefileConfiguration[]>(subKey);
-            if (!util.areEqual(updatedMakefileConfigurations, makefileConfigurations)) {
-                // todo: skip over updating the IntelliSense configuration provider if the current makefile configuration
-                // is not among the subobjects that suffered modifications.
+            let updatedConfiguration: MakefileConfiguration | undefined = updatedMakefileConfigurations?.find(k => {
+                if (k.name === currentMakefileConfiguration.name) {
+                    return k;
+                }
+            });
+            // TODO: should call an onConfigurationUpdate(updatedConfiguration);
+            // so that not only build log, but other updated members can be handled
+            if (updatedConfiguration)
+                updatedConfiguration.nolog = currentMakefileConfiguration.nolog;
+            if (!util.areEqual(updatedConfiguration, currentMakefileConfiguration)) {
+                await readMakefileConfigurations(currentMakefileConfigurationName);
+                setCurrentMakefileConfiguration(currentMakefileConfiguration.name);
                 extension.getState().configureDirty = true;
-                updatedSettingsSubkeys.push(subKey);
-                let updatedConfiguration: MakefileConfiguration | undefined = updatedMakefileConfigurations?.find(k => {
-                    if (k.name === currentMakefileConfiguration.name) {
-                        return k;
+
+                const cleanit: string = localize("autotools.cleanit", "Clean");
+                const setit: string = localize("autotools.edit.setting", "Setting...");
+                vscode.window.showWarningMessage(
+                    localize("autotools.should.clean", "Does this change require 'make clean'?"),
+                    cleanit, localize("autotools.no", "No"), setit)
+                .then((value) => {
+                    if (value === cleanit) {
+                        extension.build(make.t_clean);
+                    } else if (value === setit) {
+                        openSettings("autotools.promptClean");
                     }
                 });
-                // TODO: should call an onConfigurationUpdate(updatedConfiguration);
-                // so that not only build log, but other updated members can be handled
-                await readMakefileConfigurations(currentMakefileConfigurationName);
-                if (!util.areEqual(updatedConfiguration, currentMakefileConfiguration)) {
-                    setCurrentMakefileConfiguration(currentMakefileConfiguration.name);
-                    extension.getState().configureDirty = true;
-
-                    const cleanit: string = localize("autotools.cleanit", "Clean");
-                    const setit: string = localize("autotools.edit.setting", "Setting...");
-                    vscode.window.showWarningMessage(
-                        localize("autotools.should.clean", "Does this change require 'make clean'?"),
-                        cleanit, localize("autotools.no", "No"), setit)
-                    .then((value) => {
-                        if (value === cleanit) {
-                            extension.build(make.t_clean);
-                        } else if (value === setit) {
-                            openSettings("autotools.promptClean");
-                        }
-                    });
-                }
             }
 
             subKey = "keepDryRuns";
@@ -591,7 +587,8 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
             }
 
             // Final updates in some constructs that depend on more than one of the above settings.
-            await analyzeConfigureParams();
+            if (extension.getState().configureDirty)
+                await analyzeConfigureParams();
 
             // Report all the settings changes detected by now.
             // TODO: to avoid unnecessary telemetry processing, evaluate whether the changes done
