@@ -32,7 +32,7 @@ import { AutoToolsBuildTaskProvider,
         TestTask,
         MyTaskProvider } from './tasks';
 import { SuiteDecorations } from './suite-decorator';
-
+import * as tele from './tele';
 import * as nls from 'vscode-nls';
 import { assert } from 'console';
 import { installAutotools } from './install';
@@ -808,6 +808,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }
 
     vscode.window.registerFileDecorationProvider(extension.suiteDecorator);
+
+    tele.activate(context);
 
     // Analyze settings for type validation and telemetry
     let workspaceConfiguration: vscode.WorkspaceConfiguration = vscode.workspace.getConfiguration("autotools");
