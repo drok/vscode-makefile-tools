@@ -322,16 +322,18 @@ export class Extension {
     updateTestSuite(sub: gnumake.Make): void {
         if (!sub.test_suite?.test)
             return;
+        let c = configuration.getCurrentMakefileConfiguration();
         for (let submake of sub.submake.values()) {
             if (!submake.test_suite?.test)
                 continue;
-            submake.test_suite.depends?.forEach((test) => {
-                if (submake.test_suite?.test)
-                    extension.testController.addTest(submake.test_suite.test, test, test.flags & Goal.Flags.Test_Result_Mask);
-
-            });
             extension.testController.addSubTest(sub.test_suite.test, submake.test_suite.test);
             this.updateTestSuite(submake);
+        }
+        if (sub.test_suite && sub.test_suite.test) {
+            let logpath = path.join(c.top_builddir, sub.dir);
+            sub.test_suite.depends?.forEach((test) => {
+                sub.test_suite?.test && extension.testController.addTest(logpath, sub.test_suite.test, test, test.flags & Goal.Flags.Test_Result_Mask)});
+
         }
     }
 

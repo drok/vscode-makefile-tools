@@ -128,7 +128,7 @@ export class AutoToolsTestTaskProvider implements MyTaskProvider {
             configuration.getAllBuildTargets().forEach((goals, dir) => {
             for (let g of goals.values()) {
                 if (g.flags & Goal.Flags.Test_Suite) {
-                    g.test || tc.addSuite(dir, g);
+                    g.test || tc.addSuite(c, dir, g);
                     if (g.goal && g.depends) {
                         let rel = new vscode.RelativePattern(vscode.Uri.file(path.join(c.top_builddir, dir)), '*.trs');
                         let watcher =   vscode.workspace.createFileSystemWatcher(rel);

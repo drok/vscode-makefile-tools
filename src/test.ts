@@ -14,7 +14,9 @@ import { makeFullPath } from './util';
 import { TRS_Info } from './make';
 import { extension,
         openEditor } from './extension';
+import { MakefileConfiguration } from './configuration';
 import { resolvePathToRoot } from './util';
+import { MakefileConfiguration } from './configuration';
 
 export class MyTestController {
   private root: TestItem | undefined;
@@ -36,13 +38,15 @@ export class MyTestController {
     this.testCompletedEvent.fire(test);
   }
 
-  public addSuite(dir: string, sub: Goal) : void {
+  public addSuite(c: MakefileConfiguration, dir: string, sub: Goal) : void {
     sub.test =  this.controller.createTestItem(
-            dir || '/', dir || "Top Test Suite", undefined);
+            dir || '/', dir || "Top Test Suite",
+            vscode.Uri.file(path.join(c.top_builddir, dir, sub.goal || "")
+            ));
     sub.test.tags = [this.debuggable];
     this.testGoals.set(sub.test, sub);
   }
-  public addTest(suite: TestItem, goal: Goal, trs: TRS) : void {
+  public addTest(logpath: string, suite: TestItem, goal: Goal, trs: TRS) : void {
     goal.test = this.controller.createTestItem(
             goal.task?.name || "",
             goal.goal || "",
@@ -83,7 +87,7 @@ export class MyTestController {
   updateGoalTRS(run: TestRun, test: TestItem, trs: TRS) : void {
     switch(trs) {
         case TRS.NONE: break;
-        case TRS.ERROR: run.errored(test, new vscode.TestMessage("some error")); break;
+        case TRS.ERROR: run.errored(test, new vscode.TestMessage("See log file")); break;
         case TRS.SKIP: run.skipped(test); break;
         case TRS.PASS: run.passed(test); break;
         default: run.failed(test, new vscode.TestMessage(TRS_Info[trs].tooltip || "unk")); break;
