@@ -479,18 +479,6 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
     // config arg after config is fully loaded.
     // await extension._projectOutlineProvider.update(extension.getState().buildConfiguration); // FIXME: update with real target
 
-    // Modifying any makefile should trigger an IntelliSense config provider update,
-    // so make the dirty state true.
-    // TODO: limit to makefiles relevant to this project, instead of any random makefile anywhere.
-    //       We can't listen only to the makefile pointed to autotools.configurations.top_builddir,
-    //       because that is only the entry point and can refer to other relevant makefiles.
-    // TODO: don't trigger an update for any dummy save, verify how the content changed.
-    vscode.workspace.onDidSaveTextDocument(e => {
-        if (e.uri.fsPath.toLowerCase().endsWith("makefile")) {
-            extension.getState().configureDirty = true;
-        }
-    });
-
     // Watch for Makefile Tools setting updates that can change the IntelliSense config provider dirty state.
     // More than one setting may be updated on one settings.json save,
     // so make sure to OR the dirty state when it's calculated by a formula (not a simple TRUE value).
