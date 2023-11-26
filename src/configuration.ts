@@ -152,7 +152,7 @@ export function setLoggingLevel(logLevel: string): void { loggingLevel = logLeve
 // Read from settings the desired logging level for the Makefile Tools extension.
 export async function readLoggingLevel(): Promise<void> {
     loggingLevel = await util.getExpandedSetting<string>("loggingLevel") || "Normal";
-    logger.message(`Logging level: ${loggingLevel}`);
+    logger.message(`Logging level: ${loggingLevel}`, "Verbose");
 }
 
 let extensionLog: string | undefined;
@@ -172,7 +172,7 @@ export async function readExtensionLog(): Promise<void> {
     if (extensionLog) {
         extensionLog = util.resolvePathToRoot(extensionLog);
 
-        logger.message(`Writing extension log at ${extensionLog}`);
+        logger.message(`Writing extension log at ${extensionLog}`, "Verbose");
     }
 }
 
@@ -248,7 +248,7 @@ async function analyzeConfigureParams(): Promise<void> {
     }
 
     if (relativeMakefile)
-        logMakeCmd(relativeMakefile);
+        await logMakeCmd(relativeMakefile);
 
     await extension.setFullFeatureSet(relativeMakefile ? true : false);
 
@@ -305,11 +305,19 @@ function findMakefile(): string | undefined {
     return relativeMakefile;
 }
 
-export function logMakeCmd(relativeMakefile: string): void {
+export async function logMakeCmd(relativeMakefile: string): Promise<void> {
+    extension.pkginfo = await make.getPackageJSON().catch(() => undefined);
+    if (extension.pkginfo) {
+        let pkg = extension.pkginfo;
+        logger.message(localize('autotools.package.coordinates', "Package \"{0}\" version {1} - bug reports: {2}, url: {3}",
+        pkg.name || "unknown", pkg.version || "unk", pkg.bugreport || "unknown", pkg.url || "unknown"), "Normal");
+        logger.message(localize('autotools.ref.kb', "More info about editting the package with vscode at: {0}/{1}#{2}",
+        "https://autotools.mergesium.com/kb", extension.pkginfo.name, extension.pkginfo.version), "Normal");
+    }
     if (currentMakefileConfiguration.makeArgs)
-        logger.message(`Make cmd (${relativeMakefile}): '${makePath} ${currentMakefileConfiguration.makeArgs.join(" ")}' for configuration "${currentMakefileConfiguration.name}"`);
+        logger.message(`Make cmd (${relativeMakefile}): '${makePath} ${currentMakefileConfiguration.makeArgs.join(" ")}' for configuration "${currentMakefileConfiguration.name}"`, "Debug");
     else
-        logger.message(`Make cmd (${relativeMakefile}): '${makePath}' for configuration "${currentMakefileConfiguration.name}"`);
+        logger.message(`Make cmd (${relativeMakefile}): '${makePath}' for configuration "${currentMakefileConfiguration.name}"`, "Verbose");
 }
 
 // Helper to find in the array of MakefileConfiguration which problemMatchers correspond to a configuration name
@@ -372,7 +380,7 @@ export async function readMakefileConfigurations(currentConfigurationName : stri
         return k.name;
     }));
     if (makefileConfigurationNames.length > 0) {
-        logger.message("Defined autotools.configurations: " + makefileConfigurationNames.join(";"));
+        logger.message("Defined autotools.configurations: " + makefileConfigurationNames.join(";"), "Verbose");
     }
 
     // Verify if the current makefile configuration (check against the expanded values)

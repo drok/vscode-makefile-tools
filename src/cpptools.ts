@@ -111,20 +111,21 @@ export class CppConfigurationProvider implements cpp.CustomConfigurationProvider
 
     public logConfigurationProviderItem(filePath: SourceFileConfigurationItem, fromCache: boolean = false): void {
         let uriObj: vscode.Uri = <vscode.Uri>filePath.uri;
-        logger.message("Sending configuration " + (fromCache ? "(from cache) " : "") + "for file " + uriObj.fsPath + " -----------------------------------", "Normal");
-        logger.message("    Defines: " + filePath.configuration.defines.join(";"), "Verbose");
-        logger.message("    Includes: " + filePath.configuration.includePath.join(";"), "Verbose");
+        let when = "Debug";
+        logger.message("Exporting config " + (fromCache ? "(from cache) " : "") + "for file " + uriObj.fsPath, "Verbose");
+        logger.message("    Defines: " + filePath.configuration.defines.join(";"), when);
+        logger.message("    Includes: " + filePath.configuration.includePath.join(";"), when);
         if (filePath.configuration.forcedInclude) {
-            logger.message("    Force Includes: " + filePath.configuration.forcedInclude.join(";"), "Verbose");
+            logger.message("    Force Includes: " + filePath.configuration.forcedInclude.join(";"), when);
         }
-        logger.message("    Standard: " + filePath.configuration.standard, "Verbose");
-        logger.message("    IntelliSense Mode: " + filePath.configuration.intelliSenseMode, "Verbose");
-        logger.message("    Compiler Path: " + filePath.configuration.compilerPath, "Verbose");
-        logger.message("    Compiler Arguments: " + filePath.configuration.compilerArgs?.join(";"), "Verbose");
+        logger.message("    Standard: " + filePath.configuration.standard, when);
+        logger.message("    IntelliSense Mode: " + filePath.configuration.intelliSenseMode, when);
+        logger.message("    Compiler Path: " + filePath.configuration.compilerPath, when);
+        logger.message("    Compiler Arguments: " + filePath.configuration.compilerArgs?.join(";"), when);
         if (process.platform === "win32" && filePath.configuration.windowsSdkVersion) {
-            logger.message("    Windows SDK Version: " + filePath.configuration.windowsSdkVersion, "Verbose");
+            logger.message("    Windows SDK Version: " + filePath.configuration.windowsSdkVersion, when);
         }
-        logger.message("---------------------------------------------------------------------------------------------------", "Verbose");
+        logger.message("---------------------------------------------------------------------------------------------------", "Debug");
     }
 
     public logConfigurationProviderComplete(): void {

@@ -33,19 +33,24 @@ function countStats(sub: Make): number[] {
     // let num_dirs : number = 0;
     sub.stats.subdirs = sub.submake.size;
     for (let submake of sub.submake.values()) {
-        let [t, n, s] = countStats(submake);
+        let [t, n, s, c] = countStats(submake);
         sub.stats.programs += t;
         sub.stats.tests += n;
         sub.stats.subdirs += s;
+        sub.stats.checks += c;
     }
     for (let [goal, g] of sub.goals)
         sub.stats.programs += ((g.flags & Goal.Flags.Linked_binary)
             && !(g.flags & Goal.Flags.Test_Program)) ? 1 : 0;
 
+    let numTestsHere = (sub.goals.get("test-suite.log")?.depends?.length ?? 0);
+    sub.stats.tests += numTestsHere;
+    sub.stats.checks += (numTestsHere ? 1 : 0);
     return [
         sub.stats.programs,
-        sub.stats.tests + (sub.goals.get("test-suite.log")?.depends?.length ?? 0),
-        sub.submake.size
+        sub.stats.tests,
+        sub.submake.size,
+        sub.stats.checks
     ];
 }
 

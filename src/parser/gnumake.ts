@@ -226,10 +226,12 @@ export class Make implements Parser {
         tests: number;
         programs: number;
         subdirs: number;
+        checks: number;
     } = {
         tests: 0,
         programs: 0,
-        subdirs: 0
+        subdirs: 0,
+        checks: 0
     };
 }
 

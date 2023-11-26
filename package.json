@@ -53,9 +53,20 @@
 
             },
             {
+                "command": "autotools.outline.buildAll",
+                "icon": "$(combine)",
+                "title": "%autotools.buildAll.title%"
+
+            },
+            {
                 "command": "autotools.checkAll",
                 "icon": "$(checklist)",
                 "title": "%autotools.checkAll.title%"
+            },
+            {
+                "command": "autotools.outline.checkAll",
+                "icon": "$(checklist)",
+                "title": "%autotools.outline.checkAll.title%"
             },
             {
                 "command": "autotools.check",
@@ -106,7 +117,14 @@
             },
             {
                 "command": "autotools.configure",
+                "icon": "$(refresh)",
                 "title": "%autotools.command.configure.title%"
+            },
+            {
+                "command": "autotools.visit.knowledgeBase",
+                "icon": "$(comment)",
+                "title": "%autotools.command.visit.knowledgeBase.title%"
+
             },
             {
                 "command": "autotools.exportToIntelisense",
@@ -123,8 +141,8 @@
             },
             {
                 "command": "autotools.outline.configure",
-                "title": "%autotools.command.makefile.configure.title%",
-                "icon": "$(settings)"
+                "title": "%autotools.command.outline.configure.title%",
+                "icon": "$(refresh)"
             },
             {
                 "command": "autotools.resetState",
@@ -455,6 +473,8 @@
             "autotools__viewContainer": [
                 {
                     "id": "autotools.outline",
+                    "icon": "res/viewcontainer.svg",
+
                     "name": "%autotools.configuration.views.makefile.outline.description%"
                 }
             ]
@@ -640,6 +660,31 @@
                     "command": "autotools.outline.configure",
                     "when": "view == autotools.outline",
                     "group": "1_makefileOutline@3"
+                },
+                {
+                    "command": "autotools.outline.buildAll",
+                    "when": "view == autotools.outline",
+                    "group": "1_makefileOutline@3"
+                },
+                {
+                    "command": "autotools.newConfiguration",
+                    "when": "view == autotools.outline",
+                    "group": "1_makefileOutline@3"
+                },
+                {
+                    "command": "autotools.outline.checkAll",
+                    "when": "view == autotools.outline",
+                    "group": "1_makefileOutline@3"
+                },
+                {
+                    "command": "autotools.visit.knowledgeBase",
+                    "when": "view == autotools.outline",
+                    "group": "navigation@1"
+                },
+                {
+                    "command": "autotools.outline.configure",
+                    "when": "view == autotools.outline",
+                    "group": "navigation@2"
                 }
             ],
             "view/item/context": [

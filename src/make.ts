@@ -95,6 +95,43 @@ export function setCurPID(pid: number): void { curPID = pid; }
 // The source file of parseContent (build log or configuration dryrun cache).
 let parseFile: string | undefined;
 
+export interface pkgInfo {
+    name: string;
+    version: string;
+    bugreport: string;
+    url: string;
+}
+export async function getPackageJSON(): Promise<pkgInfo> {
+    return new Promise<pkgInfo>(async (resolve, reject) => {
+        let c = configuration.getCurrentMakefileConfiguration();
+        let info : string | undefined;
+        const result: util.SpawnProcessResult = await util.spawnChildProcess(
+            path.join(c.top_builddir, "config.status"), ["--file=-:-"],
+            util.getWorkspaceRoot(),
+            true, true,
+            '{ "name": "@PACKAGE_NAME@", "version": "@PACKAGE_VERSION@", "bugreport": "@PACKAGE_BUGREPORT@", "url": "@PACKAGE_URL@" }',
+            (x) => {info = x}, undefined);
+        if (result.returnCode !== 0)
+            reject();
+        if (info === undefined)
+            reject();
+
+        let theinfo : pkgInfo;
+        try {
+            theinfo = JSON.parse(info || "");
+            resolve(theinfo);
+        } catch (e) {
+            reject();
+        }
+        reject();
+    });
+}
+
+let export_stats : {
+    programs: number;
+    tests: number;
+    checks: number;
+};
 // Targets need to parse a dryrun make invocation that does not include a target name
 // (other than default empty "" or the standard "all"), otherwise it would produce
 // a subset of all the targets involved in the makefile (only the ones triggered
@@ -179,7 +216,7 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
     // FIXME: also assume-old the configuration files listed
     // ./config.status --help
 
-    logger.message(`Export Intellisense Info from: 'make ${makeArgs.join(" ")}'`, "debug");
+    logger.message(`Export Intellisense Info from: 'make ${makeArgs.join(" ")}'`, "Debug");
 
     try {
         // TODO: Use stream writes
@@ -308,7 +345,7 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
         // The dry-run analysis should operate on english.
         const result: util.SpawnProcessResult = await util.spawnChildProcess(
                 extension.dryRunner,
-                makeArgs, util.getWorkspaceRoot(), true, true, stdout, stderr);
+                makeArgs, util.getWorkspaceRoot(), true, true, undefined, stdout, stderr);
         if (keepDryRuns && completeErr) {
             fs.appendFileSync(dryrunFile,
                 lineEnding +
@@ -320,7 +357,7 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
         }
         clearInterval(timeout);
         let elapsedTime: number = util.elapsedTimeSince(startTime);
-        logger.message(`Generating dry-run elapsed time: ${elapsedTime}`);
+        logger.message(`Generating dry-run elapsed time: ${elapsedTime}`, "Verbose");
 
         parseFile = keepDryRuns ? dryrunFile : (dryrunFile + " (not saved)");
 
@@ -347,6 +384,10 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
             // All done, notify that new data is available
             extension.updateCppToolsProvider();
             extension.updateTasks(build_tree);
+            export_stats = {
+                programs: build_tree.stats.programs,
+                tests: build_tree.stats.tests,
+                checks: build_tree.stats.checks};
         }
         ui.getUI().setStatus(result.returnCode !== ConfigureBuildReturnCodeTypes.success ? ui.UIStatus.ERR : ui.UIStatus.OK);
 
@@ -567,11 +608,25 @@ export async function configure(triggeredBy: TriggeredBy): Promise<number> {
       retc = analyzeConfigureSubphases(subphaseStats);
     }
 
+    extension.getState().configureDirty = !(retc === ConfigureBuildReturnCodeTypes.success);
+
     if (retc === ConfigureBuildReturnCodeTypes.success) {
+        let fileIndex = extension.getCppConfigurationProvider().getCustomConfigurationProvider().fileIndex;
+
+        let sample = Array.from(fileIndex.keys()).slice(2)
+                .concat("...")
+                .map(f => path.basename(f));
     // FIXME: not true. it gets here if --dry-run parsing throws
-      logger.message("Configure succeeded.");
+      logger.message(localize("autotools.log.config.exported",
+        "Build configuration for {0} source files like {1} imported to Intellisense.",
+            fileIndex.size,
+            sample.join(", ")
+            ));
+      logger.message(localize("autotools.log.config.exported2",
+            "{0} build tasks and {1} test tasks in {2} check suites were imported (see Run Task... command)",
+            export_stats.programs, export_stats.tests, export_stats.checks));
     } else {
-      logger.message("Configure failed.");
+      logger.message("Export failed.");
     }
 
     return retc;
@@ -609,7 +664,7 @@ export async function configure(triggeredBy: TriggeredBy): Promise<number> {
       }
 
     } else if (readCache) {
-        // FIXME: 
+        // FIXME:
         // util.deleteFileSync(configurationCache);
         logger.message("FIXME: Config is empty. Delete the file.");
     }
@@ -637,7 +692,7 @@ export async function configure(triggeredBy: TriggeredBy): Promise<number> {
       telemetryMeasures[phase.name + ".elapsed"] = phase.status.elapsed;
     });
 
-    logger.message(`Configure elapsed time: ${configureElapsedTime}`);
+    logger.message(`Configure elapsed time: ${configureElapsedTime}`, "Verbose");
 
     // Let's consider that a cancelled configure is not a complete configure,
     // even if, depending when the cancel happened, the cache may have been loaded already.
@@ -676,7 +731,7 @@ async function loadConfigurationFromCache(progress: vscode.Progress<{}>, cancel:
     if (content) {
         try {
             progress.report({ increment: 1, message: localize("make.configure.cache", "Importing cached configuration") });
-            logger.message(`Configuring from cache: ${cacheFile}`);
+            logger.message(`Configuring from cache: ${cacheFile}`, "Verbose");
             let configurationCache: ConfigurationCache = {
                 customConfigurationProvider: {
                     workspaceBrowse: {
@@ -711,7 +766,7 @@ async function loadConfigurationFromCache(progress: vscode.Progress<{}>, cancel:
         }
 
         elapsedTime = util.elapsedTimeSince(startTime);
-        logger.message(`Load configuration from cache elapsed time: ${elapsedTime}`);
+        logger.message(`Load configuration from cache elapsed time: ${elapsedTime}`, "Verbose");
 
         // Log all the files read from cache after elapsed time is calculated.
         // IntelliSense should be available by now for all files.
@@ -767,15 +822,14 @@ export async function doConfigure(progress: vscode.Progress<{}>, cancel: vscode.
 
     // Let the caller collect and log all information regarding the subphases return codes.
     if (!recursiveDoConfigure) {
-        logger.message("Configure finished. The status for all the subphases that ran:");
+        logger.message("Configure finished. The status for all the subphases that ran:", "Debug");
         let subphases: ConfigureSubphaseStatusItem[] = getRelevantConfigStats(subphaseStats);
         subphases.forEach(subphase => {
-            logger.message(`${subphase.name}: return code = ${subphase.status.retc}, ` +
-                           `elapsed time = ${subphase.status.elapsed}`);
+            logger.message(`  - ${subphase.name}: return code = ${subphase.status.retc}, ` +
+                           `elapsed time = ${subphase.status.elapsed}`, "Debug");
         });
     }
 
-    extension.getState().configureDirty = false;
     return subphaseStats;
 }
 

@@ -186,7 +186,7 @@ export async function killTree(progress: vscode.Progress<{}>, pid: number): Prom
 
     try {
         // pgrep should run on english, regardless of the system setting.
-        const result: SpawnProcessResult = await spawnChildProcess('pgrep', ['-P', pid.toString()], getWorkspaceRoot(), true, false, stdout);
+        const result: SpawnProcessResult = await spawnChildProcess('pgrep', ['-P', pid.toString()], getWorkspaceRoot(), true, false, undefined, stdout);
         if (!!stdoutStr.length) {
             children = stdoutStr.split('\n').map((line: string) => Number.parseInt(line));
 
@@ -249,6 +249,7 @@ export function spawnChildProcess(
     workingDirectory: string,
     forceEnglish: boolean,
     ensureQuoted: boolean,
+    input: string | undefined,
     stdoutCallback?: (stdout: string) => void,
     stderrCallback?: (stderr: string) => void): Promise<SpawnProcessResult> {
 
@@ -297,6 +298,10 @@ export function spawnChildProcess(
                 stderrCallback(`${data}`);
             });
         }
+        if (input) {
+            child.stdin.write(input);
+        }
+        child.stdin.end();
 
         child.on('close', (returnCode: number, signal: string) => {
             resolve({returnCode, signal});
@@ -330,7 +335,7 @@ export async function cygpath(pathStr: string): Promise<string> {
   };
 
   // Running cygpath can use the system locale.
-  await spawnChildProcess("cygpath", [pathStr, "-w"], "", false, false, stdout);
+  await spawnChildProcess("cygpath", [pathStr, "-w"], "", false, false, undefined, stdout);
   return windowsPath;
 }
 

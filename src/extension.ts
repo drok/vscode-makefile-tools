@@ -7,6 +7,7 @@ import * as configuration from './configuration';
 import * as cpptools from './cpptools';
 import * as fs from 'fs';
 import * as logger from './logger';
+import * as util from './util';
 import * as make from './make';
 import * as toolParser from './parser/tool';
 import * as gnumake from './parser/gnumake';
@@ -62,6 +63,7 @@ export class Extension {
     private compilerFullPath ?: string;
     public readonly dryRunner : string;
     public testController : MyTestController;
+    public pkginfo : make.pkgInfo | undefined;
 
     public constructor(public readonly extensionContext: vscode.ExtensionContext) {
         this.autotoolsTask = new AutoToolsBootstrapTaskProvider();
@@ -83,6 +85,14 @@ export class Extension {
         }));
         extensionContext.subscriptions.push(vscode.commands.registerCommand('autotools.configure.help', async () => {
             await this.autotoolsTask.help();
+        }));
+        extensionContext.subscriptions.push(vscode.commands.registerCommand('autotools.visit.knowledgeBase', async () => {
+            vscode.commands.executeCommand('vscode.open', vscode.Uri.from({
+                scheme: 'https',
+                authority: 'autotools.mergesium.com',
+                path: '/kb/' + this.pkginfo?.name,
+                fragment: this.pkginfo?.version
+            }));
         }));
         debugProvider.activate(extensionContext);
 
@@ -359,7 +369,10 @@ export class Extension {
     // config.status (just re-output)
     public async regen(): Promise<void> { await this.autotoolsTask.regen(); }
     // config.status --recheck
-    public async recheck(): Promise<void> { await this.autotoolsTask.recheck(); }
+    public async recheck(): Promise<void> {
+        await this.autotoolsTask.recheck();
+        this.pkginfo = await make.getPackageJSON().catch(() => undefined);
+    }
     public autotoolsDone(): void { this.autotoolsTask.autotoolsDone(); }
 
     public build(target: make.BuildTarget): void { this.buildTasks.build(target); }
@@ -631,17 +644,28 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }));
     /** End of commands that shouldn't be exposed in package.json, they are used for command substitution in launch.json and tasks.json. */
 
-    context.subscriptions.push(vscode.commands.registerCommand('autotools.buildAll', async () => {
-        const kind:BuildTask = {
-            type: "build",
-            target: make.t_all
-        };
-        let top_builddir = configuration.getCurrentMakefileConfiguration().top_builddir;
-        await vscode.tasks.executeTask(new vscode.Task(kind, vscode.TaskScope.Workspace, 'build all', 'autotools',
-            new vscode.ProcessExecution(configuration.getMakePath(),
-                (top_builddir ? ['-C', top_builddir] : [])
-                .concat(make.t_all.goal)
-            )));
+    context.subscriptions.push(vscode.commands.registerCommand('autotools.outline.buildAll', async (sub: tree.SubNode) => {
+        telemetry.logEvent("outline.buildAll");
+        if (sub instanceof tree.SubNode)
+            extension.build(new make.BuildTarget(sub.submake.dir, make.t_all.goal));
+        else
+            extension.build(make.t_all);
+    }));
+
+    context.subscriptions.push(vscode.commands.registerCommand('autotools.buildAll', async (sub: tree.SubNode) => {
+        telemetry.logEvent("buildAll");
+        if (sub instanceof tree.SubNode)
+            extension.build(new make.BuildTarget(sub.submake.dir, make.t_all.goal));
+        else
+            extension.build(make.t_all);
+    }));
+
+    context.subscriptions.push(vscode.commands.registerCommand('autotools.outline.checkAll', async () => {
+        extension.build(make.t_check);
+    }));
+
+    context.subscriptions.push(vscode.commands.registerCommand('autotools.checkAll', async () => {
+        extension.build(make.t_check);
     }));
 
     context.subscriptions.push(vscode.commands.registerCommand('autotools.exportToIntelisense', async () => {
@@ -654,13 +678,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         extension.getState().reset();
     }));
 
-    //context.subscriptions.push(vscode.commands.registerCommand('autotools.outline.configure', () => {
-    //    return vscode.commands.executeCommand("autotools.configure");
-    //}));
+    context.subscriptions.push(vscode.commands.registerCommand('autotools.outline.configure', () => {
+        return vscode.commands.executeCommand("autotools.configure");
+    }));
 
     context.subscriptions.push(vscode.commands.registerCommand('autotools.configure', async () => {
         telemetry.logEvent("configure");
-        extension.configure();
+        extension.recheck();
     }));
 
     context.subscriptions.push(vscode.commands.registerCommand('autotools.build', async (sub: tree.TaskNode) => {
