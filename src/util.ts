@@ -9,7 +9,8 @@ import * as child_process from 'child_process';
 import * as logger from './logger';
 import * as make from './make';
 import * as path from 'path';
-import * as telemetry from './telemetry';
+import { extension, telemetry } from './extension';
+import { Attributes } from './tele';
 import * as vscode from 'vscode';
 
 import * as nls from "vscode-nls";
@@ -626,7 +627,7 @@ export async function getExpandedSetting<T>(settingId: string, propSchema?: any)
     let settingVal: any | undefined = workspaceConfiguration.get<T>(settingId);
 
     if (!propSchema) {
-        propSchema = thisExtensionPackage().contributes.configuration.properties;
+        propSchema = extension.extensionContext.extension.packageJSON.contributes.configuration.properties;
         propSchema = propSchema.properties ? propSchema.properties[`autotools.${settingId}`] : propSchema[`autotools.${settingId}`];
     }
 
@@ -747,12 +748,10 @@ export async function expandVariablesInSetting(settingId: string, settingVal: st
     // The escape character is only for our regexp here to know to not expand it.
     // Safe to replace \\${ with ESCAPED_VARIABLE_EXPANSION. This will cause the pattern to be skipped
     // by the regular expression below and also we will replace in reverse at the end (without \\).
-    const telemetryProperties: telemetry.Properties = {setting: settingId};
     let preprocStr: string = settingVal.replace(/\\\$\{/mg, "ESCAPED_VARIABLE_EXPANSION");
     if (preprocStr !== settingVal) {
         logger.message(`Detected escaped variable expansion patterns in setting '${settingId}', within value '${settingVal}'.`);
-        telemetryProperties.pattern = "escaped";
-        telemetry.logEvent("varexp", telemetryProperties);
+        telemetry.logEvent("varexp", {var: settingId, val: settingVal});
         settingVal = preprocStr;
     }
 
@@ -761,32 +760,22 @@ export async function expandVariablesInSetting(settingId: string, settingVal: st
     let regexpVSCodeVar: RegExp = /(\$\{(\w+)\})|(\$\{(\w+):(.+?)\})/mg;
     let result: RegExpExecArray | null = regexpVSCodeVar.exec(expandedSetting);
     while (result) {
-        const telemetryProperties: telemetry.Properties = {setting: settingId};
         let toStr: string = "";
         if (result[2] === "workspaceFolder" || result[2] === "workspaceRoot") {
             toStr = getWorkspaceRoot();
-            telemetryProperties.pattern =  result[2];
         } else if (result[2] === "workspaceFolderBasename") {
             toStr = path.basename(getWorkspaceRoot());
-            telemetryProperties.pattern =  result[2];
         } else if (result[2] === "userHome") {
             toStr = userHome();
-            telemetryProperties.pattern =  result[2];
         } else if (result[2] === "configuration") {
             toStr = configuration.getCurrentMakefileConfiguration().name;
-            telemetryProperties.pattern =  result[2];
         } else if (result[2] === "buildTargetName") {
             toStr = (await configuration.getCurrentTarget()).goal;
-            telemetryProperties.pattern =  result[2];
         } else if (result[2] === "buildTargetDir") {
             toStr = (await configuration.getCurrentTarget()).builddir;
-            telemetryProperties.pattern =  result[2];
         } else if (result[4] === "env" && result[5]) {
             toStr = process.env[result[5]] || "";
-            telemetryProperties.pattern =  result[4];
         } else if (result[4] === "command") {
-            telemetryProperties.pattern =  result[4];
-            telemetryProperties.info = result[5];
             try {
                 toStr = await vscode.commands.executeCommand(result[5]);
             } catch (e) {
@@ -796,8 +785,6 @@ export async function expandVariablesInSetting(settingId: string, settingVal: st
         } else if (result[4] === "config" && result[5]) {
             // Extract the name of the extension we read this setting from (before the dot)
             // and the setting follows the first dot.
-            telemetryProperties.pattern =  result[4];
-            telemetryProperties.info = result[5];
             const regexpCfg: RegExp = /(\w+)\.(.+)/mg;
             const res: RegExpExecArray | null = regexpCfg.exec(result[5]);
             if (res && res[1] && res[2]) {
@@ -829,10 +816,7 @@ export async function expandVariablesInSetting(settingId: string, settingVal: st
         } else {
             logger.message(`Unrecognized variable format: ${result[0]}`);
             toStr = "unknown";
-            telemetryProperties.pattern =  "unrecognized";
         }
-
-        telemetry.logEvent("varexp", telemetryProperties);
 
         // Because we replace at the same time as we evaluate possible consecutive $ patterns
         // we need to start each time the search from the beginning (otherwise the lastIndex gets messed up).
@@ -918,32 +902,3 @@ export async function scheduleAsyncTask<T>(task: () => Promise<T>): Promise<T> {
        });
    });
 }
-
-export function thisExtension(): vscode.Extension<any> {
-    const ext: vscode.Extension<any> | undefined = vscode.extensions.getExtension('mergesium.autotools');
-    if (!ext) {
-      throw new Error("Our own extension is null.");
-    }
-
-    return ext;
-}
-
-export interface PackageJSON {
-    name: string;
-    publisher: string;
-    version: string;
-    contributes: any;
-}
-
-export function thisExtensionPackage(): PackageJSON {
-    const pkg: PackageJSON = thisExtension().packageJSON as PackageJSON;
-
-    return {
-      name: pkg.name,
-      publisher: pkg.publisher,
-      version: pkg.version,
-      contributes: pkg.contributes
-    };
-}
-
-export function thisExtensionPath(): string { return thisExtension().extensionPath; }

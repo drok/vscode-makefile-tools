@@ -14,7 +14,8 @@ import * as gnumake from './parser/gnumake';
 import { Goal } from './parser/gnumake';
 import * as path from 'path';
 import * as state from './state';
-import * as telemetry from './telemetry';
+// import * as telemetry from './telemetry';
+import { SpanStatusCode } from './tele';
 import * as tree from './tree';
 import * as ui from './ui';
 import { resolvePathToRoot } from './util';
@@ -42,7 +43,7 @@ const localize: nls.LocalizeFunc = nls.loadMessageBundle();
 let statusBar: ui.UI = ui.getUI();
 
 export let extension: Extension;
-
+export let telemetry: tele.MyTelemetry;
 export class Extension {
     static readonly whoami: string = "mergesium.autotools";
 
@@ -98,6 +99,7 @@ export class Extension {
         }));
         debugProvider.activate(extensionContext);
 
+        telemetry = new tele.MyTelemetry(extensionContext);
     }
     public createPanel() : void {
         this._projectOutlineTreeView = vscode.window.createTreeView('autotools.outline', {
@@ -600,8 +602,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     extension = new Extension(context);
     await extension.setFullFeatureSet(false);
 
-    telemetry.activate();
-
     context.subscriptions.push(vscode.commands.registerCommand('autotools.setBuildConfiguration', async () => {
         await configuration.setNewConfiguration();
     }));
@@ -809,23 +809,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
     vscode.window.registerFileDecorationProvider(extension.suiteDecorator);
 
-    tele.activate(context);
-
-    // Analyze settings for type validation and telemetry
-    let workspaceConfiguration: vscode.WorkspaceConfiguration = vscode.workspace.getConfiguration("autotools");
-    let telemetryProperties: telemetry.Properties | null = {};
-    try {
-        telemetryProperties = await telemetry.analyzeSettings(workspaceConfiguration, "autotools",
-            util.thisExtensionPackage().contributes.configuration.properties,
-            true, telemetryProperties);
-    } catch (e) {
-        telemetry.telemetryLogger(e.message);
-    }
-
-    if (telemetryProperties && util.hasProperties(telemetryProperties)) {
-        telemetry.logEvent("settings", telemetryProperties);
-    }
-
     if (!configuration.getConfigurationMakefile()) {
         ui.getUI().setLoading(extension.isAutotoolsProject() ? ui.UIStatus.ERR : ui.UIStatus.NON_AUTOTOOLS);
         return;
@@ -840,6 +823,7 @@ export async function deactivate(): Promise<void> {
 
     const items : any = [
         extension,
+        telemetry,
         statusBar
     ];
 

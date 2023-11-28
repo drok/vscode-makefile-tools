@@ -3,7 +3,8 @@
 
 // Configuration support
 
-import {extension} from './extension';
+import { extension, telemetry } from './extension';
+import { Attributes, SpanStatusCode } from './tele';
 import * as logger from './logger';
 import * as make from './make';
 import { BuildTarget } from './make';
@@ -12,7 +13,6 @@ import * as ui from './ui';
 import * as util from './util';
 import * as vscode from 'vscode';
 import * as path from 'path';
-import * as telemetry from './telemetry';
 import * as multiStep from './multiStepInput';
 import { openSettings } from './extension';
 import * as fs from 'fs';
@@ -498,11 +498,11 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
             // We are interested in updating only some relevant properties.
             // A subset of these should also trigger an IntelliSense config provider update.
             // Avoid unnecessary updates (for example, when settings are modified via the extension quickPick).
-            let telemetryProperties: telemetry.Properties | null = {};
             let updatedSettingsSubkeys: string[] = [];
             const keyRoot: string = "autotools";
             let subKey: string;
 
+            telemetry.startSpan("updateSettings");
             subKey = "loggingLevel";
             let updatedLoggingLevel : string | undefined = await util.getExpandedSetting<string>(subKey);
             if (updatedLoggingLevel !== loggingLevel) {
@@ -625,19 +625,17 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
                        settingObj = workspaceConfiguration[subKey];
                     }
 
-                    telemetryProperties = await telemetry.analyzeSettings(settingObj, key,
-                        util.thisExtensionPackage().contributes.configuration.properties[key],
-                        false, telemetryProperties);
                 } catch (e) {
+                    telemetry.logException(e);
                     logger.message(e.message);
                 }
             });
             if (extension.getState().configureDirty) {
                 await make.configure(make.TriggeredBy.configureAfterConfigurationChange);
             }
-            if (telemetryProperties && util.hasProperties(telemetryProperties)) {
-                telemetry.logEvent("settingsChanged", telemetryProperties);
-            }
+            telemetry.endSpanWithStatus(SpanStatusCode.OK, undefined, {
+                changed: updatedSettingsSubkeys.join(",")
+            });
         }
     });
 }
@@ -674,43 +672,11 @@ export async function setNewConfiguration(): Promise<void> {
     options.ignoreFocusOut = true; // so that the logger and the quick pick don't compete over focus
     const chosen: string | undefined = await vscode.window.showQuickPick(items, options);
     if (chosen && chosen !== currentMakefileConfiguration.name) {
-        let telemetryProperties: telemetry.Properties | null = {
-            state: "makefileConfiguration"
-        };
-        telemetry.logEvent("stateChanged", telemetryProperties);
+        telemetry.logEvent("changeConfig", { to: chosen });
 
         await setConfigurationByName(chosen);
 
         await make.configure(make.TriggeredBy.configureAfterConfigurationChange);
-
-        // Refresh telemetry for this new makefile configuration
-        // (this will find the corresponding item in the autotools.configurations array
-        // and report all the relevant settings of that object).
-        // Because of this, the event name is still "settingsChanged", even if
-        // we're doing a state change now.
-        let keyRoot: string = "autotools";
-        let subKey: string = "configurations";
-        let key: string = keyRoot + "." + subKey;
-        let workspaceConfiguration: vscode.WorkspaceConfiguration = vscode.workspace.getConfiguration(keyRoot);
-        telemetryProperties = {};
-
-        // We should have at least one item in the configurations array
-        // if the extension changes state for launch configuration,
-        // but guard just in case.
-        let makefileonfigurationSetting: any = workspaceConfiguration[subKey];
-        if (makefileonfigurationSetting) {
-            try {
-                telemetryProperties = await telemetry.analyzeSettings(makefileonfigurationSetting, key,
-                    util.thisExtensionPackage().contributes.configuration.properties[key],
-                    true, telemetryProperties);
-            } catch (e) {
-                logger.message(e.message);
-            }
-
-            if (telemetryProperties && util.hasProperties(telemetryProperties)) {
-                telemetry.logEvent("settingsChanged", telemetryProperties);
-            }
-        }
     }
 }
 

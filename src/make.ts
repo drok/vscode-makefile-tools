@@ -6,7 +6,9 @@
 import * as configuration from './configuration';
 import * as cpp from 'vscode-cpptools';
 import * as cpptools from './cpptools';
-import {extension} from './extension';
+import {extension, telemetry} from './extension';
+import * as tele from './tele';
+import { Attributes, SpanStatusCode } from './tele';
 import * as fs from 'fs';
 import * as logger from './logger';
 import * as shellParser from './parser/shell';
@@ -18,7 +20,6 @@ import {Make, Goal, Variable, Database} from './parser/gnumake';
 import {Parser, ParserDisp} from './parser';
 import * as path from 'path';
 import * as util from './util';
-import * as telemetry from './telemetry';
 import * as vscode from 'vscode';
 import * as ui from './ui';
 import { quote } from '@mergesium/shell-quote';
@@ -100,6 +101,7 @@ export interface pkgInfo {
     version: string;
     bugreport: string;
     url: string;
+    automake: string;
 }
 export async function getPackageJSON(): Promise<pkgInfo> {
     return new Promise<pkgInfo>(async (resolve, reject) => {
@@ -109,7 +111,7 @@ export async function getPackageJSON(): Promise<pkgInfo> {
             path.join(c.top_builddir, "config.status"), ["--file=-:-"],
             util.getWorkspaceRoot(),
             true, true,
-            '{ "name": "@PACKAGE_NAME@", "version": "@PACKAGE_VERSION@", "bugreport": "@PACKAGE_BUGREPORT@", "url": "@PACKAGE_URL@" }',
+            '{ "name": "@PACKAGE@", "version": "@VERSION@", "bugreport": "@PACKAGE_BUGREPORT@", "url": "@PACKAGE_URL@", "automake": "@AUTOMAKE@" }',
             (x) => {info = x}, undefined);
         if (result.returnCode !== 0)
             reject();
@@ -313,7 +315,8 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
             } catch (e) {
                 logger.message(`Parser error (line ${linenumber}):` + e);
                 parserStack = [];
-                throw new Error("Quitting the parse due to " + e);
+                telemetry.logException(e);
+                throw new Error("Quit parse" + e);
             }
 
             heartBeat = Date.now();
@@ -377,7 +380,7 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
             if (result.returnCode !== null) {
                 util.reportDryRunError(dryrunFile);
             }
-
+            telemetry.logEvent("DryRunFailed", {returnCode: result.returnCode});
             extension.resetCppToolsProvider();
             // FIXME: Since dry-running failed, also unlink the configCache file
         } else {
@@ -388,6 +391,12 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
                 programs: build_tree.stats.programs,
                 tests: build_tree.stats.tests,
                 checks: build_tree.stats.checks};
+            telemetry.setAttributes({
+                    stats: [ linenumber,
+                        export_stats.programs,
+                        export_stats.tests,
+                        export_stats.checks ]
+            });
         }
         ui.getUI().setStatus(result.returnCode !== ConfigureBuildReturnCodeTypes.success ? ui.UIStatus.ERR : ui.UIStatus.OK);
 
@@ -398,6 +407,7 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
         };
     } catch (error) {
         logger.message("Parsing the configuration failed due to: " + error);
+        telemetry.logException(error);
         ui.getUI().setStatus(ui.UIStatus.RUNTIME);
         return {
             retc: ConfigureBuildReturnCodeTypes.notFound,
@@ -539,6 +549,7 @@ export async function configure(triggeredBy: TriggeredBy): Promise<number> {
     return ConfigureBuildReturnCodeTypes.fullFeatureFalse;
   }
 
+  telemetry.startSpan("configure");
   // Same start time for configure and an eventual pre-configure.
   let configureStartTime: number = Date.now();
 
@@ -634,6 +645,8 @@ export async function configure(triggeredBy: TriggeredBy): Promise<number> {
     logger.message(
       `Exception thrown during the configure process: ${e.message}`
     );
+    telemetry.logException(e);
+    telemetry.endSpanWithStatus(SpanStatusCode.ERROR, e.message);
     retc = ConfigureBuildReturnCodeTypes.other;
     return e.errno;
   } finally {
@@ -671,26 +684,6 @@ export async function configure(triggeredBy: TriggeredBy): Promise<number> {
 
     let configureElapsedTime: number =
       util.elapsedTimeSince(configureStartTime);
-    const telemetryMeasures: telemetry.Measures = {
-      numberIndexedSourceFiles: provider.fileIndex.size,
-      numberMakefileConfigurations:
-        configuration.getMakefileConfigurations().length,
-      totalElapsedTime: configureElapsedTime,
-    };
-    const telemetryProperties: telemetry.Properties = {
-      firstTime: (!ranConfigureInCodebaseLifetime).toString(),
-      readCache: readCache.toString(),
-      triggeredBy: triggeredBy,
-    };
-
-    // Report all relevant exit codes
-    telemetryMeasures.exitCode = retc;
-    let subphases: ConfigureSubphaseStatusItem[] =
-      getRelevantConfigStats(subphaseStats);
-    subphases.forEach((phase) => {
-      telemetryMeasures[phase.name + ".exitCode"] = phase.status.retc;
-      telemetryMeasures[phase.name + ".elapsed"] = phase.status.elapsed;
-    });
 
     logger.message(`Configure elapsed time: ${configureElapsedTime}`, "Verbose");
 
@@ -701,7 +694,14 @@ export async function configure(triggeredBy: TriggeredBy): Promise<number> {
       extension.setCompletedConfigureInSession(true);
     }
 
-    telemetry.logEvent("configure", telemetryProperties, telemetryMeasures);
+    telemetry.endSpanWithStatus(SpanStatusCode.OK, undefined, {
+        numFiles: provider.fileIndex.size,
+        numConfigs: configuration.getMakefileConfigurations().length,
+        firstTime: !ranConfigureInCodebaseLifetime,
+        readCache: readCache,
+        trigBy: triggeredBy,
+        ret: retc,
+    });
 
     if (retc !== ConfigureBuildReturnCodeTypes.success) {
       logger.showOutputChannel();
@@ -723,6 +723,7 @@ async function loadConfigurationFromCache(progress: vscode.Progress<{}>, cancel:
         };
     }
 
+    telemetry.startSpan("loadCache");
     let startTime: number = Date.now();
     let elapsedTime: number;
 
@@ -743,6 +744,10 @@ async function loadConfigurationFromCache(progress: vscode.Progress<{}>, cancel:
             let json  = JSON.parse(content);
             configurationCache = json;
 
+            let stats: Attributes = {
+                stats: [configurationCache.customConfigurationProvider.workspaceBrowse.browsePath.length,
+                configurationCache.customConfigurationProvider.fileIndex.length,
+            ]};
             // Deserialize object.
             // configurationCache.customConfigurationProvider.fileIndex.uri is converted to vscode.Uri objects
             // buildTargets is converted to Map
@@ -761,10 +766,16 @@ async function loadConfigurationFromCache(progress: vscode.Progress<{}>, cancel:
                 });
             });
 
+            telemetry.endSpanWithStatus(SpanStatusCode.OK, undefined, {
+                stats: [
+                    configurationCache.customConfigurationProvider.workspaceBrowse.browsePath.length,
+                    configurationCache.customConfigurationProvider.fileIndex.length,
+                ]});
         } catch (e) {
+            telemetry.logException(e);
             logger.message("An error occured while parsing the configuration cache.");
+            telemetry.endSpanWithStatus(SpanStatusCode.ERROR, "parsing");
         }
-
         elapsedTime = util.elapsedTimeSince(startTime);
         logger.message(`Load configuration from cache elapsed time: ${elapsedTime}`, "Verbose");
 
@@ -776,6 +787,7 @@ async function loadConfigurationFromCache(progress: vscode.Progress<{}>, cancel:
             extension.getCppConfigurationProvider().logConfigurationProviderComplete();
         });
     } else {
+        telemetry.endSpanWithStatus(SpanStatusCode.ERROR, "nodata");
         return {
             retc: ConfigureBuildReturnCodeTypes.notFound,
             elapsed: 0
@@ -813,11 +825,23 @@ export async function doConfigure(progress: vscode.Progress<{}>, cancel: vscode.
         logger.message("Loading configurations from cache is not necessary.", "Verbose");
     }
 
+    let s = telemetry.startSpan("import");
+    telemetry.setAttributes({
+            n: extension.pkginfo?.name,
+            v: extension.pkginfo?.version,
+            am: extension.pkginfo?.automake.split("-").slice(-1)[0],
+        });
     // This generates the dryrun output (saving it on disk) or reads an alternative build log.
     // Timings for this sub-phase happen inside.
     subphaseStats.generateParseContent = await generateParseContent(progress, cancel, recursiveDoConfigure);
-    if (subphaseStats.generateParseContent.retc === ConfigureBuildReturnCodeTypes.cancelled) {
-        return subphaseStats;
+
+    switch (subphaseStats.generateParseContent.retc) {
+        case ConfigureBuildReturnCodeTypes.cancelled:
+            telemetry.setSpanStatus(SpanStatusCode.ERROR, "Cancelled");
+        case ConfigureBuildReturnCodeTypes.success:
+            telemetry.setSpanStatus(SpanStatusCode.OK); break;
+        default:
+            telemetry.setSpanStatus(SpanStatusCode.ERROR);
     }
 
     // Let the caller collect and log all information regarding the subphases return codes.
