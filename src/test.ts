@@ -103,9 +103,6 @@ export class MyTestController {
 
   constructor(public id: string, public label: string) {
     this.controller = vscode.tests.createTestController(id, label);
-    const item = this.controller.createTestItem("first", "test");
-    item.canResolveChildren = false;
-    this.controller.items.add(item);
   }
 
   createRunProfile(label: string, kind: vscode.TestRunProfileKind, runHandler: (request: vscode.TestRunRequest, token: vscode.CancellationToken) => void | Thenable<void>, isDefault?: boolean | undefined, tag?: vscode.TestTag | undefined): vscode.TestRunProfile {
@@ -141,6 +138,9 @@ export class MyTestController {
         }
       );
     }
+  }
+  public deactivate() : void {
+    this.controller.dispose();
   }
 
     async runHandler(

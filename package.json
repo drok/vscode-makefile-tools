@@ -43,6 +43,10 @@
     "contributes": {
         "commands": [
             {
+                "command": "autotools.addAutotools",
+                "title": "%autotools.command.addAutotools.title%"
+            },
+            {
                 "command": "autotools.command.bootstrap",
                 "title": "%autotools.command.bootstrap.title%"
             },
@@ -586,6 +590,10 @@
         ],
         "menus": {
             "commandPalette": [
+                {
+                    "command": "autotools.addAutotools",
+                    "when": "!autotools:isAutotoolsProject"
+                },
                 {
                     "command": "autotools.check",
                     "when": "never"

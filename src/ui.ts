@@ -18,9 +18,10 @@ export enum UIStatus {
     RUNTIME = 3,
     /* Other error conditions */
     NO_MAKEFILE = 4,
+    NON_AUTOTOOLS = 5,
     /* Updating makefiles */
-    REGEN = 5,
-    LOADING = 6,
+    REGEN = 6,
+    LOADING = 7,
 }
 
 export class UI {
@@ -34,6 +35,7 @@ export class UI {
         new vscode.ThemeColor("statusBarItem.errorBackground"),
         new vscode.ThemeColor("statusBar.background"),
         new vscode.ThemeColor("statusBar.background"),
+        new vscode.ThemeColor("statusBar.background"),
     ];
     static fgcolors: vscode.ThemeColor[] = [
         new vscode.ThemeColor("statusBar.foreground"), /* OK */
@@ -41,6 +43,7 @@ export class UI {
         new vscode.ThemeColor("statusBarItem.errorForeground"), /* ERR */
         new vscode.ThemeColor("statusBarItem.errorForeground"), /* RUNTIME */
         new vscode.ThemeColor("statusBarItem.errorForeground"), /* NO_MAKEFILE */
+        new vscode.ThemeColor("statusBar.foreground"), /* NON_AUTOTOOLS */
         new vscode.ThemeColor("statusBar.foreground"), /* REGEN */
         new vscode.ThemeColor("statusBar.foreground"), /* LOADING */
     ];
@@ -55,6 +58,10 @@ export class UI {
         this.configurationButton.backgroundColor = UI.colors[status];
         this.configurationButton.color = UI.fgcolors[status];
         switch (status) {
+            case UIStatus.NON_AUTOTOOLS:
+                this.configurationButton.tooltip = localize("autotools.report.no.autoconf", "Not an Autotools project. Click to add autotools.");
+                this.configurationButton.text = '$(tools)';
+                break;
             case UIStatus.NO_MAKEFILE:
                 this.configurationButton.tooltip = localize("autotools.report.no.makefine", "The configuration is not initialized; There is no Makefile.");
                 break;
@@ -63,10 +70,21 @@ export class UI {
                 this.configurationButton.text = "$(tools) $(bug)";
                 break;
         }
+        switch (status) {
+            case UIStatus.NON_AUTOTOOLS:
+                this.configurationButton.command = "autotools.addAutotools";
+                break;
+            default:
+                this.configurationButton.command = "autotools.setBuildConfiguration";
+                break;
+        }
     }
 
     public setLoading(loading: UIStatus): void {
         switch (loading) {
+            case UIStatus.NON_AUTOTOOLS:
+                this.configurationButton.text = '$(tools)';
+                break;
             case UIStatus.LOADING:
                 this.configurationButton.text = '$(loading~spin) ' + this.configuration;
                 break;
@@ -82,7 +100,6 @@ export class UI {
     public constructor() {
         this.configuration = '...'
         this.configurationButton = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 4.6);
-        this.configurationButton.command = "autotools.setBuildConfiguration";
         this.configurationButton.tooltip = localize("autotools.click.setconfig", "Click to select another build configuration");
         this.configurationButton.backgroundColor = UI.colors[UIStatus.OK];
         this.configurationButton.color = UI.fgcolors[UIStatus.OK];

@@ -118,6 +118,8 @@ export async function setCurrentMakefileConfiguration(configuration: string | un
 // Read the current configuration from workspace state, update status bar item
 export function readCurrentMakefileConfiguration(): void {
     let buildConfiguration : string | undefined = extension.getState().buildConfiguration;
+    if (!extension.isAutotoolsProject())
+        return;
     if (!buildConfiguration) {
         logger.message("No build configuration is selected. Assuming 'Default'.");
     } else {
@@ -233,22 +235,32 @@ export function setConfigurationProblemMatchers(problemMatchers: string[]): void
 // apply to the current makefile configuration.
 async function analyzeConfigureParams(): Promise<void> {
     let relativeMakefile = findMakefile();
-    let reason : string = "ok";
-    if (!relativeMakefile) {
+    let reason : string;
+    if (!relativeMakefile && extension.isAutotoolsProject()) {
         if (await extension.configure()) {
             relativeMakefile = findMakefile();
             if (!relativeMakefile) {
                 logger.message('Configuration succeeded but there is no makefile for');
                 reason = "configured-noMakefile"
             }
+            reason = "ok";
         } else {
             reason = "configure-failed";
             logger.message('Configuring the project failed.');
         }
+    } else {
+        reason = "n/a";
     }
 
-    if (relativeMakefile)
+    statusBar.setStatus(extension.isAutotoolsProject() ?
+        (relativeMakefile ? ui.UIStatus.OK : ui.UIStatus.NO_MAKEFILE) :
+        ui.UIStatus.NON_AUTOTOOLS);
+
+    if (relativeMakefile) {
+        extension._projectOutlineProvider.update(currentMakefileConfigurationName);
+        extension.createPanel();
         await logMakeCmd(relativeMakefile);
+    }
 
     await extension.setFullFeatureSet(relativeMakefile ? true : false);
 
@@ -296,7 +308,6 @@ function findMakefile(): string | undefined {
         makefileExists = util.checkFileExistsSync(makeFileTest);
     }
     extension.updateMakefileFilePresent(makefileExists);
-    statusBar.setStatus(makefileExists ? ui.UIStatus.OK : ui.UIStatus.NO_MAKEFILE);
     if (!makefileExists)
         relativeMakefile = topMakefile;
     settopMakefile(topMakefile);
@@ -388,7 +399,7 @@ export async function readMakefileConfigurations(currentConfigurationName : stri
     // Exception: "Default" which means the user didn't set it and relies on whatever default
     // the current set of makefiles support. "Default" is not going to be part of the list
     // but we shouldn't log about it.
-    if (currentConfigurationName !== "Default" && !makefileConfigurationNames.includes(currentConfigurationName)) {
+    if (currentConfigurationName && currentConfigurationName !== "Default" && !makefileConfigurationNames.includes(currentConfigurationName)) {
         logger.message(`Current makefile configuration ${currentConfigurationName} is no longer present in the available list.` +
             ` Re-setting the current makefile configuration to default.`);
         await setConfigurationByName(undefined);

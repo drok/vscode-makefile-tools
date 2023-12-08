@@ -35,6 +35,7 @@ import { SuiteDecorations } from './suite-decorator';
 
 import * as nls from 'vscode-nls';
 import { assert } from 'console';
+import { installAutotools } from './install';
 nls.config({ messageFormat: nls.MessageFormat.bundle, bundleFormat: nls.BundleFormat.standalone })();
 const localize: nls.LocalizeFunc = nls.loadMessageBundle();
 
@@ -46,7 +47,7 @@ export class Extension {
     static readonly whoami: string = "mergesium.autotools";
 
     private mementoState = new state.StateManager(this.extensionContext);
-    public readonly _projectOutlineProvider = new tree.ProjectOutlineProvider(this.mementoState.buildConfiguration || 'Default');
+    public readonly _projectOutlineProvider = new tree.ProjectOutlineProvider(this.mementoState.buildConfiguration);
     private _projectOutlineTreeView : vscode.TreeView<tree.Node> | undefined;
     public readonly suiteDecorator = new SuiteDecorations();
 
@@ -62,8 +63,9 @@ export class Extension {
     private needTaskFetchBugWorkaround: boolean = true;
     private compilerFullPath ?: string;
     public readonly dryRunner : string;
-    public testController : MyTestController;
+    public testController : MyTestController | undefined;
     public pkginfo : make.pkgInfo | undefined;
+    private _treeDisposables: vscode.Disposable[] = [];
 
     public constructor(public readonly extensionContext: vscode.ExtensionContext) {
         this.autotoolsTask = new AutoToolsBootstrapTaskProvider();
@@ -96,16 +98,18 @@ export class Extension {
         }));
         debugProvider.activate(extensionContext);
 
-        this.testController = new MyTestController(
-            "mergesium.autotools", "Autotools tests");
     }
-    public createPanel(extensionContext: vscode.ExtensionContext) : void {
+    public createPanel() : void {
         this._projectOutlineTreeView = vscode.window.createTreeView('autotools.outline', {
             treeDataProvider: this._projectOutlineProvider,
             showCollapseAll: false
 
         });
-        extensionContext.subscriptions.push(this._projectOutlineTreeView.onDidChangeSelection((e) => {
+        this.testController = new MyTestController(
+            "mergesium.autotools", "Autotools tests");
+        this.testController?.activate();
+
+        this._treeDisposables.push(this._projectOutlineTreeView.onDidChangeSelection((e) => {
             if (e.selection.length > 0) {
                 let selected = e.selection[0];
                 if (selected instanceof tree.Node && !(selected instanceof tree.SubNode)) {
@@ -117,6 +121,16 @@ export class Extension {
         // this._projectOutlineTreeView.message = "outline message";
 //        this._projectOutlineTreeView.badge = {tooltip: '🧰', value: 42};
 //        this._projectOutlineTreeView.badge = {tooltip: '🧰', value: 42};
+    }
+    public deletePanel() : void {
+        if (this._projectOutlineTreeView) {
+            this._projectOutlineTreeView = undefined;
+            this._treeDisposables.forEach((d) => d.dispose());
+            this._treeDisposables = [];
+
+            this.testController?.deactivate();
+            this.testController = undefined;
+        }
     }
 
     failStatUpdate(oldresult: make.TRS, result: make.TRS) {
@@ -163,7 +177,7 @@ export class Extension {
                 this.failStatUpdate(oldresult, result);
                 // Don't update the test suites. They are auto summarized
                 if (goal.test && !(goal.flags & Goal.Flags.Test_Suite))
-                    this.testController.trsChange(goal.test);
+                    this.testController?.trsChange(goal.test);
                 this.updateOutlineBadge();
             }
         }
@@ -208,7 +222,7 @@ export class Extension {
 //                                this.updateOutlineBadge();
 //                            }
                             // Should wait for tasks.trsChange()
-                            definition.test && goal.test && this.testController.testCompleted(goal.test, definition.test);
+                            definition.test && goal.test && this.testController?.testCompleted(goal.test, definition.test);
                         }
                     }
                 } else if (definition.type == "check:-standby-code" && definition.builddir) {
@@ -258,6 +272,9 @@ export class Extension {
             }
         });
 
+        vscode.commands.executeCommand("setContext", "autotools:isAutotoolsProject",
+            this.isAutotoolsProject());
+
         if (!this.autotoolsTask.isBootstrapped()) {
             let cmd = this.autotoolsTask.bootstrap_cmd();
             if (cmd) {
@@ -272,8 +289,7 @@ export class Extension {
                 });
             }
         }
-
-        if (this.needTaskFetchBugWorkaround) {
+        if (this.needTaskFetchBugWorkaround && this.isAutotoolsProject()) {
             // FIXME: This is a workaround for vscode not parsing tasks.json prior to fetchTasks()
             const kind:BuildTask = {
                 type: "build",
@@ -326,7 +342,7 @@ export class Extension {
         }
         if (build_tree.test_suite?.test) {
             this.updateTestSuite(build_tree);
-            this.testController.update(build_tree, build_tree.test_suite.test);
+            this.testController?.update(build_tree, build_tree.test_suite.test);
         }
     }
     updateTestSuite(sub: gnumake.Make): void {
@@ -336,13 +352,13 @@ export class Extension {
         for (let submake of sub.submake.values()) {
             if (!submake.test_suite?.test)
                 continue;
-            extension.testController.addSubTest(sub.test_suite.test, submake.test_suite.test);
+            extension.testController?.addSubTest(sub.test_suite.test, submake.test_suite.test);
             this.updateTestSuite(submake);
         }
         if (sub.test_suite && sub.test_suite.test) {
             let logpath = path.join(c.top_builddir, sub.dir);
             sub.test_suite.depends?.forEach((test) => {
-                sub.test_suite?.test && extension.testController.addTest(logpath, sub.test_suite.test, test, test.flags & Goal.Flags.Test_Result_Mask)});
+                sub.test_suite?.test && extension.testController?.addTest(logpath, sub.test_suite.test, test, test.flags & Goal.Flags.Test_Result_Mask)});
 
         }
     }
@@ -380,6 +396,7 @@ export class Extension {
         this.needTaskFetchBugWorkaround = false;
         return await this.autotoolsTask.configure();
     };
+    public isAutotoolsProject(): boolean { return !!configuration.getConfigureAc(); }
     public isBootstrapped(): boolean { return this.autotoolsTask.isBootstrapped(); }
 
     public updateMakefileFilePresent(newValue: boolean): void {
@@ -389,7 +406,10 @@ export class Extension {
     public getState(): state.StateManager { return this.mementoState; }
 
     public dispose(): void {
-        this._projectOutlineTreeView?.dispose();
+        if (this._projectOutlineTreeView) {
+            this._projectOutlineTreeView.dispose();
+            this._treeDisposables.forEach((d) => d.dispose());
+        }
         if (this.cppToolsAPI) {
             this.cppToolsAPI.dispose();
         }
@@ -644,6 +664,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }));
     /** End of commands that shouldn't be exposed in package.json, they are used for command substitution in launch.json and tasks.json. */
 
+    context.subscriptions.push(vscode.commands.registerCommand('autotools.addAutotools', async () => {
+        telemetry.logEvent("addAutotools");
+        await installAutotools();
+    }));
+
     context.subscriptions.push(vscode.commands.registerCommand('autotools.outline.buildAll', async (sub: tree.SubNode) => {
         telemetry.logEvent("outline.buildAll");
         if (sub instanceof tree.SubNode)
@@ -772,8 +797,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
     extension.registerTasks();
 
-    extension.testController.activate();
-
     let configureAc = configuration.getConfigureAc();
     if (configureAc) {
         context.subscriptions.push(vscode.workspace.createFileSystemWatcher('**/' + configureAc)
@@ -783,8 +806,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         context.subscriptions.push(vscode.workspace.createFileSystemWatcher('**/*.in')
             .onDidChange((e) => {  extension.regen(); }));
     }
-
-    extension.createPanel(context);
 
     vscode.window.registerFileDecorationProvider(extension.suiteDecorator);
 
@@ -804,7 +825,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }
 
     if (!configuration.getConfigurationMakefile()) {
-        ui.getUI().setLoading(ui.UIStatus.ERR);
+        ui.getUI().setLoading(extension.isAutotoolsProject() ? ui.UIStatus.ERR : ui.UIStatus.NON_AUTOTOOLS);
         return;
     }
     await make.configure(make.TriggeredBy.cleanConfigure);

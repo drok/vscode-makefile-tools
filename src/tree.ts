@@ -237,17 +237,15 @@ export class TaskSection extends Node {
 }
 
 export class ConfigurationNode extends Node {
-    constructor(configurationName: string) {
+    constructor(private _name : string | undefined) {
         super();
         // super(`configuration:${configurationName}`);
-        this._name = configurationName;
     }
 
-    _name: string;
     build_tree: Make | undefined;
 
     update(configurationName: string): void {
-        this._name = localize("tree.configuration", "Configuration: {0}", `[${configurationName}]`);
+        this._name = configurationName;
     }
 
     updateTargets(build_tree: Make) : void {
@@ -277,7 +275,7 @@ export class ConfigurationNode extends Node {
     }
 
     getTreeItem(): vscode.TreeItem {
-        const item: vscode.TreeItem = new vscode.TreeItem(this._name);
+        const item: vscode.TreeItem = new vscode.TreeItem(this._name || "unk");
         item.collapsibleState = this.build_tree ? vscode.TreeItemCollapsibleState.Expanded : vscode.TreeItemCollapsibleState.None;
         item.tooltip = "top_builddir = " + configuration.getCurrentMakefileConfiguration().top_builddir;
         item.contextValue = [
@@ -294,7 +292,7 @@ export class ProjectOutlineProvider implements vscode.TreeDataProvider<Node> {
     private readonly _changeEvent = new vscode.EventEmitter<Node | null>();
     //private readonly _unsetString = localize("Unset", "Unset");
 
-    constructor(configuration: string) {
+    constructor(configuration: string | undefined) {
         this._currentConfigurationItem = new ConfigurationNode(configuration);
     }
 

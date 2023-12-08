@@ -128,7 +128,7 @@ export class AutoToolsTestTaskProvider implements MyTaskProvider {
             configuration.getAllBuildTargets().forEach((goals, dir) => {
             for (let g of goals.values()) {
                 if (g.flags & Goal.Flags.Test_Suite) {
-                    g.test || tc.addSuite(c, dir, g);
+                    g.test || tc?.addSuite(c, dir, g);
                     if (g.goal && g.depends) {
                         let rel = new vscode.RelativePattern(vscode.Uri.file(path.join(c.top_builddir, dir)), '*.trs');
                         let watcher =   vscode.workspace.createFileSystemWatcher(rel);
@@ -274,6 +274,7 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
     public regenTask?: vscode.Task;
     public recheckTask?: vscode.Task;
     public helpTask?: vscode.Task;
+    private the_bootstrap_cmd : string[] | undefined;
     private working: boolean = false;
     static manifests: string[] = [
             "configure.ac",
@@ -321,6 +322,8 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
 	}
 
     public bootstrap_cmd(): string[] | undefined {
+        if (this.the_bootstrap_cmd)
+            return this.the_bootstrap_cmd;
         let configureAc = AutoToolsBootstrapTaskProvider.manifests.find((m) => checkFileExistsSync(resolvePathToRoot(m)));
         configuration.setConfigureAc(configureAc);
         if (!configureAc) {
@@ -333,7 +336,6 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
             script = resolvePathToRoot("autogen.sh");
             if (checkFileExistsSync(script))
                 return [script];
-            configuration.setConfigureAc(configureAc);
         }
         return ["autoreconf", "-fvi"];
     }
