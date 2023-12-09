@@ -68,7 +68,7 @@ export class Extension {
     public pkginfo : make.pkgInfo | undefined;
     private _treeDisposables: vscode.Disposable[] = [];
 
-    public constructor(public readonly extensionContext: vscode.ExtensionContext) {
+    public constructor(public readonly extensionContext: vscode.ExtensionContext, teleParams: tele.Params) {
         this.autotoolsTask = new AutoToolsBootstrapTaskProvider();
         this.buildTasks = new AutoToolsBuildTaskProvider();
         this.testTasks = new AutoToolsTestTaskProvider();
@@ -99,7 +99,7 @@ export class Extension {
         }));
         debugProvider.activate(extensionContext);
 
-        telemetry = new tele.MyTelemetry(extensionContext);
+        telemetry = new tele.MyTelemetry(extensionContext, teleParams);
     }
     public createPanel() : void {
         this._projectOutlineTreeView = vscode.window.createTreeView('autotools.outline', {
@@ -599,7 +599,8 @@ function openLog(selected: tree.Node): Thenable<vscode.TextDocument> {
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
     statusBar = ui.getUI();
-    extension = new Extension(context);
+    let teleParams = await tele.getParams();
+    extension = new Extension(context, teleParams);
     await extension.setFullFeatureSet(false);
 
     context.subscriptions.push(vscode.commands.registerCommand('autotools.setBuildConfiguration', async () => {
