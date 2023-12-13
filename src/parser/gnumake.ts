@@ -32,7 +32,7 @@ enum MakeSection {
 export const EnteringRE = /^# make(?:\[\d+\])?: Entering directory '(.*)'$/;
 const LeavingRE = /^# make(?:\[\d+\])?: Leaving directory '(.*)'$/;
 const NothingRE = /^make(?:\[\d+\])?: Nothing to be done for '(.*)'\.$/;
-const ExecutingRE = /^(.+):(\d+): (?:update target '(.*)' due to: (?:.*)|target '(.*)' does not exist)$/;
+export const ExecutingRE = /^(<builtin>|(.+):(\d+)): (?:update target '(.*)' due to: (?:.*)|target '(.*)' does not exist)$/;
 const UptodateRE = /^make(?:\[\d+\])?: '(.*)' is up to date\.$/;
 export const CopyrightRE = /^# GNU Make/;
 const RecursingRE = /^Making (.*) in (.*)$/;
@@ -68,7 +68,6 @@ export class Make implements Parser {
         // GNU make.
         // TODO: How to tell the user his config is non-portable? Maybe allow a setting
         // "Allow non-portable config" ?
-        "--no-builtin-rules",
     ];};
     ingest (line: string) : [ParserDisp, Parser] {
         switch (this.section) {
@@ -92,12 +91,12 @@ export class Make implements Parser {
                 }
                 let executing = ExecutingRE.exec(line);
                 if (executing) {
-                    this.file = executing[3] || executing[4];
-                    if (this.file == "config.status" && false) { // FIXME: implement recursive detection. a single refresh is ok if configure.ac is newer
-                        // For some reason, reconfig was triggerred, meaning
-                        // --dry-run was not respected. Abort. this is a bug.
-                        throw new Error(`Unexpected reconfig in Make ${this.dir}. This is a bug.`);
-                    }
+//                    if (this.file == "config.status" && false) { // FIXME: implement recursive detection. a single refresh is ok if configure.ac is newer
+//                        // For some reason, reconfig was triggerred, meaning
+//                        // --dry-run was not respected. Abort. this is a bug.
+//                        throw new Error(`Unexpected reconfig in Make ${this.dir}. This is a bug.`);
+//                    }
+                    this.startExecuting(executing);
                     return [ParserDisp.Enter, new Executing(this)];
                 }
                 let uptodate = UptodateRE.exec(line);
@@ -215,12 +214,22 @@ export class Make implements Parser {
         return path.join(this.root, this.dir);
     }
     public finish(): void { this.section = MakeSection.Copyright; }
+    public startExecuting(rea: RegExpExecArray) {
+        if (rea[1] === "<builtin>" && !make.builtin_targets.has(this.dir + "/" + rea[4])) {
+            logger.message(localize("gnumake.warn.builtin.rule",
+                "WARN: Built-in rules used for {0} in {1}, potentially with unexpected/incomplete FLAGS. see https://autotools.mergesium.com/doc/builtin-rules",
+                rea[4], this.dir));
+            make.builtin_targets.add(this.dir + "/" + rea[4]);
+        }
+        this.file = rea[4] || rea[5];
+    }
     dir: string = 'first';
     section: MakeSection;
     file: string | undefined;
     goals: Map<string,Goal>;
     config_header: Set<string> | undefined;
     submake: Map<string, Make> = new Map();
+    /* builtins set prevents the same builtin warning to be printed multiple times */
     test_suite: Goal | undefined;
     stats: {
         tests: number;
@@ -387,7 +396,7 @@ const AutomakeNoiseRe = new RegExp('^(' +
     '.*\\.o|.*\\.h|' +
     'Makefile.in)$');
 const AutomakeTestLogRe = /^.*\.log$/;
-const GoalRecipeRe = /^recipe to execute \(from '(.*)', line (\d+)\):/;
+const GoalRecipeRe = /^recipe to execute \((built-in|from '(.*)', line (\d+))\):/;
 const GoalsEndRe = /^# files hash-table stats:$/;
 /**
  * Parse information about a single goal, differentiating phony targets,
@@ -459,6 +468,9 @@ export class Goal extends Node implements Parser {
                         case "Failed to be updated.":
                             /* FIXME: This should be handled */
                             return [ParserDisp.Continue, this];
+                        case "Builtin rule":
+                            /* FIXME: Should warn user of non-portable if builtins are used */
+                            return [ParserDisp.Continue, this];
                         default:
                             if(GoalAckInfoRe.test(info[1]))
                                 return [ParserDisp.Continue, this];
@@ -468,7 +480,7 @@ export class Goal extends Node implements Parser {
                                 if (this.goal)
                                     return [ParserDisp.Enter, new Recipe(this)];
                                 else
-                                    throw new Error(`Unexpected Recipe in ${recipe[1]}:${recipe[2]} before goal name`);
+                                    throw new Error(`Unexpected Recipe in ${recipe[2]}:${recipe[3]} before goal name`);
                             }
                             throw new Error(`Unexpected Goal Info ${info[1]}`);
                         }

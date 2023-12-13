@@ -17,7 +17,7 @@ import { parse, quote } from '@mergesium/shell-quote';
 // import  from '../extension';
 import { extension } from '../extension';
 import { Making } from './tool';
-import { Make, EnteringRE, CopyrightRE } from './gnumake';
+import { Make, EnteringRE, CopyrightRE, ExecutingRE } from './gnumake';
 
 export interface PreprocessDryRunOutputReturnType {
     retc: number;
@@ -327,6 +327,11 @@ export class Executing implements Parser {
             return [ParserDisp.Leave, this];
         }
 
+        let executing = ExecutingRE.exec(line);
+        if (executing) {
+            this.make.startExecuting(executing);
+            return [ParserDisp.Leave, this];
+        }
         // FIXME: line could be emitted by a script snippet, and it could throw the parser. try Catch here.
         let makes = new Making(parseToolCmd(line), this);
         if (makes.done())
@@ -370,7 +375,6 @@ function parseToolArguments(args: string): string[] {
     let parsedCmdLine = parse(args);
     let numArgs: number = parsedCmdLine.findIndex(v => typeof v !== "string");
     numArgs = numArgs == -1 ? parsedCmdLine.length : numArgs + 1;
-    let removedOptArg : boolean = true;
     // TODO: Avoid this song and dance with removing optargs by having Intellisense ignore the args it doesn't care about
     return (parsedCmdLine.slice(0, numArgs) as string[]);
 }

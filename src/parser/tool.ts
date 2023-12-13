@@ -27,7 +27,6 @@ import { Executing } from './shell';
 // todo: any other scenarios of aliases and symlinks
 // that would make parseLineAsTool to not match the regular expression,
 // therefore wrongly skipping over compilation lines?
-const compilers: string[] = ["ccache", "clang\\+\\+", "clang-cl", "clang-cpp", "clang", "gcc", "gpp", "cpp", "icc", "cc", "icl", "cl", "g\\+\\+", "c\\+\\+"];
 const linkers: string[] = ["ccache", "ilink", "link", "ld", "ccld", "gcc", "clang\\+\\+", "clang", "cc", "g\\+\\+", "c\\+\\+"];
 // Language detection based on file extension (from GCC manpage)
 // https://gcc.gnu.org/onlinedocs/gcc/Overall-Options.html
@@ -56,8 +55,7 @@ export class Making implements Parser {
             //throw new Error("compilerTool.fullPath is not a string (eg, subshell)");
             /* FIXME: this isCompiler() functionality is a placeholder */
             if(ObjectFileRE.test(caller.currentTarget)) {
-                if (compilers.includes(path.basename(tool.fullPath)))
-                    this.handleCompilerCommand(tool, caller.currentDir);
+                this.handleCompilerCommand(tool, caller.currentDir);
             } else {
                 if (linkers.includes(path.basename(tool.fullPath)))
                     this.handleLinkerCommand(tool, caller.currentDir);

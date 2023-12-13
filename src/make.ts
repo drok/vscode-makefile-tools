@@ -134,6 +134,8 @@ let export_stats : {
     tests: number;
     checks: number;
 };
+
+export var builtin_targets : Set<string> = new Set();
 // Targets need to parse a dryrun make invocation that does not include a target name
 // (other than default empty "" or the standard "all"), otherwise it would produce
 // a subset of all the targets involved in the makefile (only the ones triggered
@@ -211,7 +213,6 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
     // rejecting GNU make's builtin variables and rules because automake
     // generates implicit rules to cover all the targets. It does not rely
     // on builtins
-        "--no-builtin-variables",
     // always make gets the full dependency graph, as opposed to incremental
         "--always-make");
 
@@ -349,6 +350,7 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
         const result: util.SpawnProcessResult = await util.spawnChildProcess(
                 extension.dryRunner,
                 makeArgs, util.getWorkspaceRoot(), true, true, undefined, stdout, stderr);
+        builtin_targets.clear();
         if (keepDryRuns && completeErr) {
             fs.appendFileSync(dryrunFile,
                 lineEnding +
