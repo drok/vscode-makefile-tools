@@ -90,16 +90,22 @@ export class Extension {
             await this.autotoolsTask.help();
         }));
         extensionContext.subscriptions.push(vscode.commands.registerCommand('autotools.visit.knowledgeBase', async () => {
-            vscode.commands.executeCommand('vscode.open', vscode.Uri.from({
-                scheme: 'https',
-                authority: 'autotools.mergesium.com',
-                path: '/kb/' + this.pkginfo?.name,
-                fragment: this.pkginfo?.version
-            }));
+            this.gotoKnowledgeBase();
+        }));
+        extensionContext.subscriptions.push(vscode.commands.registerCommand('autotools.command.openKnowledgeBase', async () => {
+            this.gotoKnowledgeBase();
         }));
         debugProvider.activate(extensionContext);
 
         telemetry = new tele.MyTelemetry(extensionContext, teleParams);
+    }
+    gotoKnowledgeBase() {
+        vscode.commands.executeCommand('vscode.open', vscode.Uri.from({
+            scheme: 'https',
+            authority: 'autotools.mergesium.com',
+            path: '/kb/' + this.pkginfo?.name,
+            fragment: this.pkginfo?.version
+        }));
     }
     public createPanel() : void {
         this._projectOutlineTreeView = vscode.window.createTreeView('autotools.outline', {

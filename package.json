@@ -135,6 +135,10 @@
                 "title": "%autotools.exportToIntelisense.title%"
             },
             {
+                "command": "autotools.command.openKnowledgeBase",
+                "title": "%autotools.command.openKnowledgeBase.title%"
+            },
+            {
                 "command": "autotools.configure.help",
                 "title": "%autotools.command.configure.help.title%"
             },

@@ -9,6 +9,7 @@
    "autotools.command.makefile.setBuildConfiguration.title": "Autotools: Select a build configuration",
    "autotools.command.setBuildConfiguration.title": "Set the current build configuration",
    "autotools.command.configure.title": "Autotools: Configure",
+   "autotools.command.openKnowledgeBase.title": "Autotools: Go to Knowledge Base",
    "autotools.command.outline.configure.title": "Re-configure",
    "autotools.command.build.title": "Build",
    "autotools.command.test.title": "Run test",
