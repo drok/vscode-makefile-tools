@@ -2,7 +2,6 @@
     "C_Cpp.default.configurationProvider": "mergesium.autotools",
     "makefile.buildLog": "./dummy_dryrun.log",
     "makefile.extensionOutputFolder": "./.vscode",
-    "makefile.extensionLog": "./.vscode/Makefile.out",
     "makefile.makePath": "c:/some/other/fake/path",
     "makefile.buildBeforeLaunch": false,
     "makefile.loggingLevel": "Debug",

@@ -319,12 +319,6 @@
                     "description": "%autotools.configuration.makefile.makePath.description%",
                     "scope": "resource"
                 },
-                "autotools.extensionLog": {
-                    "type": "string",
-                    "description": "%autotools.configuration.makefile.extensionLog.description%",
-                    "default": "",
-                    "scope": "resource"
-                },
                 "autotools.autoBootstrap": {
                     "type": "boolean",
                     "markdownDescription": "%autotools.configuration.autoBootstrap.markdownDescription%",

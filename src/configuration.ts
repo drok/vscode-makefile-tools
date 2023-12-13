@@ -157,27 +157,6 @@ export async function readLoggingLevel(): Promise<void> {
     logger.message(`Logging level: ${loggingLevel}`, "Verbose");
 }
 
-let extensionLog: string | undefined;
-export function getExtensionLog(): string | undefined { return extensionLog; }
-export function setExtensionLog(path: string): void { extensionLog = path; }
-
-// Read from settings the path to a log file capturing all the "Makefile Tools" output channel content.
-// Useful for very large repos, which would produce with a single command a log larger
-// than the "Makefile Tools" output channel capacity.
-// Also useful for developing unit tests based on real world code,
-// that would not clone a whole repo for testing.
-// If an extension log is specified, its content is cleared during activation.
-// Any messages that are being logged throughout the lifetime of the extension
-// are going to be appended to this file.
-export async function readExtensionLog(): Promise<void> {
-    extensionLog = await util.getExpandedSetting<string>("extensionLog");
-    if (extensionLog) {
-        extensionLog = util.resolvePathToRoot(extensionLog);
-
-        logger.message(`Writing extension log at ${extensionLog}`, "Verbose");
-    }
-}
-
 // The configuration cache is stored in ${top_builddir}/.vscode/all.cache
 // Ie, each config is keyed to the configuration and target
 // TODO: The user should have the option to turn off the cache because it may become decoherent with the
@@ -463,20 +442,6 @@ export function initFromState(): void {
 // or after any change in the configuration/build-target workspace state variables, in which case
 // we need a refresh of all settings expanding ${configuration} or ${buildTarget}.
 export async function initFromSettings(activation: boolean = false): Promise<void> {
-    // Read first anything related to the extension log,
-    // to be able to document any upcoming reads.
-    await readExtensionLog();
-
-    // Delete the extension log file, if exists, even if we lose what we logged earlier
-    // about reading the output folder and extension log.
-    // The deletion should happen only at activation time (to not allow the log file to grow indefinitely),
-    // while reading the settings is done at activation time  and also anytime later,
-    // after changing a makefile configuration, a build or a launch target.
-    let extensionLog : string | undefined = getExtensionLog();
-    if (extensionLog && activation && util.checkFileExistsSync(extensionLog)) {
-        util.deleteFileSync(extensionLog);
-    }
-
     await readLoggingLevel();
     await readMakePath();
     await readkeepDryRuns();
@@ -507,17 +472,6 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
             let updatedLoggingLevel : string | undefined = await util.getExpandedSetting<string>(subKey);
             if (updatedLoggingLevel !== loggingLevel) {
                 await readLoggingLevel();
-                updatedSettingsSubkeys.push(subKey);
-            }
-
-            subKey = "extensionLog";
-            let updatedExtensionLog : string | undefined = await util.getExpandedSetting<string>(subKey);
-            if (updatedExtensionLog) {
-                updatedExtensionLog = util.resolvePathToRoot(updatedExtensionLog);
-            }
-            if (updatedExtensionLog !== extensionLog) {
-                // No IntelliSense update needed.
-                await readExtensionLog();
                 updatedSettingsSubkeys.push(subKey);
             }
 

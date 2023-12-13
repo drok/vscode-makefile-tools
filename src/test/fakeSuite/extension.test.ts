@@ -74,7 +74,7 @@ suite('Fake dryrun parsing', /*async*/() => {
       // than without debugging/loading the project before.
       // If we define extension log here instead of .vscode/settings.json, we also have to clean it up
       // because at project load time, there is no makefile log identified and no file is deleted on activation.
-      let extensionLogPath: string = configuration.getExtensionLog() || path.join(vscode.workspace.rootPath || "./", ".vscode/Makefile.out");
+      let extensionLogPath: string = path.join(vscode.workspace.rootPath || "./", ".vscode/Makefile.out");
       if (util.checkFileExistsSync(extensionLogPath)) {
          util.deleteFileSync(extensionLogPath);
       }
@@ -117,7 +117,7 @@ suite('Fake dryrun parsing', /*async*/() => {
          // than without debugging/loading the project before.
          // If we define extension log here instead of .vscode/settings.json, we also have to clean it up
          // because at project load time, there is no makefile log identified and no file is deleted on activation.
-         let extensionLogPath: string = configuration.getExtensionLog() || path.join(vscode.workspace.rootPath || "./", ".vscode/Makefile.out");
+         let extensionLogPath: string = path.join(vscode.workspace.rootPath || "./", ".vscode/Makefile.out");
          if (util.checkFileExistsSync(extensionLogPath)) {
             util.deleteFileSync(extensionLogPath);
          }
@@ -155,7 +155,7 @@ suite('Fake dryrun parsing', /*async*/() => {
 
          // Extension log is defined in the test .vscode/settings.json but delete it now
          // because we are interested to compare against a baseline from this point further.
-         let extensionLogPath: string = configuration.getExtensionLog() || path.join(vscode.workspace.rootPath || "./", ".vscode/Makefile.out");
+         let extensionLogPath: string = path.join(vscode.workspace.rootPath || "./", ".vscode/Makefile.out");
          if (extensionLogPath && util.checkFileExistsSync(extensionLogPath)) {
             util.deleteFileSync(extensionLogPath);
          }
@@ -207,7 +207,7 @@ suite('Fake dryrun parsing', /*async*/() => {
    
          // Extension log is defined in the test .vscode/settings.json but delete it now
          // because we are interested to compare against a baseline from this point further.
-         let extensionLogPath: string = configuration.getExtensionLog() || path.join(vscode.workspace.rootPath || "./", ".vscode/Makefile.out");
+         let extensionLogPath: string = path.join(vscode.workspace.rootPath || "./", ".vscode/Makefile.out");
          if (extensionLogPath && util.checkFileExistsSync(extensionLogPath)) {
             util.deleteFileSync(extensionLogPath);
          }
@@ -246,7 +246,7 @@ suite('Fake dryrun parsing', /*async*/() => {
    
          // Extension log is defined in the test .vscode/settings.json but delete it now
          // because we are interested to compare against a baseline from this point further.
-         let extensionLogPath: string = configuration.getExtensionLog() || path.join(vscode.workspace.rootPath || "./", ".vscode/Makefile.out");
+         let extensionLogPath: string = path.join(vscode.workspace.rootPath || "./", ".vscode/Makefile.out");
          if (extensionLogPath && util.checkFileExistsSync(extensionLogPath)) {
             util.deleteFileSync(extensionLogPath);
          }
@@ -285,7 +285,7 @@ suite('Fake dryrun parsing', /*async*/() => {
    
          // Extension log is defined in the test .vscode/settings.json but delete it now
          // because we are interested to compare against a baseline from this point further.
-         let extensionLogPath: string = configuration.getExtensionLog() || path.join(vscode.workspace.rootPath || "./", ".vscode/Makefile.out");
+         let extensionLogPath: string = path.join(vscode.workspace.rootPath || "./", ".vscode/Makefile.out");
          if (extensionLogPath && util.checkFileExistsSync(extensionLogPath)) {
             util.deleteFileSync(extensionLogPath);
          }
@@ -322,7 +322,7 @@ suite('Fake dryrun parsing', /*async*/() => {
 
       // Extension log is defined in the test .vscode/settings.json but delete it now
       // because we are interested to compare against a baseline from this point further.
-      let extensionLogPath: string = configuration.getExtensionLog() || path.join(vscode.workspace.rootPath || "./", ".vscode/Makefile.out");
+      let extensionLogPath: string = path.join(vscode.workspace.rootPath || "./", ".vscode/Makefile.out");
       if (extensionLogPath && util.checkFileExistsSync(extensionLogPath)) {
          util.deleteFileSync(extensionLogPath);
       }
@@ -366,7 +366,7 @@ suite('Fake dryrun parsing', /*async*/() => {
 
       // Delete extension log a bit later than other tests. For this one, we only care to capture varexp.
       // All else that happens before, it was covered during the other tests in this suite.
-      let extensionLogPath: string = configuration.getExtensionLog() || path.join(vscode.workspace.rootPath || "./", ".vscode/Makefile.out");
+      let extensionLogPath: string = path.join(vscode.workspace.rootPath || "./", ".vscode/Makefile.out");
       if (extensionLogPath && util.checkFileExistsSync(extensionLogPath)) {
          util.deleteFileSync(extensionLogPath);
       }

@@ -42,7 +42,6 @@
    "autotools.configurations.configureArgs.title": "Arguments for the configure script",
    "autotools.configuration.makefile.configurations.problemMatchers.description": "Problem matcher names to use when building the current target",
    "autotools.configuration.makefile.loggingLevel.description": "The logging level for the makefile tools extension",
-   "autotools.configuration.makefile.extensionLog.description": "The path to an output file storing all content from the Makefile output channel.",
    "autotools.configuration.makefile.configurationCachePath.description": "The path to a cache file storing the output of the last dry-run make command. When unset, a file named 'configurationCache.log' is stored at the path specified by the 'makefile.extensionOutputFolder' setting.",
    "autotools.configuration.autoBootstrap.markdownDescription": "Automatically bootstrap project if the `configure` file does not exist. See [bootstrapping](https://www.gnu.org/software/automake/faq/autotools-faq.html#What-does-_002e_002fbootstrap-or-_002e_002fautogen_002esh-do_003f)",
    "autotools.configuration.makefile.keepDryRuns.markdownDescription": "Keep the output of the dry-run in `${top_builddir}/.vscode/${currentTarget}.dryrun.log`",
