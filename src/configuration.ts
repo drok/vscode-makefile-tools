@@ -190,6 +190,15 @@ export async function readkeepConfigurationCache() : Promise<void> {
     keepConfigurationCache = await util.getExpandedSetting<boolean>("keepConfigurationCache") || false;
 }
 
+// prompt to clean when the active configuration changes?
+//   true : prompt, clean if user confirms
+//   false: no prompting, no cleaning
+let promptClean: boolean;
+export function getPromptClean(): boolean { return promptClean; }
+export async function readpromptClean() : Promise<void> {
+    promptClean = await util.getExpandedSetting<boolean>("promptClean") || true;
+}
+
 // The following (makefile, problem matchers, build log), same as command&args above
 // are deduced via a set of rules of defaults and overrides that we calculate only when necessary
 // and access the last result otherwise.
@@ -446,6 +455,7 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
     await readMakePath();
     await readkeepDryRuns();
     await readkeepConfigurationCache();
+    await readpromptClean();
     await readMakefileConfigurations(currentMakefileConfigurationName);
 
     setCurrentMakefileConfiguration(currentMakefileConfigurationName);
@@ -498,22 +508,37 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
             if (updatedConfiguration)
                 updatedConfiguration.nolog = currentMakefileConfiguration.nolog;
             if (!util.areEqual(updatedConfiguration, currentMakefileConfiguration)) {
+                const needConfigure = !util.areEqual(
+                        updatedConfiguration?.configureArgs,
+                        currentMakefileConfiguration.configureArgs);
                 await readMakefileConfigurations(currentMakefileConfigurationName);
                 setCurrentMakefileConfiguration(currentMakefileConfiguration.name);
                 extension.getState().configureDirty = true;
 
-                const cleanit: string = localize("autotools.cleanit", "Clean");
-                const setit: string = localize("autotools.edit.setting", "Setting...");
-                vscode.window.showWarningMessage(
-                    localize("autotools.should.clean", "Does this change require 'make clean'?"),
-                    cleanit, localize("autotools.no", "No"), setit)
-                .then((value) => {
-                    if (value === cleanit) {
-                        extension.build(make.t_clean);
-                    } else if (value === setit) {
-                        openSettings("autotools.promptClean");
-                    }
-                });
+                var configuring : Promise<boolean> | undefined;
+                if (needConfigure) {
+                    configuring = extension.configure();
+                }
+
+                if (promptClean) {
+                    const cleanit: string = localize("autotools.cleanit", "Clean");
+                    const setit: string = localize("autotools.edit.setting", "Setting...");
+
+                    vscode.window.showWarningMessage(
+                        localize("autotools.should.clean", "Does this change require 'make clean'?"),
+                        cleanit, localize("autotools.no", "No"), setit)
+                    .then((value) => {
+                        if (value === cleanit) {
+                            if (configuring)
+                                configuring.then<boolean>(() => true);
+                            extension.build(make.t_clean);
+                        } else if (value === setit) {
+                            openSettings("autotools.promptClean");
+                        }
+                    });
+                }
+                if (configuring)
+                    configuring.finally();
             }
 
             subKey = "keepDryRuns";

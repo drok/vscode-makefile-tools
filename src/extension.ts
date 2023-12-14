@@ -710,13 +710,14 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         extension.getState().reset();
     }));
 
-    context.subscriptions.push(vscode.commands.registerCommand('autotools.outline.configure', () => {
-        return vscode.commands.executeCommand("autotools.configure");
+    context.subscriptions.push(vscode.commands.registerCommand('autotools.outline.recheck', () => {
+        telemetry.logEvent("recheck");
+        extension.recheck();
     }));
 
     context.subscriptions.push(vscode.commands.registerCommand('autotools.configure', async () => {
         telemetry.logEvent("configure");
-        extension.recheck();
+        extension.configure();
     }));
 
     context.subscriptions.push(vscode.commands.registerCommand('autotools.build', async (sub: tree.TaskNode) => {
