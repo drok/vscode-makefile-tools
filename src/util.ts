@@ -223,6 +223,8 @@ export function normalizeEnvironmentVarname(varname: string): string {
 
 export function mergeEnvironment(...env: EnvironmentVariables[]): EnvironmentVariables {
     return env.reduce((acc, vars) => {
+        if ('CDPATH' in vars)
+            delete vars['CDPATH'];
         if (process.platform === 'win32') {
             // Env vars on windows are case insensitive, so we take the ones from
             // active env and overwrite the ones in our current process env
