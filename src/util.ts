@@ -345,6 +345,7 @@ export async function cygpath(pathStr: string): Promise<string> {
 export async function ensureWindowsPath(path: string): Promise<string> {
    if (process.platform !== "win32" || !path.startsWith("/")) {
       return path;
+      // return Promise.resolve(path);
    }
 
    let winPath: string = path;
@@ -589,6 +590,7 @@ export function reportDryRunError(dryrunOutputFile: string): void {
     logger.message("  3. Once makefiles are valid, you can 'Export configuration to Intellisense'");
     logger.message("It should be enough to correct the issue and save the offending file (configure.ac or Makefile.am)");
     logger.message("The extension will re-generate the Makefiles on save");
+    logger.message("There may be a solution for this in the knowledge base at " + extension.kbUrl());
     logger.message("If this is not helpful, please report a bug at https://github.com/Mergesium/autotools/issues");
 }
 

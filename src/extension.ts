@@ -99,6 +99,9 @@ export class Extension {
 
         telemetry = new tele.MyTelemetry(extensionContext, teleParams);
     }
+    public kbUrl() {
+        return `https://autotools.mergesium.com/kb/${this.pkginfo?.name}#${this.pkginfo?.version}`;
+    }
     gotoKnowledgeBase() {
         vscode.commands.executeCommand('vscode.open', vscode.Uri.from({
             scheme: 'https',

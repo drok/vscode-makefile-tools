@@ -39,7 +39,7 @@ const sourceFileExtensions_cpp: string[] = [".cc", ".cpp", ".cxx", ".cpp", ".CPP
 const chunkSize: number = 100;
 
 
-const ObjectFileRE = /^.+\.(?:o|obj)$/;
+const ObjectFileRE = /^.+\.(?:o|lo|obj)$/;
 /**
  * Parse the argument list of a tool invocation to determine if it is
  * a compiler or linker, and add the learnt define[] and include[] to
@@ -58,6 +58,8 @@ export class Making implements Parser {
                 this.handleCompilerCommand(tool, caller.currentDir);
             } else {
                 if (linkers.includes(path.basename(tool.fullPath)))
+                    this.handleLinkerCommand(tool, caller.currentDir);
+                else if (tool.argv.length && typeof tool.argv[0] == "string" && path.basename(tool.argv[0]) == "libtool" && tool.hasArg(["mode=link"]))
                     this.handleLinkerCommand(tool, caller.currentDir);
             }
         }
@@ -82,10 +84,6 @@ export class Making implements Parser {
 
         // Compiler path is either what the makefile provides or found in the PATH environment variable or empty
         let compilerFullPath: string = compilerTool.fullPath || "";
-        if (!compilerTool.found) {
-            let toolBaseName: string = path.basename(compilerFullPath);
-            compilerFullPath = path.join(util.toolPathInEnv(toolBaseName) || "", toolBaseName);
-        }
 
         // Exclude switches that are being processed separately (I, FI, include, D, std)
         // and switches that don't affect IntelliSense but are causing errors.
@@ -94,10 +92,12 @@ export class Making implements Parser {
         // Parse and log the includes, forced includes and the defines
         let includes = compilerTool.filterArgs('I');
         // FIXME: cpptools bug: cannot handle relative paths
-        includes = await util.makeFullPaths(includes, currentPath);
+        if (includes.length)
+            includes = await util.makeFullPaths(includes, currentPath);
         let forcedIncludes = compilerTool.filterArgs('FI');
         forcedIncludes = forcedIncludes.concat(compilerTool.filterArgs('include'));
-        forcedIncludes = await util.makeFullPaths(forcedIncludes, currentPath);
+        if (forcedIncludes.length)
+             forcedIncludes = await util.makeFullPaths(forcedIncludes, currentPath);
 
         let defines = compilerTool.filterArgs('D');
 

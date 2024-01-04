@@ -369,9 +369,24 @@ function parseToolCmd(line: string) : Tool {
     tool.fullPath = tool.argv.shift() || "";
     return tool;
 }
+
+const LibtoolRE = /^[^\s]+ [^\s]+\/libtool .* (?:--mode=(\w+)) (.*) (?:\`test -f .*\`)?([^`\s]+)\s*$/;
+const VpathRE = /^(.*) (?:\`test -f .*\`)([^`\s]+)\s*$/;
+
 // Parse a command line, removing comments, compound statements (||, &&)
 // redirections, and unescaping shell escape sequences
 function parseToolArguments(args: string): string[] {
+    let libtool_cmd = LibtoolRE.exec(args);
+    if (libtool_cmd) {
+        /* If this is is libtool, remove the VPATH test and everything before --mode=compile */
+        args = libtool_cmd[2] + ' ' + libtool_cmd[3];
+        /* TODO : Use libtool_cmd[1] = compile | link */
+    } else {
+        let vpath_cmd = VpathRE.exec(args);
+        if (vpath_cmd) {
+            args = vpath_cmd[1] + ' ' + vpath_cmd[2];
+        }
+    }
     let parsedCmdLine = parse(args);
     let numArgs: number = parsedCmdLine.findIndex(v => typeof v !== "string");
     numArgs = numArgs == -1 ? parsedCmdLine.length : numArgs + 1;

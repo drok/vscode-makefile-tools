@@ -224,6 +224,9 @@ export function setConfigurationProblemMatchers(problemMatchers: string[]): void
 async function analyzeConfigureParams(): Promise<void> {
     let relativeMakefile = findMakefile();
     let reason : string;
+
+    extension.getState().configureDirty = false;
+
     if (!relativeMakefile && extension.isAutotoolsProject()) {
         if (await extension.configure()) {
             relativeMakefile = findMakefile();
@@ -505,40 +508,41 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
             });
             // TODO: should call an onConfigurationUpdate(updatedConfiguration);
             // so that not only build log, but other updated members can be handled
-            if (updatedConfiguration)
+            if (updatedConfiguration) {
                 updatedConfiguration.nolog = currentMakefileConfiguration.nolog;
-            if (!util.areEqual(updatedConfiguration, currentMakefileConfiguration)) {
-                const needConfigure = !util.areEqual(
-                        updatedConfiguration?.configureArgs,
-                        currentMakefileConfiguration.configureArgs);
-                await readMakefileConfigurations(currentMakefileConfigurationName);
-                setCurrentMakefileConfiguration(currentMakefileConfiguration.name);
-                extension.getState().configureDirty = true;
+                if (!util.areEqual(updatedConfiguration, currentMakefileConfiguration)) {
+                    const needConfigure = !util.areEqual(
+                            updatedConfiguration?.configureArgs,
+                            currentMakefileConfiguration.configureArgs);
+                    await readMakefileConfigurations(currentMakefileConfigurationName);
+                    setCurrentMakefileConfiguration(currentMakefileConfiguration.name);
+                    extension.getState().configureDirty = true;
 
-                var configuring : Promise<boolean> | undefined;
-                if (needConfigure) {
-                    configuring = extension.configure();
+                    var configuring : Promise<boolean> | undefined;
+                    if (needConfigure) {
+                        configuring = extension.configure();
+                    }
+
+                    if (promptClean) {
+                        const cleanit: string = localize("autotools.cleanit", "Clean");
+                        const setit: string = localize("autotools.edit.setting", "Setting...");
+
+                        vscode.window.showWarningMessage(
+                            localize("autotools.should.clean", "Does this change require 'make clean'?"),
+                            cleanit, localize("autotools.no", "No"), setit)
+                        .then((value) => {
+                            if (value === cleanit) {
+                                if (configuring)
+                                    configuring.then<boolean>(() => true);
+                                extension.build(make.t_clean);
+                            } else if (value === setit) {
+                                openSettings("autotools.promptClean");
+                            }
+                        });
+                    }
+                    if (configuring)
+                        configuring.finally();
                 }
-
-                if (promptClean) {
-                    const cleanit: string = localize("autotools.cleanit", "Clean");
-                    const setit: string = localize("autotools.edit.setting", "Setting...");
-
-                    vscode.window.showWarningMessage(
-                        localize("autotools.should.clean", "Does this change require 'make clean'?"),
-                        cleanit, localize("autotools.no", "No"), setit)
-                    .then((value) => {
-                        if (value === cleanit) {
-                            if (configuring)
-                                configuring.then<boolean>(() => true);
-                            extension.build(make.t_clean);
-                        } else if (value === setit) {
-                            openSettings("autotools.promptClean");
-                        }
-                    });
-                }
-                if (configuring)
-                    configuring.finally();
             }
 
             subKey = "keepDryRuns";

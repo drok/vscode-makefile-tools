@@ -311,6 +311,8 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
                                 } // else parent continues
                             }
                         }
+                    } else {
+                        throw new Error(`Parser stack empty @ line ${linenumber}`);
                     }
                 });
             } catch (e) {
@@ -371,8 +373,7 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
         // because it "can't fail". It represents only display of database and no targets are actually run.
         // try syntax error
         if (result.returnCode !== ConfigureBuildReturnCodeTypes.success) {
-            logger.message("The make dry-run command failed.");
-            logger.message("IntelliSense may work only partially or not at all.");
+            logger.message("Exporting project config from Makefiles failed.");
             logger.message(completeErr);
 
             // Report the standard dry-run error & guide only when the configure was not cancelled
@@ -626,7 +627,7 @@ export async function configure(triggeredBy: TriggeredBy): Promise<number> {
     if (retc === ConfigureBuildReturnCodeTypes.success) {
         let fileIndex = extension.getCppConfigurationProvider().getCustomConfigurationProvider().fileIndex;
 
-        let sample = Array.from(fileIndex.keys()).slice(2)
+        let sample = Array.from(fileIndex.keys()).slice(-2)
                 .concat("...")
                 .map(f => path.basename(f));
     // FIXME: not true. it gets here if --dry-run parsing throws
