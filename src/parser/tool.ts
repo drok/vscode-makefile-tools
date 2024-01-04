@@ -54,8 +54,9 @@ export class Making implements Parser {
         if (typeof tool.fullPath == "string") {
             //throw new Error("compilerTool.fullPath is not a string (eg, subshell)");
             /* FIXME: this isCompiler() functionality is a placeholder */
+            var srcDir = util.resolvePathToRoot(caller.make.dir);
             if(ObjectFileRE.test(caller.currentTarget)) {
-                this.handleCompilerCommand(tool, caller.currentDir);
+                this.handleCompilerCommand(tool, caller.currentDir, srcDir);
             } else {
                 if (linkers.includes(path.basename(tool.fullPath)))
                     this.handleLinkerCommand(tool, caller.currentDir);
@@ -73,7 +74,7 @@ export class Making implements Parser {
     done() : boolean { return true; }
 
 
-    async handleCompilerCommand(compilerTool : ToolInvocation, currentPath : string): Promise<void> {
+    async handleCompilerCommand(compilerTool : ToolInvocation, currentPath: string, srcDir : string): Promise<void> {
         // If ccache wraps the compiler, parse again the remaining command line and we should obtain
         // the real compiler name.
         //if (compilerTool && path.parse(compilerTool.pathInMakefile).name.endsWith("ccache")) {
@@ -114,7 +115,8 @@ export class Making implements Parser {
 
         // Parse the source files
         let file: string = compilerTool.argv[compilerTool.argv.length-1];
-        file = await util.makeFullPath(file, currentPath);
+        // TODO: the src file could be a built src (ie, in currentDir) #16
+        file = await util.makeFullPath(file, srcDir);
 
         // The language represented by this compilation command (-x is for GCC)
         let xlanguage = compilerTool.filterArgs("x");
