@@ -888,7 +888,7 @@ export function readTRS(b: BuildTarget) : TRS
 {
     let c = configuration.getCurrentMakefileConfiguration();
 
-    let trs = path.join(c.top_builddir, b.builddir, path.basename(b.goal, ".log") + ".trs");
+    let trs = util.resolvePathToRoot(path.join(c.top_builddir, b.builddir, path.basename(b.goal, ".log") + ".trs"));
     try {
         const fileContent = fs.readFileSync(trs, 'utf8');
         const lines = fileContent.split('\n');

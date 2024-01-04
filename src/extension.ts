@@ -168,7 +168,7 @@ export class Extension {
         if (!c.top_builddir)
             return;
 
-        let dir = path.relative(c.top_builddir, path.dirname(uri.path));
+        let dir = path.relative(util.resolvePathToRoot(c.top_builddir), path.dirname(uri.path));
         let log = path.basename(uri.path, ".trs") + ".log";
         let goal = configuration.getAllBuildTargets()
             ?.get(dir)

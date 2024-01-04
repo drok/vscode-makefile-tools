@@ -12,6 +12,7 @@ import * as path from 'path';
 import { extension, telemetry } from './extension';
 import { Attributes } from './tele';
 import * as vscode from 'vscode';
+import { Disposable } from 'vscode-jsonrpc';
 
 import * as nls from "vscode-nls";
 nls.config({ messageFormat: nls.MessageFormat.bundle, bundleFormat: nls.BundleFormat.standalone })();
@@ -906,3 +907,17 @@ export async function scheduleAsyncTask<T>(task: () => Promise<T>): Promise<T> {
        });
    });
 }
+
+export class MyFileWatcher implements Disposable {
+    private disposables: Disposable[] = [];
+
+    private watcher : fs.FSWatcher;
+    constructor(dir: string, fn: (e: string, f: string) => void) {
+        this.watcher = fs.watch(dir,  undefined, fn);
+    }
+
+    dispose() {
+        this.disposables.forEach(d => d.dispose());
+        this.watcher.close();
+    }
+};

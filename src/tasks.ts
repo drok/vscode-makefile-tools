@@ -3,7 +3,6 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 import * as path from 'path';
-import * as fs from 'fs';
 import * as cp from 'child_process';
 import { Task, TaskDefinition, TaskScope, TaskGroup, TaskProvider,
     ProcessExecution, ShellExecution,
@@ -18,6 +17,7 @@ import * as vscode from 'vscode';
 import * as nls from 'vscode-nls';
 import { Script } from 'vm';
 import { extension } from './extension';
+import * as util from './util';
 nls.config({ messageFormat: nls.MessageFormat.bundle, bundleFormat: nls.BundleFormat.standalone })();
 const localize: nls.LocalizeFunc = nls.loadMessageBundle();
 
@@ -130,15 +130,10 @@ export class AutoToolsTestTaskProvider implements MyTaskProvider {
                 if (g.flags & Goal.Flags.Test_Suite) {
                     g.test || tc?.addSuite(c, dir, g);
                     if (g.goal && g.depends) {
-                        let rel = new vscode.RelativePattern(vscode.Uri.file(path.join(c.top_builddir, dir)), '*.trs');
-                        let watcher =   vscode.workspace.createFileSystemWatcher(rel);
-                        disposables.push(watcher
-                            .onDidChange((uri) => { extension.trsChange(c, uri); }));
-                        disposables.push(watcher
-                            .onDidDelete((uri) => { extension.trsChange(c, uri); }));
-                        disposables.push(watcher
-                            .onDidCreate((uri) => { extension.trsChange(c, uri); }));
-
+                        let p : string = util.resolvePathToRoot(path.join(c.top_builddir, dir));
+                        disposables.push(new util.MyFileWatcher(p, (e, f) => {
+                            extension.trsChange(c, vscode.Uri.file(path.join(p,f)));
+                        }));
                         g.depends.forEach((d) => {
                             if(!d.goal)
                                 throw new Error("Invalid test.depends");
