@@ -52,6 +52,31 @@ export class Making implements Parser {
     ];};
     constructor(tool : ToolInvocation, caller: Executing) {
         if (typeof tool.fullPath == "string") {
+
+            /* automake uses mv and other utils. Skip them, they don't compile
+             * This list doesn't need to be complete. If non-compiler commands get through,
+             * any extracted garbage will be overwritten by the last valid compiler command.
+             * This pre-filtering is only meant to cut down on obvious noise like
+             * "Found compiler commandd: mv ..."
+             */
+            switch (tool.fullPath) {
+                case 'mv':
+                case 'rm':
+                case 'touch':
+                case 'cd':
+                case 'test':
+                case 'mkdir':
+                case 'if':
+                case 'echo':
+                case 'set':
+                case 'case':
+                case ':':
+                case 'depbase=`echo':
+                case 'fail=':
+                case 'Making':
+                    return;
+            }
+
             //throw new Error("compilerTool.fullPath is not a string (eg, subshell)");
             /* FIXME: this isCompiler() functionality is a placeholder */
             var srcDir = util.resolvePathToRoot(caller.make.dir);

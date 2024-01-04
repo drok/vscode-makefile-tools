@@ -481,12 +481,14 @@ export class Extension {
     }
 
     // Request a custom config provider update.
-    public updateCppToolsProvider(): void {
+    public updateCppToolsProvider(): number {
         this.cppConfigurationProvider.logConfigurationProviderBrowse();
 
         if (this.cppToolsAPI) {
             this.cppToolsAPI.didChangeCustomConfiguration(this.cppConfigurationProvider);
+            return 0;
         }
+        return 1;
     }
 
     public ensureCppToolsProviderRegistered(): Promise<void> {

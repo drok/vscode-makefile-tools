@@ -388,7 +388,7 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
             // FIXME: Since dry-running failed, also unlink the configCache file
         } else {
             // All done, notify that new data is available
-            extension.updateCppToolsProvider();
+            result.returnCode = extension.updateCppToolsProvider();
             extension.updateTasks(build_tree);
             export_stats = {
                 programs: build_tree.stats.programs,
@@ -627,12 +627,12 @@ export async function configure(triggeredBy: TriggeredBy): Promise<number> {
     if (retc === ConfigureBuildReturnCodeTypes.success) {
         let fileIndex = extension.getCppConfigurationProvider().getCustomConfigurationProvider().fileIndex;
 
-        let sample = Array.from(fileIndex.keys()).slice(-2)
+        let sample = Array.from(fileIndex.keys()).slice(0, 2)
                 .concat("...")
                 .map(f => path.basename(f));
     // FIXME: not true. it gets here if --dry-run parsing throws
       logger.message(localize("autotools.log.config.exported",
-        "Build configuration for {0} source files like {1} imported to Intellisense.",
+        "Build configuration for {0} source files like {1} exported to Intellisense.",
             fileIndex.size,
             sample.join(", ")
             ));
@@ -640,7 +640,8 @@ export async function configure(triggeredBy: TriggeredBy): Promise<number> {
             "{0} build tasks and {1} test tasks in {2} check suites were imported (see Run Task... command)",
             export_stats.programs, export_stats.tests, export_stats.checks));
     } else {
-      logger.message("Export failed.");
+        if (retc == 1) /* ie, Intellisense API not available */
+            logger.message("Export failed.");
     }
 
     return retc;
