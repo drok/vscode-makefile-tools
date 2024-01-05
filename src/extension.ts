@@ -351,27 +351,23 @@ export class Extension {
                 { select: false, focus: false, expand: true, } );
             this.updateOutlineBadge();
         }
-        if (build_tree.test_suite?.test) {
-            this.updateTestSuite(build_tree);
-            this.testController?.update(build_tree, build_tree.test_suite.test);
-        }
+        this.updateTestSuite(build_tree, build_tree, true);
     }
-    updateTestSuite(sub: gnumake.Make): void {
-        if (!sub.test_suite?.test)
-            return;
+    updateTestSuite(sub: gnumake.Make, parent: gnumake.Make, top: boolean): void {
         let c = configuration.getCurrentMakefileConfiguration();
         for (let submake of sub.submake.values()) {
-            if (!submake.test_suite?.test)
-                continue;
-            extension.testController?.addSubTest(sub.test_suite.test, submake.test_suite.test);
-            this.updateTestSuite(submake);
+            if (submake.test_suite?.test && parent.test_suite?.test)
+                extension.testController?.addSubTest(parent.test_suite.test, submake.test_suite.test);
+            //if (submake.test_suite?.test)
+            this.updateTestSuite(submake, sub.test_suite ? sub : parent, top && !sub.test_suite);
         }
         if (sub.test_suite && sub.test_suite.test) {
             let logpath = path.join(c.top_builddir, sub.dir);
             sub.test_suite.depends?.forEach((test) => {
                 sub.test_suite?.test && extension.testController?.addTest(logpath, sub.test_suite.test, test, test.flags & Goal.Flags.Test_Result_Mask)});
-
         }
+        if (top && sub.test_suite?.test)
+            this.testController?.update(sub.test_suite.test);
     }
 
     // goal is the *.log goal. The executable will be read from .depends[0]

@@ -61,7 +61,7 @@ export class MyTestController {
     suite.children.add(sub);
   }
 
-  public update(build_tree: Make, suite: TestItem) : void {
+  public update(suite: TestItem) : void {
       this.controller.items.replace([suite]);
       const run = this.controller.createTestRun(
             new vscode.TestRunRequest(undefined, [], this.runProfile),
