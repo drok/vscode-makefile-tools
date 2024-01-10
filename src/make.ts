@@ -263,6 +263,7 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
         extension.resetCppToolsProvider();
 
         let stdout: any = (result: string): void => {
+            // FIXME: should end look after caught exception
             if (keepDryRuns)
                 fs.appendFileSync(dryrunFile, result);
 

@@ -500,9 +500,12 @@ export class Goal extends Node implements Parser {
                 else if (AutomakeNoiseRe.test(goal[1]))
                     this.flags |= Goal.Flags.Automake_noise;
                 this.goal = goal[1];
+                if (!this.goal)
+                    throw new Error(`Runtime error: empty goal name ${line}`);
                 if (this.goal == "test-suite.log") {
                     this.flags |= Goal.Flags.Test_Suite;
                     this.depends = goal[2].split(' ')
+                        .filter(s => !!s)
                         .map(s => new Goal(s, Goal.Flags.Test_Log));
                 } else if (AutomakeTestLogRe.test(goal[1])) {
                     this.flags |= Goal.Flags.Test_Log;
