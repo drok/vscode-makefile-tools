@@ -104,25 +104,47 @@ export interface pkgInfo {
 export async function getPackageJSON(): Promise<pkgInfo> {
     return new Promise<pkgInfo>(async (resolve, reject) => {
         let c = configuration.getCurrentMakefileConfiguration();
-        let info : string | undefined;
-        const result: util.SpawnProcessResult = await util.spawnChildProcess(
-            path.join(c.top_builddir, "config.status"), ["--file=-:-"],
-            util.getWorkspaceRoot(),
-            true, true,
-            '{ "name": "@PACKAGE@", "version": "@VERSION@", "bugreport": "@PACKAGE_BUGREPORT@", "url": "@PACKAGE_URL@", "automake": "@AUTOMAKE@" }',
-            (x) => {info = x}, undefined);
-        if (result.returnCode !== 0)
-            reject();
-        if (info === undefined)
-            reject();
+        let theinfo : pkgInfo | undefined;
 
-        let theinfo : pkgInfo;
-        try {
-            theinfo = JSON.parse(info || "");
-            resolve(theinfo);
-        } catch (e) {
-            reject();
+        if (extension.isConfigured()) {
+            let info : string | undefined;
+            const result: util.SpawnProcessResult = await util.spawnChildProcess(
+                path.join(c.top_builddir, "config.status"), ["--file=-:-"],
+                util.getWorkspaceRoot(),
+                true, true,
+                '{ "name": "@PACKAGE@", "version": "@VERSION@", "bugreport": "@PACKAGE_BUGREPORT@", "url": "@PACKAGE_URL@", "automake": "@AUTOMAKE@" }',
+                (x) => {info = x}, undefined);
+            if (result.returnCode !== 0) reject();
+            if (info === undefined) reject();
+            try {
+                theinfo = JSON.parse(info || "");
+                if (theinfo) resolve(theinfo);
+            } catch (e) {
+                reject();
+            }
+        } else {
+            const result: util.SpawnProcessResult = await util.spawnChildProcess(
+                "autoconf", ["--trace=AC_INIT"],
+                util.getWorkspaceRoot(),
+                true, true,
+                undefined,
+                (x) => {
+                    var ac_init = x.trimEnd().split(':');
+                    if (ac_init && ac_init.length > 4 && ac_init[0] == "configure.ac" && ac_init[2] == "AC_INIT") {
+                        theinfo = {
+                            "name": ac_init[3],
+                            "version": ac_init[4] ?? '',
+                            "bugreport": ac_init[5] ?? '',
+                            // 7 is tarname
+                            "url": ac_init[7] ?? '',
+                            "automake": "unk",
+                        };
+                    }
+                }, undefined);
+            if (result.returnCode !== 0) reject();
+            if (theinfo) resolve(theinfo);
         }
+
         reject();
     });
 }
@@ -379,7 +401,7 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
             // Also don't write the cache if this operation was cancelled
             // because it may be incomplete and affect a future non clean configure.
             if (result.returnCode !== null) {
-                util.reportDryRunError(dryrunFile);
+                await util.reportDryRunError(dryrunFile);
             }
             telemetry.logEvent("DryRunFailed", {returnCode: result.returnCode});
             extension.resetCppToolsProvider();
@@ -606,7 +628,7 @@ export async function configure(triggeredBy: TriggeredBy): Promise<number> {
         });
 
         let r = await doConfigure(progress, cancel, readCache, configurationCache);
-        extension.autotoolsDone();
+        extension.autotoolsDoneNoResult();
         return r;
       }
     );
@@ -638,8 +660,12 @@ export async function configure(triggeredBy: TriggeredBy): Promise<number> {
             "{0} build tasks and {1} test tasks in {2} check suites were imported (see Run Task... command)",
             export_stats.programs, export_stats.tests, export_stats.checks));
     } else {
-        if (retc == 1) /* ie, Intellisense API not available */
-            logger.message("Export failed.");
+        if (retc == 1) {/* ie, Intellisense API not available */
+            var kbUrl : vscode.Uri = await extension.kbUrl();
+            logger.message('Export to Intellisense failed. Review the OUTPUT tab of C++ for cause.', "Normal");
+            logger.message('Exporting can be re-attempted with "Autotools: Export Configuration to Intellisense"', "Normal");
+            logger.message('KB: ' + kbUrl.toString(true) + '#intellisense-export-fail', "Normal");
+        }
     }
 
     return retc;

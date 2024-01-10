@@ -18,6 +18,7 @@ import * as nls from 'vscode-nls';
 import { Script } from 'vm';
 import { extension } from './extension';
 import * as util from './util';
+import * as logger from './logger';
 nls.config({ messageFormat: nls.MessageFormat.bundle, bundleFormat: nls.BundleFormat.standalone })();
 const localize: nls.LocalizeFunc = nls.loadMessageBundle();
 
@@ -282,8 +283,9 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
                 type: this.myType,
                 action: 'bootstrap'
             };
-            this.bootstrapTask = new Task(kind, TaskScope.Workspace, b.join(' '),
+            this.bootstrapTask = new Task(kind, TaskScope.Workspace,
                 localize("autotools.bootstrap.task", "Bootstrap autotools"),
+                "Autotools task",
                 new ProcessExecution(b[0], b.slice(1)));
             this.bootstrapTask.group = TaskGroup.Build;
             this.bootstrapTask.detail = localize("automake.bootstrap", "$(tools) Bootstrap project using '{0}'", b.join(' '));
@@ -443,8 +445,27 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
         }
         return Promise.resolve(success);
     }
-    public async autotoolsDone(): Promise<void> {
+    public async autotoolsDoneNoResult(): Promise<void> {
         this.working = false;
+    }
+    public async autotoolsDone(task: vscode.ProcessExecution, exitCode: number): Promise<void> {
+        this.working = false;
+        if (exitCode != 0) {
+            var kbUrl : vscode.Uri = await extension.kbUrl();
+            if (task == this.bootstrapTask?.execution) {
+                logger.message('Bootstrap failed. Review the Terminal tab for cause.', "Normal");
+                logger.message('Bootstrapping can be re-attempted with "Autotools: Bootstrap"', "Normal");
+                logger.message('KB: ' + kbUrl.toString(true) + '#bootstrap-fail', "Normal");
+            }
+            else if (task == this.regenTask?.execution) {
+                logger.message('Regen failed. Review the Terminal tab for cause.', "Normal");
+                logger.message('KB: ' + kbUrl.toString(true) + '#regen-fail', "Normal");
+            }
+            else if (task == this.recheckTask?.execution) {
+                logger.message('Recheck failed. Review the Terminal tab for cause.', "Normal");
+                logger.message('KB: ' + kbUrl.toString(true) + '#recheck-fail', "Normal");
+            }
+        }
     }
 }
 

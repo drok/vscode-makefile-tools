@@ -308,13 +308,12 @@ function findMakefile(): string | undefined {
 }
 
 export async function logMakeCmd(relativeMakefile: string): Promise<void> {
-    extension.pkginfo = await make.getPackageJSON().catch(() => undefined);
+    var kburl = await extension.kbUrl();
     if (extension.pkginfo) {
         let pkg = extension.pkginfo;
         logger.message(localize('autotools.package.coordinates', "Package \"{0}\" version {1} - bug reports: {2}, url: {3}",
         pkg.name || "unknown", pkg.version || "unk", pkg.bugreport || "unknown", pkg.url || "unknown"), "Normal");
-        logger.message(localize('autotools.ref.kb', "More info about editting the package with vscode at: {0}/{1}#{2}",
-        "https://autotools.mergesium.com/kb", extension.pkginfo.name, extension.pkginfo.version), "Normal");
+        logger.message(localize('autotools.ref.kb', "More info about editting the package with vscode at: {0}", kburl.toString(true)), "Normal");
     }
     if (currentMakefileConfiguration.makeArgs)
         logger.message(`Make cmd (${relativeMakefile}): '${makePath} ${currentMakefileConfiguration.makeArgs.join(" ")}' for configuration "${currentMakefileConfiguration.name}"`, "Debug");

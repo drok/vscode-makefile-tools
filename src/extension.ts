@@ -90,25 +90,34 @@ export class Extension {
             await this.autotoolsTask.help();
         }));
         extensionContext.subscriptions.push(vscode.commands.registerCommand('autotools.visit.knowledgeBase', async () => {
-            this.gotoKnowledgeBase();
+            await this.gotoKnowledgeBase();
         }));
         extensionContext.subscriptions.push(vscode.commands.registerCommand('autotools.command.openKnowledgeBase', async () => {
-            this.gotoKnowledgeBase();
+            await this.gotoKnowledgeBase();
         }));
         debugProvider.activate(extensionContext);
 
         telemetry = new tele.MyTelemetry(extensionContext, teleParams);
     }
-    public kbUrl() {
-        return `https://autotools.mergesium.com/kb/${this.pkginfo?.name}#${this.pkginfo?.version}`;
-    }
-    gotoKnowledgeBase() {
-        vscode.commands.executeCommand('vscode.open', vscode.Uri.from({
+    public async kbUrl() : Promise<vscode.Uri> {
+        if (!this.pkginfo)
+            this.pkginfo = await make.getPackageJSON().catch(() => undefined);
+
+        var url = vscode.Uri.from({
             scheme: 'https',
             authority: 'autotools.mergesium.com',
-            path: '/kb/' + this.pkginfo?.name,
-            fragment: this.pkginfo?.version
-        }));
+            path: '/kb/' + util.slugify(this.pkginfo?.name ?? 'unknown'),
+            // The s- prefix matches my_kramdown_patch
+            // Used for headings that start with digits (1.0.0) because html element ids cannot begin with non letter
+            query: this.pkginfo?.version.match(/^a-zA-Z/) ?
+                'v=' + util.slugify('s-' + this.pkginfo?.version) :
+                this.pkginfo?.version ? 'v=' + util.slugify(this.pkginfo?.version) : undefined
+        });
+        return url;
+    }
+    async gotoKnowledgeBase() {
+        let kburl = await this.kbUrl();
+        vscode.commands.executeCommand('vscode.open', kburl.toString(true));
     }
     public createPanel() : void {
         this._projectOutlineTreeView = vscode.window.createTreeView('autotools.outline', {
@@ -270,10 +279,12 @@ export class Extension {
                     const definition: AutotoolsTask = <any>task.definition;
                     if (definition?.action == "regen" || definition?.action == "recheck")
                         ui.getUI().setStatus(e.exitCode ? ui.UIStatus.ERR : ui.UIStatus.OK);
+                        if (task.execution instanceof vscode.ProcessExecution)
+                            this.autotoolsTask.autotoolsDone(task.execution,
+                                (typeof e.exitCode == 'number') ? e.exitCode : (e.exitCode ? 1 : 0));
                         if (!e.exitCode) {
                             make.configure(make.TriggeredBy.configureAfterConfigurationChange);
-                        } else
-                            this.autotoolsTask.autotoolsDone();
+                        }
 //                } else if (definition.type == "test-NOPE" && definition.test) {
 //                    let suite = configuration.getAllBuildTargets()
 //                        ?.get(definition.test.builddir)
@@ -394,14 +405,20 @@ export class Extension {
     // config.status --recheck
     public async recheck(): Promise<void> {
         await this.autotoolsTask.recheck();
-        this.pkginfo = await make.getPackageJSON().catch(() => undefined);
     }
-    public autotoolsDone(): void { this.autotoolsTask.autotoolsDone(); }
+    public autotoolsDoneNoResult(): void { this.autotoolsTask.autotoolsDoneNoResult(); }
 
     public build(target: make.BuildTarget): void { this.buildTasks.build(target); }
     public async configure(): Promise<boolean> {
         this.needTaskFetchBugWorkaround = false;
-        return await this.autotoolsTask.configure();
+        var success =  await this.autotoolsTask.configure();
+        if (!success) {
+            let kbUrl = await extension.kbUrl();
+            logger.message('Configure failed. Review the Terminal tab for cause.', "Normal");
+            logger.message('Configuring can be re-attempted with "Autotools: Configure"', "Normal");
+            logger.message('KB: ' + kbUrl.toString(true) + '#config-fail', "Normal");
+        }
+        return success;
     };
     public isAutotoolsProject(): boolean { return !!configuration.getConfigureAc(); }
     public isBootstrapped(): boolean { return this.autotoolsTask.isBootstrapped(); }

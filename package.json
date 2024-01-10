@@ -15,15 +15,15 @@
         "vscode": "^1.74.0"
     },
     "bugs": {
-        "url": "https://github.com/Mergesium/vscode-makefile-tools/issues",
-        "email": "support.vscode.autotools@mergesium.com"
+        "url": "https://github.com/Mergesium/autotools/issues",
+        "email": "autotools-support@mergesium.com"
     },
     "repository": {
         "type": "git",
-        "url": "https://github.com/Mergesium/vscode-makefile-tools.git"
+        "url": "https://github.com/Mergesium/autotools"
     },
-    "homepage": "https://github.com/Mergesium/vscode-makefile-tools",
-    "qna": "https://github.com/Mergesium/vscode-makefile-tools/issues",
+    "homepage": "https://autotools.mergesium.com",
+    "qna": "https://github.com/Mergesium/autotools/discussions/categories/q-a",
     "keywords": [
         "C",
         "C++",

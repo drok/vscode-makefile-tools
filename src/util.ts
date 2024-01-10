@@ -586,14 +586,15 @@ export function sortAndRemoveDuplicates(src: string[]) : string[] {
     return removeDuplicates(src.sort());
 }
 
-export function reportDryRunError(dryrunOutputFile: string): void {
+export async function reportDryRunError(dryrunOutputFile: string): Promise<void> {
+    var kbUrl = await extension.kbUrl();
     logger.message('Dry-running the project failed. Fix the errors and attempt again. Possibilities:');
     logger.message("  1. Corrupt Makefiles can be re-output with 'Update Makefiles and Headers'");
     logger.message("  2. ./configure can be re-run with the same configureArgs with 'Autotools: Configure'");
     logger.message("  3. Once makefiles are valid, you can 'Export configuration to Intellisense'");
     logger.message("It should be enough to correct the issue and save the offending file (configure.ac or Makefile.am)");
     logger.message("The extension will re-generate the Makefiles on save");
-    logger.message("There may be a solution for this in the knowledge base at " + extension.kbUrl());
+    logger.message("There may be a solution for this in the knowledge base at " + kbUrl.toString(true) + '#dry-run');
     logger.message("If this is not helpful, please report a bug at https://github.com/Mergesium/autotools/issues");
 }
 
@@ -906,6 +907,18 @@ export async function scheduleAsyncTask<T>(task: () => Promise<T>): Promise<T> {
            }
        });
    });
+}
+
+export const slugify = (...args: (string | number)[]): string => {
+    const value = args.join(' ')
+
+    return value
+        .normalize('NFD') // split an accented letter in the base letter and the acent
+        .replace(/[\u0300-\u036f]/g, '') // remove all previously split accents
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9\.\:_\- ]/g, '') // remove all chars not allowed in html identifiers (to be replaced)
+        .replace(/\s+/g, '-') // separator
 }
 
 export class MyFileWatcher implements Disposable {
