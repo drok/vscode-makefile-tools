@@ -174,8 +174,6 @@ export class Extension {
     }
 
     trsChange(c: configuration.MakefileConfiguration, uri: vscode.Uri) : void {
-        if (!c.top_builddir)
-            return;
 
         let dir = path.relative(util.resolvePathToRoot(c.top_builddir), path.dirname(uri.path));
         let log = path.basename(uri.path, ".trs") + ".log";
@@ -422,6 +420,7 @@ export class Extension {
     };
     public isAutotoolsProject(): boolean { return !!configuration.getConfigureAc(); }
     public isBootstrapped(): boolean { return this.autotoolsTask.isBootstrapped(); }
+    public isConfigured(): boolean { return this.autotoolsTask.isConfigured(configuration.getCurrentMakefileConfiguration()); }
 
     public updateMakefileFilePresent(newValue: boolean): void {
         vscode.commands.executeCommand("setContext", "autotools.makefileFilePresent", newValue);
@@ -628,7 +627,25 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     await extension.setFullFeatureSet(false);
 
     context.subscriptions.push(vscode.commands.registerCommand('autotools.setBuildConfiguration', async () => {
-        await configuration.setNewConfiguration();
+        if (!configuration.getCurrentMakefileConfiguration().top_builddir && extension.isConfigured()) {
+            const doit: string = localize("autotools.switch.to.out.of.tree", "Browse doc page");
+            vscode.window.showErrorMessage(
+                localize("autotools.want.out-of-tree", "The project needs to be switched to out-of-tree build mode."),
+                doit,
+                localize("autotools.cancel", "Cancel")).then((value) => {
+                if (value === doit) {
+                    // this.autotoolsTask.bootstrap();
+                    vscode.commands.executeCommand('vscode.open', "https://autotools.mergesium.com/kb/docs/#switch-to-out-of-tree-configuration");
+                }
+            });
+        // https://github.com/microsoft/vscode/blob/0bb69da87ca19412a768d5966fcb0e7b36b2dd3f/src/vs/workbench/contrib/extensions/browser/extensions.contribution.ts#L277
+            // await vscode.commands.executeCommand('extension.open', context.extension.id, 'readme', true);
+            // await vscode.commands.executeCommand('extension.open', "ms-vscode-remote.remote-ssh");
+            // await vscode.commands.executeCommand('extension.open', "ms-vscode-remote.remote-ssh#getting-started");
+            // vscode.commands.executeCommand('vscode.open', "https://autotools.mergesium.com/doc/switch-to-out-of-tree-configurations");
+        } else {
+            await configuration.setNewConfiguration();
+        }
     }));
 
     context.subscriptions.push(vscode.commands.registerCommand('autotools.getConfiguration', async () => {

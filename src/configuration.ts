@@ -111,7 +111,7 @@ export async function setCurrentMakefileConfiguration(configuration: string | un
             // Suppress bash's error message "/bin/bash: line 74: /tmp/tmp-suite-log.tmp: Permission denied" to stderr
             "am__sh_e_setup": 'set +e; exec 2> /dev/null'
     }};
-    statusBar.setConfiguration(currentMakefileConfiguration.name);
+    statusBar.setConfiguration(currentMakefileConfiguration.name, currentMakefileConfiguration.top_builddir);
     extension.onConfigurationSelect(currentMakefileConfiguration);
 }
 
@@ -228,16 +228,20 @@ async function analyzeConfigureParams(): Promise<void> {
     extension.getState().configureDirty = false;
 
     if (!relativeMakefile && extension.isAutotoolsProject()) {
-        if (await extension.configure()) {
-            relativeMakefile = findMakefile();
-            if (!relativeMakefile) {
-                logger.message('Configuration succeeded but there is no makefile for');
-                reason = "configured-noMakefile"
+        if (extension.isBootstrapped()) {
+            if (extension.isConfigured() || await extension.configure()) {
+                relativeMakefile = findMakefile();
+                if (!relativeMakefile) {
+                    logger.message('Configuration succeeded but there is no makefile for');
+                    reason = "configured-noMakefile"
+                }
+                reason = "ok";
+            } else {
+                reason = "configure-failed";
             }
-            reason = "ok";
         } else {
-            reason = "configure-failed";
-            logger.message('Configuring the project failed.');
+            reason = "Is not Bootstraped";
+            logger.message('The project is not yet bootstrapped.');
         }
     } else {
         reason = "n/a";

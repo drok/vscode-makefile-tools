@@ -27,6 +27,7 @@ export enum UIStatus {
 export class UI {
     private configuration: string;
     private configurationButton: vscode.StatusBarItem;
+    private intree: boolean;
     static colors: vscode.ThemeColor[] = [
         new vscode.ThemeColor("statusBar.background"),
         new vscode.ThemeColor("statusBarItem.warningBackground"),
@@ -49,8 +50,12 @@ export class UI {
     ];
 
     /* When a new configuration is set, it is shown as 'loading' */
-    public setConfiguration(configuration: string): void {
-        this.configuration = configuration;
+    public setConfiguration(configuration: string, top_builddir: string): void {
+        this.configuration = configuration + (!top_builddir ? " (in-tree)" : "");
+        this.intree = !top_builddir;
+        this.configurationButton.tooltip = !top_builddir ?
+            localize("autotools.click.in-tree", "See docs for switching to out-of-tree") :
+            localize("autotools.click.setconfig", "Click to select another build configuration")
         this.setLoading(UIStatus.LOADING);
     }
 
@@ -98,7 +103,8 @@ export class UI {
     }
 
     public constructor() {
-        this.configuration = '...'
+        this.configuration = '...';
+        this.intree = false;
         this.configurationButton = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 4.6);
         this.configurationButton.tooltip = localize("autotools.click.setconfig", "Click to select another build configuration");
         this.configurationButton.backgroundColor = UI.colors[UIStatus.OK];

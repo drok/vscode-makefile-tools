@@ -133,7 +133,8 @@ export class AutoToolsTestTaskProvider implements MyTaskProvider {
                     if (g.goal && g.depends) {
                         let p : string = util.resolvePathToRoot(path.join(c.top_builddir, dir));
                         disposables.push(new util.MyFileWatcher(p, (e, f) => {
-                            extension.trsChange(c, vscode.Uri.file(path.join(p,f)));
+                            if (f.endsWith(".trs"))
+                                extension.trsChange(c, vscode.Uri.file(path.join(p,f)));
                         }));
                         g.depends.forEach((d) => {
                             if(!d.goal)
@@ -338,6 +339,9 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
     }
     public isBootstrapped(): boolean {
         return checkFileExistsSync(resolvePathToRoot("configure"));
+    }
+    public isConfigured(c: configuration.MakefileConfiguration): boolean {
+        return checkFileExistsSync(resolvePathToRoot(path.join(c.top_builddir, "config.status")));
     }
     update(disposables: vscode.Disposable[]): void {
     }
