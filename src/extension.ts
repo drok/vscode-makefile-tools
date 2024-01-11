@@ -473,6 +473,10 @@ export class Extension {
                 this.cppToolsAPI.notifyReady(this.cppConfigurationProvider);
                 this.setRanNotifyReadyInSession(true);
             }
+        } else {
+            let kbUrl = await extension.kbUrl();
+            logger.message('C/C++ Intellisense is not loaded. Install an extension to enable syntax highlighting and completions.', "Normal");
+            logger.message('KB: ' + kbUrl.toString(true) + '#intellisense-not-loaded', "Normal");
         }
     }
 
@@ -494,13 +498,11 @@ export class Extension {
 
     // Request a custom config provider update.
     public updateCppToolsProvider(): number {
-        this.cppConfigurationProvider.logConfigurationProviderBrowse();
-
         if (this.cppToolsAPI) {
+            this.cppConfigurationProvider.logConfigurationProviderBrowse();
             this.cppToolsAPI.didChangeCustomConfiguration(this.cppConfigurationProvider);
-            return 0;
         }
-        return 1;
+        return 0;
     }
 
     public ensureCppToolsProviderRegistered(): Promise<void> {
