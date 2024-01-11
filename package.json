@@ -14,6 +14,7 @@
     "engines": {
         "vscode": "^1.74.0"
     },
+    "extensionKind": ["workspace"],
     "bugs": {
         "url": "https://github.com/Mergesium/autotools/issues",
         "email": "autotools-support@mergesium.com"
@@ -34,6 +35,7 @@
     "categories": [
         "Programming Languages",
         "Debuggers",
+        "Testing",
         "Other"
     ],
     "activationEvents": [
