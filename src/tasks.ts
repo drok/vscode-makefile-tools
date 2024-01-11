@@ -126,7 +126,8 @@ export class AutoToolsTestTaskProvider implements MyTaskProvider {
         this.numSuspect = 0;
         let tc = extension.testController;
         let c = configuration.getCurrentMakefileConfiguration();
-            configuration.getAllBuildTargets().forEach((goals, dir) => {
+        let t = configuration.getAllBuildTargets();
+            t.forEach((goals, dir) => {
             for (let g of goals.values()) {
                 if (g.flags & Goal.Flags.Test_Suite) {
                     g.test || tc?.addSuite(c, dir, g);

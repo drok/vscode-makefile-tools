@@ -388,7 +388,8 @@ export class Extension {
             };
             vscode.debug.startDebugging(
                 vscode.workspace.workspaceFolders?.[0],
-                new DebugNow(c, {goal: goal.depends[0].goal, builddir: builddir},),
+                new DebugNow(c, {goal: goal.depends[0].goal, builddir: builddir},
+                        !!(goal.depends[0].flags & Goal.Flags.Linked_binary)),
                 dopt)
             .then((z) => console.log(z));
         }

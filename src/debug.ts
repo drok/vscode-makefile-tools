@@ -58,7 +58,7 @@ class MyConfiguration implements vscode.DebugConfiguration {
  * the builddir is pre-populated
  */
 export class DebugNow implements vscode.DebugConfiguration {
-    constructor(c: MakefileConfiguration, built: BuildTarget) {
+    constructor(c: MakefileConfiguration, built: BuildTarget, buildit: boolean) {
         this.$comment = [
             "Debug a hardcoded target in any build configuration; customize environment and args as needed",
             "The 'cwd' is set automatically to demonstrate how",
@@ -69,18 +69,19 @@ export class DebugNow implements vscode.DebugConfiguration {
             (built.builddir ? " in " + built.builddir : "");
         this.request = "launch";
         this.program =
-            resolvePathToRoot(
+            resolvePathToRoot( buildit ?
                 path.join(c.top_builddir, (built.builddir ? path.join(built.builddir, built.goal) :
-            built.goal)));
+            built.goal)):
+            path.join(built.builddir, built.goal));
         this.environment = [{
             name: "srcdir",
             value: resolvePathToRoot(built.builddir)
         }];
         this.args = [];
         this.stopAtEntry = true;
-        this.preLaunchTask = "autotools: build '" + built.goal + "'" +
-            (built.builddir ? " in " + built.builddir : "");
-        this.cwd = path.join(c.top_builddir, built.builddir);
+        this.preLaunchTask = buildit ? "autotools: build '" + built.goal + "'" +
+                (built.builddir ? " in " + built.builddir : "") : undefined;
+        this.cwd = resolvePathToRoot(path.join(c.top_builddir, built.builddir));
         this.setupCommands = defaultSetupCommands;
     }
     $comment: string[];
@@ -91,7 +92,7 @@ export class DebugNow implements vscode.DebugConfiguration {
     environment: { name: string, value: string }[];
     args: string[];
     stopAtEntry: boolean;
-    preLaunchTask: string;
+    preLaunchTask: string | undefined;
     cwd: string;
     setupCommands: { description: string, text: string, ignoreFailures: boolean }[];
 }
@@ -147,7 +148,7 @@ class MyDebugProvider implements DebugConfigurationProvider {
     // If needed, modify the debug configuration before launching the debug session
     if (config.type === undefined) {
         return getCurrentTarget()
-            .then(goal => new DebugNow(getCurrentMakefileConfiguration(), goal));
+            .then(goal => new DebugNow(getCurrentMakefileConfiguration(), goal, true));
         //return null;
         // return new MyConfiguration("dir-name", "test-name");
     }

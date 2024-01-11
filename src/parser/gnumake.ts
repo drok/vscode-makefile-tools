@@ -206,6 +206,7 @@ export class Make implements Parser {
             } else
                 this.submake.set(dir, submake)
         })
+        this.test_suite = other.test_suite;
     }
     public getFile(): string | undefined {
         return this.file;
@@ -425,6 +426,7 @@ export class Goal extends Node implements Parser {
         Test_Suite: 1024,
         Test_Program: 2048,
         Test_Log: 4096,
+        Library: 8192,
     };
 
     static makeArgs(): string[] { return [
@@ -500,17 +502,20 @@ export class Goal extends Node implements Parser {
                 else if (AutomakeNoiseRe.test(goal[1]))
                     this.flags |= Goal.Flags.Automake_noise;
                 this.goal = goal[1];
-                if (!this.goal)
-                    throw new Error(`Runtime error: empty goal name ${line}`);
-                if (this.goal == "test-suite.log") {
-                    this.flags |= Goal.Flags.Test_Suite;
-                    this.depends = goal[2].split(' ')
-                        .filter(s => !!s)
-                        .map(s => new Goal(s, Goal.Flags.Test_Log));
-                } else if (AutomakeTestLogRe.test(goal[1])) {
-                    this.flags |= Goal.Flags.Test_Log;
-                    this.depends = goal[2].split(' ')
-                        .map(s => new Goal(s, Goal.Flags.Test_Program));
+                if (goal[2]) {
+                    if (this.goal == "test-suite.log") {
+                        this.flags |= Goal.Flags.Test_Suite;
+                        this.depends = goal[2].split(' ')
+                            .filter(s => s)
+                            .map(s => new Goal(s, Goal.Flags.Test_Log));
+                    } else if (AutomakeTestLogRe.test(goal[1])) {
+                        this.flags |= Goal.Flags.Test_Log;
+                        this.depends = goal[2].split(' ')
+                            .map(s => new Goal(s, Goal.Flags.Test_Program));
+                    }
+                } else if (!this.flags) {
+                    // .test.log: (ie, implicit rules)
+                    this.flags |= Goal.Flags.Automake_noise;
                 }
                 return [ParserDisp.Continue, this];
             }
@@ -545,7 +550,8 @@ export class Goal extends Node implements Parser {
     test: vscode.TestItem | undefined;
 }
 
-const LinkerRe = /\$\(LINK\)\s/;
+const LibraryRe = /\.(la|a|so|dll)$/;
+const LinkerRe = /\$\(\w*LINK\)\s/;
 const RanlibRe = /\$\(RANLIB\)\s/;
 const TestRe = /\$\(AM_TESTS_FD_REDIRECT\)\s/;
 /**
@@ -561,10 +567,14 @@ export class Recipe implements Parser {
     ingest (line: string) : [ParserDisp, Parser] {
         if (line == "")
             return [ParserDisp.Leave, this];
-        if (LinkerRe.test(line))
-            this.goal.flags |= Goal.Flags.Linked_binary;
-        if (RanlibRe.test(line))
+        if (LinkerRe.test(line)) {
+            if (this.goal.goal && LibraryRe.test(this.goal.goal))
+                this.goal.flags |= Goal.Flags.Library;
+            else
+                this.goal.flags |= Goal.Flags.Linked_binary;
+        } else if (RanlibRe.test(line)) {
             this.goal.flags |= Goal.Flags.Static_library;
+        }
         if (TestRe.test(line))
             this.goal.flags |= Goal.Flags.Test_Log;
         return [ParserDisp.Continue, this];

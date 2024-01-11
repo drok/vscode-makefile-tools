@@ -43,7 +43,6 @@ export class MyTestController {
             dir || '/', dir || "Top Test Suite",
             vscode.Uri.file(path.join(c.top_builddir, dir, sub.goal || "")
             ));
-    sub.test.tags = [this.debuggable];
     this.testGoals.set(sub.test, sub);
   }
   public addTest(logpath: string, suite: TestItem, goal: Goal, trs: TRS) : void {
@@ -53,7 +52,7 @@ export class MyTestController {
             vscode.Uri.file(resolvePathToRoot(path.join(logpath, goal.goal || ""))));
     this.testGoals.set(goal.test, goal);
     if (goal.depends?.length &&
-            (goal.depends[0].flags & Goal.Flags.Linked_binary))
+            (goal.depends[0].flags & Goal.Flags.Test_Program))
         goal.test.tags = [this.debuggable];
     suite.children.add(goal.test);
   }
