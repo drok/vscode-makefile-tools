@@ -79,14 +79,19 @@ export class Making implements Parser {
 
             //throw new Error("compilerTool.fullPath is not a string (eg, subshell)");
             /* FIXME: this isCompiler() functionality is a placeholder */
-            var srcDir = util.resolvePathToRoot(caller.make.dir);
-            if(ObjectFileRE.test(caller.currentTarget)) {
-                this.handleCompilerCommand(tool, caller.currentDir, srcDir);
+            if (tool.ltmode === 'link') {
+                this.handleLinkerCommand(tool, caller.currentDir, caller.currentTarget);
             } else {
-                if (linkers.includes(path.basename(tool.fullPath)))
-                    this.handleLinkerCommand(tool, caller.currentDir);
-                else if (tool.argv.length && typeof tool.argv[0] == "string" && path.basename(tool.argv[0]) == "libtool" && tool.hasArg(["mode=link"]))
-                    this.handleLinkerCommand(tool, caller.currentDir);
+                var srcDir = util.resolvePathToRoot(caller.make.dir);
+                if(ObjectFileRE.test(caller.currentTarget)) {
+                    this.handleCompilerCommand(tool, caller.currentDir, srcDir);
+                } else {
+                    /* FIXME: Do this if Flags.Linked_Target - but the rule is printed after exec. Tweak dry-runner ?*/
+                    if (linkers.includes(path.basename(tool.fullPath)))
+                        this.handleLinkerCommand(tool, caller.currentDir, caller.currentTarget);
+                    else if (tool.argv.length && typeof tool.argv[0] == "string" && path.basename(tool.argv[0]) == "libtool" && tool.hasArg(["mode=link"]))
+                        this.handleLinkerCommand(tool, caller.currentDir, caller.currentTarget);
+                }
             }
         }
     }
@@ -185,7 +190,7 @@ export class Making implements Parser {
         }
     } // handleCompilerCommand function
 
-    async handleLinkerCommand(tool : ToolInvocation, currentPath : string): Promise<void> {
+    async handleLinkerCommand(tool : ToolInvocation, currentPath : string, currentTarget : string): Promise<void> {
 
         // A target binary is usually produced by the linker with the /out or /o switch,
         // but there are several scenarios (for win32 Microsoft cl.exe)
@@ -201,7 +206,7 @@ export class Making implements Parser {
 
             if (path.basename(tool.fullPath).startsWith("cl")) {
                 if (!tool.hasArg(["c", "P", "E", "EP"])) {
-                    logger.message("Found compiler command:\n" + tool, "Verbose");
+                    logger.message("Found linker command:\n" + tool, "Verbose");
 
                     // First read the value of the /Fe switch (for cl.exe)
                     compilerTargetBinary = tool.getArg("Fe");
@@ -244,6 +249,10 @@ export class Making implements Parser {
             }
         }
 
+        if (tool.ltmode === 'link') {
+            logger.message("Found LT linker command: " + tool, "Verbose");
+            linkerTargetBinary = currentTarget;
+        } else
         // TODO: implement launch support for DLLs and LIBs, besides executables.
         if (!tool.hasArg(["dll", "lib", "shared"])) {
             // Gcc/Clang tools can also perform linking so don't parse any output binary
@@ -305,9 +314,11 @@ export class Making implements Parser {
         // Additionally, for linker commands, ignore any dollar if present in the target binary name.
         // We need to ignore the $ anywhere else in the linker command line so that we don't lose
         // valid target binaries.
-        if (targetBinary && !targetBinary.includes("$")) {
+        if (!targetBinary || targetBinary.includes("$")) {
+            throw new Error("targets should never have dollar signs");
+        } else
             this.targetBinaries.push(targetBinary);
-        }
+
     }; // handleLinkerCommand function
 
     targetBinaries: string[] = [];

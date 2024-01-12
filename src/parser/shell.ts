@@ -170,6 +170,9 @@ export interface ToolInvocation {
     // plus the file name, with the extension appended (for windows)
     fullPath: string;
 
+    // Libtool mode (compile, link)
+    ltmode: string | undefined;
+
     // if found at the full path resolved above
     found: boolean;
 
@@ -213,14 +216,16 @@ export interface ToolInvocation {
 }
 
 export class Tool implements ToolInvocation {
-    constructor(pathInMakefile : string, fullPath: string, found: boolean, argv: string[]) {
+    constructor(pathInMakefile : string, fullPath: string, ltmode: string | undefined, found: boolean, argv: string[]) {
         this.pathInMakefile = pathInMakefile;
         this.fullPath = fullPath;
+        this.ltmode = ltmode;
         this.found = found;
         this.argv = argv;
     }
     pathInMakefile: string;
     fullPath: string;
+    ltmode: string | undefined; // libtool mode (compile, link)
     found: boolean;
     argv: string[];
 
@@ -357,39 +362,38 @@ export class Executing implements Parser {
     linebuf : string = "";
 }
 
-function parseToolCmd(line: string) : Tool {
-    let tool = new Tool(
-        // don't use join and neither paths/filenames processed above if we want to keep the exact text in the makefile
-        // match[1] + match[2],
-        "",
-        "", // toolFullPath,
-        true, // toolFound,
-        parseToolArguments(line)
-    );
-    tool.fullPath = tool.argv.shift() || "";
-    return tool;
-}
-
 const LibtoolRE = /^[^\s]+ [^\s]+\/libtool .* (?:--mode=(\w+)) (.*) (?:\`test -f .*\`)?([^`\s]+)\s*$/;
 const VpathRE = /^(.*) (?:\`test -f .*\`)([^`\s]+)\s*$/;
 
 // Parse a command line, removing comments, compound statements (||, &&)
 // redirections, and unescaping shell escape sequences
-function parseToolArguments(args: string): string[] {
-    let libtool_cmd = LibtoolRE.exec(args);
+function parseToolCmd(line: string) : Tool {
+    let libtool_cmd = LibtoolRE.exec(line);
+    let ltmode : string | undefined;
     if (libtool_cmd) {
         /* If this is is libtool, remove the VPATH test and everything before --mode=compile */
-        args = libtool_cmd[2] + ' ' + libtool_cmd[3];
+        line = libtool_cmd[2] + ' ' + libtool_cmd[3];
+        ltmode = libtool_cmd[1];
         /* TODO : Use libtool_cmd[1] = compile | link */
     } else {
-        let vpath_cmd = VpathRE.exec(args);
+        let vpath_cmd = VpathRE.exec(line);
         if (vpath_cmd) {
-            args = vpath_cmd[1] + ' ' + vpath_cmd[2];
+            line = vpath_cmd[1] + ' ' + vpath_cmd[2];
         }
     }
-    let parsedCmdLine = parse(args);
+    let parsedCmdLine = parse(line);
     let numArgs: number = parsedCmdLine.findIndex(v => typeof v !== "string");
     numArgs = numArgs == -1 ? parsedCmdLine.length : numArgs + 1;
-    // TODO: Avoid this song and dance with removing optargs by having Intellisense ignore the args it doesn't care about
-    return (parsedCmdLine.slice(0, numArgs) as string[]);
+
+    let tool = new Tool(
+        // don't use join and neither paths/filenames processed above if we want to keep the exact text in the makefile
+        // match[1] + match[2],
+        "",
+        "", // toolFullPath,
+        ltmode,
+        true, // toolFound,
+        parsedCmdLine.slice(0, numArgs) as string[]
+    );
+    tool.fullPath = tool.argv.shift() || "";
+    return tool;
 }
