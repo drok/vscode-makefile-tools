@@ -1,3 +1,6 @@
 [submodule "vendor/gnumake"]
 	path = vendor/gnumake
 	url = ../make
+[submodule "vendor/automake"]
+	path = vendor/automake
+	url = ../automake
