@@ -232,6 +232,7 @@ export class Make implements Parser {
     submake: Map<string, Make> = new Map();
     /* builtins set prevents the same builtin warning to be printed multiple times */
     test_suite: Goal | undefined;
+    hasStats?: boolean;
     stats: {
         tests: number;
         programs: number;
@@ -546,7 +547,7 @@ export class Goal extends Node implements Parser {
         super();
     }
     depends: Goal[] | undefined = undefined;
-    task: vscode.Task | undefined;
+    task: vscode.Task | Map<string,vscode.Task> | undefined;
     test: vscode.TestItem | undefined;
 }
 

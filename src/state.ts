@@ -27,6 +27,16 @@ export class StateManager {
     this._update('buildConfiguration', v);
   }
 
+
+  // The project build configuration (one of the entries in the array of autotools.configurations
+  // or a default).
+  get testEnvironment(): string | undefined {
+    return this._get<string>('testEnvironment');
+  }
+  set testEnvironment(v: string | undefined) {
+    this._update('testEnvironment', v);
+  }
+
   // The project build target (one of the targets defined in the makefile).
   get buildTarget(): BuildTarget | undefined {
     return this._get<BuildTarget>('buildTarget');

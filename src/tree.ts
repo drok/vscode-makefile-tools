@@ -66,10 +66,10 @@ export class SubNode extends Node {
             goals.push(...[...this.submake.goals.values()]
                 // Bit of a hack to hardcode excluding test_program
                 .filter(goal => (goal.flags & this.flags) && !(goal.flags & Goal.Flags.Test_Program))
-                .map(goal => new TaskNode(goal)));
+                .map(goal => new TaskNode(goal, this.submake)));
         } else if (this.submake.test_suite?.depends)
             goals.push(...this.submake.test_suite.depends
-                    .map(test => new TaskNode(test)));
+                    .map(test => new TaskNode(test, this.submake)));
         return goals;
     }
 
@@ -111,7 +111,7 @@ export class SubNode extends Node {
 }
 
 export class TaskNode extends Node {
-    constructor(public goal: Goal) {
+    constructor(public goal: Goal, private make: Make) {
         super();
     }
 
@@ -137,41 +137,26 @@ export class TaskNode extends Node {
             return item;
 
         if (this.goal.flags & Goal.Flags.Test_Log) {
-            const definition: TestTask = <any>this.goal.task.definition;
             item.resourceUri = vscode.Uri.from({
                 scheme: "test",
                 authority: Extension.whoami,
-                path: '/' +  definition.test?.builddir,
+                path: '/' +  this.make.dir,
                 query:  this.goal.goal,
             });
         }
         return item;
     }
     logfile() : string | undefined {
-        if (!this.goal.task)
-            return undefined;
-        if ((this.goal.flags & Goal.Flags.Test_Log)) {
-            const definition: TestTask = <any>this.goal.task.definition;
-            if (definition.test)
-                return path.join(definition.test.builddir, definition.test.goal);
-        }
-        return undefined;
+        return this.goal.test?.id;
     }
 
 }
 
 
 export class TaskSection extends Node {
-    constructor(build_tree: Make, name: string, flag: number) {
+    constructor(private tree: Make, private _name: string, private flag: number) {
         super();
-        this.tree = build_tree;
-        this._name = name;
-        this.flag = flag;
     }
-
-    tree: Make;
-    flag: number;
-    _name: string;
 
 //    update(targetName: BuildTarget): void {
 //        this._name = localize("tree.build.target", "Build target: {0}", `[${targetName.goal} @ ${targetName.builddir}]`);
@@ -182,10 +167,10 @@ export class TaskSection extends Node {
                 .map(sub => new SubNode(sub, this.flag));
             goals.push(...[...this.tree.goals.values()]
                 .filter(goal => goal.flags & this.flag)
-                .map(goal => new TaskNode(goal)));
+                .map(goal => new TaskNode(goal, this.tree)));
             if ((this.flag & Goal.Flags.Test_Suite) && this.tree.test_suite?.depends)
                 goals.push(...this.tree.test_suite.depends
-                    .map(test => new TaskNode(test)));
+                    .map(test => new TaskNode(test, this.tree)));
             return goals;
     }
 
@@ -237,20 +222,9 @@ export class TaskSection extends Node {
 }
 
 export class ConfigurationNode extends Node {
-    constructor(private _name : string | undefined) {
+    constructor(private _name : string | undefined, private build_tree: Make) {
         super();
         // super(`configuration:${configurationName}`);
-    }
-
-    build_tree: Make | undefined;
-
-    update(configurationName: string): void {
-        this._name = configurationName;
-    }
-
-    updateTargets(build_tree: Make) : void {
-        this.build_tree = build_tree;
-        countStats(build_tree);
     }
 
 //    private hasGoalKind(flag: number) : boolean {
@@ -292,15 +266,10 @@ export class ProjectOutlineProvider implements vscode.TreeDataProvider<Node> {
     private readonly _changeEvent = new vscode.EventEmitter<Node | null>();
     //private readonly _unsetString = localize("Unset", "Unset");
 
-    constructor(configuration: string | undefined) {
-        this._currentConfigurationItem = new ConfigurationNode(configuration);
+    constructor(private configuration: string | undefined) {
     }
 
-    private _currentConfigurationItem: ConfigurationNode;
-
-    public refresh(): any {
-        this._changeEvent.fire(this._currentConfigurationItem);
-    }
+    private tree: Make = new Make('', '');
 
     get onDidChangeTreeData(): any {
         return this._changeEvent.event;
@@ -309,15 +278,19 @@ export class ProjectOutlineProvider implements vscode.TreeDataProvider<Node> {
         return node.getTreeItem();
     }
     getChildren(node?: Node): Node[] {
-        if (node) {
-            //throw new Error("Unexpected request for children of ProjectOutlineProvider");
-            return node.getChildren();
+        let goals : Node[];
+        if (!node) {
+            goals = [...this.tree.submake.values()]
+                .map(sub => new SubNode(sub, Goal.Flags.Linked_binary));
+            goals.push(...[...this.tree.goals.values()]
+                .filter(goal => goal.flags & Goal.Flags.Linked_binary)
+                .map(goal => new TaskNode(goal, this.tree)));
+        } else {
+            goals = node.getChildren();
         }
-        return [this._currentConfigurationItem];
-     }
+        return goals;
+    }
     public getParent(element: Node): Node | undefined {
-        //const parent = element. resource.with({ path: dirname(element.resource.path) });
-        // return parent.path !== '//' ? { resource: parent, isDirectory: true } : undefined;
         if (!(element instanceof ConfigurationNode))
             throw new Error("Unexpected request for parent of non-ConfigurationNode");
         return element instanceof ConfigurationNode ? undefined : {} as Node;
@@ -336,19 +309,88 @@ export class ProjectOutlineProvider implements vscode.TreeDataProvider<Node> {
        return (!checkFileExists ? `${kind} (not found)` : `${kind}`) + `: [${makeRelative ? util.makeRelPath(finalPath, util.getWorkspaceRoot()) : finalPath}]`;
     }
 
+    // Updates the tree when build configuration changes
     async update(configuration: string): Promise<void> {
-        this._currentConfigurationItem.update(configuration);
-
+        this.configuration = configuration;
         this.updateTree();
     }
 
-    updateConfiguration(configuration: string): void {
-        this._currentConfigurationItem.update(configuration);
-        this.updateTree();
-    }
-
+    // Updates the tree when settings.json changes
     updateTargets(build_tree: Make) : void {
-        this._currentConfigurationItem.updateTargets(build_tree);
+        this.tree = build_tree;
+        if (!build_tree.hasStats) {
+            countStats(build_tree);
+            build_tree.hasStats = true;
+        }
+        this.updateTree();
+    }
+
+    updateTree(): void {
+        this._changeEvent.fire(null);
+    }
+}
+
+export class ProjectTestsProvider implements vscode.TreeDataProvider<Node> {
+    private readonly _changeEvent = new vscode.EventEmitter<Node | null>();
+
+    constructor() {
+    }
+    private tree: Make = new Make('', '');
+
+    public refresh(): any {
+        this._changeEvent.fire(null);
+    }
+
+    get onDidChangeTreeData(): any {
+        return this._changeEvent.event;
+    }
+    async getTreeItem(node: Node): Promise<vscode.TreeItem> {
+        return node.getTreeItem();
+    }
+    getChildren(node?: Node): Node[] {
+        let goals : Node[];
+        if (!node) {
+            goals = [...this.tree.submake.values()]
+                .map(sub => new SubNode(sub, Goal.Flags.Test_Suite));
+            goals.push(...[...this.tree.goals.values()]
+                .filter(goal => goal.flags & Goal.Flags.Test_Suite)
+                .map(goal => new TaskNode(goal, this.tree)));
+            if (this.tree.test_suite?.depends)
+                goals
+                .push(...this.tree.test_suite.depends
+                .map(test => new TaskNode(test, this.tree)));
+        } else {
+            goals = node.getChildren();
+        }
+        return goals;
+    }
+    public getParent(element: Node): Node | undefined {
+        if (!(element instanceof ConfigurationNode))
+            throw new Error("Unexpected request for parent of non-ConfigurationNode");
+        return element instanceof ConfigurationNode ? undefined : {} as Node;
+    }
+
+    pathDisplayed(pathInSettings: string | undefined, kind: string, searchInPath: boolean, makeRelative: boolean): string {
+       if (!pathInSettings) {
+         return `${kind}: [Unset]`;
+       }
+
+       const pathBase: string | undefined = (searchInPath && path.parse(pathInSettings).dir === "") ? path.parse(pathInSettings).base : undefined;
+       const pathInEnv: string | undefined = pathBase ? (path.join(util.toolPathInEnv(pathBase) || "", pathBase)) : undefined;
+       const finalPath: string = pathInEnv || pathInSettings;
+       let checkFileExists: boolean = pathInSettings !== undefined;
+
+       return (!checkFileExists ? `${kind} (not found)` : `${kind}`) + `: [${makeRelative ? util.makeRelPath(finalPath, util.getWorkspaceRoot()) : finalPath}]`;
+    }
+
+    // Updates the tree when build configuration changes
+    async update(configuration: string): Promise<void> {
+        this.updateTree();
+    }
+
+    // Updates the tree when settings.json changes
+    updateTargets(build_tree: Make) : void {
+        this.tree = build_tree;
         this.updateTree();
     }
 

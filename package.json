@@ -206,6 +206,57 @@
             "type": "object",
             "title": "Autotools",
             "properties": {
+
+                "autotools.test_environments": {
+                    "type": "array",
+                    "default": [],
+                    "description": "%autotools.configuration.test_environments.description%",
+                    "items" : {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "format": "/^[a-zA-Z0-9_-]+$/",
+                            "description": "%autotools.configuration.test_environments.name.description%",
+                            "examples": ["legacy", "modern", "future"]
+                          },
+                          "TESTS_ENVIRONMENT" : {
+                            "type": "array",
+                            "default": [],
+                            "title": "%autotools.configuration.tests_environment.TESTS_ENVIRONMENT.sub.title%",
+                            "items": {
+                                "type": "object",
+                                "default": {},
+                                "properties": {
+                                    "name": {
+                                        "type": "string"
+                                    },
+                                    "value": {
+                                        "type": "string"
+                                    }
+                                }
+                            }
+                          },
+                          "XFAIL_TESTS" : {
+                            "type": "array",
+                            "default": [],
+                            "title": "%autotools.configuration.tests_environment.XFAIL_TESTS.sub.title%",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "required": ["name"],
+                        "title": "%autotools.configuration.tests_environment.title%",
+                        "default": {
+                            "name": "modern",
+                            "TESTS_ENVIRONMENT": [
+                                { "name": "VAR1", "value": "modern-1" }, {"name": "VAR2", "value": "mod2"}
+                            ]
+                        }
+                    }
+                },
+
                 "autotools.configurations": {
                     "type": "array",
                     "default": [],
@@ -218,6 +269,7 @@
                             "name": "Debug",
                             "top_builddir": "build/Debug",
                             "configureArgs": [
+                                "--enable-option-checking",
                                 "CFLAGS=-ggdb3 -O0",
                                 "CXXFLAGS=-ggdb3 -O0"
                             ]
@@ -308,6 +360,33 @@
                     },
                     "scope": "resource"
                 },
+
+                "autotools.TESTS_ENVIRONMENT" : {
+                    "type": "array",
+                    "default": [],
+                    "title": "%autotools.configuration.tests_environment.TESTS_ENVIRONMENT.global.title%",
+                    "items": {
+                        "type": "object",
+                        "default": {},
+                        "properties": {
+                            "name": {
+                                "type": "string"
+                            },
+                            "value": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                },
+                "autotools.XFAIL_TESTS" : {
+                    "type": "array",
+                    "default": [],
+                    "title": "%autotools.configuration.tests_environment.XFAIL_TESTS.sub.title%",
+                    "items": {
+                      "type": "string"
+                    }
+                },
+
                 "autotools.loggingLevel": {
                     "type": "string",
                     "enum": [
@@ -480,6 +559,12 @@
                     "icon": "res/viewcontainer.svg",
 
                     "name": "%autotools.configuration.views.makefile.outline.description%"
+                },
+                {
+                    "id": "autotools.tests",
+                    "icon": "res/viewcontainer.svg",
+
+                    "name": "%autotools.configuration.views.testsuites.description%"
                 }
             ]
         },
@@ -681,7 +766,7 @@
                 },
                 {
                     "command": "autotools.outline.checkAll",
-                    "when": "view == autotools.outline",
+                    "when": "view == autotools.tests",
                     "group": "1_makefileOutline@3"
                 },
                 {
@@ -708,22 +793,22 @@
                 },
                 {
                     "command": "autotools.test",
-                    "when": "view == autotools.outline && viewItem =~ /nodeType=test/",
+                    "when": "view == autotools.tests && viewItem =~ /nodeType=test/",
                     "group": "inline@10"
                 },
                 {
                     "command": "autotools.debug",
-                    "when": "view == autotools.outline && viewItem =~ /nodeType=bintest/",
+                    "when": "view == autotools.tests && viewItem =~ /nodeType=bintest/",
                     "group": "inline@9"
                 },
                 {
                     "command": "autotools.check",
-                    "when": "view == autotools.outline && viewItem =~ /nodeType=check/",
+                    "when": "view == autotools.tests && viewItem =~ /nodeType=check/",
                     "group": "inline@11"
                 },
                 {
                     "command": "autotools.checkAll",
-                    "when": "view == autotools.outline && viewItem =~ /nodeType=allcheck/",
+                    "when": "view == autotools.tests && viewItem =~ /nodeType=allcheck/",
                     "group": "inline@11"
                 },
                 {
@@ -733,7 +818,7 @@
                 },
                 {
                     "command": "autotools.openLog",
-                    "when": "view == autotools.outline && viewItem =~ /nodeType=check/",
+                    "when": "view == autotools.tests && viewItem =~ /nodeType=check/",
                     "group": "inline@2"
                 },
                 {

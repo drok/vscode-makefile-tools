@@ -155,6 +155,10 @@ let export_stats : {
     checks: number;
 };
 
+export function supportsTestEnvironments() : boolean {
+    return true;
+}
+
 export var builtin_targets : Set<string> = new Set();
 // Targets need to parse a dryrun make invocation that does not include a target name
 // (other than default empty "" or the standard "all"), otherwise it would produce
@@ -920,17 +924,18 @@ export function readTRS(b: BuildTarget) : TRS
         const fileContent = fs.readFileSync(trs, 'utf8');
         const lines = fileContent.split('\n');
 
-        let testResult = '';
+        //let testResult = '';
         let globalTestResult = '';
 
         for (const line of lines) {
-            if (line.startsWith(':test-result:')) {
-                testResult = line.split(':test-result:')[1].trim();
-            } else if (line.startsWith(':global-test-result:')) {
+            //if (line.startsWith(':test-result:')) {
+            //    testResult = line.split(':test-result:')[1].trim();
+            //} else
+            if (line.startsWith(':global-test-result:')) {
                 globalTestResult = line.split(':global-test-result:')[1].trim();
             }
         }
-        switch (testResult || globalTestResult) {
+        switch (/*testResult || */globalTestResult) {
             case "XPASS": return TRS.XPASS;
             case "PASS": return TRS.PASS;
             case "SKIP": return TRS.SKIP;

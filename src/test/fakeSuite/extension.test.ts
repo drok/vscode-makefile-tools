@@ -377,7 +377,6 @@ suite('Fake dryrun parsing', /*async*/() => {
          name: "MyTmpName",
          isDefault: false,
          top_builddir: "",
-         nolog: {},
          makeArgs: ["${command:makefile.getLaunchTargetPath}",
                     "${SomeUnsupportedVar}",
                     "try_\\${escape_varexp1}_various_\\${escape_varexp2}_escapes",

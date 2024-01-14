@@ -21,9 +21,9 @@ import * as nls from 'vscode-nls';
 import { dir } from 'console';
 import { Disposable } from 'vscode-jsonrpc';
 import { AutoToolsBuildTaskProvider, BuildTask } from './tasks';
-import assert = require('assert');
-import { fstat } from 'fs';
-import G = require('glob');
+import { assert } from 'console';
+import { parse, quote } from '@mergesium/shell-quote';
+
 nls.config({ messageFormat: nls.MessageFormat.bundle, bundleFormat: nls.BundleFormat.standalone })();
 const localize: nls.LocalizeFunc = nls.loadMessageBundle();
 
@@ -60,12 +60,40 @@ export interface MakefileConfiguration {
     isDefault: boolean;
 
     // unwriteable file used to block autmake TEST_SUITE outputting summaries for indiv. tests
-    nolog: vscode.ProcessExecutionOptions;
+    // One environment set for each TestEnvironment, indexed by name
+    //nologs: Map<string,vscode.ProcessExecutionOptions>;
 
     // TODO: investigate how flexible this is to integrate with other build systems than the MAKE family
     // (basically anything that can produce a dry-run output is sufficient)
     // Implement set-able dry-run, verbose, change-directory and always-make switches
     // since different tools may use different arguments for the same behavior
+}
+
+export interface TestEnvironment {
+    // A name associated with this environment
+    name: string;
+
+    // A set of environment variables
+    TESTS_ENVIRONMENT?: EnvironmentSetting[];
+
+    // List of tests expected to fail
+    XFAIL_TESTS?: string[];
+
+    // Testing UI run profile
+    run?: vscode.TestRunProfile;
+
+    // Testing UI debug profile
+    debug?: vscode.TestRunProfile;
+
+    // Environemnts for single tests and for check suites
+    testExecOptions?: vscode.ProcessExecutionOptions;
+    checkExecOptions?: vscode.ProcessExecutionOptions;
+    testDebugEnv?: { [key: string]: string }
+}
+
+export interface EnvironmentSetting {
+    name: string;
+    value: string;
 }
 
 let currentMakefileConfigurationName: string | "Default";
@@ -85,34 +113,10 @@ export async function setCurrentMakefileConfiguration(configuration: string | un
         name: "Default",
         top_builddir: defaultBuildFolder(),
         isDefault: true,
-        nolog: {}
     }
-    let nolog_file = path.join(currentMakefileConfiguration.top_builddir,"no-partial-suite-log");
-    let tmp = nolog_file + '.tmp';
-    try {
-        fs.stat(tmp, (err) => {
-            if (err?.code === 'ENOENT') {
-                fs.createWriteStream(tmp, {flags: 'w'})
-                .on('close', () => fs.chmodSync(tmp, "0444"))
-                .close();
-            }
-        });
-    } catch (err) {
-        // Ignore. If chmod failed, the summary will be printed when single tests are run.
-        // Ugly, but no reason to alarm the user.
-    }
-    currentMakefileConfiguration.nolog ={
-        // These options are static, and not relevant to the end-user. Avoid displaying them to the user
-        env: {
-            // FIXME: generate a proper tmpfile with extension .tmp and make it
-            // readonly, This prevents the test suite summary being printed.
-            "TEST_SUITE_LOG": nolog_file,
-            "SUBDIRS": "",
-            // Suppress bash's error message "/bin/bash: line 74: /tmp/tmp-suite-log.tmp: Permission denied" to stderr
-            "am__sh_e_setup": 'set +e; exec 2> /dev/null'
-    }};
     statusBar.setConfiguration(currentMakefileConfiguration.name, currentMakefileConfiguration.top_builddir);
     extension.onConfigurationSelect(currentMakefileConfiguration);
+    updateEnvironmentsForCurrentMakefile();
 }
 
 // Read the current configuration from workspace state, update status bar item
@@ -221,7 +225,7 @@ export function setConfigurationProblemMatchers(problemMatchers: string[]): void
 // Analyze the settings of the current makefile configuration and the global workspace settings,
 // according to various merging rules and decide what make command and build log
 // apply to the current makefile configuration.
-async function analyzeConfigureParams(): Promise<void> {
+async function analyzeConfigureParams(reload: boolean): Promise<void> {
     let relativeMakefile = findMakefile();
     let reason : string;
 
@@ -255,6 +259,8 @@ async function analyzeConfigureParams(): Promise<void> {
         extension._projectOutlineProvider.update(currentMakefileConfigurationName);
         extension.createPanel();
         await logMakeCmd(relativeMakefile);
+        extension.setConfiguration(getCurrentMakefileConfiguration().name);
+        extension.setTestEnvironment();
     }
 
     await extension.setFullFeatureSet(relativeMakefile ? true : false);
@@ -372,14 +378,6 @@ export async function readMakefileConfigurations(currentConfigurationName : stri
         }
     });
 
-    if (detectedUnnamedConfigurations) {
-        logger.message("Updating makefile configurations in settings.");
-        await workspaceConfiguration.update("configurations", makefileConfigurations);
-    }
-
-    // Now read "makefile.configurations" again and expand as needed.
-    makefileConfigurations = await util.getExpandedSetting<MakefileConfiguration[]>("configurations") || [];
-
     // Log the updated list of configuration names
     const makefileConfigurationNames: string[] = makefileConfigurations.map((k => {
         return k.name;
@@ -400,6 +398,165 @@ export async function readMakefileConfigurations(currentConfigurationName : stri
     }
 }
 
+let testEnvironments: TestEnvironment[] = [];
+export function getTestEnvironments(): TestEnvironment[] { return testEnvironments; }
+
+let loadedTestEnvironments: TestEnvironment[] = [];
+export function getLoadedEnvironments(): TestEnvironment[] { return loadedTestEnvironments; }
+
+//export function setMakefileConfigurations(configurations: MakefileConfiguration[]): void { makefileConfigurations = configurations; }
+
+// Read make configurations optionally defined by the user in settings: makefile.configurations.
+export async function readTestEnvironments(): Promise<void> {
+    // We need to read "makefile.configurations" unexpanded first, because we may write back into these settings
+    // in case we indentify "name" missing. We'll expand later, see end of function.
+    let workspaceConfiguration: vscode.WorkspaceConfiguration = vscode.workspace.getConfiguration("autotools");
+    loadedTestEnvironments = workspaceConfiguration.get<TestEnvironment[]>("test_environments") || [];
+    let unnamedConfigurationId: number = 0;
+    testEnvironments = [];
+
+    vscode.commands.executeCommand('setContext', "autotools:haveEnvironments",
+        testEnvironments.length ? true : false);
+
+    const unnamedPrefix = "Unnamed";
+    // Collect unnamed configurations (probably) defined by the extension earlier,
+    // to make sure we avoid duplicates in case any new configuration is in need of a name.
+    let unnamedConfigurationNames: string [] = testEnvironments.map((k => {
+        return k.name || unnamedPrefix;
+    }));
+    unnamedConfigurationNames = unnamedConfigurationNames.filter(item => (item && item.startsWith("Unnamed")));
+    var global_XFAIL_TESTS = getProjectTestEnvironment().XFAIL_TESTS??[];
+    loadedTestEnvironments.forEach(element => {
+        if (!element.name) {
+            // Just considering the possibility that there are already unnamed configurations
+            // defined with IDs other than the rule we assume (like not consecutive numbers, but not only).
+            // This may happen when the user deletes configurations at some point without updating the IDs.
+            unnamedConfigurationId++;
+            let autoGeneratedName: string = `${unnamedPrefix}-${unnamedConfigurationId}`;
+            while (unnamedConfigurationNames.includes(autoGeneratedName)) {
+                unnamedConfigurationId++;
+                autoGeneratedName = `${unnamedPrefix}-${unnamedConfigurationId}`;
+            }
+
+            element.name = autoGeneratedName;
+            logger.message(`Defining name ${autoGeneratedName} for unnamed test environment ${element}.`);
+        }
+        // element.testExecOptions = processExecutionOptions(element);
+        // element.checkExecOptions = processExecutionOptions(element);
+        testEnvironments.push({
+            name: element.name,
+            /* Need separate ExecOptions for test and check commands because test run with SUBDIRS env in updateEnvironmentsForCurrentMakefile() */
+            testExecOptions: processExecutionOptions(element),
+            checkExecOptions: processExecutionOptions(element),
+            testDebugEnv: processDebugEnvironment(element),
+            XFAIL_TESTS: element.XFAIL_TESTS ? [...global_XFAIL_TESTS,...element.XFAIL_TESTS??[]] : global_XFAIL_TESTS});
+    });
+
+    // Log the updated list of configuration names
+    const testEnvironmentNames: string[] = testEnvironments.map((k => {
+        return k.name;
+    }));
+    if (testEnvironmentNames.length > 0) {
+        logger.message("Defined autotools.test_environments: " + testEnvironmentNames.join(";"), "Verbose");
+    } else {
+        testEnvironments = [ { name: "Default", "TESTS_ENVIRONMENT": [] } ];
+    }
+    extension.setTestEnvironment();
+}
+
+function updateEnvironmentsForCurrentMakefile(): void {
+    // FIXME: store this R/O file somewhere global, to avoid updating environments per current makefile
+    let nolog_file = util.resolvePathToRoot(path.join(currentMakefileConfiguration.top_builddir,"no-partial-suite-log"));
+    let tmp = nolog_file + '.tmp';
+    try {
+        fs.stat(tmp, (err) => {
+            if (err?.code === 'ENOENT') {
+                fs.createWriteStream(tmp, {flags: 'w'})
+                .on('close', () => fs.chmodSync(tmp, "0444"))
+                .close();
+            }
+        });
+    } catch (err) {
+        // Ignore. If chmod failed, the summary will be printed when single tests are run.
+        // Ugly, but no reason to alarm the user.
+    }
+//    currentMakefileConfiguration.nologs = new Map();
+    testEnvironments.forEach((e) => {
+        // These options are static, and not relevant to the end-user. Avoid displaying them to the user
+        // FIXME: generate a proper tmpfile with extension .tmp and make it
+        // readonly, This prevents the test suite summary being printed.
+        let env = e.testExecOptions?.env;
+        if (env) {
+            env['TEST_SUITE_LOG'] = nolog_file;
+            env['SUBDIRS'] = "";
+            // Suppress bash's error message "/bin/bash: line 74: /tmp/tmp-suite-log.tmp: Permission denied" to stderr
+            env['am__sh_e_setup'] = 'set +e; exec 2> /dev/null';
+            if (make.supportsTestEnvironments()) {
+                env['LOG_DRIVER'] = extension.testRunner;
+                env['LOG_DRIVER_FLAGS'] = `--env-name "${env.name}"`;
+            }
+        }
+        env = e.checkExecOptions?.env;
+        if (env && make.supportsTestEnvironments()) {
+            env['LOG_DRIVER'] = extension.testRunner;
+            env['LOG_DRIVER_FLAGS'] = `--env-name "${env.name}"`;
+        }
+    });
+   
+}
+function processExecutionOptions(env: TestEnvironment) : vscode.ProcessExecutionOptions {
+    var vars : string[] = [];
+    testEnvironment.TESTS_ENVIRONMENT?.forEach(e => {
+        e.name &&
+            vars.push(`${e.name}=` + quote([`${e.value}`]));
+    });
+    env.TESTS_ENVIRONMENT?.forEach(e => {
+        e.name &&
+            vars.push(`${e.name}=` + quote([`${e.value}`]));
+    });
+    return { env: { TESTS_ENVIRONMENT: vars.join(' ')} };
+}
+function processDebugEnvironment(env: TestEnvironment) : { [key: string]: string } {
+    var vars : { [key: string]: string } = {};
+    testEnvironment.TESTS_ENVIRONMENT?.forEach(e => {
+        e.name &&
+            (vars[e.name] = e.value);
+    });
+    env.TESTS_ENVIRONMENT?.forEach(e => {
+        e.name &&
+            (vars[e.name] = e.value);
+    });
+    return vars;
+}
+
+export function getTestEnvironment(name: string) : TestEnvironment {
+    return testEnvironments.find(k => k.name === name) || testEnvironments[0];
+}
+
+export function getProjectTestEnvironment() : TestEnvironment {
+    return testEnvironment;
+}
+export function getCurrentTestEnvironment() : TestEnvironment {
+    return testEnvironments[0];
+}
+
+let testEnvironment : TestEnvironment = { name: "Default", TESTS_ENVIRONMENT: [] };
+
+export async function readProjectTestEnvironment(): Promise<void> {
+    let workspaceConfiguration: vscode.WorkspaceConfiguration = vscode.workspace.getConfiguration("autotools");
+    testEnvironment.TESTS_ENVIRONMENT = workspaceConfiguration.get<EnvironmentSetting[]>("TESTS_ENVIRONMENT") ||
+        [];
+
+    testEnvironment.XFAIL_TESTS = workspaceConfiguration.get<string[]>("XFAIL_TESTS") || [];
+
+    vscode.commands.executeCommand('setContext', "autotools:haveGlobalWaivers",
+        testEnvironment.XFAIL_TESTS?.length ? true : false);
+
+    if (testEnvironment.XFAIL_TESTS && testEnvironment.XFAIL_TESTS.length > 0) {
+        logger.message("Defined autotools.XFAIL_TESTS: " + testEnvironment.XFAIL_TESTS.join(";"), "Verbose");
+    }
+}
+
 // The current target is the read from the default built task,
 // or the first Linked_binary target
 export async function getCurrentTarget(): Promise<make.BuildTarget> {
@@ -414,7 +571,9 @@ export async function getCurrentTarget(): Promise<make.BuildTarget> {
     if (default_build) {
         // assert(default_build.definition);
         const definition: BuildTask = <any>default_build.definition;
-        assert(definition && definition.target);
+        assert(definition && definition.target, "default_build should have definition and target", default_build);
+        if (!definition?.target)
+            return Promise.reject();
         return Promise.resolve(definition.target);
     }
 
@@ -422,8 +581,10 @@ export async function getCurrentTarget(): Promise<make.BuildTarget> {
     for (const[dir, targets] of buildTargets) {
         for (let [name, goal] of targets) {
             if (goal.flags & Goal.Flags.Linked_binary) {
-                assert(goal.task);
-                return Promise.resolve(goal.task.definition.target);
+                assert(goal.task, "Current target goal should have task(s)", goal);
+                if (goal.task instanceof vscode.Task)
+                    return Promise.resolve(goal.task.definition.target);
+                return Promise.reject();
             }
         }
     }
@@ -462,10 +623,13 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
     await readkeepDryRuns();
     await readkeepConfigurationCache();
     await readpromptClean();
+    await readProjectTestEnvironment();
     await readMakefileConfigurations(currentMakefileConfigurationName);
-
     setCurrentMakefileConfiguration(currentMakefileConfigurationName);
-    await analyzeConfigureParams();
+
+    await readTestEnvironments();
+
+    await analyzeConfigureParams(false);
 
     // FIXME: seems wrong to do || make.t_all; this fn should probably be called
     // config arg after config is fully loaded.
@@ -479,6 +643,7 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
             // We are interested in updating only some relevant properties.
             // A subset of these should also trigger an IntelliSense config provider update.
             // Avoid unnecessary updates (for example, when settings are modified via the extension quickPick).
+            let updatedTestEnvironments : boolean = false;
             let updatedSettingsSubkeys: string[] = [];
             const keyRoot: string = "autotools";
             let subKey: string;
@@ -502,6 +667,26 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
                 updatedSettingsSubkeys.push(subKey);
             }
 
+            // Base tests environment
+            subKey = "TESTS_ENVIRONMENTS";
+            let oldProjectTestEnvironment = getProjectTestEnvironment();
+            await readProjectTestEnvironment();
+            if (!util.areEqual(oldProjectTestEnvironment, getProjectTestEnvironment())) {
+                updatedSettingsSubkeys.push(subKey);
+                updatedTestEnvironments = true;
+            }
+
+            // Read and update test environments
+            subKey = "test_environments";
+            if (!updatedTestEnvironments) {
+                let updatedEnvironments = await util.getExpandedSetting<TestEnvironment[]>(subKey);
+                updatedTestEnvironments = !util.areEqual(updatedEnvironments, getLoadedEnvironments())
+            }
+            if (updatedTestEnvironments) {
+                await readTestEnvironments();
+                updatedSettingsSubkeys.push(subKey);
+            }
+
             subKey = "configurations";
             let updatedMakefileConfigurations : MakefileConfiguration[] | undefined = await util.getExpandedSetting<MakefileConfiguration[]>(subKey);
             let updatedConfiguration: MakefileConfiguration | undefined = updatedMakefileConfigurations?.find(k => {
@@ -512,7 +697,7 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
             // TODO: should call an onConfigurationUpdate(updatedConfiguration);
             // so that not only build log, but other updated members can be handled
             if (updatedConfiguration) {
-                updatedConfiguration.nolog = currentMakefileConfiguration.nolog;
+//                updatedConfiguration.nologs = currentMakefileConfiguration.nologs;
                 if (!util.areEqual(updatedConfiguration, currentMakefileConfiguration)) {
                     const needConfigure = !util.areEqual(
                             updatedConfiguration?.configureArgs,
@@ -563,8 +748,13 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
             }
 
             // Final updates in some constructs that depend on more than one of the above settings.
-            if (extension.getState().configureDirty)
-                await analyzeConfigureParams();
+            if (!extension.getState().configureDirty) {
+                if (updatedTestEnvironments) {
+                    updateEnvironmentsForCurrentMakefile();
+                    extension.resyncTasks();
+                }
+            } else
+                await analyzeConfigureParams(true);
 
             // Report all the settings changes detected by now.
             // TODO: to avoid unnecessary telemetry processing, evaluate whether the changes done
@@ -612,7 +802,7 @@ export async function setConfigurationByName(configurationName: string | undefin
     logger.message("Re-reading settings after configuration change.");
     // Refresh settings, they may reference variables or commands reading state configuration var (${configuration}).
     await initFromSettings();
-    extension._projectOutlineProvider.updateConfiguration(currentMakefileConfigurationName);
+    extension._projectOutlineProvider.update(currentMakefileConfigurationName);
 }
 
 export function prepareConfigurationsQuickPick(): string[] {

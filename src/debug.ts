@@ -6,6 +6,8 @@ import { getCurrentTarget,
 import { BuildTarget } from './make';
 import { DebugConfigurationProvider, WorkspaceFolder, DebugConfiguration, ProviderResult } from 'vscode';
 import { resolvePathToRoot } from './util';
+import * as configuration from './configuration';
+import { Goal } from './parser/gnumake';
 
 let defaultSetupCommands = [{
     "description": "Set source directory",
@@ -19,6 +21,9 @@ let defaultSetupCommands = [{
 }
 ];
 
+export function isDebuggable(goal: Goal) : boolean {
+    return !!(goal.flags & Goal.Flags.Linked_binary);
+}
 class MyConfiguration implements vscode.DebugConfiguration {
     constructor(built: BuildTarget) {
         this.$comment = [
@@ -58,7 +63,7 @@ class MyConfiguration implements vscode.DebugConfiguration {
  * the builddir is pre-populated
  */
 export class DebugNow implements vscode.DebugConfiguration {
-    constructor(c: MakefileConfiguration, built: BuildTarget, buildit: boolean) {
+    constructor(c: MakefileConfiguration, built: BuildTarget, buildit: boolean, env?: configuration.TestEnvironment) {
         this.$comment = [
             "Debug a hardcoded target in any build configuration; customize environment and args as needed",
             "The 'cwd' is set automatically to demonstrate how",
@@ -76,7 +81,16 @@ export class DebugNow implements vscode.DebugConfiguration {
         this.environment = [{
             name: "srcdir",
             value: resolvePathToRoot(built.builddir)
-        }];
+        }]
+        if (env) {
+            if (env.testDebugEnv)
+                Object.entries(env.testDebugEnv).forEach(([k,v]) => {
+                    this.environment.push({
+                        name: k,
+                        value: v
+                    });
+                });
+        }
         this.args = [];
         this.stopAtEntry = true;
         this.preLaunchTask = buildit ? "autotools: build '" + built.goal + "'" +

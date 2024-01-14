@@ -16,13 +16,15 @@ import { extension,
         openEditor } from './extension';
 import { MakefileConfiguration } from './configuration';
 import { resolvePathToRoot } from './util';
-import { MakefileConfiguration } from './configuration';
+import * as configuration from "./configuration";
+import { TestEnvironment } from './configuration';
+import { isDebuggable } from './debug';
 
 export class MyTestController {
   private root: TestItem | undefined;
   private readonly controller: vscode.TestController;
-  private runProfile: vscode.TestRunProfile | undefined;
-  private debugProfile: vscode.TestRunProfile | undefined;
+  // private runProfiles: vscode.TestRunProfile[];
+  // private debugProfiles: vscode.TestRunProfile[];
   private coverageProfile: vscode.TestRunProfile | undefined;
   private testGoals = new WeakMap<vscode.TestItem, Goal>();
   readonly debuggable = new vscode.TestTag('debuggable');
@@ -38,6 +40,29 @@ export class MyTestController {
     this.testCompletedEvent.fire(test);
   }
 
+  public async run(test: TestItem, env: TestEnvironment) : Promise<void> {
+    const runs = this.activeRuns.get(test);
+    if (!runs) {
+        // do nothing if a run is waiting for this
+        var cancelToken = new vscode.CancellationTokenSource();
+        await env.run?.runHandler(new vscode.TestRunRequest([test], [], env.run), cancelToken.token);
+        cancelToken.dispose();
+    }
+  }
+  public async debug(test: TestItem, env: TestEnvironment) : Promise<void> {
+    const runs = this.activeRuns.get(test);
+    if (!runs) {
+        // do nothing if a run is waiting for this
+        var cancelToken = new vscode.CancellationTokenSource();
+        try {
+            await env.debug?.runHandler(new vscode.TestRunRequest([test], [], env.run), cancelToken.token);
+        } catch (e) {
+            console.error("Failed to start debugger", test);
+        }
+        cancelToken.dispose();
+
+    }
+  }
   public addSuite(c: MakefileConfiguration, dir: string, sub: Goal) : void {
     sub.test =  this.controller.createTestItem(
             dir || '/', dir || "Top Test Suite",
@@ -46,13 +71,14 @@ export class MyTestController {
     this.testGoals.set(sub.test, sub);
   }
   public addTest(logpath: string, suite: TestItem, goal: Goal, trs: TRS) : void {
+//    var testName : string = goal.task instanceof vscode.Task ? goal.task.name :
+//        goal.task instanceof Map ? goal.task.get
     goal.test = this.controller.createTestItem(
-            goal.task?.name || "",
+            path.join(logpath, goal.goal ||""),
             goal.goal || "",
             vscode.Uri.file(resolvePathToRoot(path.join(logpath, goal.goal || ""))));
     this.testGoals.set(goal.test, goal);
-    if (goal.depends?.length &&
-            (goal.depends[0].flags & Goal.Flags.Test_Program))
+    if (goal.depends?.length && isDebuggable(goal.depends[0]))
         goal.test.tags = [this.debuggable];
     suite.children.add(goal.test);
   }
@@ -64,26 +90,30 @@ export class MyTestController {
     this.controller.items.replace([]);
   }
   public update(suite: TestItem) : void {
-    this.controller.items.add(suite);
-    const run = this.controller.createTestRun(
-      new vscode.TestRunRequest(undefined, [], this.runProfile),
-      "Autotools TRS",
-      false
-    );
-    this.updateTRS(run, suite);
-    run.end();
+      this.controller.items.add(suite);
+      configuration.getTestEnvironments().forEach(env => {
+        const run = this.controller.createTestRun(
+                new vscode.TestRunRequest(undefined, [], env.run),
+                "Autotools TRS on " + env.run?.label,
+            false
+        );
+        this.updateTRS(run, suite);
+        run.end();
+      });
       // this.activate();
   }
   public trsChange(test: TestItem) : void {
     const runs = this.activeRuns.get(test);
     if (!runs) {
         // do nothing if a run is waiting for this
-        let run = this.controller.createTestRun(
-            new vscode.TestRunRequest([test], [], this.runProfile),
-            "Manual run",
-            false);
-        this.updateTRS(run, test);
-        run.end();
+        configuration.getTestEnvironments().forEach(env => {
+            let run = this.controller.createTestRun(
+                new vscode.TestRunRequest([test], [], env.run),
+                "Manual run",
+                false);
+            this.updateTRS(run, test);
+            run.end();
+        });
     }
 }
   updateGoalTRS(run: TestRun, test: TestItem, trs: TRS) : void {
@@ -116,21 +146,25 @@ export class MyTestController {
   }
 
   public activate(): void {
-      this.debugProfile = this.controller.createRunProfile(
-        'Debug',
-        vscode.TestRunProfileKind.Debug,
-        (request, token) => {
-          this.runHandler(vscode.TestRunProfileKind.Debug, request, token);
-        }, false, this.debuggable
-      );
+      configuration.getTestEnvironments().map( env => {
+        env.debug = this.controller.createRunProfile(
+            'Debug',
+            vscode.TestRunProfileKind.Debug,
+            (request, token) => {
+              this.runHandler(vscode.TestRunProfileKind.Debug, request, token, env);
+            }, false, this.debuggable
+          );
 
-      this.runProfile = this.controller.createRunProfile(
-        'Run',
-        vscode.TestRunProfileKind.Run,
-        (request, token) => {
-          this.runHandler(vscode.TestRunProfileKind.Run, request, token);
-        }, true//, {id: 'run-id'}
-    );
+          env.run = this.controller.createRunProfile(
+            env.name,
+            vscode.TestRunProfileKind.Run,
+            (request, token) => {
+                this.runHandler(vscode.TestRunProfileKind.Run, request, token, env);
+            }, true/* , {id: env.name} */
+          );
+        });
+
+/*
     if (false) { // TODO
       this.coverageProfile = this.controller.createRunProfile(
         'Coverage',
@@ -140,6 +174,7 @@ export class MyTestController {
         }
       );
     }
+*/
   }
   public deactivate() : void {
     this.controller.dispose();
@@ -148,7 +183,8 @@ export class MyTestController {
     async runHandler(
         kind: vscode.TestRunProfileKind,
         request: vscode.TestRunRequest,
-        token: vscode.CancellationToken
+        token: vscode.CancellationToken,
+        env: configuration.TestEnvironment
     ) {
         const run = this.controller.createTestRun(request);
         const queue: vscode.TestItem[] = [];
@@ -163,7 +199,7 @@ export class MyTestController {
         // For every test that was queued, try to run it. Call run.passed() or run.failed().
         // The `TestMessage` can contain extra information, like a failing location or
         // a diff output. But here we'll just give it a textual message.
-        while (queue.length > 0 && !token.isCancellationRequested) {
+        while (queue.length > 0 && !token?.isCancellationRequested) {
             const test = queue.pop()!;
 
             // Skip tests the user asked to exclude
@@ -180,16 +216,25 @@ export class MyTestController {
                             openEditor(makefile);
                         } else {
                             // test case, open in in the debugger
-                            await extension.debugGoal(goal, test.parent?.id || "");
-                            run.enqueued(test);
+                            try {
+                                await extension.debugGoal(goal, test.parent?.id || "", env);
+                            } catch (e) {
+                                console.error("Failed to start debugger", e);
+                            }
                         }
+                        run.started(test);
                         break;
                     case vscode.TestRunProfileKind.Run:
                         if (test.children.size) {
                             test. children.forEach(test => queue.push(test));
                         } else {
                             if (goal.task) {
-                                vscode.tasks.executeTask(goal.task);
+                                if (goal.task instanceof vscode.Task)
+                                    vscode.tasks.executeTask(goal.task);
+                                else {
+                                    var task = goal.task.get(env.name);
+                                    if (task) vscode.tasks.executeTask(task);
+                                }
                                 let runs = this.activeRuns.get(test);
                                 if (!runs) {
                                     runs = new Set<TestRun>();
