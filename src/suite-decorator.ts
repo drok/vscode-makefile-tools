@@ -33,20 +33,21 @@ export class SuiteDecorations implements vscode.FileDecorationProvider {
 		// const query = fromFileChangeNodeUri(uri);
         let test : Goal | undefined;
         if (uri.scheme == "check") {
-            let sub = configuration.getAllBuildTargets()
-                .get(uri.path.substring(1));
-            let test = sub?.get(uri.query);
-            if (test)
-                return  { /* tooltip: "pass: 100/2000", badge: "99", */
-                    color: ((test?.flags & Goal.Flags.Test_Result_Mask) == TRS.PASS) ? undefined :  SuiteDecorations.check_err };
-            else
+//            let sub = configuration.getAllBuildTargets()
+//                .get(uri.path.substring(1));
+//            let test = sub?.get(uri.query);
+//            if (test)
+//                return  { /* tooltip: "pass: 100/2000", badge: "99", */
+//                    color: ((test?.flags & Goal.Flags.Test_Result_Mask) == TRS.PASS) ? undefined :  SuiteDecorations.check_err };
+//            else
                 return { };
-        } else if (uri.scheme == "test") {
+        } else
+        if (uri.scheme == "test") {
             let goals = configuration.getAllBuildTargets();
             let g = goals
                 .get(uri.path.substring(1));
             let suite : Goal | undefined = g?.get("test-suite.log");
-            test = suite
+            test = suite // FIXME: PERF: this does a linear search for each test
                 ?.depends?.find(t => t.goal == uri.query);
         }
         if (!test)
