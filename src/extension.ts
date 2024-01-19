@@ -360,6 +360,7 @@ export class Extension {
                 { select: false, focus: false, expand: true, } );
             this.updateOutlineBadge();
         }
+        this.testController?.clear();
         this.updateTestSuite(build_tree, build_tree, true);
     }
     updateTestSuite(sub: gnumake.Make, parent: gnumake.Make, top: boolean): void {

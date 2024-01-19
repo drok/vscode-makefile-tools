@@ -60,8 +60,10 @@ export class MyTestController {
     suite.children.add(sub);
   }
 
+  public clear() : void {
+    this.controller.items.replace([]);
+  }
   public update(suite: TestItem) : void {
-      this.controller.items.replace([suite]);
       const run = this.controller.createTestRun(
             new vscode.TestRunRequest(undefined, [], this.runProfile),
             "Autotools TRS",
@@ -69,6 +71,7 @@ export class MyTestController {
       );
       this.updateTRS(run, suite);
       run.end();
+    this.controller.items.add(suite);
       // this.activate();
   }
   public trsChange(test: TestItem) : void {
