@@ -64,14 +64,14 @@ export class MyTestController {
     this.controller.items.replace([]);
   }
   public update(suite: TestItem) : void {
-      const run = this.controller.createTestRun(
-            new vscode.TestRunRequest(undefined, [], this.runProfile),
-            "Autotools TRS",
-        false
-      );
-      this.updateTRS(run, suite);
-      run.end();
     this.controller.items.add(suite);
+    const run = this.controller.createTestRun(
+      new vscode.TestRunRequest(undefined, [], this.runProfile),
+      "Autotools TRS",
+      false
+    );
+    this.updateTRS(run, suite);
+    run.end();
       // this.activate();
   }
   public trsChange(test: TestItem) : void {
