@@ -562,27 +562,6 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
                 updatedSettingsSubkeys.push(subKey);
             }
 
-            subKey = "additionalCompilerNames";
-            let updatedAdditionalCompilerNames : string[] | undefined = await util.getExpandedSetting<string[]>(subKey);
-            if (!util.areEqual(updatedAdditionalCompilerNames, additionalCompilerNames)) {
-                await readAdditionalCompilerNames();
-                updatedSettingsSubkeys.push(subKey);
-            }
-
-            subKey = "excludeCompilerNames";
-            let updatedExcludeCompilerNames : string[] | undefined = await util.getExpandedSetting<string[]>(subKey);
-            if (!util.areEqual(updatedExcludeCompilerNames, excludeCompilerNames)) {
-                await readExcludeCompilerNames();
-                updatedSettingsSubkeys.push(subKey);
-            }
-
-            subKey = "ignoreDirectoryCommands";
-            let updatedIgnoreDirectoryCommands : boolean | undefined = await util.getExpandedSetting<boolean>(subKey);
-            if (updatedIgnoreDirectoryCommands !== ignoreDirectoryCommands) {
-                await readIgnoreDirectoryCommands();
-                updatedSettingsSubkeys.push(subKey);
-            }
-
             // Final updates in some constructs that depend on more than one of the above settings.
             if (extension.getState().configureDirty)
                 await analyzeConfigureParams();
