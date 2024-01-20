@@ -807,13 +807,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             return await vscode.tasks.executeTask(sub.goal.task);
     }));
 
-    context.subscriptions.push(vscode.commands.registerCommand('autotools.build', async (sub: tree.TaskNode) => {
-        telemetry.logEvent("build");
-        if (!sub.goal.task)
-            throw new Error("Missing build task on TaskNode");
-        return await vscode.tasks.executeTask(sub.goal.task);
-    }));
-
     context.subscriptions.push(vscode.commands.registerCommand('autotools.check', async (sub: tree.SubNode) => {
         telemetry.logEvent("check");
         /* Must be a SubNode */
