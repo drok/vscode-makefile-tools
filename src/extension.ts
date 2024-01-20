@@ -765,10 +765,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         return await vscode.tasks.executeTask(sub.goal.task);
     }));
 
-    context.subscriptions.push(vscode.commands.registerCommand('autotools.outline.buildTarget', () => {
-        return vscode.commands.executeCommand("autotools.buildTarget");
-    }));
-
     context.subscriptions.push(vscode.commands.registerCommand('autotools.build', async (sub: tree.TaskNode) => {
         telemetry.logEvent("build");
         if (!sub.goal.task)
