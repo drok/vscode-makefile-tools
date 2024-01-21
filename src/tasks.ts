@@ -21,6 +21,7 @@ import * as util from './util';
 import * as make from './make';
 import * as logger from './logger';
 import { env } from 'process';
+import * as ui from './ui';
 nls.config({ messageFormat: nls.MessageFormat.bundle, bundleFormat: nls.BundleFormat.standalone })();
 const localize: nls.LocalizeFunc = nls.loadMessageBundle();
 
@@ -431,6 +432,7 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
     public async bootstrap(): Promise<void> {
         if (this.bootstrapTask && !this.working) {
             vscode.tasks.executeTask(this.bootstrapTask).then(() => {
+                ui.getUI().setLoading(ui.UIStatus.LOADING);
                 this.working = true;
             });
         }
@@ -441,6 +443,7 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
         // a separate, unnecesary update.
         if (this.regenTask && !this.working) {
             vscode.tasks.executeTask(this.regenTask).then(() => {
+                ui.getUI().setLoading(ui.UIStatus.REGEN);
                 this.working = true;
             });
         }
@@ -451,6 +454,7 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
         // a separate, unnecesary update.
         if (this.recheckTask && !this.working) {
             vscode.tasks.executeTask(this.recheckTask).then(() => {
+                ui.getUI().setLoading(ui.UIStatus.REGEN);
                 this.working = true;
             });
         }

@@ -415,6 +415,7 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
             // All done, notify that new data is available
             result.returnCode = extension.updateCppToolsProvider();
             extension.updateTasks(build_tree);
+            extension.updateWatchers();
             export_stats = {
                 programs: build_tree.stats.programs,
                 tests: build_tree.stats.tests,
@@ -593,6 +594,7 @@ export async function configure(triggeredBy: TriggeredBy): Promise<number> {
   let subphaseStats: ConfigureSubphasesStatus = {};
 
   try {
+    ui.getUI().setLoading(ui.UIStatus.LOADING);
     subphaseStats = await vscode.window.withProgress(
       {
         location: vscode.ProgressLocation.Notification,

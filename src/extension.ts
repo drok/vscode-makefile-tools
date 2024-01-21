@@ -379,6 +379,14 @@ export class Extension {
         }
     }
 
+    public updateWatchers() {
+        this.configDisposables.concat([...Array.from(configuration.getAllBuildTargets().keys())
+            .map( (p) => new util.MyFileWatcher(resolvePathToRoot(p), (e, f) => {
+                if (f == 'Makefile.am' || (f.endsWith('.in') && f != 'Makefile.in'))
+                    /* Regen if config*.in files change, other than Makefile.in which is updated due to Makefile.am */
+                    extension.regen();
+            }))]);
+    }
     private configDisposables : vscode.Disposable[] = [];
     private buildTree: gnumake.Make | undefined;
     public resyncTasks(): void {
@@ -388,6 +396,7 @@ export class Extension {
     public updateTasks(build_tree: gnumake.Make): void {
         this.buildTree = build_tree;
         this.configDisposables.forEach((d) => d.dispose());
+        this.configDisposables = [];
         this.tasks.forEach((provider) => provider.update(this.configDisposables));
         if (this._projectOutlineTreeView) {
             this._projectOutlineProvider.updateTargets(build_tree);
@@ -475,6 +484,7 @@ export class Extension {
         this._projectOutlineTreeView?.dispose();
         this._projectTestSuitesView?.dispose();
         this._treeDisposables.forEach((d) => d.dispose());
+        this.configDisposables.forEach((d) => d.dispose());
         if (this.cppToolsAPI) {
             this.cppToolsAPI.dispose();
         }
@@ -887,10 +897,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     if (configureAc) {
         context.subscriptions.push(vscode.workspace.createFileSystemWatcher('**/' + configureAc)
             .onDidChange((e) => { extension.recheck(); }));
-        context.subscriptions.push(vscode.workspace.createFileSystemWatcher('**/Makefile.am')
-            .onDidChange((e) => {  extension.regen(); }));
-        context.subscriptions.push(vscode.workspace.createFileSystemWatcher('**/*.in')
-            .onDidChange((e) => {  extension.regen(); }));
     }
 
     vscode.window.registerFileDecorationProvider(extension.suiteDecorator);
