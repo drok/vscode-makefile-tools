@@ -77,18 +77,18 @@ export class MyTestController {
   public addSuite(c: MakefileConfiguration, dir: string, sub: Goal) : void {
     sub.test =  this.controller.createTestItem(
             dir || '/', dir || "Top Test Suite",
-            vscode.Uri.file(path.join(c.top_builddir, dir, sub.goal || "")
+            vscode.Uri.file(resolvePathToRoot(path.join(c.top_builddir, dir, sub.goal || ""))
             ));
     this.testGoals.set(sub.test, sub);
     sub.test.tags = tags_none;
   }
-  public addTest(logpath: string, suite: TestItem, goal: Goal, trs: TRS) : void {
+  public addTest(c: MakefileConfiguration, logpath: string, suite: TestItem, goal: Goal, trs: TRS) : void {
 //    var testName : string = goal.task instanceof vscode.Task ? goal.task.name :
 //        goal.task instanceof Map ? goal.task.get
     goal.test = this.controller.createTestItem(
             path.join(logpath, goal.goal ||""),
             goal.goal || "",
-            vscode.Uri.file(resolvePathToRoot(path.join(logpath, goal.goal || ""))));
+            vscode.Uri.file(resolvePathToRoot(path.join(c.top_builddir, logpath, goal.goal || ""))));
     this.testGoals.set(goal.test, goal);
     if (goal.depends?.length && isDebuggable(goal.depends[0]))
         goal.test.tags = tags_debuggable;

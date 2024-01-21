@@ -424,7 +424,7 @@ export class Extension {
         if (sub.test_suite && sub.test_suite.test) {
             //let logpath = path.join(c.top_builddir, sub.dir);
             sub.test_suite.depends?.forEach((test) => {
-                sub.test_suite?.test && extension.testController?.addTest(sub.dir, sub.test_suite.test, test, test.flags & Goal.Flags.Test_Result_Mask)});
+                sub.test_suite?.test && extension.testController?.addTest(c, sub.dir, sub.test_suite.test, test, test.flags & Goal.Flags.Test_Result_Mask)});
         }
         if (top && sub.test_suite?.test)
             this.testController?.update(sub.test_suite.test);
