@@ -80,6 +80,7 @@ export class MyTestController {
             vscode.Uri.file(path.join(c.top_builddir, dir, sub.goal || "")
             ));
     this.testGoals.set(sub.test, sub);
+    sub.test.tags = tags_none;
   }
   public addTest(logpath: string, suite: TestItem, goal: Goal, trs: TRS) : void {
 //    var testName : string = goal.task instanceof vscode.Task ? goal.task.name :
