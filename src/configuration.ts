@@ -731,7 +731,9 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
                     if (configuring)
                         configuring.finally();
                 }
-            }
+            } else
+                await readMakefileConfigurations(currentMakefileConfigurationName);
+
 
             subKey = "keepDryRuns";
             let updatedkeepDryRuns : boolean | undefined = await util.getExpandedSetting<boolean>(subKey);

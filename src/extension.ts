@@ -139,7 +139,7 @@ export class Extension {
 
         });
         this.testController = new MyTestController(
-            "mergesium.autotools", "Autotools tests");
+            Extension.whoami, "Autotools tests");
         this.testController?.activate();
 
         this._treeDisposables.push(this._projectTestSuitesView.onDidChangeSelection((e) => {

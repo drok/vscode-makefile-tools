@@ -11,6 +11,7 @@ import * as path from 'path';
 import * as util from './util';
 import * as vscode from 'vscode';
 import * as cpp from 'vscode-cpptools';
+import { Extension } from './extension';
 
 export interface SourceFileConfigurationItem extends cpp.SourceFileConfigurationItem {
     readonly compileCommand: toolParser.CompileCommand;
@@ -37,7 +38,7 @@ export interface CustomConfigProviderItem {
 
 export class CppConfigurationProvider implements cpp.CustomConfigurationProvider {
     public readonly name = 'Autotools Integration';
-    public readonly extensionId = 'mergesium.autotools';
+    public readonly extensionId = Extension.whoami;
 
     private workspaceBrowseConfiguration: cpp.WorkspaceBrowseConfiguration = { browsePath: [] };
 
