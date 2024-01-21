@@ -411,6 +411,7 @@ export class Extension {
             }
         this.testController?.clear();
         this.updateTestSuite(build_tree, build_tree, true);
+        this.testController?.onOpenedDocument();
     }
     updateTestSuite(sub: gnumake.Make, parent: gnumake.Make, top: boolean): void {
         let c = configuration.getCurrentMakefileConfiguration();
@@ -890,6 +891,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         await vscode.commands.executeCommand("vscode.open", fileUri);
         await vscode.commands.executeCommand("workbench.files.action.showActiveFileInExplorer");
     }
+
+    context.subscriptions.push(vscode.window.tabGroups.onDidChangeTabs((tabs) => {
+        // logger.message(`Opened file ${.uri}`, "Normal");
+        extension.testController?.onOpenedDocument();
+    }));
 
     extension.registerTasks();
 
