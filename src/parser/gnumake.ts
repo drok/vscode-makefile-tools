@@ -48,13 +48,15 @@ export class Make implements Parser {
     {
         this.dir = path.relative(root, dir);
         this.section = MakeSection.Starting;
-        let foundGoals = configuration.getAllBuildTargets().get(this.dir);
-        if (foundGoals) {
-            this.goals = foundGoals;
-        } else {
-            this.goals = new Map<string, Goal>();
-            configuration.getAllBuildTargets().set(this.dir, this.goals);
-        }
+        if (root) {
+            let foundGoals = configuration.getAllBuildTargets().get(this.dir);
+            if (foundGoals) {
+                this.goals = foundGoals;
+            } else {
+                this.goals = new Map<string, Goal>();
+                configuration.getAllBuildTargets().set(this.dir, this.goals);
+            }
+        } else this.goals = new Map<string, Goal>();
     }
     static makeArgs(): string[] { return [
         // take precedence over other parallel executions
