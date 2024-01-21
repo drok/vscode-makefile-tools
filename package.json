@@ -325,6 +325,7 @@
                             },
                             "top_builddir": {
                               "type": "string",
+                              "title": "%autotools.configurations.top_builddir.title%",
                               "markdownDescription": "%autotools.configurations.top_builddir.markdownDescription%"
                             },
                             "configureArgs": {
