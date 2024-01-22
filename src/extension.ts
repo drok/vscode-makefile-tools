@@ -153,8 +153,6 @@ export class Extension {
         // this._projectOutlineTreeView.description = "outline description";
         // this._projectTestSuitesView.description = configuration.getCurrentTestEnvironment().name;
         // this._projectOutlineTreeView.message = "outline message";
-        this._projectOutlineTreeView.badge = {tooltip: '🧰', value: 42};
-        this._projectTestSuitesView.badge = {tooltip: '🧰', value: 42};
     }
     public setConfiguration(name: string) {
         if (this._projectOutlineTreeView) {
