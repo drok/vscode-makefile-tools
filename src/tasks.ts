@@ -507,7 +507,7 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
     public async autotoolsDoneNoResult(): Promise<void> {
         this.working = false;
     }
-    public async autotoolsDone(task: vscode.ProcessExecution, exitCode: number): Promise<void> {
+    public async autotoolsDone(task: ProcessExecution | ShellExecution | vscode.CustomExecution | undefined, exitCode: number): Promise<void> {
         this.working = false;
         if (exitCode != 0) {
             var kbUrl : vscode.Uri = await extension.kbUrl();

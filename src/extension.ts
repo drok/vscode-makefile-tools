@@ -306,9 +306,8 @@ export class Extension {
                     const definition: AutotoolsTask = <any>task.definition;
                     if (definition?.action == "regen" || definition?.action == "recheck")
                         ui.getUI().setStatus(e.exitCode ? ui.UIStatus.ERR : ui.UIStatus.OK);
-                        if (task.execution instanceof vscode.ProcessExecution)
-                            this.autotoolsTask.autotoolsDone(task.execution,
-                                (typeof e.exitCode == 'number') ? e.exitCode : (e.exitCode ? 1 : 0));
+                        this.autotoolsTask.autotoolsDone(task.execution,
+                            (typeof e.exitCode == 'number') ? e.exitCode : (e.exitCode ? 1 : 0));
                         if (!e.exitCode) {
                             make.configure(make.TriggeredBy.configureAfterConfigurationChange);
                         }

@@ -251,9 +251,10 @@ async function analyzeConfigureParams(reload: boolean): Promise<void> {
         reason = "n/a";
     }
 
-    statusBar.setStatus(extension.isAutotoolsProject() ?
-        (relativeMakefile ? ui.UIStatus.OK : ui.UIStatus.NO_MAKEFILE) :
-        ui.UIStatus.NON_AUTOTOOLS);
+    if (!reload)
+        statusBar.setStatus(extension.isAutotoolsProject() ?
+            (relativeMakefile ? ui.UIStatus.OK : ui.UIStatus.NO_MAKEFILE) :
+            ui.UIStatus.NON_AUTOTOOLS);
 
     if (relativeMakefile) {
         extension._projectOutlineProvider.update(currentMakefileConfigurationName);
@@ -696,16 +697,18 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
             });
             // TODO: should call an onConfigurationUpdate(updatedConfiguration);
             // so that not only build log, but other updated members can be handled
+            var needConfigure : boolean = false;
             if (updatedConfiguration) {
 //                updatedConfiguration.nologs = currentMakefileConfiguration.nologs;
-                if (!util.areEqual(updatedConfiguration, currentMakefileConfiguration)) {
-                    const needConfigure = !util.areEqual(
+                var oldConfig = currentMakefileConfiguration;
+                if (!util.areEqual(updatedConfiguration, oldConfig)) {
+                    needConfigure = !util.areEqual(
                             updatedConfiguration?.configureArgs,
-                            currentMakefileConfiguration.configureArgs);
-                    await readMakefileConfigurations(currentMakefileConfigurationName);
-                    setCurrentMakefileConfiguration(currentMakefileConfiguration.name);
+                            oldConfig.configureArgs);
                     extension.getState().configureDirty = true;
 
+                    await readMakefileConfigurations(currentMakefileConfigurationName);
+                    await setCurrentMakefileConfiguration(currentMakefileConfigurationName);
                     var configuring : Promise<boolean> | undefined;
                     if (needConfigure) {
                         configuring = extension.configure();
@@ -730,9 +733,15 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
                     }
                     if (configuring)
                         configuring.finally();
+                } else {
+                    await readMakefileConfigurations(currentMakefileConfigurationName);
+                    await setCurrentMakefileConfiguration(currentMakefileConfigurationName);
                 }
-            } else
+            } else {
                 await readMakefileConfigurations(currentMakefileConfigurationName);
+                await setCurrentMakefileConfiguration(currentMakefileConfigurationName);
+            }
+
 
 
             subKey = "keepDryRuns";
@@ -807,31 +816,52 @@ export async function setConfigurationByName(configurationName: string | undefin
     extension._projectOutlineProvider.update(currentMakefileConfigurationName);
 }
 
-export function prepareConfigurationsQuickPick(): string[] {
-    const items: string[] = makefileConfigurations.map((k => {
-        return k.name;
-    }));
+class BuildConfigPickItem implements vscode.QuickPickItem {
+
+    constructor(public label: string, public description?: string, public detail?: string) {
+        this.label = label;
+        this.description = description;
+        this.detail = detail;
+    }
+    public kind?: vscode.QuickPickItemKind;
+}
+const editOrCreatePick : BuildConfigPickItem = new BuildConfigPickItem(localize("autotools.edit.setting", "New/Edit ..."));
+export function prepareConfigurationsQuickPick(): BuildConfigPickItem[] {
+    const items: BuildConfigPickItem[] = makefileConfigurations.map<BuildConfigPickItem>((k =>
+        new BuildConfigPickItem(k.name, k.top_builddir, k.configureArgs ? "Args: " + k.configureArgs.join(" ") : undefined)
+        ));
 
     if (items.length === 0) {
         logger.message("No configurations defined in autotools.configurations setting.");
-        items.push("Default");
+        items.push(new BuildConfigPickItem("Default", undefined, undefined));
     }
 
+    items.push({label: 'Add/Edit...', kind: vscode.QuickPickItemKind.Separator}, editOrCreatePick);
     return items;
 }
 
 // Fill a drop-down with all the configuration names defined by the user in autotools.configurations setting.
 // Triggers a cpptools configuration provider update after selection.
 export async function setNewConfiguration(): Promise<void> {
-    const items: string[] = prepareConfigurationsQuickPick();
+    const items: BuildConfigPickItem[] = prepareConfigurationsQuickPick();
 
-    let options: vscode.QuickPickOptions = {};
+    let options: vscode.QuickPickOptions = {
+        placeHolder: localize("autotools.selectConfiguration", "Select a build configuration"),
+        title: localize("autotools.selectConfiguration", "Build Configuration selection"),
+        matchOnDescription: false,
+        matchOnDetail: true
+    };
     options.ignoreFocusOut = true; // so that the logger and the quick pick don't compete over focus
-    const chosen: string | undefined = await vscode.window.showQuickPick(items, options);
-    if (chosen && chosen !== currentMakefileConfiguration.name) {
-        telemetry.logEvent("changeConfig", { to: chosen });
+    const chosen: BuildConfigPickItem | undefined = await vscode.window.showQuickPick(items, options);
+    if (chosen && chosen.label !== currentMakefileConfiguration.name) {
+        telemetry.logEvent("changeConfig", { to: chosen.label });
 
-        await setConfigurationByName(chosen);
+        if (chosen === editOrCreatePick) {
+            await openSettings("autotools.configurations");
+            return;
+        }
+
+        await setConfigurationByName(chosen.label);
 
         await make.configure(make.TriggeredBy.configureAfterConfigurationChange);
     }
