@@ -515,14 +515,17 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
                 logger.message('Bootstrap failed. Review the Terminal tab for cause.', "Normal");
                 logger.message('Bootstrapping can be re-attempted with "Autotools: Bootstrap"', "Normal");
                 logger.message('KB: ' + kbUrl.toString(true) + '#bootstrap-fail', "Normal");
+                logger.showOutputChannel();
             }
             else if (task == this.regenTask?.execution) {
                 logger.message('Regen failed. Review the Terminal tab for cause.', "Normal");
                 logger.message('KB: ' + kbUrl.toString(true) + '#regen-fail', "Normal");
+                logger.showOutputChannel();
             }
             else if (task == this.recheckTask?.execution) {
                 logger.message('Recheck failed. Review the Terminal tab for cause.', "Normal");
                 logger.message('KB: ' + kbUrl.toString(true) + '#recheck-fail', "Normal");
+                logger.showOutputChannel();
             }
         }
     }
