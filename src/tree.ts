@@ -76,7 +76,7 @@ export class SubNode extends Node {
     getTreeItem(): vscode.TreeItem {
         const item: vscode.TreeItem = new vscode.TreeItem(this.submake.dir);
         item.contextValue = ["nodeType=sub"]
-            .concat(((this.flags & Goal.Flags.Test_Log) && this.submake.test_suite) ? ['nodeType=check'] : [])
+            .concat(((this.flags & Goal.Flags.Test_Suite) && this.submake.test_suite) ? ['nodeType=check'] : [])
             .concat((this.flags & Goal.Flags.Linked_binary) ? ['nodeType=allbuild'] : [])
             .join(',');
         item.collapsibleState = vscode.TreeItemCollapsibleState.Collapsed;
