@@ -234,18 +234,22 @@ export class MyTestController {
         targets.forEach((v,dir) => {
             v.forEach((goal,name) => {
                 if (goal.test) {
+                    if (!goal.test.tags.length) {
+                        if (applicable_tests.has(goal.test))
+                            goal.test.tags = tags_applicable;
+                    } else
                     switch (goal.test.tags) {
                         case tags_applicable:
-                            if (!applicable_tests.has(goal.test)) goal.test.tags = tags_none;
+                            if (!applicable_tests.has(goal.test))
+                                goal.test.tags = tags_none;
                             break;
                         case tags_debuggable_applicable:
-                            if (!applicable_tests.has(goal.test)) goal.test.tags = tags_debuggable;
+                            if (!applicable_tests.has(goal.test))
+                                goal.test.tags = tags_debuggable;
                             break;
                         case tags_debuggable:
-                            if (applicable_tests.has(goal.test)) goal.test.tags = tags_debuggable_applicable;
-                            break;
-                        case tags_none:
-                            if (applicable_tests.has(goal.test)) goal.test.tags = tags_applicable;
+                            if (applicable_tests.has(goal.test))
+                                goal.test.tags = tags_debuggable_applicable;
                             break;
                     }
                 }
