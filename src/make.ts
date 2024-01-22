@@ -714,7 +714,7 @@ export async function configure(triggeredBy: TriggeredBy): Promise<number> {
     } else if (readCache) {
         // FIXME:
         // util.deleteFileSync(configurationCache);
-        logger.message("FIXME: Config is empty. Delete the file.");
+        logger.message(`Warning: Config cache ${configurationCache} is empty. It can be deleted.`, "Verbose");
     }
 
     let configureElapsedTime: number =
