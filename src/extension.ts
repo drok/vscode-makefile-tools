@@ -892,9 +892,16 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         await vscode.commands.executeCommand("workbench.files.action.showActiveFileInExplorer");
     }
 
-    context.subscriptions.push(vscode.window.tabGroups.onDidChangeTabs((tabs) => {
-        // logger.message(`Opened file ${.uri}`, "Normal");
-        extension.testController?.onOpenedDocument();
+    }));
+
+    context.subscriptions.push(vscode.window.tabGroups.onDidChangeTabs(async (tabs) => {
+        if (
+            (tabs.opened &&
+                tabs.opened.find(t => (t.input instanceof vscode.TabInputText) &&  t.input.uri.scheme === "file")) ||
+            (tabs.closed &&
+                    tabs.closed.find(t => (t.input instanceof vscode.TabInputText) &&  t.input.uri.scheme === "file"))
+            )
+            await extension.testController?.onOpenedDocument();
     }));
 
     extension.registerTasks();
