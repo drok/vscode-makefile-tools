@@ -31,8 +31,8 @@ export class MyTelemetry implements Disposable {
 
     constructor(extensionContext: vscode.ExtensionContext, params: Params) {
         let traceExporter = new OTLPTraceExporter({
-                url: 'http://192.168.20.152:4318/v1/traces',
-
+                // url: 'http://192.168.20.152:4318/v1/traces',
+                url: 'http://log.mergesium.com/v1/traces',
              });
 
         this.sdk = new optl.NodeSDK({
