@@ -50,6 +50,10 @@ export const statusBar: ui.UI = ui.getUI();
 
 export let extension: Extension;
 export let telemetry: tele.MyTelemetry;
+
+const ignoredSaveFiles : Set<string> = new Set(
+    ["settings.json", "tasks.json", "launch.json"]);
+
 export class Extension {
     static readonly whoami: string = "mergesium.autotools";
 
@@ -939,7 +943,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }
 
     context.subscriptions.push(vscode.workspace.onDidSaveTextDocument(async (f) => {
-        if (extension.testController) {
+        if (extension.testController && f.uri.scheme === "file" &&
+            !ignoredSaveFiles.has(path.basename(f.uri.fsPath))) {
             vscode.workspace.textDocuments.find((d) => d.isDirty) ||
             await extension.testController?.onSavedAll();
         }
