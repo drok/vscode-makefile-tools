@@ -200,7 +200,7 @@ export class Extension {
     /**
      * Handler for TRS file changes. Updates the Goal's trs structure with the current and global results
      * @param c {@linkcode MakefileConfiguration Current build configuration}
-     * @param env TestEnvironment that is the "current", used to select the right :test-result: TRS line
+     * @param env {@linkcode TestEnvironment} The TestEnvironment that is the "current", used to select the right :test-result: TRS line
      * @param uri the uri of the TRS file as reported by fs.watch
      */
     trsChange(c: MakefileConfiguration, env: TestEnvironment, uri: vscode.Uri) : void {
@@ -920,7 +920,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
     // Read from the workspace state before reading from settings,
     // becase the latter may use state info in variable expansion.
-    await configuration.initFromState();
+    configuration.initFromState();
     await configuration.initFromSettings(true);
 
     if (extension.isAutotoolsProject())
