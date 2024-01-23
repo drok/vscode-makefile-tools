@@ -207,62 +207,59 @@
                ]
              }
           ],
-        "configuration": {
-            "type": "object",
-            "title": "Autotools",
+        "configuration": [
+        {
+            "title": "Preferences",
+            "order": 1,
             "properties": {
 
-                "autotools.test_environments": {
-                    "type": "array",
-                    "default": [],
-                    "description": "%autotools.configuration.test_environments.description%",
-                    "items" : {
-                        "type": "object",
-                        "properties": {
-                          "name": {
-                            "type": "string",
-                            "format": "/^[a-zA-Z0-9_-]+$/",
-                            "description": "%autotools.configuration.test_environments.name.description%",
-                            "examples": ["legacy", "modern", "future"]
-                          },
-                          "TESTS_ENVIRONMENT" : {
-                            "type": "array",
-                            "default": [],
-                            "title": "%autotools.configuration.tests_environment.TESTS_ENVIRONMENT.sub.title%",
-                            "items": {
-                                "type": "object",
-                                "default": {},
-                                "properties": {
-                                    "name": {
-                                        "type": "string"
-                                    },
-                                    "value": {
-                                        "type": "string"
-                                    }
-                                }
-                            }
-                          },
-                          "XFAIL_TESTS" : {
-                            "type": "array",
-                            "default": [],
-                            "title": "%autotools.configuration.tests_environment.XFAIL_TESTS.sub.title%",
-                            "items": {
-                              "type": "string"
-                            }
-                          }
-                        },
-                        "required": ["name"],
-                        "title": "%autotools.configuration.tests_environment.title%",
-                        "default": {
-                            "name": "modern",
-                            "TESTS_ENVIRONMENT": [
-                                { "name": "VAR1", "value": "modern-1" }, {"name": "VAR2", "value": "mod2"}
-                            ]
-                        }
-                    }
+                "autotools.loggingLevel": {
+                    "order": 1,
+                    "type": "string",
+                    "enum": [
+                        "Normal",
+                        "Verbose",
+                        "Debug"
+                    ],
+                    "default": "Normal",
+                    "description": "%autotools.configuration.makefile.loggingLevel.description%",
+                    "scope": "resource"
                 },
-
+                "autotools.autoBootstrap": {
+                    "type": "boolean",
+                    "markdownDescription": "%autotools.configuration.autoBootstrap.markdownDescription%",
+                    "default": true,
+                    "scope": "resource"
+                },
+                "autotools.keepDryRuns": {
+                    "order": 4,
+                    "scope": "resource",
+                    "type": "boolean",
+                    "markdownDescription": "%autotools.configuration.makefile.keepDryRuns.markdownDescription%",
+                    "default": false
+                },
+                "autotools.keepConfigurationCache": {
+                    "order": 4,
+                    "scope": "resource",
+                    "type": "boolean",
+                    "markdownDescription": "%autotools.configuration.makefile.keepConfigurationCache.markdownDescription%",
+                    "default": false
+                },
+                "autotools.promptClean": {
+                    "scope": "resource",
+                    "type": "boolean",
+                    "markdownDescription": "%autotools.configuration.promptClean.description%",
+                    "default": true
+                }
+            }
+        },
+        {
+            "title": "Building",
+            "order": 2,
+            "properties": {
                 "autotools.configurations": {
+                    "scope": "resource",
+                    "order": 1,
                     "type": "array",
                     "default": [],
                     "description": "%autotools.configuration.makefile.configurations.description%",
@@ -363,11 +360,24 @@
                                 "description": "%autotools.configuration.makefile.configurations.problemMatchers.description%"
                             }
                         }
-                    },
-                    "scope": "resource"
+                    }
                 },
 
+                "autotools.makePath": {
+                    "order": 1,
+                    "type": "string",
+                    "default": "make",
+                    "description": "%autotools.configuration.makefile.makePath.description%",
+                    "scope": "resource"
+                }
+            }
+        },
+        {
+            "title": "Testing",
+            "order": 3,
+            "properties": {
                 "autotools.TESTS_ENVIRONMENT" : {
+                    "order": 1,
                     "type": "array",
                     "default": [],
                     "title": "%autotools.configuration.tests_environment.TESTS_ENVIRONMENT.global.title%",
@@ -385,6 +395,7 @@
                     }
                 },
                 "autotools.XFAIL_TESTS" : {
+                    "order": 2,
                     "type": "array",
                     "default": [],
                     "title": "%autotools.configuration.tests_environment.XFAIL_TESTS.sub.title%",
@@ -393,49 +404,60 @@
                     }
                 },
 
-                "autotools.loggingLevel": {
-                    "type": "string",
-                    "enum": [
-                        "Normal",
-                        "Verbose",
-                        "Debug"
-                    ],
-                    "default": "Normal",
-                    "description": "%autotools.configuration.makefile.loggingLevel.description%",
-                    "scope": "resource"
-                },
-                "autotools.makePath": {
-                    "type": "string",
-                    "default": "make",
-                    "description": "%autotools.configuration.makefile.makePath.description%",
-                    "scope": "resource"
-                },
-                "autotools.autoBootstrap": {
-                    "type": "boolean",
-                    "markdownDescription": "%autotools.configuration.autoBootstrap.markdownDescription%",
-                    "default": true,
-                    "scope": "resource"
-                },
-                "autotools.keepDryRuns": {
-                    "type": "boolean",
-                    "markdownDescription": "%autotools.configuration.makefile.keepDryRuns.markdownDescription%",
-                    "default": false,
-                    "scope": "resource"
-                },
-                "autotools.keepConfigurationCache": {
-                    "type": "boolean",
-                    "markdownDescription": "%autotools.configuration.makefile.keepConfigurationCache.markdownDescription%",
-                    "default": false,
-                    "scope": "resource"
-                },
-                "autotools.promptClean": {
-                    "type": "boolean",
-                    "markdownDescription": "%autotools.configuration.promptClean.description%",
-                    "default": true,
-                    "scope": "resource"
+                "autotools.test_environments": {
+                    "order": 3,
+                    "scope": "resource",
+                    "type": "array",
+                    "default": [],
+                    "description": "%autotools.configuration.test_environments.description%",
+                    "items" : {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "format": "/^[a-zA-Z0-9_-]+$/",
+                            "description": "%autotools.configuration.test_environments.name.description%",
+                            "examples": ["legacy", "modern", "future"]
+                          },
+                          "TESTS_ENVIRONMENT" : {
+                            "type": "array",
+                            "default": [],
+                            "title": "%autotools.configuration.tests_environment.TESTS_ENVIRONMENT.sub.title%",
+                            "items": {
+                                "type": "object",
+                                "default": {},
+                                "properties": {
+                                    "name": {
+                                        "type": "string"
+                                    },
+                                    "value": {
+                                        "type": "string"
+                                    }
+                                }
+                            }
+                          },
+                          "XFAIL_TESTS" : {
+                            "type": "array",
+                            "default": [],
+                            "title": "%autotools.configuration.tests_environment.XFAIL_TESTS.sub.title%",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "required": ["name"],
+                        "title": "%autotools.configuration.tests_environment.title%",
+                        "default": {
+                            "name": "modern",
+                            "TESTS_ENVIRONMENT": [
+                                { "name": "VAR1", "value": "modern-1" }, {"name": "VAR2", "value": "mod2"}
+                            ]
+                        }
+                    }
                 }
             }
-        },
+        }
+        ],
         "viewsWelcome": [
             {
                 "view": "autotools.outline",
