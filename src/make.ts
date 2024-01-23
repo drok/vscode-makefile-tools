@@ -577,11 +577,8 @@ export async function configure(triggeredBy: TriggeredBy): Promise<number> {
     extension.getState().ranConfigureInCodebaseLifetime;
   extension.getState().ranConfigureInCodebaseLifetime = true;
 
-  // If `fullFeatureSet` is false and it wasn't a manual command invocation, return and `other` return value.
-  if (
-    !extension.getFullFeatureSet() &&
-    !triggeredBy.includes("command pallette")
-  ) {
+  // If there are no Makefiles, cannot configure Intellisense.
+  if (!configuration.getConfigurationMakefile()) {
     return ConfigureBuildReturnCodeTypes.fullFeatureFalse;
   }
 

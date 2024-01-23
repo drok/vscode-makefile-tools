@@ -23,7 +23,8 @@ import {
     } from './tree';
 import * as tree from './tree';
 import * as ui from './ui';
-import { resolvePathToRoot } from './util';
+import { resolvePathToRoot,
+         checkFileExistsSync } from './util';
 import * as vscode from 'vscode';
 import * as cpp from 'vscode-cpptools';
 import * as debugProvider from './debug';
@@ -45,7 +46,7 @@ import { installAutotools } from './install';
 nls.config({ messageFormat: nls.MessageFormat.bundle, bundleFormat: nls.BundleFormat.standalone })();
 const localize: nls.LocalizeFunc = nls.loadMessageBundle();
 
-let statusBar: ui.UI = ui.getUI();
+export const statusBar: ui.UI = ui.getUI();
 
 export let extension: Extension;
 export let telemetry: tele.MyTelemetry;
@@ -477,8 +478,23 @@ export class Extension {
     // config.status (just re-output)
     public async regen(): Promise<void> { await this.autotoolsTask.regen(); }
     // config.status --recheck
-    public async recheck(): Promise<void> {
+    public async recheck(changed: boolean): Promise<void> {
+        if (changed) {
+            if (!this.isAutotoolsProject() && this.autotoolsTask.bootstrap_cmd()) {
+                // newly installed
+                statusBar.show();
+                configuration.initFromState();
+                await configuration.initFromSettings(true);
+                await outputLogHeader();
+                await extension.configure();
+                return Promise.resolve();
+            } else if (this.isAutotoolsProject() && !this.autotoolsTask.bootstrap_cmd()) {
+                // Disable extension, configure.ac deleted
+                return Promise.resolve();
+            }
+        }
         await this.autotoolsTask.recheck();
+        return Promise.resolve();
     }
     public autotoolsDoneNoResult(): void { this.autotoolsTask.autotoolsDoneNoResult(); }
 
@@ -499,7 +515,7 @@ export class Extension {
     public isConfigured(): boolean { return this.autotoolsTask.isConfigured(configuration.getCurrentMakefileConfiguration()); }
 
     public updateMakefileFilePresent(newValue: boolean): void {
-        vscode.commands.executeCommand("setContext", "autotools.makefileFilePresent", newValue);
+        vscode.commands.executeCommand("setContext", "autotools:makefileFilePresent", newValue);
     }
 
     public getState(): state.StateManager { return this.mementoState; }
@@ -512,13 +528,6 @@ export class Extension {
         if (this.cppToolsAPI) {
             this.cppToolsAPI.dispose();
         }
-    }
-
-    private fullFeatureSet: boolean = false;
-    public getFullFeatureSet(): boolean { return this.fullFeatureSet; }
-    public async setFullFeatureSet(newValue: boolean): Promise<void> {
-        await vscode.commands.executeCommand('setContext', "autotools:fullFeatureSet", newValue);
-        this.fullFeatureSet = newValue;
     }
 
     // Used for calling cppToolsAPI.notifyReady only once in a VSCode session.
@@ -697,12 +706,9 @@ function openLog(selected: tree.Node): Thenable<vscode.TextDocument> {
     }
     return Promise.reject();
 }
-
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
-    statusBar = ui.getUI();
     let teleParams = await tele.getParams();
     extension = new Extension(context, teleParams);
-    await extension.setFullFeatureSet(false);
 
     context.subscriptions.push(vscode.commands.registerCommand('autotools.setBuildConfiguration', async () => {
         if (!configuration.getCurrentMakefileConfiguration().top_builddir && extension.isConfigured()) {
@@ -825,7 +831,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
     context.subscriptions.push(vscode.commands.registerCommand('autotools.outline.recheck', () => {
         telemetry.logEvent("recheck");
-        extension.recheck();
+        extension.recheck(false);
     }));
 
     context.subscriptions.push(vscode.commands.registerCommand('autotools.configure', async () => {
@@ -920,11 +926,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
     // Read from the workspace state before reading from settings,
     // becase the latter may use state info in variable expansion.
-    configuration.initFromState();
-    await configuration.initFromSettings(true);
-
-    if (extension.isAutotoolsProject())
+    if (extension.isAutotoolsProject()) {
+        statusBar.show();
+        configuration.initFromState();
+        await configuration.initFromSettings(true);
         await outputLogHeader();
+    }
 
     const openFile = async (fileUri: vscode.Uri) => {
         await vscode.commands.executeCommand("vscode.open", fileUri);
@@ -932,7 +939,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }
 
     context.subscriptions.push(vscode.workspace.onDidSaveTextDocument(async (f) => {
-        logger.message(`Saved file ${f.uri}`, "Normal");
         if (extension.testController) {
             vscode.workspace.textDocuments.find((d) => d.isDirty) ||
             await extension.testController?.onSavedAll();
@@ -953,10 +959,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
     extension.registerTasks();
 
-    let configureAc = configuration.getConfigureAc();
-    if (configureAc) {
-        context.subscriptions.push(vscode.workspace.createFileSystemWatcher('**/' + configureAc)
-            .onDidChange((e) => { extension.recheck(); }));
+    if (vscode.workspace.workspaceFolders) {
+        let configureAc = vscode.workspace.createFileSystemWatcher(
+            new vscode.RelativePattern(vscode.workspace.workspaceFolders[0], (configuration.getConfigureAc() || "configure.ac")));
+        context.subscriptions.push(configureAc.onDidChange(async (e) => await extension.recheck(true)));
+        context.subscriptions.push(configureAc.onDidCreate(async (e) => await extension.recheck(true)));
+        context.subscriptions.push(configureAc.onDidDelete(async (e) => await extension.recheck(true)));
     }
 
     vscode.window.registerFileDecorationProvider(extension.suiteDecorator);

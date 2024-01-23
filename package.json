@@ -553,7 +553,6 @@
                 {
                     "id": "autotools__viewContainer",
                     "title": "Autotools",
-                    "when": "autotools:fullFeatureSet",
                     "icon": "res/viewcontainer.svg"
                 }
             ]
@@ -569,6 +568,7 @@
                 {
                     "id": "autotools.tests",
                     "icon": "res/viewcontainer.svg",
+                    "when": "autotools:isAutotoolsProject",
 
                     "name": "%autotools.configuration.views.testsuites.description%"
                 }
@@ -577,7 +577,7 @@
         "taskDefinitions": [
             {
                 "type": "build",
-                "when": "processExecutionSupported && autotools.makefileFilePresent",
+                "when": "processExecutionSupported && autotools:makefileFilePresent",
                 "required": ["label", "target"],
                 "properties": {
                     "label": {
@@ -605,7 +605,7 @@
             },
             {
                 "type": "test",
-                "when": "processExecutionSupported && autotools.makefileFilePresent",
+                "when": "processExecutionSupported && autotools:makefileFilePresent",
                 "required": ["label", "test"],
                 "properties": {
                     "label": {
@@ -632,7 +632,7 @@
             },
             {
                 "type": "check",
-                "when": "processExecutionSupported && autotools.makefileFilePresent",
+                "when": "processExecutionSupported && autotools:makefileFilePresent",
                 "required": ["label"],
                 "properties": {
                     "label": {
@@ -662,7 +662,7 @@
             },
             {
                 "type": "autotools",
-                "when": "processExecutionSupported && autotools.makefileFilePresent",
+                "when": "processExecutionSupported && autotools:makefileFilePresent",
                 "required": ["label"],
                 "properties": {
                     "label": {
@@ -695,7 +695,7 @@
                 },
                 {
                     "command": "autotools.exportToIntelisense",
-                    "when": "autotools:fullFeatureSet"
+                    "when": "autotools:makefileFilePresent"
                 },
                 {
                     "command": "autotools.command.bootstrap",
@@ -707,7 +707,7 @@
                 },
                 {
                     "command": "autotools.command.regen",
-                    "when": "autotools:fullFeatureSet"
+                    "when": "autotools.isBootstrapped"
                 },
                 {
                     "command": "autotools.newConfiguration",
@@ -735,11 +735,11 @@
                 },
                 {
                     "command": "autotools.buildAll",
-                    "when": "autotools:fullFeatureSet"
+                    "when": "autotools:makefileFilePresent"
                 },
                 {
                     "command": "autotools.checkAll",
-                    "when": "autotools:fullFeatureSet"
+                    "when": "autotools:makefileFilePresent"
                 },
                 {
                     "command": "autotools.outline.recheck",

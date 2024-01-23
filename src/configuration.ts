@@ -3,7 +3,7 @@
 
 // Configuration support
 
-import { extension, telemetry } from './extension';
+import { extension, telemetry, statusBar } from './extension';
 import { Attributes, SpanStatusCode } from './tele';
 import * as logger from './logger';
 import * as make from './make';
@@ -27,7 +27,7 @@ import { parse, quote } from '@mergesium/shell-quote';
 nls.config({ messageFormat: nls.MessageFormat.bundle, bundleFormat: nls.BundleFormat.standalone })();
 const localize: nls.LocalizeFunc = nls.loadMessageBundle();
 
-let statusBar: ui.UI = ui.getUI();
+// let statusBar: ui.UI = ui.getUI();
 
 // Each different scenario of building the same makefile, in the same environment, represents a configuration.
 // Example: "make BUILD_TYPE=Debug" and "make BUILD_TYPE=Release" can be the debug and release configurations.
@@ -123,8 +123,6 @@ export async function setCurrentMakefileConfiguration(configuration: string | un
 // Read the current configuration from workspace state, update status bar item
 export function readCurrentMakefileConfiguration(): void {
     let buildConfiguration : string | undefined = extension.getState().buildConfiguration;
-    if (!extension.isAutotoolsProject())
-        return;
     setCurrentMakefileConfigurationName(buildConfiguration);
 }
 
@@ -243,14 +241,13 @@ async function analyzeConfigureParams(reload: boolean): Promise<void> {
             reason = "Is not Bootstraped";
             logger.message('The project is not yet bootstrapped.');
         }
+        if (!reload)
+            statusBar.setStatus(extension.isAutotoolsProject() ?
+                (relativeMakefile ? ui.UIStatus.OK : ui.UIStatus.NO_MAKEFILE) :
+                ui.UIStatus.NON_AUTOTOOLS);
     } else {
         reason = "n/a";
     }
-
-    if (!reload)
-        statusBar.setStatus(extension.isAutotoolsProject() ?
-            (relativeMakefile ? ui.UIStatus.OK : ui.UIStatus.NO_MAKEFILE) :
-            ui.UIStatus.NON_AUTOTOOLS);
 
     if (relativeMakefile) {
         extension._projectOutlineProvider.update(currentMakefileConfigurationName);
@@ -259,8 +256,6 @@ async function analyzeConfigureParams(reload: boolean): Promise<void> {
         extension.setConfiguration(getCurrentMakefileConfiguration().name);
         extension.setTestEnvironment();
     }
-
-    await extension.setFullFeatureSet(relativeMakefile ? true : false);
 
     telemetry.logEvent(reason, { reason: "init" });
     getProblemMatchersForConfiguration();
@@ -615,7 +610,6 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
     await readMakefileConfigurations(currentMakefileConfigurationName);
     await readTestEnvironments();
     setCurrentMakefileConfiguration(currentMakefileConfigurationName);
-
 
     await analyzeConfigureParams(false);
 

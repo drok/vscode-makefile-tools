@@ -109,12 +109,13 @@ export class UI {
         this.configurationButton.tooltip = localize("autotools.click.setconfig", "Click to select another build configuration");
         this.configurationButton.backgroundColor = UI.colors[UIStatus.OK];
         this.configurationButton.color = UI.fgcolors[UIStatus.OK];
-        this.configurationButton.show();
     }
 
     public dispose(): void {
         this.configurationButton.dispose();
     }
+    public show() { this.configurationButton.show(); }
+    public hide() { this.configurationButton.hide(); }
 }
 
 export function getUI(): UI {
