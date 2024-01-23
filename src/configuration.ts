@@ -121,16 +121,10 @@ export async function setCurrentMakefileConfiguration(configuration: string | un
 }
 
 // Read the current configuration from workspace state, update status bar item
-export async function readCurrentMakefileConfiguration(): Promise<void> {
+export function readCurrentMakefileConfiguration(): void {
     let buildConfiguration : string | undefined = extension.getState().buildConfiguration;
     if (!extension.isAutotoolsProject())
         return;
-    //await outputLogHeader();
-    //if (!buildConfiguration) {
-    //    logger.message("No build configuration is selected. Assuming 'Default'.");
-    //} else {
-    //    logger.message(`Selected build configuration is "${buildConfiguration}"`);
-    //}
     setCurrentMakefileConfigurationName(buildConfiguration);
 }
 
@@ -603,8 +597,8 @@ export async function getCurrentTarget(): Promise<make.BuildTarget> {
 // At activation time we read from state, update UI accordingly
 // and commands become available to be run in settings via expansion.
 // These can also be resetted via the makefile.resetState command.
-export async function initFromState(): Promise<void> {
-   await readCurrentMakefileConfiguration();
+export function initFromState(): void {
+   readCurrentMakefileConfiguration();
 }
 
 // Initialization from settings (or backup default rules).
