@@ -18,7 +18,12 @@ AC_CONFIG_HEADERS([config.h])
 # The following build options:
 # 1.13.2       = require at least automake 1.13.2 (2013/CentOS-7/Ubuntu-16),
 #                when the parallel test suite became 'stable'.
-# -Werror      = Error out on all syntax errors Makefile.am to produce
+# -Wall        = Automake will warn about: GNU coding standards,
+#                obsolete, override (user redefines automake),
+#                portability, extra-portability, syntax, and unsupported.
+#                See the "Warning categories include:" section of
+#                'automake --help' for exact meaning.
+# -Werror      = Automake will "treat warnings as errors", to create
 #                a high-quality, portable build
 # dist-bzip2   = 'make dist' will produce a tar.bz2 source tarball
 # no-dist-gzip = don't distribute in the tar.gz format
