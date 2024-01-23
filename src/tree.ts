@@ -28,32 +28,6 @@ export abstract class Node {
     abstract logfile(): string | undefined;
 }
 
-function countStats(sub: Make): number[] {
-    // let total : number = 0;
-    // let num_dirs : number = 0;
-    sub.stats.subdirs = sub.submake.size;
-    for (let submake of sub.submake.values()) {
-        let [t, n, s, c] = countStats(submake);
-        sub.stats.programs += t;
-        sub.stats.tests += n;
-        sub.stats.subdirs += s;
-        sub.stats.checks += c;
-    }
-    for (let [goal, g] of sub.goals)
-        sub.stats.programs += ((g.flags & Goal.Flags.Linked_binary)
-            && !(g.flags & Goal.Flags.Test_Program)) ? 1 : 0;
-
-    let numTestsHere = (sub.goals.get("test-suite.log")?.depends?.length ?? 0);
-    sub.stats.tests += numTestsHere;
-    sub.stats.checks += (numTestsHere ? 1 : 0);
-    return [
-        sub.stats.programs,
-        sub.stats.tests,
-        sub.submake.size,
-        sub.stats.checks
-    ];
-}
-
 export class SubNode extends Node {
     constructor(public submake: Make, private flags: number) {
         super();
@@ -318,10 +292,6 @@ export class ProjectOutlineProvider implements vscode.TreeDataProvider<Node> {
     // Updates the tree when settings.json changes
     updateTargets(build_tree: Make) : void {
         this.tree = build_tree;
-        if (!build_tree.hasStats) {
-            countStats(build_tree);
-            build_tree.hasStats = true;
-        }
         this.updateTree();
     }
 

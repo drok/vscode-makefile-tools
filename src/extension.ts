@@ -4,6 +4,7 @@
 // Makefile Tools extension
 
 import * as configuration from './configuration';
+import { MakefileConfiguration, TestEnvironment } from './configuration';
 import * as cpptools from './cpptools';
 import * as fs from 'fs';
 import * as logger from './logger';
@@ -111,6 +112,9 @@ export class Extension {
         if (!this.pkginfo)
             this.pkginfo = await make.getPackageJSON().catch(() => undefined);
 
+        if (!this.pkginfo)
+            return Promise.reject();
+
         var url = vscode.Uri.from({
             scheme: 'https',
             authority: 'autotools.mergesium.com',
@@ -121,7 +125,7 @@ export class Extension {
                 'v=' + util.slugify('s-' + this.pkginfo?.version) :
                 this.pkginfo?.version ? 'v=' + util.slugify(this.pkginfo?.version) : undefined
         });
-        return url;
+        return Promise.resolve(url);
     }
     async gotoKnowledgeBase() {
         let kburl = await this.kbUrl();
@@ -138,10 +142,6 @@ export class Extension {
             showCollapseAll: false
 
         });
-        this.testController = new MyTestController(
-            Extension.whoami, "Autotools tests");
-        this.testController?.activate();
-
         this._treeDisposables.push(this._projectTestSuitesView.onDidChangeSelection((e) => {
             if (e.selection.length > 0) {
                 let selected = e.selection[0];
@@ -406,6 +406,20 @@ export class Extension {
         this.buildTree = build_tree;
         this.configDisposables.forEach((d) => d.dispose());
         this.configDisposables = [];
+        if (!build_tree.hasStats) {
+            countStats(build_tree);
+            build_tree.hasStats = true;
+        }
+        if (build_tree.stats.checks) {
+            if (!this.testController) {
+                this.testController = new MyTestController(
+                    Extension.whoami, "Autotools tests", extension.getState().liveCheckId);
+            }
+            this.testController.clear();
+        } else {
+            this.testController?.deactivate();
+            this.testController = undefined;
+        }
         this.tasks.forEach((provider) => provider.update(this.configDisposables));
         if (this._projectOutlineTreeView) {
             this._projectOutlineProvider.updateTargets(build_tree);
@@ -417,8 +431,7 @@ export class Extension {
             this._projectTestSuitesView.reveal(this._projectTestSuitesProvider.getChildren(undefined)[0],
                 { select: false, focus: false, expand: true, } );
             this.updateOutlineBadge();
-            }
-        this.testController?.clear();
+        }
         this.updateTestSuite(build_tree, build_tree, true);
         this.testController?.onOpenedDocument();
         this.testController?.restoreLiveCheck();
@@ -907,8 +920,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
     // Read from the workspace state before reading from settings,
     // becase the latter may use state info in variable expansion.
-    configuration.initFromState();
+    await configuration.initFromState();
     await configuration.initFromSettings(true);
+
+    if (extension.isAutotoolsProject())
+        await outputLogHeader();
 
     const openFile = async (fileUri: vscode.Uri) => {
         await vscode.commands.executeCommand("vscode.open", fileUri);
@@ -952,6 +968,19 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     await make.configure(make.TriggeredBy.cleanConfigure);
 }
 
+export async function outputLogHeader() : Promise<void> {
+
+    var kburl = await extension.kbUrl();
+    if (extension.pkginfo/* && !currentMakefileConfiguration*/) {
+        let pkg = extension.pkginfo;
+        logger.message(localize('autotools.package.coordinates', "Package \"{0}\" version {1} - bug reports: {2}, url: {3}",
+        pkg.name || "unknown", pkg.version || "unk", pkg.bugreport || "unknown", pkg.url || "unknown"), "Normal");
+        logger.message(localize('autotools.ref.kb', "Knowledge Base: {0}", kburl.toString(true)), "Normal");
+        logger.message("=======================", "Normal");
+    }
+    return Promise.resolve();
+}
+
 export async function deactivate(): Promise<void> {
     vscode.window.showInformationMessage(localize("extension.deactivated", "The extension {0} is de-activated.", "'vscode-makefile-tools'"));
 
@@ -968,4 +997,29 @@ export async function deactivate(): Promise<void> {
             item.dispose();
         }
     }
+    return Promise.resolve();
+}
+
+function countStats(sub: gnumake.Make): number[] {
+    sub.stats.subdirs = sub.submake.size;
+    for (let submake of sub.submake.values()) {
+        let [t, n, s, c] = countStats(submake);
+        sub.stats.programs += t;
+        sub.stats.tests += n;
+        sub.stats.subdirs += s;
+        sub.stats.checks += c;
+    }
+    for (let [goal, g] of sub.goals)
+        sub.stats.programs += ((g.flags & Goal.Flags.Linked_binary)
+            && !(g.flags & Goal.Flags.Test_Program)) ? 1 : 0;
+
+    let numTestsHere = (sub.goals.get("test-suite.log")?.depends?.length ?? 0);
+    sub.stats.tests += numTestsHere;
+    sub.stats.checks += (numTestsHere ? 1 : 0);
+    return [
+        sub.stats.programs,
+        sub.stats.tests,
+        sub.submake.size,
+        sub.stats.checks
+    ];
 }

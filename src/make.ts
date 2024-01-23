@@ -4,6 +4,7 @@
 // Support for make operations
 
 import * as configuration from './configuration';
+import { MakefileConfiguration, TestEnvironment } from './configuration';
 import * as cpp from 'vscode-cpptools';
 import * as cpptools from './cpptools';
 import {extension, telemetry} from './extension';
@@ -114,13 +115,15 @@ export async function getPackageJSON(): Promise<pkgInfo> {
                 true, true,
                 '{ "name": "@PACKAGE@", "version": "@VERSION@", "bugreport": "@PACKAGE_BUGREPORT@", "url": "@PACKAGE_URL@", "automake": "@AUTOMAKE@" }',
                 (x) => {info = x}, undefined);
-            if (result.returnCode !== 0) reject();
-            if (info === undefined) reject();
+            if (result.returnCode !== 0) return reject();
+            if (info === undefined) return reject();
             try {
                 theinfo = JSON.parse(info || "");
-                if (theinfo) resolve(theinfo);
+                if (theinfo) {
+                    return resolve(theinfo);
+                }
             } catch (e) {
-                reject();
+                return reject();
             }
         } else {
             const result: util.SpawnProcessResult = await util.spawnChildProcess(
@@ -141,19 +144,24 @@ export async function getPackageJSON(): Promise<pkgInfo> {
                         };
                     }
                 }, undefined);
-            if (result.returnCode !== 0) reject();
-            if (theinfo) resolve(theinfo);
+            if (result.returnCode !== 0) return reject();
+            if (theinfo) return resolve(theinfo);
         }
 
-        reject();
+        return reject();
     });
 }
 
-let export_stats : {
+export interface AutotoolsStats {
     programs: number;
     tests: number;
     checks: number;
 };
+
+let export_stats : AutotoolsStats;
+export function getStats() : AutotoolsStats {
+    return export_stats;
+}
 
 export function supportsTestEnvironments() : boolean {
     return true;
@@ -265,6 +273,8 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
 
         // Clear the existing Intellisense config from cache or previous parsing
         extension.resetCppToolsProvider();
+
+        export_stats = {programs: 0, tests: 0, checks: 0};
 
         let stdout: any = (result: string): void => {
             // FIXME: should end look after caught exception
@@ -414,17 +424,14 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
         } else {
             // All done, notify that new data is available
             result.returnCode = extension.updateCppToolsProvider();
+            export_stats = build_tree.stats;
             extension.updateTasks(build_tree);
             extension.updateWatchers();
-            export_stats = {
-                programs: build_tree.stats.programs,
-                tests: build_tree.stats.tests,
-                checks: build_tree.stats.checks};
             telemetry.setAttributes({
                     stats: [ linenumber,
-                        export_stats.programs,
-                        export_stats.tests,
-                        export_stats.checks ]
+                        build_tree.stats.programs,
+                        build_tree.stats.tests,
+                        build_tree.stats.checks ]
             });
         }
         ui.getUI().setStatus(result.returnCode !== ConfigureBuildReturnCodeTypes.success ? ui.UIStatus.ERR : ui.UIStatus.OK);
@@ -593,6 +600,8 @@ export async function configure(triggeredBy: TriggeredBy): Promise<number> {
   let retc: number = ConfigureBuildReturnCodeTypes.success;
   let subphaseStats: ConfigureSubphasesStatus = {};
 
+  await util.scheduleAsyncTask(async () => {await extension.registerCppToolsProvider(); });
+
   try {
     ui.getUI().setLoading(ui.UIStatus.LOADING);
     subphaseStats = await vscode.window.withProgress(
@@ -654,17 +663,17 @@ export async function configure(triggeredBy: TriggeredBy): Promise<number> {
     if (retc === ConfigureBuildReturnCodeTypes.success) {
         let fileIndex = extension.getCppConfigurationProvider().getCustomConfigurationProvider().fileIndex;
 
-        let sample = Array.from(fileIndex.keys()).slice(0, 2)
+        let sample = Array.from(fileIndex.keys()).slice(0, 3)
                 .concat("...")
                 .map(f => path.basename(f));
     // FIXME: not true. it gets here if --dry-run parsing throws
       logger.message(localize("autotools.log.config.exported",
-        "Build configuration for {0} source files like {1} exported to Intellisense.",
+        "Exported to Intellisense: build configuration for {0} source files like {1}",
             fileIndex.size,
             sample.join(", ")
             ));
       logger.message(localize("autotools.log.config.exported2",
-            "{0} build tasks and {1} test tasks in {2} check suites were imported (see Run Task... command)",
+            "Generated tasks: {0} build tasks and {1} test tasks in {2} check suites (see Run Task... command)",
             export_stats.programs, export_stats.tests, export_stats.checks));
     } else {
         if (retc == 1) {/* ie, Intellisense API not available */
@@ -762,7 +771,6 @@ async function loadConfigurationFromCache(progress: vscode.Progress<{}>, cancel:
     let startTime: number = Date.now();
     let elapsedTime: number;
 
-    await util.scheduleAsyncTask(async () => {await extension.registerCppToolsProvider(); });
     let content: string | undefined = util.readFile(cacheFile);
     if (content) {
         try {

@@ -63,7 +63,7 @@ suite('Fake dryrun parsing', /*async*/() => {
       extension.getState().reset(false);
       await vscode.workspace.getConfiguration("makefile").update("launchConfigurations", undefined);
       configuration.setCurrentMakefileConfiguration("Default");
-      configuration.initFromState();
+      await configuration.initFromState();
       await configuration.initFromSettings();
 
       // We define extension log here as opposed to in the fake repro .vscode/settings.json
@@ -106,7 +106,7 @@ suite('Fake dryrun parsing', /*async*/() => {
          extension.getState().reset(false);
          await vscode.workspace.getConfiguration("makefile").update("launchConfigurations", undefined);
          configuration.setCurrentMakefileConfiguration("Default");
-         configuration.initFromState();
+         await configuration.initFromState();
          await configuration.initFromSettings();
    
          // We define extension log here as opposed to in the fake repro .vscode/settings.json
@@ -150,7 +150,7 @@ suite('Fake dryrun parsing', /*async*/() => {
          extension.getState().reset(false);
          await vscode.workspace.getConfiguration("makefile").update("launchConfigurations", undefined);
          configuration.setCurrentMakefileConfiguration("Default");
-         configuration.initFromState();
+         await configuration.initFromState();
          await configuration.initFromSettings();
 
          // Extension log is defined in the test .vscode/settings.json but delete it now
@@ -202,7 +202,7 @@ suite('Fake dryrun parsing', /*async*/() => {
          extension.getState().reset(false);
          await vscode.workspace.getConfiguration("makefile").update("launchConfigurations", undefined);
          configuration.setCurrentMakefileConfiguration("Default");
-         configuration.initFromState();
+         await configuration.initFromState();
          await configuration.initFromSettings();
    
          // Extension log is defined in the test .vscode/settings.json but delete it now
@@ -241,7 +241,7 @@ suite('Fake dryrun parsing', /*async*/() => {
          extension.getState().reset(false);
          await vscode.workspace.getConfiguration("makefile").update("launchConfigurations", undefined);
          configuration.setCurrentMakefileConfiguration("Default");
-         configuration.initFromState();
+         await configuration.initFromState();
          await configuration.initFromSettings();
    
          // Extension log is defined in the test .vscode/settings.json but delete it now
@@ -280,7 +280,7 @@ suite('Fake dryrun parsing', /*async*/() => {
          extension.getState().reset(false);
          await vscode.workspace.getConfiguration("makefile").update("launchConfigurations", undefined);
          configuration.setCurrentMakefileConfiguration("Default");
-         configuration.initFromState();
+         await configuration.initFromState();
          await configuration.initFromSettings();
    
          // Extension log is defined in the test .vscode/settings.json but delete it now
@@ -317,7 +317,7 @@ suite('Fake dryrun parsing', /*async*/() => {
       extension.getState().reset(false);
       await vscode.workspace.getConfiguration("makefile").update("launchConfigurations", undefined);
       configuration.setCurrentMakefileConfiguration("Default");
-      configuration.initFromState();
+      await configuration.initFromState();
       await configuration.initFromSettings();
 
       // Extension log is defined in the test .vscode/settings.json but delete it now
@@ -357,7 +357,7 @@ suite('Fake dryrun parsing', /*async*/() => {
       extension.getState().reset(false);
       await vscode.workspace.getConfiguration("makefile").update("launchConfigurations", undefined);
       configuration.setCurrentMakefileConfiguration("Default");
-      configuration.initFromState();
+      await configuration.initFromState();
       await configuration.initFromSettings();
 
       configuration.prepareConfigurationsQuickPick();

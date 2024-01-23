@@ -115,20 +115,22 @@ export async function setCurrentMakefileConfiguration(configuration: string | un
         isDefault: true,
     }
     statusBar.setConfiguration(currentMakefileConfiguration.name, currentMakefileConfiguration.top_builddir);
+    logger.message(`Selected build configuration is "${configuration}" in ${currentMakefileConfiguration.top_builddir}`);
     extension.onConfigurationSelect(currentMakefileConfiguration);
     updateEnvironmentsForCurrentMakefile();
 }
 
 // Read the current configuration from workspace state, update status bar item
-export function readCurrentMakefileConfiguration(): void {
+export async function readCurrentMakefileConfiguration(): Promise<void> {
     let buildConfiguration : string | undefined = extension.getState().buildConfiguration;
     if (!extension.isAutotoolsProject())
         return;
-    if (!buildConfiguration) {
-        logger.message("No build configuration is selected. Assuming 'Default'.");
-    } else {
-        logger.message(`Selected build configuration is "${buildConfiguration}"`);
-    }
+    //await outputLogHeader();
+    //if (!buildConfiguration) {
+    //    logger.message("No build configuration is selected. Assuming 'Default'.");
+    //} else {
+    //    logger.message(`Selected build configuration is "${buildConfiguration}"`);
+    //}
     setCurrentMakefileConfigurationName(buildConfiguration);
 }
 
@@ -319,13 +321,6 @@ function findMakefile(): string | undefined {
 }
 
 export async function logMakeCmd(relativeMakefile: string): Promise<void> {
-    var kburl = await extension.kbUrl();
-    if (extension.pkginfo) {
-        let pkg = extension.pkginfo;
-        logger.message(localize('autotools.package.coordinates', "Package \"{0}\" version {1} - bug reports: {2}, url: {3}",
-        pkg.name || "unknown", pkg.version || "unk", pkg.bugreport || "unknown", pkg.url || "unknown"), "Normal");
-        logger.message(localize('autotools.ref.kb', "More info about editting the package with vscode at: {0}", kburl.toString(true)), "Normal");
-    }
     if (currentMakefileConfiguration.makeArgs)
         logger.message(`Make cmd (${relativeMakefile}): '${makePath} ${currentMakefileConfiguration.makeArgs.join(" ")}' for configuration "${currentMakefileConfiguration.name}"`, "Debug");
     else
@@ -608,8 +603,8 @@ export async function getCurrentTarget(): Promise<make.BuildTarget> {
 // At activation time we read from state, update UI accordingly
 // and commands become available to be run in settings via expansion.
 // These can also be resetted via the makefile.resetState command.
-export function initFromState(): void {
-   readCurrentMakefileConfiguration();
+export async function initFromState(): Promise<void> {
+   await readCurrentMakefileConfiguration();
 }
 
 // Initialization from settings (or backup default rules).
@@ -624,9 +619,9 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
     await readpromptClean();
     await readProjectTestEnvironment();
     await readMakefileConfigurations(currentMakefileConfigurationName);
+    await readTestEnvironments();
     setCurrentMakefileConfiguration(currentMakefileConfigurationName);
 
-    await readTestEnvironments();
 
     await analyzeConfigureParams(false);
 
@@ -808,7 +803,6 @@ export async function setConfigurationByName(configurationName: string | undefin
     setCurrentMakefileConfigurationName(configurationName);
     extension.getState().buildConfiguration = configurationName;
     logger.message(`Setting configuration - ${currentMakefileConfigurationName}`);
-    logger.message("Re-reading settings after configuration change.");
     // Refresh settings, they may reference variables or commands reading state configuration var (${configuration}).
     await initFromSettings();
     extension._projectOutlineProvider.update(currentMakefileConfigurationName);

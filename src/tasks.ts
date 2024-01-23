@@ -235,7 +235,7 @@ export class AutoToolsCheckTaskProvider implements MyTaskProvider {
                     builddir: dir
                 };
                 if (!e.length) {
-                    g.task = new Task(kind, TaskScope.Workspace, 'run test suite ' + (dir ? ('in ' + dir) : 'at the top'),
+                    g.task = new Task(kind, TaskScope.Workspace, 'Run test suite ' + (dir ? ('in ' + dir) : 'at the top'),
                         "autotools",
                     new ProcessExecution(
                         configuration.getMakePath(),
@@ -254,7 +254,7 @@ export class AutoToolsCheckTaskProvider implements MyTaskProvider {
                     var newMap : Map<string, vscode.Task> = new Map();
                     g.task = newMap;
                     e.forEach((env) => {
-                        var newTask = new Task(kind, TaskScope.Workspace, 'run test suite ' + (dir ? ('in ' + dir) : 'at the top @ ' + env.name),
+                        var newTask = new Task(kind, TaskScope.Workspace, 'Run test suite ' + (dir ? ('in ' + dir) : 'at the top @ ' + env.name),
                             "autotools",
                         new ProcessExecution(
                             configuration.getMakePath(),
