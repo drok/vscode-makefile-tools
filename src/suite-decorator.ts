@@ -52,7 +52,7 @@ export class SuiteDecorations implements vscode.FileDecorationProvider {
         }
         if (!test)
             return {}; // This will log an error in ExtensionHost about invalid/empty deco
-        return TRS_Info[test.flags & Goal.Flags.Test_Result_Mask];
+        return TRS_Info[test.trs?.current ?? TRS.NONE];
 	}
 
 }

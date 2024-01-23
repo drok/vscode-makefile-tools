@@ -75,6 +75,11 @@
                 "title": "%autotools.outline.checkAll.title%"
             },
             {
+                "command": "autotools.livecheck",
+                "icon": "$(broadcast)",
+                "title": "%autotools.command.livecheck.title%"
+            },
+            {
                 "command": "autotools.check",
                 "icon": "$(checklist)",
                 "title": "%autotools.command.check.title%"
@@ -796,6 +801,11 @@
                     "command": "autotools.test",
                     "when": "view == autotools.tests && viewItem =~ /nodeType=test/",
                     "group": "inline@10"
+                },
+                {
+                    "command": "autotools.livecheck",
+                    "when": "view == autotools.tests && viewItem =~ /nodeType=check/",
+                    "group": "inline@9"
                 },
                 {
                     "command": "autotools.debug",

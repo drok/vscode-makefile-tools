@@ -64,6 +64,14 @@ export class StateManager {
     this._update('ranConfigureInCodebaseLifetime', v);
   }
 
+  // Live testing test id (suite to run on save)
+  get liveCheckId(): string | undefined {
+    return this._get<string>('liveCheckId');
+  }
+  set liveCheckId(v: string | undefined) {
+    this._update('liveCheckId', v);
+  }
+
   // If the project needs a clean configure as a result
   // of an operation that alters the configure state
   // (makefile configuration change, build target change,

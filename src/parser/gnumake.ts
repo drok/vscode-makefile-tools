@@ -411,8 +411,6 @@ const GoalsEndRe = /^# files hash-table stats:$/;
 export class Goal extends Node implements Parser {
     public static readonly Flags = {
         None: 0,
-        /* Test status, filled when task runs. 3-bits = make.TRS */
-        Test_Result_Mask: 7,
 
         /* Flags gathered from Make (phony, etc) */
         Not_a_target: 8,
@@ -431,6 +429,7 @@ export class Goal extends Node implements Parser {
         Test_Log: 4096,
         Library: 8192,
     };
+    public trs?: make.TestResult;
 
     static makeArgs(): string[] { return [
         // Nothing. The goals are output when the Database is output
@@ -549,6 +548,7 @@ export class Goal extends Node implements Parser {
         super();
     }
     depends: Goal[] | undefined = undefined;
+    livetask: vscode.Task | undefined;
     task: vscode.Task | Map<string,vscode.Task> | undefined;
     test: vscode.TestItem | undefined;
 }

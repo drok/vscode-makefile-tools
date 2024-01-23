@@ -197,7 +197,13 @@ export class Extension {
             this.testTasks.numSuspect++;
     }
 
-    trsChange(c: configuration.MakefileConfiguration, uri: vscode.Uri) : void {
+    /**
+     * Handler for TRS file changes. Updates the Goal's trs structure with the current and global results
+     * @param c {@linkcode MakefileConfiguration Current build configuration}
+     * @param env TestEnvironment that is the "current", used to select the right :test-result: TRS line
+     * @param uri the uri of the TRS file as reported by fs.watch
+     */
+    trsChange(c: MakefileConfiguration, env: TestEnvironment, uri: vscode.Uri) : void {
 
         let dir = path.relative(util.resolvePathToRoot(c.top_builddir), path.dirname(uri.path));
         let log = path.basename(uri.path, ".trs") + ".log";
@@ -207,21 +213,20 @@ export class Extension {
             ?.depends?.find((d) => d.goal === log);
 
         if (goal) {
-            let oldresult = goal.flags & Goal.Flags.Test_Result_Mask;
-            let result = make.readTRS(new make.BuildTarget(dir, log));
-            if (oldresult != result) {
-                goal.flags &= ~Goal.Flags.Test_Result_Mask;
-                goal.flags |= result;
+            let old = goal.trs;
+            goal.trs = make.readTRS(new make.BuildTarget(dir, log), env, c);
+            if (goal.trs.current != old?.current) {
                 this.suiteDecorator.update(vscode.Uri.from(
                     {authority: Extension.whoami, scheme: 'test', path: '/' + dir, query: log}));
                 this.suiteDecorator.update(vscode.Uri.from(
                     {authority: Extension.whoami, scheme: 'check', path: '/' + dir, query: 'test-suite.log'}));
-                this.failStatUpdate(oldresult, result);
+                this.failStatUpdate(old?.current || make.TRS.NONE, goal.trs.current);
                 // Don't update the test suites. They are auto summarized
-                if (goal.test && !(goal.flags & Goal.Flags.Test_Suite))
-                    this.testController?.trsChange(goal.test);
                 this.updateOutlineBadge();
             }
+            if ( goal.test && goal.trs.global != old?.global && !(goal.flags & Goal.Flags.Test_Suite))
+                this.testController?.trsChange(goal.test);
+
         }
     }
 
@@ -300,6 +305,13 @@ export class Extension {
                         if (hasUpdates) this.updateOutlineBadge();
                     }
 */
+                } else if (definition.type == 'check') {
+                    let suite = configuration.getAllBuildTargets()
+                        ?.get(definition.builddir)
+                        ?.get('test-suite.log');
+                    if (suite && suite.test) {
+                        this.testController?.suiteCompleted(suite.test);
+                    }
                 } else if (definition.type == "autotools") {
                     const definition: AutotoolsTask = <any>task.definition;
                     if (definition?.action == "regen" || definition?.action == "recheck")
@@ -409,6 +421,7 @@ export class Extension {
         this.testController?.clear();
         this.updateTestSuite(build_tree, build_tree, true);
         this.testController?.onOpenedDocument();
+        this.testController?.restoreLiveCheck();
     }
     updateTestSuite(sub: gnumake.Make, parent: gnumake.Make, top: boolean): void {
         let c = configuration.getCurrentMakefileConfiguration();
@@ -421,7 +434,7 @@ export class Extension {
         if (sub.test_suite && sub.test_suite.test) {
             //let logpath = path.join(c.top_builddir, sub.dir);
             sub.test_suite.depends?.forEach((test) => {
-                sub.test_suite?.test && extension.testController?.addTest(c, sub.dir, sub.test_suite.test, test, test.flags & Goal.Flags.Test_Result_Mask)});
+                sub.test_suite?.test && extension.testController?.addTest(c, sub.dir, sub.test_suite.test, test)});
         }
         if (top && sub.test_suite?.test)
             this.testController?.update(sub.test_suite.test);
@@ -815,6 +828,19 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             return await vscode.tasks.executeTask(sub.goal.task);
     }));
 
+    context.subscriptions.push(vscode.commands.registerCommand('autotools.livecheck', async (sub: tree.SubNode) => {
+        telemetry.logEvent("livecheck");
+        /* Must be a SubNode */
+        if (!sub.submake.test_suite)
+            throw new Error("Missing test suite on SubNode");
+        if (!sub.submake.test_suite.task)
+            throw new Error("Missing check task on SubNode");
+        assert(sub.submake.test_suite.task instanceof Map, "test_suite.task should be a Map", sub.submake.test_suite.task);
+        sub.submake.test_suite.test &&
+            extension.testController?.togglelivecheck(sub.submake.test_suite.test);
+            // return await vscode.tasks.executeTask(sub.submake.test_suite.test);
+    }));
+
     context.subscriptions.push(vscode.commands.registerCommand('autotools.check', async (sub: tree.SubNode) => {
         telemetry.logEvent("check");
         /* Must be a SubNode */
@@ -889,6 +915,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         await vscode.commands.executeCommand("workbench.files.action.showActiveFileInExplorer");
     }
 
+    context.subscriptions.push(vscode.workspace.onDidSaveTextDocument(async (f) => {
+        logger.message(`Saved file ${f.uri}`, "Normal");
+        if (extension.testController) {
+            vscode.workspace.textDocuments.find((d) => d.isDirty) ||
+            await extension.testController?.onSavedAll();
+        }
     }));
 
     // context.subscriptions.push(vscode.window.onDidChangeVisibleTextEditors( (editors) => {

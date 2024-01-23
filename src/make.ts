@@ -892,6 +892,11 @@ export async function doConfigure(progress: vscode.Progress<{}>, cancel: vscode.
     return subphaseStats;
 }
 
+/**
+ * Possible TRS results from automake
+ *
+ * {@url https://www.gnu.org/software/automake/manual/html_node/TEST-RESULTS.html}
+ */
 export enum TRS {
     NONE = 0, /* test result n/a */
     XPASS = 1,
@@ -901,6 +906,14 @@ export enum TRS {
     FAIL = 5,
     XFAIL = 6
 }
+export interface TestResult {
+    // :global-test-result: outcome
+    global: TRS;
+    // :test-result: outcome
+    current: TRS;
+    // number of test-results found (one per environment)
+    num: number;
+};
 
 export const TRS_Info: { [key: number]: vscode.FileDecoration } = {
     [TRS.NONE]:  { tooltip: 'n/a',   badge: '❔' },
@@ -917,37 +930,71 @@ export function isSuspect(trs: TRS) : boolean
 {
     return trs === TRS.ERROR || trs === TRS.XFAIL || trs === TRS.XPASS;
 }
-export function readTRS(b: BuildTarget) : TRS
-{
-    let c = configuration.getCurrentMakefileConfiguration();
 
+const noTRS : TestResult = { global: TRS.NONE, current: TRS.NONE, num: 0 };
+/**
+ * Read the test result for a the specified TestEnvironemnt from a TRS file.
+ * Compatibility with manually run tests (make check from the commandline),
+ * which use the default LOG_DRIVER (not test-environment aware): If the specified
+ * TestEnvironemnt has no TESTS_ENVIRONMENT settings a :test-results: line without
+ * an environemnt name is accepted as a match.
+ *
+ * @param b Build target (ie, directory and filename) of a TRS file
+ * @param env TestEnvironemnt for which to fetch the result.
+ * @param c Current build configuration.
+ * @returns a {@linkcode make.TRS TRS enum value}
+ */
+export function readTRS(b: BuildTarget, env: TestEnvironment, c: MakefileConfiguration) : TestResult
+{
     let trs = util.resolvePathToRoot(path.join(c.top_builddir, b.builddir, path.basename(b.goal, ".log") + ".trs"));
+    let hasEnv : boolean = !!env.checkExecOptions?.env?.TESTS_ENVIRONMENT.length;
+    let testResult : TestResult = { global: TRS.NONE, current: TRS.NONE, num: 0 };
     try {
         const fileContent = fs.readFileSync(trs, 'utf8');
+        if (!fileContent)
+            return noTRS;
         const lines = fileContent.split('\n');
 
-        //let testResult = '';
-        let globalTestResult = '';
+        let localResult : string = "-";
+        let globalResult : string = "NONE";
 
         for (const line of lines) {
-            //if (line.startsWith(':test-result:')) {
-            //    testResult = line.split(':test-result:')[1].trim();
-            //} else
-            if (line.startsWith(':global-test-result:')) {
-                globalTestResult = line.split(':global-test-result:')[1].trim();
+            if (line.startsWith(':test-result:')) {
+                const result = line.split(' ', 4);
+                if (result[2] == env.name) {
+                    localResult = result[1];
+                } else if (!hasEnv && result.length == 2 && localResult == "-") {
+                    localResult = result[1];
+                }
+                testResult.num++;
+            } else if (line.startsWith(':global-test-result:')) {
+                globalResult = line.split(' ', 2)[1];
             }
         }
-        switch (/*testResult || */globalTestResult) {
-            case "XPASS": return TRS.XPASS;
-            case "PASS": return TRS.PASS;
-            case "SKIP": return TRS.SKIP;
-            case "ERROR": return TRS.ERROR;
-            case "FAIL": return TRS.FAIL;
-            case "XFAIL": return TRS.XFAIL;
-            default: return TRS.ERROR;
+        switch (localResult) {
+            case "XPASS": testResult.current = TRS.XPASS; break;
+            case "PASS":  testResult.current = TRS.PASS; break;
+            case "SKIP":  testResult.current = TRS.SKIP; break;
+            case "ERROR": testResult.current = TRS.ERROR; break;
+            case "FAIL":  testResult.current = TRS.FAIL; break;
+            case "XFAIL": testResult.current = TRS.XFAIL; break;
+            case "NONE":  testResult.current = TRS.NONE; break;
+            case "-":     testResult.current = TRS.NONE; break;
+            default:      testResult.current = TRS.ERROR; break;
+        }
+        switch (globalResult) {
+            case "XPASS": testResult.global = TRS.XPASS; break;
+            case "PASS":  testResult.global = TRS.PASS; break;
+            case "SKIP":  testResult.global = TRS.SKIP; break;
+            case "ERROR": testResult.global = TRS.ERROR; break;
+            case "FAIL":  testResult.global = TRS.FAIL; break;
+            case "XFAIL": testResult.global = TRS.XFAIL; break;
+            case "NONE":  testResult.global = TRS.NONE; break;
+            default:      testResult.global = TRS.ERROR; break;
         }
     }
     catch (e) {
-        return TRS.NONE; // File does not exist
+        return noTRS; // File does not exist
     }
+    return testResult;
 }

@@ -130,7 +130,8 @@ export class AutoToolsTestTaskProvider implements MyTaskProvider {
         let tc = extension.testController;
         let c = configuration.getCurrentMakefileConfiguration();
         let t = configuration.getAllBuildTargets();
-        let e = make.supportsTestEnvironments() ? configuration.getTestEnvironments() : [];
+        let cte = configuration.getCurrentTestEnvironment();
+        let e = make.supportsTestEnvironments() ? configuration.getTestEnvironments() : [cte];
         t.forEach((goals, dir) => {
             for (let g of goals.values()) {
                 if (g.flags & Goal.Flags.Test_Suite) {
@@ -139,7 +140,7 @@ export class AutoToolsTestTaskProvider implements MyTaskProvider {
                         let p : string = util.resolvePathToRoot(path.join(c.top_builddir, dir));
                         disposables.push(new util.MyFileWatcher(p, (e, f) => {
                             if (f.endsWith(".trs"))
-                                extension.trsChange(c, vscode.Uri.file(path.join(p,f)));
+                                extension.trsChange(c, cte, vscode.Uri.file(path.join(p,f)));
                         }));
                         g.depends.forEach((d) => {
                             if(!d.goal)
@@ -150,9 +151,12 @@ export class AutoToolsTestTaskProvider implements MyTaskProvider {
                                 type: this.myType,
                                 test: test
                             };
-                            if (!e.length) {
-                                d.task = new Task(kind, TaskScope.Workspace, "run test \'" + dgoal + "\' " + (dir ? ('in ' + dir) : 'at the top'),
+                            var newMap : Map<string, vscode.Task> = new Map();
+                            d.task = newMap;
+                            e.forEach((env) => {
+                                var newTask = new Task(kind, TaskScope.Workspace, "Run test \'" + dgoal + "\' " + (dir ? ('in ' + dir) : 'at the top' + (' @ ' + env.name)),
                                 "autotools",
+
                                 new ProcessExecution(
                                     configuration.getMakePath(),
                                     (c.top_builddir ? ['-C', c.top_builddir] : [])
@@ -160,40 +164,20 @@ export class AutoToolsTestTaskProvider implements MyTaskProvider {
                                     .concat(c.makeArgs || [])
                                     .concat(["-esi",
                                         "check",
+                                        `LOG_DRIVER=${extension.testRunner}`,
                                         "TEST_LOGS=" + test.goal
-                                    ]), configuration.getCurrentTestEnvironment().testExecOptions));
-                                d.task.group = TaskGroup.Test;
-                                d.task.detail = localize("automake.test", "$(check) Run test '{0}'", path.basename(dgoal, ".log"));
-                                targets.push(d.task);
-                            } else {
-                                var newMap : Map<string, vscode.Task> = new Map();
-                                d.task = newMap;
-                                e.forEach((env) => {
-                                    var newTask = new Task(kind, TaskScope.Workspace, "run test \'" + dgoal + "\' " + (dir ? ('in ' + dir) : 'at the top' + (' @ ' + env.name)),
-                                    "autotools",
-    
-                                    new ProcessExecution(
-                                        configuration.getMakePath(),
-                                        (c.top_builddir ? ['-C', c.top_builddir] : [])
-                                        .concat(dir ? ['-C', dir] : [])
-                                        .concat(c.makeArgs || [])
-                                        .concat(["-esi",
-                                            "check",
-                                            "TEST_LOGS=" + test.goal
-                                        ]), env.testExecOptions));
-                                    newTask.group = TaskGroup.Test;
-                                    newTask.detail = localize("automake.test", "$(check) Run test '{0}'", path.basename(dgoal, ".log"));
-                                    newMap.set(env.name, newTask);
-                                    targets.push(newTask);
-                                });
-                            }
+                                    ]), env.testExecOptions));
+                                newTask.group = TaskGroup.Test;
+                                newTask.detail = localize("automake.test", "$(check) Run test '{0}'", path.basename(dgoal, ".log"));
+                                newMap.set(env.name, newTask);
+                                targets.push(newTask);
+                            });
 
                             /* Read existing TRS file to show correct last known status in the outline */
-                            let trs = readTRS(test);
-                            d.flags |= trs;
-                            this.numFails += (trs == TRS.FAIL ? 1 : 0);
-                            this.numUnknown += ((trs == TRS.NONE || trs == TRS.ERROR) ? 1 : 0);
-                            this.numSuspect += (isSuspect(trs) ? 1 : 0);
+                            d.trs = readTRS(test, cte, c);
+                            this.numFails += (d.trs.current == TRS.FAIL ? 1 : 0);
+                            this.numUnknown += ((d.trs.current == TRS.NONE || d.trs.current == TRS.ERROR) ? 1 : 0);
+                            this.numSuspect += (isSuspect(d.trs.current) ? 1 : 0);
                             this.numTests++;
 
                             // tc.addTest(suite, d, trs);
@@ -242,6 +226,7 @@ export class AutoToolsCheckTaskProvider implements MyTaskProvider {
         var targets : Task[] = [];
         let c = configuration.getCurrentMakefileConfiguration();
         let e = make.supportsTestEnvironments() ? configuration.getTestEnvironments() : [];
+        var checkExecOptions = configuration.getCurrentTestEnvironment().checkExecOptions;
         configuration.getAllBuildTargets().forEach((goals, dir) => {
             for (let g of goals.values()) {
                 if (g.flags & (Goal.Flags.Test_Suite)) {
@@ -257,8 +242,11 @@ export class AutoToolsCheckTaskProvider implements MyTaskProvider {
                         (c.top_builddir ? ['-C', c.top_builddir] : [])
                         .concat(dir ? ['-C', dir] : [])
                         .concat(c.makeArgs || [])
+                        .concat([
+                            `LOG_DRIVER=${extension.testRunner}`,
+                        ])
                         .concat("check"),
-                        configuration.getCurrentTestEnvironment().checkExecOptions));
+                        checkExecOptions));
                     g.task.group = TaskGroup.Test;
                     g.task.detail = localize("automake.check", "$(checklist) Test Suite");
                     targets.push(g.task);
@@ -273,14 +261,33 @@ export class AutoToolsCheckTaskProvider implements MyTaskProvider {
                             (c.top_builddir ? ['-C', c.top_builddir] : [])
                             .concat(dir ? ['-C', dir] : [])
                             .concat(c.makeArgs || [])
+                            .concat([
+                                `LOG_DRIVER=${extension.testRunner}`,
+                            ])
                             .concat("check"),
-                            configuration.getCurrentTestEnvironment().checkExecOptions));
+                            checkExecOptions));
                         newTask.group = TaskGroup.Test;
                         newTask.detail = localize("automake.check", "$(checklist) Test Suite");
                         newMap.set(env.name, newTask);
                         targets.push(newTask);
                     });
                 }
+                g.livetask = new Task(kind, TaskScope.Workspace, 'Update test suite ' + (dir ? ('log in ' + dir) : 'log at the top'),
+                    "autotools",
+                    new ProcessExecution(
+                        configuration.getMakePath(),
+                        (c.top_builddir ? ['-C', c.top_builddir] : [])
+                        .concat(dir ? ['-C', dir] : [])
+                        .concat(c.makeArgs || [])
+                        .concat([
+                            `LOG_DRIVER=${extension.testRunner}`,
+                        ])
+                        .concat(g.goal || "test-suite.log"),
+                        checkExecOptions));
+                g.livetask.group = TaskGroup.Test;
+                g.livetask.detail = localize("automake.livecheck", "$(checklist) $(broadcast) Test Suite Update");
+                targets.push(g.livetask);
+
             }}});
         this.myPromise = Promise.resolve(targets);
     }

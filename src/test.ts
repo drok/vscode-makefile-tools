@@ -2,7 +2,7 @@ import * as path from 'path';
 import { runInNewContext } from 'vm';
 import * as vscode from 'vscode';
 import { Goal, Make } from './parser/gnumake';
-import { BuildTarget, TRS, readTRS } from './make';
+import { BuildTarget, TRS, supportsTestEnvironments } from './make';
 import { TestController,
         EventEmitter,
         TestItemCollection,
@@ -20,17 +20,90 @@ import * as util from './util';
 import * as configuration from "./configuration";
 import { TestEnvironment } from './configuration';
 import { isDebuggable } from './debug';
-import * as make from './make';
 import * as logger from './logger';
+import * as fs from 'fs';
+
+import * as nls from 'vscode-nls';
+nls.config({ messageFormat: nls.MessageFormat.bundle, bundleFormat: nls.BundleFormat.standalone })();
+const localize: nls.LocalizeFunc = nls.loadMessageBundle();
 
 const UpdateRe = /^Makefile:\d+: update target '(.+)' due to: (.+)$/;
 
 const debuggable = new vscode.TestTag('debugme');
 const applicable = new vscode.TestTag('applicable');
+const live = new vscode.TestTag('live');
 const tags_debuggable = [debuggable];
+const tags_debuggable_live = [debuggable, live];
 const tags_applicable = [applicable];
+const tags_applicable_live = [applicable, live];
+const tags_live = [live];
 const tags_debuggable_applicable = [debuggable, applicable];
+const tags_debuggable_applicable_live = [debuggable, applicable, live];
 const tags_none : vscode.TestTag[] = [];
+
+const tagtable : Map<string, vscode.TestTag[]> = new Map([
+    [tags_none.map<string>(i => i.id).sort().join(','), tags_none],
+    [tags_applicable.map<string>(i => i.id).sort().join(','), tags_applicable],
+    [tags_debuggable.map<string>(i => i.id).sort().join(','), tags_debuggable],
+    [tags_live.map<string>(i => i.id).sort().join(','), tags_live],
+    [tags_debuggable_live.map<string>(i => i.id).sort().join(','), tags_debuggable_live],
+    [tags_applicable_live.map<string>(i => i.id).sort().join(','), tags_applicable_live],
+    [tags_debuggable_applicable.map<string>(i => i.id).sort().join(','), tags_debuggable_applicable],
+    [tags_debuggable_applicable_live.map<string>(i => i.id).sort().join(','), tags_debuggable_applicable_live],
+])
+function addTag(tag: vscode.TestTag, test: TestItem) : vscode.TestTag[] | undefined {
+    if (test.tags.includes(tag)) return undefined;
+    var broken : string = [...test.tags,tag].map<string>(t => t.id).sort().join(',');
+    var has : vscode.TestTag[] | undefined = tagtable.get(broken);
+    if (has)
+        return has;
+    return undefined;
+}
+function delTag(tag: vscode.TestTag, test: TestItem) : vscode.TestTag[] | undefined {
+    if (!test.tags.includes(tag)) return undefined;
+    var broken : string = test.tags.filter(t => t !== tag).map<string>(t => t.id).sort().join(',');
+    var has : vscode.TestTag[] | undefined = tagtable.get(broken);
+    if (has)
+        return has;
+    return undefined;
+}
+
+function readTRS(b: BuildTarget) : TRS
+{
+    let c = configuration.getCurrentMakefileConfiguration();
+
+    let trs = util.resolvePathToRoot(path.join(c.top_builddir, b.builddir, path.basename(b.goal, ".log") + ".trs"));
+    try {
+        const fileContent = fs.readFileSync(trs, 'utf8');
+        if (!fileContent)
+            return TRS.NONE;
+        const lines = fileContent.split('\n');
+
+        //let testResult = '';
+        let globalTestResult = '';
+
+        for (const line of lines) {
+            //if (line.startsWith(':test-result:')) {
+            //    testResult = line.split(':test-result:')[1].trim();
+            //} else
+            if (line.startsWith(':global-test-result:')) {
+                globalTestResult = line.split(' ')[1];
+            }
+        }
+        switch (/*testResult || */globalTestResult) {
+            case "XPASS": return TRS.XPASS;
+            case "PASS": return TRS.PASS;
+            case "SKIP": return TRS.SKIP;
+            case "ERROR": return TRS.ERROR;
+            case "FAIL": return TRS.FAIL;
+            case "XFAIL": return TRS.XFAIL;
+            default: return TRS.ERROR;
+        }
+    }
+    catch (e) {
+        return TRS.NONE; // File does not exist
+    }
+}
 
 export class MyTestController {
   private root: TestItem | undefined;
@@ -50,6 +123,9 @@ export class MyTestController {
 
     this.testCompletedEvent.fire(test);
   }
+  public suiteCompleted(suite: TestItem) : void {
+    this.testCompletedEvent.fire(suite);
+  }
 
   public async run(test: TestItem, env: TestEnvironment) : Promise<void> {
     const runs = this.activeRuns.get(test);
@@ -60,6 +136,16 @@ export class MyTestController {
         cancelToken.dispose();
     }
   }
+  public async liverun(test: TestItem, env: TestEnvironment) : Promise<void> {
+    const runs = this.activeRuns.get(test);
+    if (!runs) {
+        // do nothing if a run is waiting for this
+        var cancelToken = new vscode.CancellationTokenSource();
+        await this.runHandler(true, vscode.TestRunProfileKind.Run, new vscode.TestRunRequest([test], [], env.run), cancelToken.token, env);
+        cancelToken.dispose();
+    }
+  }
+
   public async debug(test: TestItem, env: TestEnvironment) : Promise<void> {
     const runs = this.activeRuns.get(test);
     if (!runs) {
@@ -82,7 +168,7 @@ export class MyTestController {
     this.testGoals.set(sub.test, sub);
     sub.test.tags = tags_none;
   }
-  public addTest(c: MakefileConfiguration, logpath: string, suite: TestItem, goal: Goal, trs: TRS) : void {
+  public addTest(c: MakefileConfiguration, logpath: string, suite: TestItem, goal: Goal) : void {
 //    var testName : string = goal.task instanceof vscode.Task ? goal.task.name :
 //        goal.task instanceof Map ? goal.task.get
     goal.test = this.controller.createTestItem(
@@ -94,6 +180,13 @@ export class MyTestController {
         goal.test.tags = tags_debuggable;
     else
         goal.test.tags = tags_none;
+
+    if (supportsTestEnvironments()) {
+        let envs = configuration.getTestEnvironments();
+        if (envs.length)
+            goal.test.description = localize("autotools.test.desc", "{0}/{1} environments tested", goal.trs?.num, envs.length);
+    }
+
     suite.children.add(goal.test);
   }
   public addSubTest(suite: TestItem, sub: TestItem) : void {
@@ -103,52 +196,52 @@ export class MyTestController {
   public clear() : void {
     this.controller.items.replace([]);
   }
-  public update(suite: TestItem) : void {
+  public update(suite: TestItem) : void { // FIXME: call with suite[], and createTestRun once for all suites.
       this.controller.items.add(suite);
-      configuration.getTestEnvironments().forEach(env => {
-        const run = this.controller.createTestRun(
+      var env = configuration.getCurrentTestEnvironment();
+      const run = this.controller.createTestRun(
                 new vscode.TestRunRequest(undefined, [], env.run),
                 "Autotools TRS on " + env.run?.label,
             false
         );
         this.updateTRS(run, suite);
         run.end();
-      });
       // this.activate();
   }
   public trsChange(test: TestItem) : void {
     const runs = this.activeRuns.get(test);
     if (!runs) {
         // do nothing if a run is waiting for this
-        configuration.getTestEnvironments().forEach(env => {
-            let run = this.controller.createTestRun(
+        var env = configuration.getCurrentTestEnvironment();
+        let run = this.controller.createTestRun(
                 new vscode.TestRunRequest([test], [], env.run),
                 "Manual run",
                 false);
-            this.updateTRS(run, test);
-            run.end();
-        });
+        this.updateTRS(run, test);
+        run.end();
     }
-}
-  updateGoalTRS(run: TestRun, test: TestItem, trs: TRS) : void {
+  }
+  updateGoalTRS(run: TestRun, test: TestItem, trs: TRS | undefined) : void {
     switch(trs) {
         case TRS.NONE: break;
         case TRS.ERROR: run.errored(test, new vscode.TestMessage("See log file")); break;
         case TRS.SKIP: run.skipped(test); break;
         case TRS.PASS: run.passed(test); break;
-        default: run.failed(test, new vscode.TestMessage(TRS_Info[trs].tooltip || "unk")); break;
+        case TRS.FAIL: run.failed(test, new vscode.TestMessage(TRS_Info[trs].tooltip || "fail")); break;
+        default: run.failed(test, new vscode.TestMessage(TRS_Info[TRS.FAIL].tooltip || "unk")); break;
     }
   }
   updateTRS(run: TestRun, test: TestItem) : void {
     let goal = this.testGoals.get(test);
     if (goal && !(goal.flags & Goal.Flags.Test_Suite))
-        this.updateGoalTRS(run, test, goal.flags & Goal.Flags.Test_Result_Mask);
-    for(const [id, item]  of test.children)
+        this.updateGoalTRS(run, test, goal.trs?.global);
+    else for(const [id, item]  of test.children)
         this.updateTRS(run, item);
   }
 
-  constructor(public id: string, public label: string) {
+  constructor(public id: string, public label: string, public livecheckid: string | undefined) {
     this.controller = vscode.tests.createTestController(id, label);
+    this.activate();
   }
 
   createRunProfile(label: string, kind: vscode.TestRunProfileKind, runHandler: (request: vscode.TestRunRequest, token: vscode.CancellationToken) => void | Thenable<void>, isDefault?: boolean | undefined, tag?: vscode.TestTag | undefined): vscode.TestRunProfile {
@@ -157,6 +250,16 @@ export class MyTestController {
   resolveHandler (item: TestItem | undefined): Thenable<void> | void {
     // Store the root test item
     this.root = item;
+  }
+
+  public async onSavedAll() : Promise<void> {
+    if (this.livecheckid) {
+        var test = this.controller.items.get(this.livecheckid);
+        if (test) {
+            await this.liverun(test, configuration.getCurrentTestEnvironment());
+        }
+    }
+    return Promise.resolve();
   }
 
   public async onOpenedDocument() : Promise<void> {
@@ -168,18 +271,6 @@ export class MyTestController {
     return new Promise<void>(async (resolve, reject) => {
         var targets = configuration.getAllBuildTargets();
         var runs : Map<string,string[]> = new Map();
-        // var builddir : string = util.resolvePathToRoot(configuration.getCurrentMakefileConfiguration().top_builddir);
-        vscode.window.tabGroups.all.forEach(group => {
-            logger.message(`Editor has group: col ${group.viewColumn}`, "Normal");
-            group.tabs.forEach(tab => {
-                logger.message(`Editor has tab: ${tab.label}`, "Normal");
-                if (tab.input instanceof vscode.TabInputText) {
-                    //let f: vscode.TabInputText = tab.input;
-                    logger.message(`.... file: ${tab.input.uri}`, "Normal");
-                }
-
-            });
-        });
         var applicable_tests : Set<vscode.TestItem>= new Set();
         vscode.window.tabGroups.all.forEach(group => {
             group.tabs.forEach(tab => {
@@ -234,24 +325,9 @@ export class MyTestController {
         targets.forEach((v,dir) => {
             v.forEach((goal,name) => {
                 if (goal.test) {
-                    if (!goal.test.tags.length) {
-                        if (applicable_tests.has(goal.test))
-                            goal.test.tags = tags_applicable;
-                    } else
-                    switch (goal.test.tags) {
-                        case tags_applicable:
-                            if (!applicable_tests.has(goal.test))
-                                goal.test.tags = tags_none;
-                            break;
-                        case tags_debuggable_applicable:
-                            if (!applicable_tests.has(goal.test))
-                                goal.test.tags = tags_debuggable;
-                            break;
-                        case tags_debuggable:
-                            if (applicable_tests.has(goal.test))
-                                goal.test.tags = tags_debuggable_applicable;
-                            break;
-                    }
+                    var newtags = applicable_tests.has(goal.test) ? addTag(applicable, goal.test) : delTag(applicable, goal.test);
+                    if (newtags)
+                        goal.test.tags = newtags;
                 }
             });
         });
@@ -259,21 +335,52 @@ export class MyTestController {
     });
   }
 
+  private livecheck : vscode.Uri | undefined;
+  public togglelivecheck(test : vscode.TestItem) : void {
+    var remove = test.tags.includes(live);
+    var newtags = remove ? delTag(live, test) : addTag(live, test);
+    if (newtags !== undefined) {
+        this.livecheck = !remove ? test.uri : undefined;
+        this.livecheckid = !remove ? test.id : undefined;
+        extension.getState().liveCheckId = this.livecheckid;
+
+
+        test.tags = newtags;
+        test.children.forEach(child => {
+            if (!child.children.size) {
+                var newtags = remove ? delTag(live, child) : addTag(live, child);
+                if (newtags) child.tags = newtags;
+            }
+        });
+    }
+  }
+  public restoreLiveCheck() : void {
+      if (this.livecheckid) {
+          var test = this.controller.items.get(this.livecheckid);
+          if (test) {
+              test.tags = addTag(live, test) || test.tags;
+              test.children.forEach(child => {
+                  if (!child.children.size)
+                    child.tags = addTag(live, child) || child.tags;
+              });
+          }
+      }
+  }
   public activate(): void {
       configuration.getTestEnvironments().map( env => {
         env.debug = this.controller.createRunProfile(
-            'Debug',
+            localize('autotools.test.debug.profile.name', '{0}: Debug "{1}" environment', extension.pkginfo?.name || "Autotools", env.name),
             vscode.TestRunProfileKind.Debug,
             (request, token) => {
-              this.runHandler(vscode.TestRunProfileKind.Debug, request, token, env);
+              this.runHandler(false, vscode.TestRunProfileKind.Debug, request, token, env);
             }, false, debuggable
           );
 
           env.run = this.controller.createRunProfile(
-            env.name,
+            localize('autotools.test.run.profile.name', '{0}: Test "{1}" environment', extension.pkginfo?.name || "Autotools", env.name),
             vscode.TestRunProfileKind.Run,
             (request, token) => {
-                this.runHandler(vscode.TestRunProfileKind.Run, request, token, env);
+                this.runHandler(false, vscode.TestRunProfileKind.Run, request, token, env);
             }, true/* , {id: env.name} */
           );
         });
@@ -295,6 +402,7 @@ export class MyTestController {
   }
 
     async runHandler(
+        live: boolean,
         kind: vscode.TestRunProfileKind,
         request: vscode.TestRunRequest,
         token: vscode.CancellationToken,
@@ -339,11 +447,11 @@ export class MyTestController {
                         run.started(test);
                         break;
                     case vscode.TestRunProfileKind.Run:
-                        if (test.children.size) {
-                            test. children.forEach(test => queue.push(test));
-                        } else {
                             if (goal.task) {
-                                if (goal.task instanceof vscode.Task)
+                                if (live) {
+                                    if (goal.livetask)
+                                        vscode.tasks.executeTask(goal.livetask);
+                                } else if (goal.task instanceof vscode.Task)
                                     vscode.tasks.executeTask(goal.task);
                                 else {
                                     var task = goal.task.get(env.name);
@@ -360,7 +468,6 @@ export class MyTestController {
                                 if (runs.size == 0)
                                     this.activeRuns.delete(test);
                             }
-                        }
                         break;
                 }
             }

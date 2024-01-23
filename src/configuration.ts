@@ -493,14 +493,12 @@ function updateEnvironmentsForCurrentMakefile(): void {
             // Suppress bash's error message "/bin/bash: line 74: /tmp/tmp-suite-log.tmp: Permission denied" to stderr
             env['am__sh_e_setup'] = 'set +e; exec 2> /dev/null';
             if (make.supportsTestEnvironments()) {
-                env['LOG_DRIVER'] = extension.testRunner;
-                env['LOG_DRIVER_FLAGS'] = `--env-name "${env.name}"`;
+                env['LOG_DRIVER_FLAGS'] = `--env-name "${e.name}"`;
             }
         }
         env = e.checkExecOptions?.env;
         if (env && make.supportsTestEnvironments()) {
-            env['LOG_DRIVER'] = extension.testRunner;
-            env['LOG_DRIVER_FLAGS'] = `--env-name "${env.name}"`;
+            env['LOG_DRIVER_FLAGS'] = `--env-name "${e.name}"`;
         }
     });
    
