@@ -143,7 +143,7 @@ async function readMakePath(): Promise<void> {
 let configureAc: string | undefined;
 export function setConfigureAc(file : string | undefined): void {
     configureAc = file;
-    vscode.commands.executeCommand('setContext', "autotools:haveManifest", file ? true : false);
+    vscode.commands.executeCommand('setContext', "autotools:haveManifest", file ? 1 : 2);
 }
 export function getConfigureAc(): string | undefined { return configureAc; }
 
@@ -340,7 +340,7 @@ export async function readMakefileConfigurations(currentConfigurationName : stri
     let unnamedConfigurationId: number = 0;
 
     vscode.commands.executeCommand('setContext', "autotools:haveConfigurations",
-        makefileConfigurations.length ? true : false);
+        makefileConfigurations.length ? 1 : 2);
 
     // Collect unnamed configurations (probably) defined by the extension earlier,
     // to make sure we avoid duplicates in case any new configuration is in need of a name.
@@ -406,7 +406,7 @@ export async function readTestEnvironments(): Promise<void> {
     testEnvironments = [];
 
     vscode.commands.executeCommand('setContext', "autotools:haveEnvironments",
-        testEnvironments.length ? true : false);
+        testEnvironments.length ? 1 : 2);
 
     const unnamedPrefix = "Unnamed";
     // Collect unnamed configurations (probably) defined by the extension earlier,
@@ -538,7 +538,7 @@ export async function readProjectTestEnvironment(): Promise<void> {
     testEnvironment.XFAIL_TESTS = workspaceConfiguration.get<string[]>("XFAIL_TESTS") || [];
 
     vscode.commands.executeCommand('setContext', "autotools:haveGlobalWaivers",
-        testEnvironment.XFAIL_TESTS?.length ? true : false);
+        testEnvironment.XFAIL_TESTS?.length ? 1 : 2);
 
     if (testEnvironment.XFAIL_TESTS && testEnvironment.XFAIL_TESTS.length > 0) {
         logger.message("Defined autotools.XFAIL_TESTS: " + testEnvironment.XFAIL_TESTS.join(";"), "Verbose");

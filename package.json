@@ -440,22 +440,22 @@
             {
                 "view": "autotools.outline",
                 "contents": "%autotools.welcome.markdownDescription%",
-                "when": "autotools:haveManifest && !autotools:haveConfigurations"
+                "when": "autotools:haveManifest == 1 && autotools:haveConfigurations > 1"
             },
             {
                 "view": "autotools.outline",
                 "contents": "%autotools.welcome.convert.markdownDescription%",
-                "when": "!autotools:haveManifest"
+                "when": "autotools:haveManifest > 1"
             },
             {
                 "view": "debug",
                 "contents": "%autotools.welcome.debug.auto.markdownDescription%",
-                "when": "autotools:haveConfigurations"
+                "when": "autotools:haveConfigurations == 1"
             },
             {
                 "view": "debug",
                 "contents": "%autotools.welcome.debug.markdownDescription%",
-                "when": "autotools:haveManifest && !autotools:haveConfigurations"
+                "when": "autotools:haveManifest == 1 && autotools:haveConfigurations > 1"
             }
         ],
         "languages": [
@@ -683,7 +683,7 @@
             "commandPalette": [
                 {
                     "command": "autotools.addAutotools",
-                    "when": "!autotools:isAutotoolsProject"
+                    "when": "autotools:isAutotoolsProject > 1"
                 },
                 {
                     "command": "autotools.check",

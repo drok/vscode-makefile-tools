@@ -331,7 +331,7 @@ export class Extension {
         });
 
         vscode.commands.executeCommand("setContext", "autotools:isAutotoolsProject",
-            this.isAutotoolsProject());
+            this.isAutotoolsProject() ? 1 : 2);
 
         if (!this.autotoolsTask.isBootstrapped()) {
             let cmd = this.autotoolsTask.bootstrap_cmd();
