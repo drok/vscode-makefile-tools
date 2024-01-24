@@ -886,7 +886,7 @@
                 {
                     "command": "autotools.debug",
                     "when": "view == autotools.tests && viewItem =~ /nodeType=bintest/",
-                    "group": "inline@9"
+                    "group": "inline@11"
                 },
                 {
                     "command": "autotools.check",
