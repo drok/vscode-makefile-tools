@@ -394,7 +394,7 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
             if (checkFileExistsSync(script))
                 return [script];
         }
-        return ["autoreconf", "-fvi"];
+        return configuration.autoreconfCmd().concat('-i');
     }
     public isBootstrapped(): boolean {
         return checkFileExistsSync(resolvePathToRoot("configure"));
@@ -407,14 +407,14 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
     changeConfiguration(c: configuration.MakefileConfiguration, disposables: vscode.Disposable[])
     {
         if (this.bootstrapTask) {
+            var autoreconf : string = configuration.autoreconfCmd().join(' ');
 
             this.regenTask = new Task({type: this.myType, action: 'regen'},
                     TaskScope.Workspace, "Update Makefiles and config headers",
                 localize("autotools.update.task", "Configuration output"),
                 new ShellExecution(
-                    c.top_builddir ? `automake && CDPATH= cd ${c.top_builddir} && ./config.status` :
-                        'automake && ./config.status'),
-                        "$configureAc");
+                    c.top_builddir ? `${autoreconf} -v && CDPATH= cd ${c.top_builddir} && ./config.status` :
+                        `${autoreconf} -v && ./config.status`));
             this.regenTask.group = TaskGroup.Build;
             this.regenTask.detail = localize("autotools.update", "$(sync) Regenerate Makefiles and headers. See [Autoconf output](https://www.gnu.org/software/autoconf/manual/autoconf-2.69/html_node/Output.html)");
     
@@ -422,8 +422,8 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
                 TaskScope.Workspace, "Re-check configuration",
                 localize("autotools.recheck.task", "Configuration update"),
                 new ShellExecution(
-                    c.top_builddir ? `automake && CDPATH= cd ${c.top_builddir} && ./config.status --recheck && ./config.status` :
-                        'automake && ./config.status --recheck && ./config.status'));
+                    c.top_builddir ? `${autoreconf} && CDPATH= cd ${c.top_builddir} && ./config.status --recheck && ./config.status` :
+                        `${autoreconf} && ./config.status --recheck && ./config.status`));
             this.recheckTask.group = TaskGroup.Build;
             this.recheckTask.detail = localize("autotools.recheck", "$(sync) Update configuration. See [config.status invocation - --recheck](https://www.gnu.org/software/autoconf/manual/autoconf-2.69/html_node/config_002estatus-Invocation.html)");
 

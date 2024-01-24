@@ -150,8 +150,8 @@ export function getLoggingLevel(): string | undefined { return loggingLevel; }
 export function setLoggingLevel(logLevel: string): void { loggingLevel = logLevel; }
 
 // Read from settings the desired logging level for the Makefile Tools extension.
-export async function readLoggingLevel(): Promise<void> {
-    loggingLevel = await util.getExpandedSetting<string>("loggingLevel") || "Normal";
+export function readLoggingLevel(): void {
+    loggingLevel = util.getSetting<string>("loggingLevel") || "Normal";
     logger.message(`Logging level: ${loggingLevel}`, "Verbose");
 }
 
@@ -174,8 +174,8 @@ export function getConfigurationCachePath(): string {
 //   false: file will be not be saved
 let keepDryRuns: boolean;
 export function getKeepDryRuns(): boolean { return keepDryRuns; }
-export async function readkeepDryRuns() : Promise<void> {
-    keepDryRuns = await util.getExpandedSetting<boolean>("keepDryRuns") || false;
+export function readkeepDryRuns() : void {
+    keepDryRuns = util.getSetting<boolean>("keepDryRuns") || false;
 }
 
 // Keep the configurationCache in the configuration directory?
@@ -184,8 +184,8 @@ export async function readkeepDryRuns() : Promise<void> {
 //   false: file will be not be saved
 let keepConfigurationCache: boolean;
 export function getKeepConfigurationCache(): boolean { return keepConfigurationCache; }
-export async function readkeepConfigurationCache() : Promise<void> {
-    keepConfigurationCache = await util.getExpandedSetting<boolean>("keepConfigurationCache") || false;
+export function readkeepConfigurationCache() : void {
+    keepConfigurationCache = util.getSetting<boolean>("keepConfigurationCache") || false;
 }
 
 // prompt to clean when the active configuration changes?
@@ -193,9 +193,70 @@ export async function readkeepConfigurationCache() : Promise<void> {
 //   false: no prompting, no cleaning
 let promptClean: boolean;
 export function getPromptClean(): boolean { return promptClean; }
-export async function readpromptClean() : Promise<void> {
-    promptClean = await util.getExpandedSetting<boolean>("promptClean") || true;
+export function readpromptClean() : void {
+    promptClean = util.getSetting<boolean>("promptClean") || true;
 }
+
+let autoreconfWarnCross: boolean;
+export function getautoreconfWarnCross(): boolean { return autoreconfWarnCross; }
+export function readautoreconfWarnCross() : void {
+    autoreconfWarnCross = util.getSetting<boolean>("autoreconfWarnCross") || true;
+}
+
+let autoreconfWarnPortability: boolean;
+export function getautoreconfWarnPortability(): boolean { return autoreconfWarnPortability; }
+export function readautoreconfWarnPortability() : void {
+    autoreconfWarnPortability = util.getSetting<boolean>("autoreconfWarnPortability") || false;
+}
+
+let autoreconfWarnObsolete: boolean;
+export function getautoreconfWarnObsolete(): boolean { return autoreconfWarnObsolete; }
+export function readautoreconfWarnObsolete() : void {
+    autoreconfWarnObsolete = util.getSetting<boolean>("autoreconfWarnObsolete") || false;
+}
+
+let autoreconfWarnOverride: boolean;
+export function getautoreconfWarnOverride(): boolean { return autoreconfWarnOverride; }
+export function readautoreconfWarnOverride() : void {
+    autoreconfWarnOverride = util.getSetting<boolean>("autoreconfWarnOverride") || false;
+}
+
+let autoreconfWarnUnsupported: boolean;
+export function getautoreconfWarnUnsupported(): boolean { return autoreconfWarnUnsupported; }
+export function readautoreconfWarnUnsupported() : void {
+    autoreconfWarnUnsupported = util.getSetting<boolean>("autoreconfWarnUnsupported") || false;
+}
+
+let autoreconfWarnGnu: boolean;
+export function getautoreconfWarnGnu(): boolean { return autoreconfWarnGnu; }
+export function readautoreconfWarnGnu() : void {
+    autoreconfWarnGnu = util.getSetting<boolean>("autoreconfWarnGnu") || false;
+}
+
+let autoconfTool: string = 'autoconf';
+export function getAutoconfTool(): string { return autoconfTool; }
+export async function readAutoconfTool() : Promise<void> {
+    autoconfTool = await util.getExpandedSetting<string>("autoconfTool") || 'autoconf';
+}
+
+let autoreconfTool: string = 'autoreconf';
+export function getAutoreconfTool(): string { return autoreconfTool; }
+export async function readAutoreconfTool() : Promise<void> {
+    autoconfTool = await util.getExpandedSetting<string>("autoreconfTool") || 'autoreconf';
+}
+
+export function autoreconfCmd(): string[] {
+    let cmd : string[] = [];
+    cmd.push(getAutoreconfTool());
+    if (getautoreconfWarnCross()) cmd.push("-Wcross");
+    if (getautoreconfWarnPortability()) cmd.push("-Wportability");
+    if (getautoreconfWarnObsolete()) cmd.push("-Wobsolete");
+    if (getautoreconfWarnOverride()) cmd.push("-Woverride");
+    if (getautoreconfWarnGnu()) cmd.push("-Wgnu");
+    if (!getautoreconfWarnUnsupported()) cmd.push("-Wno-unsupported");
+    return cmd;
+}
+
 
 // The following (makefile, problem matchers, build log), same as command&args above
 // are deduced via a set of rules of defaults and overrides that we calculate only when necessary
@@ -601,11 +662,19 @@ export function initFromState(): void {
 // or after any change in the configuration/build-target workspace state variables, in which case
 // we need a refresh of all settings expanding ${configuration} or ${buildTarget}.
 export async function initFromSettings(activation: boolean = false): Promise<void> {
-    await readLoggingLevel();
+    readLoggingLevel();
     await readMakePath();
-    await readkeepDryRuns();
-    await readkeepConfigurationCache();
-    await readpromptClean();
+    readkeepDryRuns();
+    readkeepConfigurationCache();
+    readpromptClean();
+    readautoreconfWarnCross();
+    readautoreconfWarnObsolete();
+    readautoreconfWarnPortability();
+    readautoreconfWarnOverride();
+    readautoreconfWarnGnu();
+    readautoreconfWarnUnsupported();
+    await readAutoconfTool();
+    await readAutoreconfTool();
     await readProjectTestEnvironment();
     await readMakefileConfigurations(currentMakefileConfigurationName);
     await readTestEnvironments();
@@ -634,7 +703,7 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
             subKey = "loggingLevel";
             let updatedLoggingLevel : string | undefined = await util.getExpandedSetting<string>(subKey);
             if (updatedLoggingLevel !== loggingLevel) {
-                await readLoggingLevel();
+                readLoggingLevel();
                 updatedSettingsSubkeys.push(subKey);
             }
 
@@ -728,14 +797,70 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
             subKey = "keepDryRuns";
             let updatedkeepDryRuns : boolean | undefined = await util.getExpandedSetting<boolean>(subKey);
             if (updatedkeepDryRuns !== keepDryRuns) {
-                await readkeepDryRuns();
+                readkeepDryRuns();
                 updatedSettingsSubkeys.push(subKey);
             }
 
             subKey = "keepConfigurationCache";
             let updatedkeepConfigurationCache : boolean | undefined = await util.getExpandedSetting<boolean>(subKey);
             if (updatedkeepConfigurationCache !== keepConfigurationCache) {
-                await readkeepConfigurationCache();
+                readkeepConfigurationCache();
+                updatedSettingsSubkeys.push(subKey);
+            }
+
+            subKey = "autoreconfWarnCross";
+            let updatedautoreconfWarnCross : boolean | undefined = await util.getExpandedSetting<boolean>(subKey);
+            if (updatedautoreconfWarnCross !== autoreconfWarnCross) {
+                readautoreconfWarnCross();
+                updatedSettingsSubkeys.push(subKey);
+            }
+
+            subKey = "autoreconfWarnPortability";
+            let updatedautoreconfWarnPortability : boolean | undefined = await util.getExpandedSetting<boolean>(subKey);
+            if (updatedautoreconfWarnPortability !== autoreconfWarnPortability) {
+                readautoreconfWarnPortability();
+                updatedSettingsSubkeys.push(subKey);
+            }
+
+            subKey = "autoreconfWarnObsolete";
+            let updatedautoreconfWarnObsolete : boolean | undefined = await util.getExpandedSetting<boolean>(subKey);
+            if (updatedautoreconfWarnObsolete !== autoreconfWarnObsolete) {
+                readautoreconfWarnObsolete();
+                updatedSettingsSubkeys.push(subKey);
+            }
+
+            subKey = "autoreconfWarnOverride";
+            let updatedautoreconfWarnOverride : boolean | undefined = await util.getExpandedSetting<boolean>(subKey);
+            if (updatedautoreconfWarnOverride !== autoreconfWarnOverride) {
+                readautoreconfWarnOverride();
+                updatedSettingsSubkeys.push(subKey);
+            }
+
+            subKey = "autoreconfWarnGnu";
+            let updatedautoreconfWarnGnu : boolean | undefined = await util.getExpandedSetting<boolean>(subKey);
+            if (updatedautoreconfWarnGnu !== autoreconfWarnGnu) {
+                readautoreconfWarnGnu();
+                updatedSettingsSubkeys.push(subKey);
+            }
+
+            subKey = "autoreconfWarnUnsupported";
+            let updatedautoreconfWarnUnsupported : boolean | undefined = await util.getExpandedSetting<boolean>(subKey);
+            if (updatedautoreconfWarnUnsupported !== autoreconfWarnUnsupported) {
+                readautoreconfWarnUnsupported();
+                updatedSettingsSubkeys.push(subKey);
+            }
+
+            subKey = "autoconfTool";
+            let updatedautoconfTool : string | undefined = await util.getExpandedSetting<string>(subKey);
+            if (updatedautoconfTool !== autoconfTool) {
+                await readAutoconfTool();
+                updatedSettingsSubkeys.push(subKey);
+            }
+
+            subKey = "autoreconfTool";
+            let updatedautoreconfTool : string | undefined = await util.getExpandedSetting<string>(subKey);
+            if (updatedautoreconfTool !== autoreconfTool) {
+                await readAutoreconfTool();
                 updatedSettingsSubkeys.push(subKey);
             }
 

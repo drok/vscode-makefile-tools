@@ -624,6 +624,10 @@ export function userHome(): string {
     return truthy.includes(value);
  }
 
+export function getSetting<T>(settingId: string) : T | undefined {
+    let workspaceConfiguration: vscode.WorkspaceConfiguration = vscode.workspace.getConfiguration("autotools");
+    return workspaceConfiguration.get<T>(settingId);
+}
 // Read setting from workspace settings and expand according to various supported patterns.
 // Do this for the simple types (converting to boolean or numerals when the varexp syntax
 // is used on such types of settings) and for arrays or objects, expand recursively
@@ -634,7 +638,9 @@ export async function getExpandedSetting<T>(settingId: string, propSchema?: any)
 
     if (!propSchema) {
         propSchema = extension.extensionContext.extension.packageJSON.contributes.configuration.properties;
-        propSchema = propSchema.properties ? propSchema.properties[`autotools.${settingId}`] : propSchema[`autotools.${settingId}`];
+        let zz = extension.extensionContext.extension.packageJSON.contributes.configuration.find((i : any) => i['properties'][`autotools.${settingId}`]);
+        propSchema = zz ? zz.properties[`autotools.${settingId}`] : propSchema;
+        // propSchema = propSchema.properties ? propSchema.prop : anyerties[`autotools.${settingId}`] : propSchema[`autotools.${settingId}`];
     }
 
     // Read what's at settingId in the workspace settings and for objects and arrays of complex types make sure

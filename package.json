@@ -231,20 +231,6 @@
                     "default": true,
                     "scope": "resource"
                 },
-                "autotools.keepDryRuns": {
-                    "order": 4,
-                    "scope": "resource",
-                    "type": "boolean",
-                    "markdownDescription": "%autotools.configuration.makefile.keepDryRuns.markdownDescription%",
-                    "default": false
-                },
-                "autotools.keepConfigurationCache": {
-                    "order": 4,
-                    "scope": "resource",
-                    "type": "boolean",
-                    "markdownDescription": "%autotools.configuration.makefile.keepConfigurationCache.markdownDescription%",
-                    "default": false
-                },
                 "autotools.promptClean": {
                     "scope": "resource",
                     "type": "boolean",
@@ -254,7 +240,7 @@
             }
         },
         {
-            "title": "Building",
+            "title": "Building Options (users)",
             "order": 2,
             "properties": {
                 "autotools.configurations": {
@@ -361,10 +347,83 @@
                             }
                         }
                     }
+                }
+            }
+        },
+        {
+            "title": "Advanced options (maintainers)",
+            "order": 4,
+            "properties": {
+                "autotools.keepDryRuns": {
+                    "order": 4,
+                    "scope": "resource",
+                    "type": "boolean",
+                    "markdownDescription": "%autotools.configuration.makefile.keepDryRuns.markdownDescription%",
+                    "default": false
                 },
-
+                "autotools.keepConfigurationCache": {
+                    "order": 4,
+                    "scope": "resource",
+                    "type": "boolean",
+                    "markdownDescription": "%autotools.configuration.makefile.keepConfigurationCache.markdownDescription%",
+                    "default": false
+                },
+                "autotools.autoreconfWarnCross": {
+                    "order": 2,
+                    "scope": "resource",
+                    "type": "boolean",
+                    "default": false,
+                    "markdownDescription": "%autotools.configuration.autoreconfWarnCross.markdownDescription%"
+                },
+                "autotools.autoreconfWarnPortability": {
+                    "order": 2,
+                    "scope": "resource",
+                    "type": "boolean",
+                    "default": false,
+                    "markdownDescription": "%autotools.configuration.autoreconfWarnPortability.markdownDescription%"
+                },
+                "autotools.autoreconfWarnObsolete": {
+                    "order": 2,
+                    "scope": "resource",
+                    "type": "boolean",
+                    "default": false,
+                    "markdownDescription": "%autotools.configuration.autoreconfWarnObsolete.markdownDescription%"
+                },
+                "autotools.autoreconfWarnOverride": {
+                    "order": 2,
+                    "scope": "resource",
+                    "type": "boolean",
+                    "default": false,
+                    "markdownDescription": "%autotools.configuration.autoreconfWarnOverride.markdownDescription%"
+                },
+                "autotools.autoreconfWarnGnu": {
+                    "order": 2,
+                    "scope": "resource",
+                    "type": "boolean",
+                    "default": false,
+                    "markdownDescription": "%autotools.configuration.autoreconfWarnGnu.markdownDescription%"
+                },
+                "autotools.autoreconfWarnUnsupported": {
+                    "order": 2,
+                    "scope": "resource",
+                    "type": "boolean",
+                    "default": true,
+                    "markdownDescription": "%autotools.configuration.autoreconfWarnUnsupported.markdownDescription%"
+                },
+                "autotools.autoconfTool": {
+                    "order": 4,
+                    "type": "string",
+                    "default": "autoconf",
+                    "markdownDescription": "%autotools.configuration.autoconfTool.markdownDescription%"
+                },
+                "autotools.autoreconfTool": {
+                    "order": 4,
+                    "type": "string",
+                    "default": "autoreconf",
+                    "markdownDescription": "%autotools.configuration.autoreconfTool.markdownDescription%"
+                },
                 "autotools.makePath": {
-                    "order": 1,
+                    "order": 3,
                     "type": "string",
                     "default": "make",
                     "description": "%autotools.configuration.makefile.makePath.description%",
@@ -381,6 +440,7 @@
                     "type": "array",
                     "default": [],
                     "title": "%autotools.configuration.tests_environment.TESTS_ENVIRONMENT.global.title%",
+                    "markdownDescription": "%autotools.configuration.tests_environment.TESTS_ENVIRONMENT.global.markdownDescription%",
                     "items": {
                         "type": "object",
                         "default": {},
@@ -398,7 +458,7 @@
                     "order": 2,
                     "type": "array",
                     "default": [],
-                    "title": "%autotools.configuration.tests_environment.XFAIL_TESTS.sub.title%",
+                    "markdownDescription": "%autotools.configuration.tests_environment.XFAIL_TESTS.global.markdownDescription%",
                     "items": {
                       "type": "string"
                     }
@@ -439,7 +499,7 @@
                           "XFAIL_TESTS" : {
                             "type": "array",
                             "default": [],
-                            "title": "%autotools.configuration.tests_environment.XFAIL_TESTS.sub.title%",
+                            "t": "%autotools.configuration.tests_environment.XFAIL_TESTS.sub.title%",
                             "items": {
                               "type": "string"
                             }
