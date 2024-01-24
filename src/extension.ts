@@ -860,7 +860,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             throw new Error("Missing check task on SubNode");
         assert(sub.submake.test_suite.task instanceof Map, "test_suite.task should be a Map", sub.submake.test_suite.task);
         sub.submake.test_suite.test &&
-            extension.testController?.togglelivecheck(sub.submake.test_suite.test);
+            extension.testController?.togglelivecheck(sub.getTreeItem(),sub.submake.test_suite.test);
             // return await vscode.tasks.executeTask(sub.submake.test_suite.test);
     }));
 

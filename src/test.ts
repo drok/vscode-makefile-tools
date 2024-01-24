@@ -31,7 +31,7 @@ const UpdateRe = /^Makefile:\d+: update target '(.+)' due to: (.+)$/;
 
 const debuggable = new vscode.TestTag('debugme');
 const applicable = new vscode.TestTag('applicable');
-const live = new vscode.TestTag('live');
+export const live = new vscode.TestTag('live');
 const tags_debuggable = [debuggable];
 const tags_debuggable_live = [debuggable, live];
 const tags_applicable = [applicable];
@@ -336,7 +336,7 @@ export class MyTestController {
   }
 
   private livecheck : vscode.Uri | undefined;
-  public togglelivecheck(test : vscode.TestItem) : void {
+  public togglelivecheck(treeItem: vscode.TreeItem, test : vscode.TestItem) : void {
     var remove = test.tags.includes(live);
     var newtags = remove ? delTag(live, test) : addTag(live, test);
     if (newtags !== undefined) {
@@ -353,6 +353,8 @@ export class MyTestController {
             }
         });
     }
+    if (treeItem.resourceUri) extension.suiteDecorator.update(treeItem.resourceUri);
+
   }
   public restoreLiveCheck() : void {
       if (this.livecheckid) {

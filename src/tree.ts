@@ -47,28 +47,31 @@ export class SubNode extends Node {
         return goals;
     }
 
+    private item : vscode.TreeItem | undefined;
     getTreeItem(): vscode.TreeItem {
-        const item: vscode.TreeItem = new vscode.TreeItem(this.submake.dir);
-        item.contextValue = ["nodeType=sub"]
-            .concat(((this.flags & Goal.Flags.Test_Suite) && this.submake.test_suite) ? ['nodeType=check'] : [])
-            .concat((this.flags & Goal.Flags.Linked_binary) ? ['nodeType=allbuild'] : [])
-            .join(',');
-        item.collapsibleState = vscode.TreeItemCollapsibleState.Collapsed;
-        if (this.flags & Goal.Flags.Test_Suite) {
-            item.description = localize("autotools.subnode.suite", "{0} tests, {1} subdirs",
-                this.submake.stats.tests, this.submake.stats.subdirs);
-            item.resourceUri = vscode.Uri.from({
-                    scheme: "check",
-                    authority: Extension.whoami,
-                    path: '/' + this.submake.dir,
-                    query: 'test-suite.log'
-                });
-        } else {
-            item.description = localize("autotools.subnode.programs", "{0} programs, {1} subdirs",
-                this.submake.stats.programs, this.submake.stats.subdirs);
+        if (!this.item) {
+            this.item = new vscode.TreeItem(this.submake.dir);
+            this.item.contextValue = ["nodeType=sub"]
+                .concat(((this.flags & Goal.Flags.Test_Suite) && this.submake.test_suite) ? ['nodeType=check'] : [])
+                .concat((this.flags & Goal.Flags.Linked_binary) ? ['nodeType=allbuild'] : [])
+                .join(',');
+            this.item.collapsibleState = vscode.TreeItemCollapsibleState.Collapsed;
+            if (this.flags & Goal.Flags.Test_Suite) {
+                this.item.description = localize("autotools.subnode.suite", "{0} tests, {1} subdirs",
+                    this.submake.stats.tests, this.submake.stats.subdirs);
+                this.item.resourceUri = vscode.Uri.from({
+                        scheme: "check",
+                        authority: Extension.whoami,
+                        path: '/' + this.submake.dir,
+                        query: 'test-suite.log'
+                    });
+            } else {
+                this.item.description = localize("autotools.subnode.programs", "{0} programs, {1} subdirs",
+                    this.submake.stats.programs, this.submake.stats.subdirs);
+            }
+            this.item.tooltip =  this.submake.dir;
         }
-        item.tooltip =  this.submake.dir;
-        return item;
+        return this.item;
     }
     makefile() : string {
         if (this.submake.dir)
@@ -93,32 +96,35 @@ export class TaskNode extends Node {
         return [];
     }
 
+    private item : vscode.TreeItem | undefined;
     getTreeItem(): vscode.TreeItem {
         if (!this.goal.goal)
             throw new Error("Unexpected null goal");
-        const item: vscode.TreeItem = new vscode.TreeItem(this.goal.goal);
-        item.collapsibleState = vscode.TreeItemCollapsibleState.None;
-        item.tooltip = this.goal.goal;
-        item.contextValue = ["nodeType=task"]
-            .concat((this.goal.flags & Goal.Flags.Linked_binary) ? ['nodeType=build'] : [])
-//            .concat((this.goal.flags & Goal.Flags.Test_Progam) ? ['nodeType=test'] : [])
-            .concat((this.goal.flags & Goal.Flags.Test_Log) ? ['nodeType=test'] : [])
-            .concat((this.goal.flags & Goal.Flags.Test_Log) &&
-                // Add different kind of supported test programs here
-                (this.goal.depends && (this.goal.depends[0].flags & Goal.Flags.Linked_binary)) ? ['nodeType=bintest'] : [])
-            .join(',');
-        if (!this.goal.task)
-            return item;
+        if (!this.item) {
+            this.item = new vscode.TreeItem(this.goal.goal);
+            this.item.collapsibleState = vscode.TreeItemCollapsibleState.None;
+            this.item.tooltip = this.goal.goal;
+            this.item.contextValue = ["nodeType=task"]
+                .concat((this.goal.flags & Goal.Flags.Linked_binary) ? ['nodeType=build'] : [])
+    //            .concat((this.goal.flags & Goal.Flags.Test_Progam) ? ['nodeType=test'] : [])
+                .concat((this.goal.flags & Goal.Flags.Test_Log) ? ['nodeType=test'] : [])
+                .concat((this.goal.flags & Goal.Flags.Test_Log) &&
+                    // Add different kind of supported test programs here
+                    (this.goal.depends && (this.goal.depends[0].flags & Goal.Flags.Linked_binary)) ? ['nodeType=bintest'] : [])
+                .join(',');
+            if (!this.goal.task)
+                return this.item;
 
-        if (this.goal.flags & Goal.Flags.Test_Log) {
-            item.resourceUri = vscode.Uri.from({
-                scheme: "test",
-                authority: Extension.whoami,
-                path: '/' +  this.make.dir,
-                query:  this.goal.goal,
-            });
+            if (this.goal.flags & Goal.Flags.Test_Log) {
+                this.item.resourceUri = vscode.Uri.from({
+                    scheme: "test",
+                    authority: Extension.whoami,
+                    path: '/' +  this.make.dir,
+                    query:  this.goal.goal,
+                });
+            }
         }
-        return item;
+        return this.item;
     }
     logfile() : string | undefined {
         return this.goal.test?.id;

@@ -6,6 +6,7 @@ import * as vscode from 'vscode';
 import * as configuration from './configuration';
 import { Extension  } from './extension';
 import { Goal, Make } from './parser/gnumake';
+import { live } from './test';
 
 import * as nls from 'vscode-nls';
 import { PassThrough } from 'stream';
@@ -33,6 +34,13 @@ export class SuiteDecorations implements vscode.FileDecorationProvider {
 		// const query = fromFileChangeNodeUri(uri);
         let test : Goal | undefined;
         if (uri.scheme == "check") {
+            let goals = configuration.getAllBuildTargets();
+            let g = goals
+                .get(uri.path.substring(1))
+                ?.get(uri.query);
+            if (g?.test?.tags?.includes(live)) {
+                return { tooltip: "live run", badge: '⚡'}
+            }
 //            let sub = configuration.getAllBuildTargets()
 //                .get(uri.path.substring(1));
 //            let test = sub?.get(uri.query);
