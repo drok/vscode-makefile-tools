@@ -154,7 +154,8 @@ export class AutoToolsTestTaskProvider implements MyTaskProvider {
                             var newMap : Map<string, vscode.Task> = new Map();
                             d.task = newMap;
                             e.forEach((env) => {
-                                var newTask = new Task(kind, TaskScope.Workspace, "Run test \'" + dgoal + "\' " + (dir ? ('in ' + dir) : 'at the top' + (' @ ' + env.name)),
+                                var newTask = new Task(kind, TaskScope.Workspace,
+                                    "Run test \'" + dgoal + "\' " + ((dir ? ('in ' + dir) : 'at the top') + (' @ ' + env.name)),
                                 "autotools",
 
                                 new ProcessExecution(
