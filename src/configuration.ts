@@ -233,16 +233,10 @@ export function readautoreconfWarnGnu() : void {
     autoreconfWarnGnu = util.getSetting<boolean>("autoreconfWarnGnu") || false;
 }
 
-let autoconfTool: string = 'autoconf';
-export function getAutoconfTool(): string { return autoconfTool; }
-export async function readAutoconfTool() : Promise<void> {
-    autoconfTool = await util.getExpandedSetting<string>("autoconfTool") || 'autoconf';
-}
-
 let autoreconfTool: string = 'autoreconf';
 export function getAutoreconfTool(): string { return autoreconfTool; }
 export async function readAutoreconfTool() : Promise<void> {
-    autoconfTool = await util.getExpandedSetting<string>("autoreconfTool") || 'autoreconf';
+    autoreconfTool = await util.getExpandedSetting<string>("autoreconfTool") || 'autoreconf';
 }
 
 export function autoreconfCmd(): string[] {
@@ -673,7 +667,6 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
     readautoreconfWarnOverride();
     readautoreconfWarnGnu();
     readautoreconfWarnUnsupported();
-    await readAutoconfTool();
     await readAutoreconfTool();
     await readProjectTestEnvironment();
     await readMakefileConfigurations(currentMakefileConfigurationName);
@@ -847,13 +840,6 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
             let updatedautoreconfWarnUnsupported : boolean | undefined = await util.getExpandedSetting<boolean>(subKey);
             if (updatedautoreconfWarnUnsupported !== autoreconfWarnUnsupported) {
                 readautoreconfWarnUnsupported();
-                updatedSettingsSubkeys.push(subKey);
-            }
-
-            subKey = "autoconfTool";
-            let updatedautoconfTool : string | undefined = await util.getExpandedSetting<string>(subKey);
-            if (updatedautoconfTool !== autoconfTool) {
-                await readAutoconfTool();
                 updatedSettingsSubkeys.push(subKey);
             }
 

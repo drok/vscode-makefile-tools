@@ -410,12 +410,6 @@
                     "default": true,
                     "markdownDescription": "%autotools.configuration.autoreconfWarnUnsupported.markdownDescription%"
                 },
-                "autotools.autoconfTool": {
-                    "order": 4,
-                    "type": "string",
-                    "default": "autoconf",
-                    "markdownDescription": "%autotools.configuration.autoconfTool.markdownDescription%"
-                },
                 "autotools.autoreconfTool": {
                     "order": 4,
                     "type": "string",
