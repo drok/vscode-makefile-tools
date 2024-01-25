@@ -10,6 +10,7 @@ import { Task, TaskDefinition, TaskScope, TaskGroup, TaskProvider,
 import { Goal } from './parser/gnumake';
 import { assert, error } from 'console';
 import * as configuration from './configuration';
+import { TestEnvironment } from './configuration';
 import { BuildTarget, t_all, t_none, readTRS, TRS, isSuspect } from './make';
 import { resolvePathToRoot, checkFileExistsSync, createDirectorySync } from './util';
 import * as vscode from 'vscode';
@@ -24,6 +25,16 @@ import { env } from 'process';
 import * as ui from './ui';
 nls.config({ messageFormat: nls.MessageFormat.bundle, bundleFormat: nls.BundleFormat.standalone })();
 const localize: nls.LocalizeFunc = nls.loadMessageBundle();
+
+const presentSilent : vscode.TaskPresentationOptions = {
+    reveal: vscode.TaskRevealKind.Silent,
+    panel: vscode.TaskPanelKind.Dedicated,
+    showReuseMessage: false }
+const defaultCheckPresentation : vscode.TaskPresentationOptions = {
+    reveal: vscode.TaskRevealKind.Always,
+    panel: vscode.TaskPanelKind.Dedicated,
+    showReuseMessage: false }
+
 
 export class AutoToolsBuildTaskProvider implements MyTaskProvider {
 	readonly myType = 'build';
@@ -151,7 +162,7 @@ export class AutoToolsTestTaskProvider implements MyTaskProvider {
                                 type: this.myType,
                                 test: test
                             };
-                            var newMap : Map<string, vscode.Task> = new Map();
+                            var newMap : Map<TestEnvironment, vscode.Task> = new Map();
                             d.task = newMap;
                             e.forEach((env) => {
                                 var newTask = new Task(kind, TaskScope.Workspace,
@@ -167,10 +178,11 @@ export class AutoToolsTestTaskProvider implements MyTaskProvider {
                                         "check",
                                         `LOG_DRIVER=${extension.testRunner}`,
                                         "TEST_LOGS=" + test.goal
-                                    ]), env.testExecOptions));
+                                    ]), env.testExecOptions), );
                                 newTask.group = TaskGroup.Test;
                                 newTask.detail = localize("automake.test", "$(check) Run test '{0}'", path.basename(dgoal, ".log"));
-                                newMap.set(env.name, newTask);
+                                newTask.presentationOptions = presentSilent;
+                                newMap.set(env, newTask);
                                 targets.push(newTask);
                             });
 
@@ -229,14 +241,16 @@ export class AutoToolsCheckTaskProvider implements MyTaskProvider {
         let e = make.supportsTestEnvironments() ? configuration.getTestEnvironments() : [];
         var checkExecOptions = configuration.getCurrentTestEnvironment().checkExecOptions;
         configuration.getAllBuildTargets().forEach((goals, dir) => {
+            const kind: CheckTask = {
+                type: this.myType,
+                builddir: dir
+            };
             for (let g of goals.values()) {
                 if (g.flags & (Goal.Flags.Test_Suite)) {
-                const kind: CheckTask = {
-                    type: this.myType,
-                    builddir: dir
-                };
-                if (!e.length) {
-                    g.task = new Task(kind, TaskScope.Workspace, 'Run test suite ' + (dir ? ('in ' + dir) : 'at the top'),
+                var newMap : Map<TestEnvironment, vscode.Task> = new Map();
+                g.task = newMap;
+                e.forEach((env) => {
+                    var newTask = new Task(kind, TaskScope.Workspace, 'Run test suite ' + (dir ? ('in ' + dir) : 'at the top') + (' @ ' + env.name),
                         "autotools",
                     new ProcessExecution(
                         configuration.getMakePath(),
@@ -248,32 +262,13 @@ export class AutoToolsCheckTaskProvider implements MyTaskProvider {
                         ])
                         .concat("check"),
                         checkExecOptions));
-                    g.task.group = TaskGroup.Test;
-                    g.task.detail = localize("automake.check", "$(checklist) Test Suite");
-                    targets.push(g.task);
-                } else {
-                    var newMap : Map<string, vscode.Task> = new Map();
-                    g.task = newMap;
-                    e.forEach((env) => {
-                        var newTask = new Task(kind, TaskScope.Workspace, 'Run test suite ' + (dir ? ('in ' + dir) : 'at the top @ ' + env.name),
-                            "autotools",
-                        new ProcessExecution(
-                            configuration.getMakePath(),
-                            (c.top_builddir ? ['-C', c.top_builddir] : [])
-                            .concat(dir ? ['-C', dir] : [])
-                            .concat(c.makeArgs || [])
-                            .concat([
-                                `LOG_DRIVER=${extension.testRunner}`,
-                            ])
-                            .concat("check"),
-                            checkExecOptions));
-                        newTask.group = TaskGroup.Test;
-                        newTask.detail = localize("automake.check", "$(checklist) Test Suite");
-                        newMap.set(env.name, newTask);
-                        targets.push(newTask);
-                    });
-                }
-                g.livetask = new Task(kind, TaskScope.Workspace, 'Update test suite ' + (dir ? ('log in ' + dir) : 'log at the top'),
+                    newTask.group = TaskGroup.Test;
+                    newTask.detail = localize("automake.check", "$(checklist) Test Suite");
+                    newTask.presentationOptions = defaultCheckPresentation;
+                    newMap.set(env, newTask);
+                    targets.push(newTask);
+                });
+                g.livetask = new Task(kind, TaskScope.Workspace, 'Update test suite ' + (dir ? ('log in ' + dir) : 'log at the top')  + (' @ ' + env.name),
                     "autotools",
                     new ProcessExecution(
                         configuration.getMakePath(),
@@ -418,7 +413,7 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
                         `${autoreconf} -v && ./config.status`));
             this.regenTask.group = TaskGroup.Build;
             this.regenTask.detail = localize("autotools.update", "$(sync) Regenerate Makefiles and headers. See [Autoconf output](https://www.gnu.org/software/autoconf/manual/autoconf-2.69/html_node/Output.html)");
-    
+
             this.recheckTask = new Task({type: this.myType, action: 'recheck'},
                 TaskScope.Workspace, "Re-check configuration",
                 localize("autotools.recheck.task", "Configuration update"),
@@ -426,6 +421,7 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
                     c.top_builddir ? `${autoreconf} && CDPATH= cd ${c.top_builddir} && ./config.status --recheck && ./config.status` :
                         `${autoreconf} && ./config.status --recheck && ./config.status`));
             this.recheckTask.group = TaskGroup.Build;
+            this.recheckTask.presentationOptions = presentSilent;
             this.recheckTask.detail = localize("autotools.recheck", "$(sync) Update configuration. See [config.status invocation - --recheck](https://www.gnu.org/software/autoconf/manual/autoconf-2.69/html_node/config_002estatus-Invocation.html)");
 
             this.myPromise = Promise.resolve([this.regenTask]

@@ -7,6 +7,7 @@
 // or dependencies on a real build)
 
 import * as configuration from '../configuration';
+import { TestEnvironment } from '../configuration';
 import * as logger from '../logger';
 import * as make from '../make';
 import * as util from '../util';
@@ -549,7 +550,7 @@ export class Goal extends Node implements Parser {
     }
     depends: Goal[] | undefined = undefined;
     livetask: vscode.Task | undefined;
-    task: vscode.Task | Map<string,vscode.Task> | undefined;
+    task: vscode.Task | Map<TestEnvironment,vscode.Task> | undefined;
     test: vscode.TestItem | undefined;
 }
 

@@ -274,7 +274,7 @@ export class Extension {
 //                                this.updateOutlineBadge();
 //                            }
                             // Should wait for tasks.trsChange()
-                            definition.test && goal.test && this.testController?.testCompleted(goal.test, definition.test);
+                            definition.test && goal.test && this.testController?.testCompleted(e.execution, goal.test, definition.test);
                         }
                     }
 /*
@@ -315,7 +315,7 @@ export class Extension {
                         ?.get(definition.builddir)
                         ?.get('test-suite.log');
                     if (suite && suite.test) {
-                        this.testController?.suiteCompleted(suite.test);
+                        this.testController?.suiteCompleted(e.execution);
                     }
                 } else if (definition.type == "autotools") {
                     const definition: AutotoolsTask = <any>task.definition;
@@ -468,7 +468,7 @@ export class Extension {
             vscode.debug.startDebugging(
                 vscode.workspace.workspaceFolders?.[0],
                 new DebugNow(c, {goal: goal.depends[0].goal, builddir: builddir},
-                        !!(goal.depends[0].flags & Goal.Flags.Linked_binary)),
+                        !!(goal.depends[0].flags & Goal.Flags.Linked_binary), env),
                 dopt)
             .then((z) => console.log(z));
         }
