@@ -258,63 +258,9 @@ export class Extension {
                     if (suite) {
                         let goal = suite.depends?.find((d) => d.goal === definition.test?.goal);
                         if (goal) {
-//                            let result : make.TRS;
-//                            if (e.exitCode) {
-//                                // Test did not run
-//                                result = make.TRS.ERROR;
-//                            } else {
-//                                result = make.readTRS(definition.test);
-//                            }
-//                            goal.flags &= ~Goal.Flags.Test_Result_Mask;
-//                            goal.flags |= result;
-//                            let oldresult = goal.flags & Goal.Flags.Test_Result_Mask;
-//                            if (result != oldresult) {
-//                                goal.flags &= ~Goal.Flags.Test_Result_Mask;
-//                                goal.flags |= result;
-//                                this.suiteDecorator.update(vscode.Uri.from(
-//                                    {authority: Extension.whoami, scheme: 'test', path: '/' + definition.test.builddir, query: definition.test.goal}));
-//                                this.suiteDecorator.update(vscode.Uri.from(
-//                                    {authority: Extension.whoami, scheme: 'check', path: '/' + definition.test.builddir, query: 'test-suite.log'}));
-//                                this.failStatUpdate(oldresult, result);
-//                                this.updateOutlineBadge();
-//                            }
-                            // Should wait for tasks.trsChange()
                             definition.test && goal.test && this.testController?.testCompleted(e.execution, goal.test, definition.test);
                         }
                     }
-/*
-                } else if (definition.type == "check:-standby-code" && definition.builddir) {
-                    let suite = configuration.getAllBuildTargets()
-                        ?.get(definition.builddir)
-                        ?.get('test-suite.log');
-                    let hasUpdates = false;
-                    if (suite) {
-                        let result: make.TRS = e.exitCode ? make.TRS.FAIL : make.TRS.PASS;
-                        if (result != (suite.flags & Goal.Flags.Test_Result_Mask)) {
-                            suite.flags &= ~Goal.Flags.Test_Result_Mask;
-                            suite.flags |= result;
-                            this.suiteDecorator.update(vscode.Uri.from(
-                                {authority: Extension.whoami, scheme: 'check', path: '/' + definition.builddir, query: suite.goal}));
-                        }
-                        if (suite.depends)
-                        for (let test of suite.depends) {
-                            if (test.task) {
-                                //if (test.task instanceof vscode.Task)
-                                    result = make.readTRS(test.task.definition.test);
-                                let oldresult = test.flags & Goal.Flags.Test_Result_Mask;
-                                if (result != oldresult) {
-                                    test.flags &= ~Goal.Flags.Test_Result_Mask;
-                                    test.flags |= result;
-                                    this.suiteDecorator.update(vscode.Uri.from(
-                                        {authority: Extension.whoami, scheme: 'test', path: '/' + definition.builddir, query: test.goal}));
-                                    hasUpdates = true;
-                                    this.failStatUpdate(oldresult, result);
-                                }
-                            }
-                        }
-                        if (hasUpdates) this.updateOutlineBadge();
-                    }
-*/
                 } else if (definition.type == 'check') {
                     let suite = configuration.getAllBuildTargets()
                         ?.get(definition.builddir)
@@ -331,11 +277,6 @@ export class Extension {
                         if (!e.exitCode) {
                             make.configure(make.TriggeredBy.configureAfterConfigurationChange);
                         }
-//                } else if (definition.type == "test-NOPE" && definition.test) {
-//                    let suite = configuration.getAllBuildTargets()
-//                        ?.get(definition.test.builddir)
-//                        ?.get('test-suite.log');
-//                    this.testController.testCompleted(definition.goal.test);
                 }
             }
         });

@@ -392,18 +392,6 @@ export class MyTestController {
             }, true/* , {id: env.name} */
           );
         });
-
-/*
-    if (false) { // TODO
-      this.coverageProfile = this.controller.createRunProfile(
-        'Coverage',
-        vscode.TestRunProfileKind.Coverage,
-        (request, token) => {
-          this.runHandler(vscode.TestRunProfileKind.Coverage, request, token);
-        }
-      );
-    }
-*/
   }
   public deactivate() : void {
     this.controller.dispose();
