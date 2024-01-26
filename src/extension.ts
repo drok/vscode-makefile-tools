@@ -52,7 +52,8 @@ export let extension: Extension;
 export let telemetry: tele.MyTelemetry;
 
 const ignoredSaveFiles : Set<string> = new Set(
-    ["settings.json", "tasks.json", "launch.json"]);
+    ["settings.json", "tasks.json", "launch.json",
+    "configure.ac", "Makefile.am"]);
 
 export class Extension {
     static readonly whoami: string = "mergesium.autotools";
@@ -502,6 +503,8 @@ export class Extension {
             }
         }
         await this.autotoolsTask.recheck();
+        if (changed && vscode.workspace.textDocuments.find((d) => d.isDirty))
+            await this.testController?.onSavedAll();
         return Promise.resolve();
     }
     public autotoolsDoneNoResult(): void { this.autotoolsTask.autotoolsDoneNoResult(); }
