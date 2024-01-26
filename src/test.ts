@@ -31,6 +31,7 @@ const localize: nls.LocalizeFunc = nls.loadMessageBundle();
 interface RunDef {
     run : vscode.TestRun;
     cancel: vscode.CancellationToken;
+    tmp_label: string | undefined;
     live: boolean;
     env: configuration.TestEnvironment;
 }
@@ -120,7 +121,7 @@ export class MyTestController {
   // private debugProfiles: vscode.TestRunProfile[];
   private coverageProfile: vscode.TestRunProfile | undefined;
   private testGoals = new WeakMap<vscode.TestItem, Goal>();
-  private testCompletedEvent: EventEmitter<vscode.TaskExecution> = new EventEmitter<vscode.TaskExecution>();
+  private testCompletedEvent: EventEmitter<void> = new EventEmitter<void>();
   private activeRuns = new WeakMap<vscode.TestItem, Map<vscode.TaskExecution,TestRun>>();
 
   public testCompleted(task: vscode.TaskExecution, test: TestItem, target: BuildTarget) : void {
@@ -130,18 +131,22 @@ export class MyTestController {
         if (run) this.updateGoalTRS(run, test, readTRS(target));
     }
 
-    this.testCompletedEvent.fire(task);
+    this.isBusy = false;
+    // extension.autotoolsDoneNoResult();
+    this.testCompletedEvent.fire();
   }
   public suiteCompleted(task: vscode.TaskExecution) : void {
-    this.testCompletedEvent.fire(task);
+    // extension.autotoolsDoneNoResult();
+    this.isBusy = false;
+    this.testCompletedEvent.fire();
   }
 
-  public async run(test: TestItem, env: TestEnvironment) : Promise<void> {
+  public run(test: TestItem, env: TestEnvironment) : void {
     const runs = this.activeRuns.get(test);
     if (!runs) {
         // do nothing if a run is waiting for this
         var cancelToken = new vscode.CancellationTokenSource();
-        await env.run?.runHandler(new vscode.TestRunRequest([test], [], env.run), cancelToken.token);
+        env.run?.runHandler(new vscode.TestRunRequest([test], [], env.run), cancelToken.token);
         cancelToken.dispose();
     }
   }
@@ -150,7 +155,7 @@ export class MyTestController {
     if (!runs) {
         // do nothing if a run is waiting for this
         var cancelToken = new vscode.CancellationTokenSource();
-        await this.runHandler(true, new vscode.TestRunRequest([test], [], env.run), cancelToken.token, env);
+        this.runHandler(true, new vscode.TestRunRequest([test], [], env.run), cancelToken.token, env);
         cancelToken.dispose();
     }
   }
@@ -161,7 +166,7 @@ export class MyTestController {
         // do nothing if a run is waiting for this
         var cancelToken = new vscode.CancellationTokenSource();
         try {
-            await env.debug?.runHandler(new vscode.TestRunRequest([test], [], env.run), cancelToken.token);
+            env.debug?.runHandler(new vscode.TestRunRequest([test], [], env.run), cancelToken.token);
         } catch (e) {
             console.error("Failed to start debugger", test);
         }
@@ -258,14 +263,13 @@ export class MyTestController {
     this.root = item;
   }
 
-  public async onSavedAll() : Promise<void> {
+  public onSavedAll() : void {
     if (this.livecheckid) {
         var test = this.controller.items.get(this.livecheckid);
         if (test) {
-            await this.liverun(test, configuration.getCurrentTestEnvironment());
+            this.liverun(test, configuration.getCurrentTestEnvironment());
         }
     }
-    return Promise.resolve();
   }
 
   public async onOpenedDocument() : Promise<void> {
@@ -380,7 +384,7 @@ export class MyTestController {
             localize('autotools.test.debug.profile.name', '{0}: Debug "{1}" environment', extension.pkginfo?.name || "Autotools", env.name),
             vscode.TestRunProfileKind.Debug,
             async(request, token) => {
-              await this.debugHandler(false, request, token, env);
+              this.debugHandler(false, request, token, env);
             }, false, debuggable
           );
 
@@ -388,7 +392,7 @@ export class MyTestController {
             localize('autotools.test.run.profile.name', '{0}: Test "{1}" environment', extension.pkginfo?.name || "Autotools", env.name),
             vscode.TestRunProfileKind.Run,
             async (request, token) => {
-                await this.runHandler(false, request, token, env);
+                this.runHandler(false, request, token, env);
             }, true/* , {id: env.name} */
           );
         });
@@ -403,23 +407,31 @@ export class MyTestController {
 
 
 
-    async runHandler(
+    runHandler(
         live: boolean,
         request: vscode.TestRunRequest,
         token: vscode.CancellationToken,
         env: configuration.TestEnvironment
     ) {
-        const run = this.controller.createTestRun(request);
+        let name: string; // FIXME: The name is not shown in vscode 1.77.3 - how about 1.85?
+        if (live) {
+            if (request.include?.length == 1) name = `Live check - ${request.include[0].label}`;
+            else name = 'Live check @ ${env.name}';
+        } else if (request.include?.length)
+            name = `Test - ${request.include[0].label}${request.include?.length>1 ? ` +${request.include.length-1}` : ''}`;
+        else name = `Test all @ ${env.name}`;
+
+        const run = this.controller.createTestRun(request, name, false);
         const queue: vscode.TestItem[] = [];
 
         // Loop through all included tests, or all known tests, and add them to our queue
-        let rundef : RunDef = {run: run, cancel: token, env: env, live: live};
+        let rundef : RunDef = {run: run, cancel: token, tmp_label: request.profile?.label, env: env, live: live};
         if (request.include) {
             for (const t of request.include) {
-                run.enqueued(t);
+                // run.enqueued(t);
                 if (!live) {
                     let goal = this.testGoals.get(t);
-                    if (goal) this.markSuiteEnqueued(run, goal);
+                    if (goal) this.markSuiteEnqueued(run, goal, env);
                 }
             }
             this.runQueue.set(rundef, [...request.include]);
@@ -452,13 +464,6 @@ export class MyTestController {
         }
     }
 
-    waitForTestFinish(waitFor: vscode.TaskExecution) : Promise<void> {
-        return new Promise(resolve => {
-            this.testCompletedEvent.event(e =>
-                (e == waitFor) && resolve());
-        });
-    }
-
     private queueRunner: vscode.Disposable | undefined;
     private runningTask: vscode.Task | undefined;
     private activeRun : RunDef | undefined;
@@ -466,15 +471,16 @@ export class MyTestController {
     private activeTest: vscode.TestItem | undefined;
     runQueuedTests() : void {
         if (!this.queueRunner) {
-            this.queueRunner = vscode.tasks.onDidEndTask(e => {
-                if (e.execution.task == this.runningTask)
-                    this.advanceQueue();
+            this.queueRunner = this.testCompletedEvent.event(async e => {
+                await this.advanceQueue();
             });
             this.startNextRun();
-            this.advanceQueue();
+            this.testCompletedEvent.fire();
         }
     }
-    advanceQueue() : void {
+    private isBusy : boolean = false;
+    public get busy() : boolean { return this.isBusy; }
+    async advanceQueue() : Promise<void> {
         if (this.activeRun) {
             do {
                 if (this.activeTest) {
@@ -482,6 +488,7 @@ export class MyTestController {
                         //this.activeQueue.filter(def => def != this.activeTest) : [];
                     if (!this.activeQueue.length) { // end of queued tests for this run
                         this.runQueue.delete(this.activeRun);
+                        // this.activeRun.run.appendOutput(`Blah in ${this.activeRun.env.name} @ ${this.activeRun.tmp_label}\n`);
                         this.activeRun.run.end();
                         this.activeRun = undefined;
                         this.activeTest = undefined;
@@ -494,7 +501,7 @@ export class MyTestController {
                     this.queueRunner = undefined;
                     break;
                 } else
-                    this.startNextTest();
+                    await this.startNextTest();
             } while (this.activeRun && !this.activeTest);
         }
     }
@@ -503,7 +510,7 @@ export class MyTestController {
         if (!next.done)
             [this.activeRun, this.activeQueue] = next.value;
     }
-    startNextTest() : void {
+    async startNextTest() : Promise<void> {
         if (this.activeRun) {
             this.activeTest = this.activeQueue.pop();
             if (this.activeTest) {
@@ -516,41 +523,21 @@ export class MyTestController {
                     assert(this.runningTask, "There must be a task for the env");
                     if (this.runningTask) {
                         this.activeRun.run.started(this.activeTest)
-                        vscode.tasks.executeTask(this.runningTask);
+                        await extension.waitToTouchMakefiles();
+                        vscode.tasks.executeTask(this.runningTask)
+                            .then(e => (this.isBusy = true));
                     }
                 } else
                     this.runningTask = undefined;
             }
         }
     }
-    markSuiteEnqueued(run: vscode.TestRun, g: Goal) : void {
+    markSuiteEnqueued(run: vscode.TestRun, g: Goal, env: TestEnvironment) : void {
         if (g.test) {
             run.enqueued(g.test);
             if (g.depends)
                 for (const sub of g.depends)
-                    this.markSuiteEnqueued(run, sub);
+                    this.markSuiteEnqueued(run, sub, env);
         }
     }
-}
-
-async function executeTaskToCompletion(task: vscode.Task) {
-    const execution = await vscode.tasks.executeTask(task);
-
-    return new Promise<void>((resolve,reject) => {
-        let disposable = vscode.tasks.onDidEndTask(e => {
-            logger.message(`ended task ${e.execution.task.name} - expected ${task.name}`, "Normal");
-            if (e.execution.task.group === task.group) {
-                disposable.dispose();
-                resolve();
-            }// else if (e.execution != execution)
-               // reject();
-        });
-        let disp2 = vscode.tasks.onDidEndTaskProcess(e => {
-            logger.message(`ended proc ${e.execution.task.name} - expected ${task.name}`, "Normal");
-            if (e.execution == execution) {
-                disp2.dispose();
-                // resolve();
-            }
-        });
-    });
 }

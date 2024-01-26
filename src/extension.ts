@@ -78,6 +78,7 @@ export class Extension {
     private compilerFullPath ?: string;
     public readonly dryRunner : string;
     public readonly testRunner : string;
+    public readonly rulesPath : string;
     public testController : MyTestController | undefined;
     public pkginfo : make.pkgInfo | undefined;
     private _treeDisposables: vscode.Disposable[] = [];
@@ -94,6 +95,7 @@ export class Extension {
         ];
         this.dryRunner = path.join(extensionContext.extensionPath, "bin/make" + (process.platform === 'win32' ? ".exe" : ""));
         this.testRunner = path.join(extensionContext.extensionPath, "bin/test-driver");
+        this.rulesPath = path.join(extensionContext.extensionPath, "include")
 
         extensionContext.subscriptions.push(vscode.commands.registerCommand('autotools.command.bootstrap', async () => {
             await this.autotoolsTask.bootstrap();
@@ -215,6 +217,11 @@ export class Extension {
      */
     trsChange(c: MakefileConfiguration, env: TestEnvironment, uri: vscode.Uri) : void {
 
+        /* The test driver moves the trs to trs.tmp when generating a new one. Avoid test status updating to 'NONE'
+         * while tests are running.
+         */
+        if (this.testController?.busy)
+            return;
         let dir = path.relative(util.resolvePathToRoot(c.top_builddir), path.dirname(uri.path));
         let log = path.basename(uri.path, ".trs") + ".log";
         let goal = configuration.getAllBuildTargets()
@@ -247,7 +254,7 @@ export class Extension {
         // It's possible that the fileWatcher takes too many descriptors, so
         // it might be replaced with waiting for exit codes.
         // Monitoring exit codes is blind to the user manually doing "make clean" or "make check"
-        vscode.tasks.onDidEndTaskProcess((e) => {
+        this.extensionContext.subscriptions.push(vscode.tasks.onDidEndTask((e) =>{
             let task = e.execution.task;
             if (task) {
                 const definition: TestTask = <any>task.definition;
@@ -261,6 +268,7 @@ export class Extension {
                             definition.test && goal.test && this.testController?.testCompleted(e.execution, goal.test, definition.test);
                         }
                     }
+                    this.autotoolsDoneNoResult();
                 } else if (definition.type == 'check') {
                     let suite = configuration.getAllBuildTargets()
                         ?.get(definition.builddir)
@@ -268,18 +276,35 @@ export class Extension {
                     if (suite && suite.test) {
                         this.testController?.suiteCompleted(e.execution);
                     }
+                    this.autotoolsDoneNoResult();
+                } else if (definition.type == "autotools") {
+                    this.autotoolsDoneNoResult();
+                }
+            }
+
+        }));
+        this.extensionContext.subscriptions.push(vscode.tasks.onDidEndTaskProcess(async (e) => {
+            let task = e.execution.task;
+            if (task) {
+                const definition: TestTask = <any>task.definition;
+                if (definition.type == "test" && definition.test) {
+                } else if (definition.type == 'check') {
                 } else if (definition.type == "autotools") {
                     const definition: AutotoolsTask = <any>task.definition;
                     if (definition?.action == "regen" || definition?.action == "recheck")
                         ui.getUI().setStatus(e.exitCode ? ui.UIStatus.ERR : ui.UIStatus.OK);
-                        this.autotoolsTask.autotoolsDone(task.execution,
+                    await this.autotoolsTask.autotoolsDone(task.execution,
                             (typeof e.exitCode == 'number') ? e.exitCode : (e.exitCode ? 1 : 0));
-                        if (!e.exitCode) {
-                            make.configure(make.TriggeredBy.configureAfterConfigurationChange);
-                        }
+                    if (!e.exitCode) {
+                        let r = await make.configure(make.TriggeredBy.configureAfterConfigurationChange);
+                        if (!r)
+                            if (this.testController) {
+                                this.testController.onSavedAll();
+                            };
+                    }
                 }
             }
-        });
+        }));
 
         vscode.commands.executeCommand("setContext", "autotools:isAutotoolsProject",
             this.isAutotoolsProject() ? 1 : 2);
@@ -304,8 +329,14 @@ export class Extension {
                 type: "build",
                 target: new make.BuildTarget(".", "fetchTasks-bug-workaround")
             };
-            vscode.tasks.executeTask(new vscode.Task(kind, vscode.TaskScope.Workspace, 'autotools', 'autotools',
-                new vscode.ProcessExecution("true", ["this-is-a-workaround-for-fetchTasks-bug-not-parsing-tasks-json"])));
+            let workaroundTask = new vscode.Task(kind, vscode.TaskScope.Workspace, 'autotools', 'autotools',
+            new vscode.ProcessExecution("true", ["this-is-a-workaround-for-fetchTasks-bug-not-parsing-tasks-json"]));
+            workaroundTask.presentationOptions = {
+                reveal: vscode.TaskRevealKind.Always,
+                panel: vscode.TaskPanelKind.Shared,
+                showReuseMessage: false};
+            workaroundTask.isBackground = true;
+            vscode.tasks.executeTask(workaroundTask);
         }
     }
     updateOutlineBadge() : void {
@@ -445,10 +476,11 @@ export class Extension {
         }
         await this.autotoolsTask.recheck();
         if (changed && vscode.workspace.textDocuments.find((d) => d.isDirty))
-            await this.testController?.onSavedAll();
+            this.testController?.onSavedAll();
         return Promise.resolve();
     }
     public autotoolsDoneNoResult(): void { this.autotoolsTask.autotoolsDoneNoResult(); }
+    public async waitToTouchMakefiles(): Promise<void> { await this.autotoolsTask.waitToTouchMakefiles(); }
 
     public build(target: make.BuildTarget): void { this.buildTasks.build(target); }
     public async configure(): Promise<boolean> {
@@ -842,12 +874,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             await openEditor(configureAc);
     }));
 
-    context.subscriptions.push(vscode.commands.registerCommand('autotools.test', async (sub: tree.TaskNode) => {
+    context.subscriptions.push(vscode.commands.registerCommand('autotools.test', (sub: tree.TaskNode) => {
         telemetry.logEvent("test");
         if (!sub.goal.task)
             throw new Error("Missing test task on TaskNode");
         if (sub.goal.test && extension.testController)
-            return await extension.testController.run(sub.goal.test, configuration.getCurrentTestEnvironment());
+            return extension.testController.run(sub.goal.test, configuration.getCurrentTestEnvironment());
         //return await vscode.tasks.executeTask(sub.goal.task);
     }));
 
@@ -890,11 +922,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         await vscode.commands.executeCommand("workbench.files.action.showActiveFileInExplorer");
     }
 
-    context.subscriptions.push(vscode.workspace.onDidSaveTextDocument(async (f) => {
+    context.subscriptions.push(vscode.workspace.onDidSaveTextDocument((f) => {
         if (extension.testController && f.uri.scheme === "file" &&
             !ignoredSaveFiles.has(path.basename(f.uri.fsPath))) {
             vscode.workspace.textDocuments.find((d) => d.isDirty) ||
-            await extension.testController?.onSavedAll();
+            extension.testController?.onSavedAll();
         }
     }));
 

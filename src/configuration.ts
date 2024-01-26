@@ -530,17 +530,16 @@ function updateEnvironmentsForCurrentMakefile(): void {
         // readonly, This prevents the test suite summary being printed.
         let env = e.testExecOptions?.env;
         if (env) {
-            env['TEST_SUITE_LOG'] = nolog_file;
-            env['SUBDIRS'] = "";
+            env.TEST_SUITE_LOG = nolog_file;
+            env.SUBDIRS = "";
             // Suppress bash's error message "/bin/bash: line 74: /tmp/tmp-suite-log.tmp: Permission denied" to stderr
-            env['am__sh_e_setup'] = 'set +e; exec 2> /dev/null';
-            if (make.supportsTestEnvironments()) {
-                env['LOG_DRIVER_FLAGS'] = `--env-name "${e.name}"`;
-            }
+            env.am__sh_e_setup = 'set +e; exec 2> /dev/null';
+            env.LOG_DRIVER_FLAGS = `--env-name "${e.name}"`;
         }
         env = e.checkExecOptions?.env;
-        if (env && make.supportsTestEnvironments()) {
-            env['LOG_DRIVER_FLAGS'] = `--env-name "${e.name}"`;
+        if (env) {
+            env.SUBDIRS = "";
+            env.LOG_DRIVER_FLAGS = `--env-name "${e.name}"`;
         }
     });
    
@@ -555,7 +554,10 @@ function processExecutionOptions(env: TestEnvironment) : vscode.ProcessExecution
         e.name &&
             vars.push(`${e.name}=` + quote([`${e.value}`]));
     });
-    return { env: { TESTS_ENVIRONMENT: vars.join(' ')} };
+    return { env: { TESTS_ENVIRONMENT: vars.join(' '),
+        MAKEFLAGS: "-I " + extension.rulesPath,
+        LOG_DRIVER: extension.testRunner
+    } };
 }
 function processDebugEnvironment(env: TestEnvironment) : { [key: string]: string } {
     var vars : { [key: string]: string } = {};

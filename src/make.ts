@@ -604,6 +604,7 @@ export async function configure(triggeredBy: TriggeredBy): Promise<number> {
 
   await util.scheduleAsyncTask(async () => {await extension.registerCppToolsProvider(); });
 
+  await extension.waitToTouchMakefiles();
   try {
     ui.getUI().setLoading(ui.UIStatus.LOADING);
     subphaseStats = await vscode.window.withProgress(

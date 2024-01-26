@@ -174,9 +174,9 @@ export class AutoToolsTestTaskProvider implements MyTaskProvider {
                                     (c.top_builddir ? ['-C', c.top_builddir] : [])
                                     .concat(dir ? ['-C', dir] : [])
                                     .concat(c.makeArgs || [])
-                                    .concat(["-esi",
-                                        "check",
-                                        `LOG_DRIVER=${extension.testRunner}`,
+                                    .concat(["-Resi",
+                                        "me-check",
+                                        "--eval=include Mergesium.rules",
                                         "TEST_LOGS=" + test.goal
                                     ]), env.testExecOptions), );
                                 newTask.group = TaskGroup.Test;
@@ -257,10 +257,9 @@ export class AutoToolsCheckTaskProvider implements MyTaskProvider {
                         (c.top_builddir ? ['-C', c.top_builddir] : [])
                         .concat(dir ? ['-C', dir] : [])
                         .concat(c.makeArgs || [])
-                        .concat([
-                            `LOG_DRIVER=${extension.testRunner}`,
-                        ])
-                        .concat("check"),
+                        .concat(["-Resi",
+                            "me-check",
+                            "--eval=include Mergesium.rules"]),
                         checkExecOptions));
                     newTask.group = TaskGroup.Test;
                     newTask.detail = localize("automake.check", "$(checklist) Test Suite");
@@ -275,12 +274,11 @@ export class AutoToolsCheckTaskProvider implements MyTaskProvider {
                         (c.top_builddir ? ['-C', c.top_builddir] : [])
                         .concat(dir ? ['-C', dir] : [])
                         .concat(c.makeArgs || [])
-                        .concat([
-                            `LOG_DRIVER=${extension.testRunner}`,
-                        ])
-                        .concat(g.goal || "test-suite.log"),
+                        .concat(["-Resi",
+                            g.goal || "test-suite.log"]),
                         checkExecOptions));
                 g.livetask.group = TaskGroup.Test;
+                g.livetask.presentationOptions = defaultCheckPresentation;
                 g.livetask.detail = localize("automake.livecheck", "$(checklist) $(broadcast) Test Suite Update");
                 targets.push(g.livetask);
 
@@ -327,6 +325,7 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
     public recheckTask?: vscode.Task;
     public helpTask?: vscode.Task;
     private the_bootstrap_cmd : string[] | undefined;
+    public onFinishedWork : vscode.EventEmitter<boolean> = new vscode.EventEmitter<boolean>();
     private working: boolean = false;
     static manifests: string[] = [
             "configure.ac",
@@ -395,8 +394,10 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
     public isBootstrapped(): boolean {
         return checkFileExistsSync(resolvePathToRoot("configure"));
     }
+    private isErroredConfiguration: boolean = false;
     public isConfigured(c: configuration.MakefileConfiguration): boolean {
-        return checkFileExistsSync(resolvePathToRoot(path.join(c.top_builddir, "config.status")));
+        return !this.isErroredConfiguration &&
+            checkFileExistsSync(resolvePathToRoot(path.join(c.top_builddir, "config.status")));
     }
     update(disposables: vscode.Disposable[]): void {
     }
@@ -434,10 +435,10 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
         }
     }
     public async bootstrap(): Promise<void> {
-        if (this.bootstrapTask && !this.working) {
+        if (this.bootstrapTask) {
+            await this.waitToTouchMakefiles();
             vscode.tasks.executeTask(this.bootstrapTask).then(() => {
                 ui.getUI().setLoading(ui.UIStatus.LOADING);
-                this.working = true;
             });
         }
     }
@@ -445,10 +446,10 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
         // Use regenWorking to avoid restarting when already running.
         // Eg, Makefile.in is updated in the workspace, which triggers
         // a separate, unnecesary update.
-        if (this.regenTask && !this.working) {
+        if (this.regenTask) {
+            await this.waitToTouchMakefiles();
             vscode.tasks.executeTask(this.regenTask).then(() => {
                 ui.getUI().setLoading(ui.UIStatus.REGEN);
-                this.working = true;
             });
         }
     }
@@ -456,19 +457,17 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
         // Use regenWorking to avoid restarting when already running.
         // Eg, Makefile.in is updated in the workspace, which triggers
         // a separate, unnecesary update.
-        await extension.readPkgInfo();
-        if (this.recheckTask && !this.working) {
+        if (this.recheckTask) {
+            await this.waitToTouchMakefiles();
+            await extension.readPkgInfo();
             vscode.tasks.executeTask(this.recheckTask).then(() => {
                 ui.getUI().setLoading(ui.UIStatus.REGEN);
-                this.working = true;
             });
         }
     }
     public async help(): Promise<void> {
         if (this.helpTask) {
-            vscode.tasks.executeTask(this.helpTask).then(() => {
-                this.working = true;
-            });
+            await vscode.tasks.executeTask(this.helpTask);
         }
     }
     public async configure(): Promise<boolean> {
@@ -491,9 +490,10 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
                     {cwd : destdir}));
             task.detail = localize("automake.configure.help", "$(tools) Configure build directory");
 
+            await this.waitToTouchMakefiles();
             vscode.tasks.executeTask(task)
                 .then((e) => {
-                    this.working = e.task.execution ? true : false;
+                    !e.task.execution && this.autotoolsDoneNoResult();
             });
 
             success = await new Promise<boolean>(resolve => {
@@ -509,11 +509,25 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
         }
         return Promise.resolve(success);
     }
-    public async autotoolsDoneNoResult(): Promise<void> {
+    public async waitToTouchMakefiles() : Promise<void> {
+        return new Promise(resolve => {
+            if (this.working) {
+                let disp = this.onFinishedWork.event(e => {
+                    if (!this.working) {
+                        this.working = true;
+                        return (!e) && (disp.dispose() ?? true) && resolve();
+                    }
+                });
+            } else { this.working = true; return resolve();}});
+    }
+    public autotoolsDoneNoResult(): void {
         this.working = false;
+        this.onFinishedWork.fire(false);
+    }
+    public get isWorking() : boolean {
+        return this.working;
     }
     public async autotoolsDone(task: ProcessExecution | ShellExecution | vscode.CustomExecution | undefined, exitCode: number): Promise<void> {
-        this.working = false;
         if (exitCode != 0) {
             var kbUrl : vscode.Uri = await extension.kbUrl();
             if (task == this.bootstrapTask?.execution) {
@@ -533,6 +547,7 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
                 logger.showOutputChannel();
             }
         }
+        this.isErroredConfiguration = (exitCode != 0);
     }
 }
 
