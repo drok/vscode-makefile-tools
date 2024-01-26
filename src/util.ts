@@ -628,6 +628,10 @@ export function getSetting<T>(settingId: string) : T | undefined {
     let workspaceConfiguration: vscode.WorkspaceConfiguration = vscode.workspace.getConfiguration("autotools");
     return workspaceConfiguration.get<T>(settingId);
 }
+export function getSettingOr<T>(settingId: string, defaultVal: T) : T {
+    let workspaceConfiguration: vscode.WorkspaceConfiguration = vscode.workspace.getConfiguration("autotools");
+    return workspaceConfiguration.get<T>(settingId, defaultVal);
+}
 // Read setting from workspace settings and expand according to various supported patterns.
 // Do this for the simple types (converting to boolean or numerals when the varexp syntax
 // is used on such types of settings) and for arrays or objects, expand recursively

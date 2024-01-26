@@ -200,37 +200,37 @@ export function readpromptClean() : void {
 let autoreconfWarnCross: boolean;
 export function getautoreconfWarnCross(): boolean { return autoreconfWarnCross; }
 export function readautoreconfWarnCross() : void {
-    autoreconfWarnCross = util.getSetting<boolean>("autoreconfWarnCross") || true;
+    autoreconfWarnCross = util.getSettingOr<boolean>("autoreconfWarnCross", false);
 }
 
 let autoreconfWarnPortability: boolean;
 export function getautoreconfWarnPortability(): boolean { return autoreconfWarnPortability; }
 export function readautoreconfWarnPortability() : void {
-    autoreconfWarnPortability = util.getSetting<boolean>("autoreconfWarnPortability") || false;
+    autoreconfWarnPortability = util.getSettingOr<boolean>("autoreconfWarnPortability", false);
 }
 
 let autoreconfWarnObsolete: boolean;
 export function getautoreconfWarnObsolete(): boolean { return autoreconfWarnObsolete; }
 export function readautoreconfWarnObsolete() : void {
-    autoreconfWarnObsolete = util.getSetting<boolean>("autoreconfWarnObsolete") || false;
+    autoreconfWarnObsolete = util.getSettingOr<boolean>("autoreconfWarnObsolete", false);
 }
 
 let autoreconfWarnOverride: boolean;
 export function getautoreconfWarnOverride(): boolean { return autoreconfWarnOverride; }
 export function readautoreconfWarnOverride() : void {
-    autoreconfWarnOverride = util.getSetting<boolean>("autoreconfWarnOverride") || false;
+    autoreconfWarnOverride = util.getSettingOr<boolean>("autoreconfWarnOverride", false);
 }
 
 let autoreconfWarnUnsupported: boolean;
 export function getautoreconfWarnUnsupported(): boolean { return autoreconfWarnUnsupported; }
 export function readautoreconfWarnUnsupported() : void {
-    autoreconfWarnUnsupported = util.getSetting<boolean>("autoreconfWarnUnsupported") || false;
+    autoreconfWarnUnsupported = util.getSettingOr<boolean>("autoreconfWarnUnsupported", true);
 }
 
 let autoreconfWarnGnu: boolean;
 export function getautoreconfWarnGnu(): boolean { return autoreconfWarnGnu; }
 export function readautoreconfWarnGnu() : void {
-    autoreconfWarnGnu = util.getSetting<boolean>("autoreconfWarnGnu") || false;
+    autoreconfWarnGnu = util.getSettingOr<boolean>("autoreconfWarnGnu", false);
 }
 
 let autoreconfTool: string = 'autoreconf';
