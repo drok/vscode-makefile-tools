@@ -305,10 +305,11 @@ async function analyzeConfigureParams(reload: boolean): Promise<void> {
     }
 
     if (relativeMakefile) {
+        await extension.kbUrl(); // Needed to read pkginfo
         extension._projectOutlineProvider.update(currentMakefileConfigurationName);
         extension.createPanel();
         await logMakeCmd(relativeMakefile);
-        extension.setConfiguration(getCurrentMakefileConfiguration().name);
+        extension.setConfiguration(currentMakefileConfigurationName);
         extension.setTestEnvironment();
     }
 
