@@ -113,6 +113,10 @@ export class Extension {
 
         telemetry = new tele.MyTelemetry(extensionContext, teleParams);
     }
+    // Force read pkginfo even if already set, used when configure.ac changes
+    public async readPkgInfo() : Promise<void> {
+        this.pkginfo = await make.getPackageJSON().catch(() => undefined);
+    }
     public async kbUrl() : Promise<vscode.Uri> {
         if (!this.pkginfo)
             this.pkginfo = await make.getPackageJSON().catch(() => undefined);

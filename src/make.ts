@@ -436,6 +436,11 @@ export async function generateParseContent(progress: vscode.Progress<{}>,
         }
         ui.getUI().setStatus(result.returnCode !== ConfigureBuildReturnCodeTypes.success ? ui.UIStatus.ERR : ui.UIStatus.OK);
 
+        // Update the projname because the dry-run may have updated config.status
+        // TODO - this can be done by reading PACKAGE var at dry-run, avoid the extra exec
+        await extension.readPkgInfo();
+        extension.setConfiguration(configuration.getCurrentMakefileConfiguration().name);
+
         curPID = -1;
         return {
             retc: result.returnCode,

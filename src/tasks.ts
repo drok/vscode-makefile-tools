@@ -456,6 +456,7 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
         // Use regenWorking to avoid restarting when already running.
         // Eg, Makefile.in is updated in the workspace, which triggers
         // a separate, unnecesary update.
+        await extension.readPkgInfo();
         if (this.recheckTask && !this.working) {
             vscode.tasks.executeTask(this.recheckTask).then(() => {
                 ui.getUI().setLoading(ui.UIStatus.REGEN);
