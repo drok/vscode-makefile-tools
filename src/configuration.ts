@@ -275,20 +275,31 @@ export function setConfigurationProblemMatchers(problemMatchers: string[]): void
 // according to various merging rules and decide what make command and build log
 // apply to the current makefile configuration.
 async function analyzeConfigureParams(reload: boolean): Promise<void> {
-    let relativeMakefile = findMakefile();
     let reason : string;
+    let hasMakefile : boolean = false;
 
     extension.getState().configureDirty = false;
 
-    if (!relativeMakefile && extension.isAutotoolsProject()) {
+    if (extension.isAutotoolsProject()) {
         if (extension.isBootstrapped()) {
             if (extension.isConfigured() || await extension.configure()) {
-                relativeMakefile = findMakefile();
-                if (!relativeMakefile) {
-                    logger.message('Configuration succeeded but there is no makefile for');
-                    reason = "configured-noMakefile"
-                }
-                reason = "ok";
+                let relativeMakefile = findMakefile();
+                if (!reload) {
+                    if (relativeMakefile) {
+                        await extension.kbUrl(); // Needed to read pkginfo
+                        extension._projectOutlineProvider.update(currentMakefileConfigurationName);
+                        extension.createPanel();
+                        await logMakeCmd(relativeMakefile);
+                        extension.setConfiguration(currentMakefileConfigurationName);
+                        extension.setTestEnvironment();
+                        reason = "ok";
+                        hasMakefile = true;
+                    } else {
+                        logger.message('Configuration succeeded but there is no makefile for');
+                        reason = "configured-noMakefile"
+                    }
+                } else
+                    reason = "ok";
             } else {
                 reason = "configure-failed";
             }
@@ -298,19 +309,10 @@ async function analyzeConfigureParams(reload: boolean): Promise<void> {
         }
         if (!reload)
             statusBar.setStatus(extension.isAutotoolsProject() ?
-                (relativeMakefile ? ui.UIStatus.OK : ui.UIStatus.NO_MAKEFILE) :
+                (hasMakefile ? ui.UIStatus.OK : ui.UIStatus.NO_MAKEFILE) :
                 ui.UIStatus.NON_AUTOTOOLS);
     } else {
         reason = "n/a";
-    }
-
-    if (relativeMakefile) {
-        await extension.kbUrl(); // Needed to read pkginfo
-        extension._projectOutlineProvider.update(currentMakefileConfigurationName);
-        extension.createPanel();
-        await logMakeCmd(relativeMakefile);
-        extension.setConfiguration(currentMakefileConfigurationName);
-        extension.setTestEnvironment();
     }
 
     telemetry.logEvent(reason, { reason: "init" });
