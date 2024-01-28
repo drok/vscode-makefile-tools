@@ -39,6 +39,7 @@ import { AutoToolsBuildTaskProvider,
         TestTask,
         MyTaskProvider } from './tasks';
 import { SuiteDecorations } from './suite-decorator';
+import { TestGrid, GridShowOptions } from './testgrid';
 import * as tele from './tele';
 import * as nls from 'vscode-nls';
 import { assert } from 'console';
@@ -113,6 +114,28 @@ export class Extension {
         extensionContext.subscriptions.push(vscode.commands.registerCommand('autotools.command.openKnowledgeBase', async () => {
             await this.gotoKnowledgeBase();
         }));
+        extensionContext.subscriptions.push(vscode.commands.registerCommand('autotools.command.testgrid.top', async (e) => {
+            telemetry.logEvent("topgrid");
+            let summary : vscode.Uri = vscode.Uri.from({
+                scheme: TestGrid.scheme,
+                authority: "mergesium.autotools",
+                path: TestGrid.top,
+            });
+            await focusPreviewedDocument(summary);
+        }));
+
+        extensionContext.subscriptions.push(vscode.commands.registerCommand('autotools.command.testgrid.item', async (sub: tree.SubNode) => {
+            telemetry.logEvent("itemgrid");
+            if (sub.submake.test_suite) {
+                let summary : vscode.Uri = vscode.Uri.from({
+                    scheme: TestGrid.scheme,
+                    authority: "mergesium.autotools",
+                    path: '/' + sub.submake.dir,
+                });
+                await focusPreviewedDocument(summary);
+            }
+        }));
+
         debugProvider.activate(extensionContext);
 
         telemetry = new tele.MyTelemetry(extensionContext, teleParams);
@@ -369,6 +392,11 @@ export class Extension {
                 value: 0
             };
         }
+    }
+
+    public readonly projectTestGrid = new TestGrid();
+    public updateAllGrids() : void {
+        this.projectTestGrid.updateAll();
     }
 
     public updateWatchers() {
@@ -691,6 +719,20 @@ function openLog(selected: tree.Node): Thenable<vscode.TextDocument> {
     }
     return Promise.reject();
 }
+
+/* returns whether configuration was done or not (bool) */
+let isActive: boolean = false;
+let _activatedEvent: vscode.EventEmitter<boolean> = new vscode.EventEmitter<boolean>();
+export async function waitActivated() : Promise<boolean> {
+    if (isActive)
+        return Promise.resolve(isActive);
+    return new Promise<boolean>(resolve => {
+        let a = _activatedEvent.event(e => {
+            a.dispose();
+            return resolve(e);
+        });
+    });
+}
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
     let teleParams = await tele.getParams();
     extension = new Extension(context, teleParams);
@@ -955,11 +997,22 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
     vscode.window.registerFileDecorationProvider(extension.suiteDecorator);
 
+    context.subscriptions.push(vscode.workspace.registerTextDocumentContentProvider(TestGrid.scheme, extension.projectTestGrid));
+    context.subscriptions.push(vscode.workspace.onDidCloseTextDocument((doc) => {
+        if (doc.uri.scheme === TestGrid.scheme) {
+            extension.projectTestGrid.closeDocument(doc.uri);
+        }
+    }))
+
     if (!configuration.getConfigurationMakefile()) {
         ui.getUI().setLoading(extension.isAutotoolsProject() ? ui.UIStatus.ERR : ui.UIStatus.NON_AUTOTOOLS);
+        isActive = true;
+        _activatedEvent.fire(isActive);
         return;
     }
     await make.configure(make.TriggeredBy.cleanConfigure);
+    isActive = true;
+    _activatedEvent.fire(isActive);
 }
 
 export async function outputLogHeader() : Promise<void> {
@@ -1016,4 +1069,19 @@ function countStats(sub: gnumake.Make): number[] {
         sub.submake.size,
         sub.stats.checks
     ];
+}
+
+async function focusPreviewedDocument(uri: vscode.Uri) : Promise<void> {
+    let summary = vscode.Uri.from({scheme: TestGrid.scheme, path: uri.path});
+    let existingEditor : vscode.TextEditor | undefined =
+        vscode.window. visibleTextEditors.find(e =>
+                e.document.uri.path == summary.path);
+    let opened = vscode.workspace.textDocuments.find(d => d.uri.path == summary.path);
+    if (!existingEditor) {
+        await vscode.window.showTextDocument(summary, GridShowOptions).then((editor) => {
+            if (!opened)
+                vscode.languages.setTextDocumentLanguage(editor.document, "markdown");
+        });
+        if (!opened) await vscode.commands.executeCommand("markdown.showPreview", summary);
+    }
 }

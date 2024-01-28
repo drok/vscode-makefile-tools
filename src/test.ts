@@ -490,6 +490,7 @@ export class MyTestController {
                         this.runQueue.delete(this.activeRun);
                         // this.activeRun.run.appendOutput(`Blah in ${this.activeRun.env.name} @ ${this.activeRun.tmp_label}\n`);
                         this.activeRun.run.end();
+                        extension.updateAllGrids();
                         this.activeRun = undefined;
                         this.activeTest = undefined;
 

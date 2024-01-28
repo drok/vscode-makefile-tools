@@ -85,6 +85,18 @@
                 "title": "%autotools.command.check.title%"
             },
             {
+                "command": "autotools.command.testgrid.top",
+                "icon": "$(checklist)",
+                "title": "Open project Test Result Summary",
+                "category": "autotools"
+            },
+            {
+                "command": "autotools.command.testgrid.item",
+                "icon": "$(checklist)",
+                "title": "Open suite Result Summary",
+                "category": "autotools"
+            },
+            {
                 "command": "autotools.build",
                 "icon": "$(combine)",
                 "title": "%autotools.command.build.title%"
@@ -832,6 +844,11 @@
             ],
             "view/title": [
                 {
+                    "command": "autotools.command.testgrid.top",
+                    "when": "view == autotools.tests",
+                    "group": "navigation@3"
+                },
+                {
                     "command": "autotools.outline.recheck",
                     "when": "view == autotools.outline",
                     "group": "1_makefileOutline@3"
@@ -863,6 +880,11 @@
                 }
             ],
             "view/item/context": [
+                {
+                    "command": "autotools.command.testgrid.item",
+                    "when": "view == autotools.tests && viewItem =~ /nodeType=check/",
+                    "group": "inline@8"
+                },
                 {
                     "command": "autotools.build",
                     "when": "view == autotools.outline && viewItem =~ /nodeType=build/",
