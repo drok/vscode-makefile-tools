@@ -175,7 +175,7 @@ export function getConfigurationCachePath(): string {
 let keepDryRuns: boolean;
 export function getKeepDryRuns(): boolean { return keepDryRuns; }
 export function readkeepDryRuns() : void {
-    keepDryRuns = util.getSetting<boolean>("keepDryRuns") || false;
+    keepDryRuns = util.getSettingOr<boolean>("keepDryRuns", false);
 }
 
 // Keep the configurationCache in the configuration directory?
@@ -185,7 +185,7 @@ export function readkeepDryRuns() : void {
 let keepConfigurationCache: boolean;
 export function getKeepConfigurationCache(): boolean { return keepConfigurationCache; }
 export function readkeepConfigurationCache() : void {
-    keepConfigurationCache = util.getSetting<boolean>("keepConfigurationCache") || false;
+    keepConfigurationCache = util.getSettingOr<boolean>("keepConfigurationCache", false);
 }
 
 // prompt to clean when the active configuration changes?
@@ -793,14 +793,14 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
 
 
             subKey = "keepDryRuns";
-            let updatedkeepDryRuns : boolean | undefined = await util.getExpandedSetting<boolean>(subKey);
+            let updatedkeepDryRuns : boolean = util.getSettingOr<boolean>(subKey, false);
             if (updatedkeepDryRuns !== keepDryRuns) {
                 readkeepDryRuns();
                 updatedSettingsSubkeys.push(subKey);
             }
 
             subKey = "keepConfigurationCache";
-            let updatedkeepConfigurationCache : boolean | undefined = await util.getExpandedSetting<boolean>(subKey);
+            let updatedkeepConfigurationCache : boolean = util.getSettingOr<boolean>(subKey, false);
             if (updatedkeepConfigurationCache !== keepConfigurationCache) {
                 readkeepConfigurationCache();
                 updatedSettingsSubkeys.push(subKey);
