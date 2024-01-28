@@ -807,42 +807,42 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
             }
 
             subKey = "autoreconfWarnCross";
-            let updatedautoreconfWarnCross : boolean | undefined = await util.getExpandedSetting<boolean>(subKey);
+            let updatedautoreconfWarnCross : boolean = util.getSettingOr<boolean>(subKey, false);
             if (updatedautoreconfWarnCross !== autoreconfWarnCross) {
                 readautoreconfWarnCross();
                 updatedSettingsSubkeys.push(subKey);
             }
 
             subKey = "autoreconfWarnPortability";
-            let updatedautoreconfWarnPortability : boolean | undefined = await util.getExpandedSetting<boolean>(subKey);
+            let updatedautoreconfWarnPortability : boolean = util.getSettingOr<boolean>(subKey, false);
             if (updatedautoreconfWarnPortability !== autoreconfWarnPortability) {
                 readautoreconfWarnPortability();
                 updatedSettingsSubkeys.push(subKey);
             }
 
             subKey = "autoreconfWarnObsolete";
-            let updatedautoreconfWarnObsolete : boolean | undefined = await util.getExpandedSetting<boolean>(subKey);
+            let updatedautoreconfWarnObsolete : boolean = util.getSettingOr<boolean>(subKey, false);
             if (updatedautoreconfWarnObsolete !== autoreconfWarnObsolete) {
                 readautoreconfWarnObsolete();
                 updatedSettingsSubkeys.push(subKey);
             }
 
             subKey = "autoreconfWarnOverride";
-            let updatedautoreconfWarnOverride : boolean | undefined = await util.getExpandedSetting<boolean>(subKey);
+            let updatedautoreconfWarnOverride : boolean = util.getSettingOr<boolean>(subKey, false);
             if (updatedautoreconfWarnOverride !== autoreconfWarnOverride) {
                 readautoreconfWarnOverride();
                 updatedSettingsSubkeys.push(subKey);
             }
 
             subKey = "autoreconfWarnGnu";
-            let updatedautoreconfWarnGnu : boolean | undefined = await util.getExpandedSetting<boolean>(subKey);
+            let updatedautoreconfWarnGnu : boolean = util.getSettingOr<boolean>(subKey, false);
             if (updatedautoreconfWarnGnu !== autoreconfWarnGnu) {
                 readautoreconfWarnGnu();
                 updatedSettingsSubkeys.push(subKey);
             }
 
             subKey = "autoreconfWarnUnsupported";
-            let updatedautoreconfWarnUnsupported : boolean | undefined = await util.getExpandedSetting<boolean>(subKey);
+            let updatedautoreconfWarnUnsupported : boolean = util.getSettingOr<boolean>(subKey, true);
             if (updatedautoreconfWarnUnsupported !== autoreconfWarnUnsupported) {
                 readautoreconfWarnUnsupported();
                 updatedSettingsSubkeys.push(subKey);
