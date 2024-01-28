@@ -79,6 +79,7 @@ export class Extension {
     public readonly dryRunner : string;
     public readonly testRunner : string;
     public readonly rulesPath : string;
+    public readonly userEnvName : string = "<none>";
     public testController : MyTestController | undefined;
     public pkginfo : make.pkgInfo | undefined;
     private _treeDisposables: vscode.Disposable[] = [];

@@ -45,8 +45,11 @@ export class AutoToolsBuildTaskProvider implements MyTaskProvider {
 	}
 
     public update(disposables: vscode.Disposable[]) {
-        var targets: Task[] = [];
         let c = configuration.getCurrentMakefileConfiguration();
+        this.changeConfiguration(c, disposables);
+    }
+    changeConfiguration(c: configuration.MakefileConfiguration, disposables: vscode.Disposable[]) {
+        var targets: Task[] = [];
         configuration.getAllBuildTargets().forEach((goals, dir) => {
             for (let g of goals.values()) {
                 if (g.flags & (Goal.Flags.Static_library | Goal.Flags.Linked_binary)) {
@@ -74,9 +77,6 @@ export class AutoToolsBuildTaskProvider implements MyTaskProvider {
             }
         });
         this.myPromise = Promise.resolve(targets);
-    }
-    changeConfiguration(c: configuration.MakefileConfiguration, disposables: vscode.Disposable[]) {
-        this.myPromise = Promise.resolve([]);
     }
 
     public build(g : BuildTarget) : void {
@@ -133,13 +133,16 @@ export class AutoToolsTestTaskProvider implements MyTaskProvider {
 	}
 
     public update(disposables: vscode.Disposable[]) {
+        let c = configuration.getCurrentMakefileConfiguration();
+        this.changeConfiguration(c, disposables);
+    }
+    changeConfiguration(c: configuration.MakefileConfiguration, disposables: vscode.Disposable[]) {
         var targets: Task[] = [];
         this.numFails = 0;
         this.numTests = 0;
         this.numUnknown = 0;
         this.numSuspect = 0;
         let tc = extension.testController;
-        let c = configuration.getCurrentMakefileConfiguration();
         let t = configuration.getAllBuildTargets();
         let cte = configuration.getCurrentTestEnvironment();
         let e = make.supportsTestEnvironments() ? configuration.getTestEnvironments() : [cte];
@@ -200,9 +203,6 @@ export class AutoToolsTestTaskProvider implements MyTaskProvider {
             }});
         this.myPromise = Promise.resolve(targets);
     }
-    changeConfiguration(c: configuration.MakefileConfiguration, disposables: vscode.Disposable[]) {
-        this.myPromise = Promise.resolve([]);
-    }
 
 	public resolveTask(_task: Task): Task | undefined {
 		const test = _task.definition.test;
@@ -236,8 +236,11 @@ export class AutoToolsCheckTaskProvider implements MyTaskProvider {
 
     update(disposables: vscode.Disposable[]) {
 
-        var targets : Task[] = [];
         let c = configuration.getCurrentMakefileConfiguration();
+        this.changeConfiguration(c, disposables);
+    }
+    changeConfiguration(c: configuration.MakefileConfiguration, disposables: vscode.Disposable[]) {
+        var targets : Task[] = [];
         let e = make.supportsTestEnvironments() ? configuration.getTestEnvironments() : [];
         var checkExecOptions = configuration.getCurrentTestEnvironment().checkExecOptions;
         configuration.getAllBuildTargets().forEach((goals, dir) => {
@@ -284,9 +287,6 @@ export class AutoToolsCheckTaskProvider implements MyTaskProvider {
 
             }}});
         this.myPromise = Promise.resolve(targets);
-    }
-    changeConfiguration(c: configuration.MakefileConfiguration, disposables: vscode.Disposable[]) {
-        this.myPromise = Promise.resolve([]);
     }
 
 	public resolveTask(_task: Task): Task | undefined {

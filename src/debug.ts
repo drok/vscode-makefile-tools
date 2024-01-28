@@ -8,6 +8,7 @@ import { DebugConfigurationProvider, WorkspaceFolder, DebugConfiguration, Provid
 import { resolvePathToRoot } from './util';
 import * as configuration from './configuration';
 import { Goal } from './parser/gnumake';
+import { extension } from './extension';
 
 let defaultSetupCommands = [{
     "description": "Set source directory",
@@ -71,7 +72,7 @@ export class DebugNow implements vscode.DebugConfiguration {
         ];
         this.type = "autotools";
         this.name = "Debug '" + built.goal + "'" +
-            (built.builddir ? " in " + built.builddir : "");
+            (built.builddir ? " in " + built.builddir : "") + ` @ ${env?.name ?? extension.userEnvName}`;
         this.request = "launch";
         this.program =
             resolvePathToRoot( buildit ?

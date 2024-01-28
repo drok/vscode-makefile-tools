@@ -716,7 +716,7 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
                 updatedSettingsSubkeys.push(subKey);
             }
 
-            // Base tests environment
+            // Base tests environment XFAIL_TESTS is handled inside readProjectTestEnvironment()
             subKey = "TESTS_ENVIRONMENTS";
             let oldProjectTestEnvironment = getProjectTestEnvironment();
             await readProjectTestEnvironment();
@@ -743,6 +743,10 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
                     return k;
                 }
             });
+            if (!util.areEqual(updatedMakefileConfigurations, makefileConfigurations)) {
+                await readMakefileConfigurations(currentMakefileConfigurationName);
+                //await setCurrentMakefileConfiguration(currentMakefileConfigurationName);
+            }
             // TODO: should call an onConfigurationUpdate(updatedConfiguration);
             // so that not only build log, but other updated members can be handled
             var needConfigure : boolean = false;
@@ -755,7 +759,6 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
                             oldConfig.configureArgs);
                     extension.getState().configureDirty = true;
 
-                    await readMakefileConfigurations(currentMakefileConfigurationName);
                     await setCurrentMakefileConfiguration(currentMakefileConfigurationName);
                     var configuring : Promise<boolean> | undefined;
                     if (needConfigure) {
@@ -781,15 +784,9 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
                     }
                     if (configuring)
                         configuring.finally();
-                } else {
-                    await readMakefileConfigurations(currentMakefileConfigurationName);
-                    await setCurrentMakefileConfiguration(currentMakefileConfigurationName);
                 }
-            } else {
-                await readMakefileConfigurations(currentMakefileConfigurationName);
-                await setCurrentMakefileConfiguration(currentMakefileConfigurationName);
-            }
-
+            } else if (updatedTestEnvironments) // Update the tasks with new environments
+                extension.onConfigurationSelect(currentMakefileConfiguration);
 
 
             subKey = "keepDryRuns";

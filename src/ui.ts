@@ -56,7 +56,6 @@ export class UI {
         this.configurationButton.tooltip = !top_builddir ?
             localize("autotools.click.in-tree", "See docs for switching to out-of-tree") :
             localize("autotools.click.setconfig", "Click to select another build configuration")
-        this.setLoading(UIStatus.LOADING);
     }
 
     public setStatus(status: UIStatus): void {
