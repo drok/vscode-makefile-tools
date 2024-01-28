@@ -66,7 +66,7 @@
             },
             {
                 "command": "autotools.checkAll",
-                "icon": "$(checklist)",
+                "icon": "$(run-all)",
                 "title": "%autotools.checkAll.title%"
             },
             {
@@ -81,7 +81,7 @@
             },
             {
                 "command": "autotools.check",
-                "icon": "$(checklist)",
+                "icon": "$(run-all)",
                 "title": "%autotools.command.check.title%"
             },
             {
@@ -881,7 +881,7 @@
                 {
                     "command": "autotools.livecheck",
                     "when": "view == autotools.tests && viewItem =~ /nodeType=check/",
-                    "group": "inline@9"
+                    "group": "inline@12"
                 },
                 {
                     "command": "autotools.debug",

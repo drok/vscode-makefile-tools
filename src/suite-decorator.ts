@@ -48,7 +48,7 @@ export class SuiteDecorations implements vscode.FileDecorationProvider {
 //                return  { /* tooltip: "pass: 100/2000", badge: "99", */
 //                    color: ((test?.flags & Goal.Flags.Test_Result_Mask) == TRS.PASS) ? undefined :  SuiteDecorations.check_err };
 //            else
-                return { };
+                return { badge: ' '};
         } else
         if (uri.scheme == "test") {
             let goals = configuration.getAllBuildTargets();
