@@ -3,7 +3,7 @@
    "autotools.command.bootstrap.title": "Autotools: Bootstrap",
    "autotools.command.regen.title": "Autotools: Update Makefiles and Headers",
    "autotools.command.makefile.buildAll.title": "Autotools: Build 'all'",
-   "autotools.outline.checkAll.title": "Run all tests",
+   "autotools.outline.checkAll.title": "Run all tests (make check)",
    "autotools.buildAll.title": "Build 'all'",
    "autotools.checkAll.title": "Autotools: Run all tests (make check)",
    "autotools.command.makefile.setBuildConfiguration.title": "Autotools: Select a build configuration",
