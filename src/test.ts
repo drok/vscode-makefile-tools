@@ -459,19 +459,15 @@ export class MyTestController {
     async advanceQueue() : Promise<void> {
         if (this.activeRun) {
             do {
-                if (this.activeGoal) {
-                    //this.activeQueue = this.activeRun.cancel.isCancellationRequested ?
-                        //this.activeQueue.filter(def => def != this.activeTest) : [];
-                    if (!this.activeQueue.length) { // end of queued tests for this run
-                        this.runQueue.delete(this.activeRun);
-                        // this.activeRun.run.appendOutput(`Blah in ${this.activeRun.env.name} @ ${this.activeRun.tmp_label}\n`);
-                        this.activeRun.run.end();
-                        extension.updateAllGrids();
-                        this.activeRun = undefined;
-                        this.activeGoal = undefined;
+                if (!this.activeQueue.length) {
+                    this.runQueue.delete(this.activeRun);
+                    // this.activeRun.run.appendOutput(`Blah in ${this.activeRun.env.name} @ ${this.activeRun.tmp_label}\n`);
+                    this.activeRun.run.end();
+                    extension.updateAllGrids();
+                    this.activeRun = undefined;
+                    this.activeGoal = undefined;
 
-                        this.startNextRun();
-                    }
+                    this.startNextRun();
                 }
                 if (!this.activeRun) {
                     this.queueRunner?.dispose();
@@ -479,7 +475,7 @@ export class MyTestController {
                     break;
                 } else
                     await this.startNextTest();
-            } while (this.activeRun && !this.activeGoal);
+            } while (this.activeRun && this.activeGoal && !this.isBusy);
         }
     }
     startNextRun() : void {
@@ -501,10 +497,17 @@ export class MyTestController {
                     if (this.runningTask && this.activeGoal.test) {
                         this.activeRun.run.started(this.activeGoal.test)
                         await extension.waitToTouchMakefiles();
-                        vscode.tasks.executeTask(this.runningTask)
-                            .then(e => (this.isBusy = true),
+                        let reason = await vscode.tasks.executeTask(this.runningTask)
+                            .then(e =>
+                                (this.isBusy = true) && "ok",
                             (r) =>
-                            false);
+                            r.message);
+                        if (!this.isBusy) {
+                            logger.message(`ERROR: Failed to start task ${this.runningTask.name}`, 'Normal');
+                            this.activeRun.run.errored(this.activeGoal.test,
+                                    new vscode.TestMessage(new vscode.MarkdownString(`Failed to start task '**${this.runningTask.name}**' - _${reason}_`)));
+                                    extension.autotoolsDoneNoResult();
+                        }
                     } else { // `make check` from the top
                         this.activeGoal = undefined;
                     }
