@@ -24,7 +24,6 @@ import * as util from './util';
 import * as vscode from 'vscode';
 import * as ui from './ui';
 import { quote } from '@mergesium/shell-quote';
-// import { updateTree } from './tree';
 
 import * as nls from 'vscode-nls';
 nls.config({ messageFormat: nls.MessageFormat.bundle, bundleFormat: nls.BundleFormat.standalone })();
