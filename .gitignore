@@ -12,4 +12,6 @@ OneLocBuild
 **/package.nls.*.json
 /build
 /bin
+/share
+/include/gnumake.h
 /src/test/fakeSuite/Repros/.vscode/compile_commands.json
