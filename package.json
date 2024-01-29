@@ -774,6 +774,17 @@
                 }
             }
         ],
+        "resourceLabelFormatters": [
+            {
+              "scheme": "trs",
+              "formatting": {
+                "label": "${path}",
+                "stripPathStartingSeparator": true,
+                "tildify": true,
+                "separator": "/",
+                "workspaceSuffix": "SUFFIX-APPENDED-TO-WORKSPACE-LABEL"
+              }
+            }],
         "menus": {
             "commandPalette": [
                 {
