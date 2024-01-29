@@ -243,7 +243,7 @@ export class AutoToolsCheckTaskProvider implements MyTaskProvider {
     changeConfiguration(c: configuration.MakefileConfiguration, disposables: vscode.Disposable[]) {
         var targets : Task[] = [];
         let e = make.supportsTestEnvironments() ? configuration.getTestEnvironments() : [];
-        var checkExecOptions = configuration.getCurrentTestEnvironment().checkExecOptions;
+        var cte = configuration.getCurrentTestEnvironment();
         configuration.getAllBuildTargets().forEach((goals, dir) => {
             const kind: CheckTask = {
                 type: this.myType,
@@ -265,7 +265,7 @@ export class AutoToolsCheckTaskProvider implements MyTaskProvider {
                         .concat(["-Resi",
                             "me-check",
                             "--eval=include Mergesium.rules"]),
-                        checkExecOptions));
+                        env.checkExecOptions));
                     newTask.group = TaskGroup.Test;
                     newTask.detail = localize("automake.check", "$(checklist) Test Suite");
                     newTask.presentationOptions = defaultCheckPresentation;
@@ -280,8 +280,8 @@ export class AutoToolsCheckTaskProvider implements MyTaskProvider {
                         .concat(dir ? ['-C', dir] : [])
                         .concat(c.makeArgs || [])
                         .concat(["-Resi",
-                            g.goal || "test-suite.log"]),
-                        checkExecOptions));
+                            cte.testDebugEnv!.TEST_SUITE_LOG]),
+                        cte.testDebugEnv));
                 g.livetask.group = TaskGroup.Test;
                 g.livetask.presentationOptions = defaultCheckPresentation;
                 g.livetask.detail = localize("automake.livecheck", "$(checklist) $(broadcast) Test Suite Update");

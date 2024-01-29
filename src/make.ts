@@ -24,6 +24,7 @@ import * as util from './util';
 import * as vscode from 'vscode';
 import * as ui from './ui';
 import { quote } from '@mergesium/shell-quote';
+// import { updateTree } from './tree';
 
 import * as nls from 'vscode-nls';
 nls.config({ messageFormat: nls.MessageFormat.bundle, bundleFormat: nls.BundleFormat.standalone })();
@@ -918,6 +919,7 @@ export enum TRS {
 export interface TestResult {
     results: Map<number, TRS>;
     global: TRS;
+    untagged?: TRS | undefined; // No environment tag
 };
 
 export const TRS_Info: { [key: number]: vscode.FileDecoration } = {
@@ -978,7 +980,7 @@ export function readTRS(b: BuildTarget, c: MakefileConfiguration) : TestResult
                     if(te.some(e => e.hashCode == envid && (!e.dirs || e.dirs.includes(b.builddir))))
                         testResult.results.set(envid, TRSLookup.get(result[1]) || TRS.NONE);
                 } else if (result.length == 2)
-                    testResult.results.set(0, TRSLookup.get(result[1]) || TRS.NONE);
+                    testResult.untagged = TRSLookup.get(result[1]);
             } else if (line.startsWith(':global-test-result:')) {
                 testResult.global = TRSLookup.get(line.split(' ', 2)[1]) || TRS.NONE;
             }

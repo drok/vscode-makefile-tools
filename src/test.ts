@@ -11,7 +11,7 @@ import { TestController,
         TestRun } from 'vscode';
 import { SSL_OP_DONT_INSERT_EMPTY_FRAGMENTS } from 'constants';
 import { makeFullPath } from './util';
-import { TRS_Info } from './make';
+import { TRS_Info, readTRS } from './make';
 import { extension,
         openEditor } from './extension';
 import { MakefileConfiguration } from './configuration';
@@ -77,43 +77,6 @@ function delTag(tag: vscode.TestTag, test: TestItem) : vscode.TestTag[] | undefi
     return undefined;
 }
 
-function readTRS(b: BuildTarget) : TRS
-{
-    let c = configuration.getCurrentMakefileConfiguration();
-
-    let trs = util.resolvePathToRoot(path.join(c.top_builddir, b.builddir, path.basename(b.goal, ".log") + ".trs"));
-    try {
-        const fileContent = fs.readFileSync(trs, 'utf8');
-        if (!fileContent)
-            return TRS.NONE;
-        const lines = fileContent.split('\n');
-
-        //let testResult = '';
-        let globalTestResult = '';
-
-        for (const line of lines) {
-            //if (line.startsWith(':test-result:')) {
-            //    testResult = line.split(':test-result:')[1].trim();
-            //} else
-            if (line.startsWith(':global-test-result:')) {
-                globalTestResult = line.split(' ')[1];
-            }
-        }
-        switch (/*testResult || */globalTestResult) {
-            case "XPASS": return TRS.XPASS;
-            case "PASS": return TRS.PASS;
-            case "SKIP": return TRS.SKIP;
-            case "ERROR": return TRS.ERROR;
-            case "FAIL": return TRS.FAIL;
-            case "XFAIL": return TRS.XFAIL;
-            default: return TRS.ERROR;
-        }
-    }
-    catch (e) {
-        return TRS.NONE; // File does not exist
-    }
-}
-
 export class MyTestController {
   private root: TestItem | undefined;
   private readonly controller: vscode.TestController;
@@ -122,57 +85,53 @@ export class MyTestController {
   private coverageProfile: vscode.TestRunProfile | undefined;
   private testGoals = new WeakMap<vscode.TestItem, Goal>();
   private testCompletedEvent: EventEmitter<void> = new EventEmitter<void>();
-  private activeRuns = new WeakMap<vscode.TestItem, Map<vscode.TaskExecution,TestRun>>();
 
-  public testCompleted(task: vscode.TaskExecution, test: TestItem, target: BuildTarget) : void {
-    let runs = this.activeRuns.get(test);
-    if (runs) {
-        var run = runs.get(task);
-        if (run) this.updateGoalTRS(run, test, readTRS(target));
+  public testCompleted(task: vscode.TaskExecution, goal: Goal, target: BuildTarget) : void {
+    let test : TestItem = goal.test!;
+    if (this.activeRun) {
+        goal.trs = readTRS(target, configuration.getCurrentMakefileConfiguration());
+        this.updateGoalTRS(this.activeRun.run, test, goal.trs?.global, target.builddir);
     }
+    this.updateTestDescription(goal, target.builddir);
 
     this.isBusy = false;
     // extension.autotoolsDoneNoResult();
     this.testCompletedEvent.fire();
   }
-  public suiteCompleted(task: vscode.TaskExecution) : void {
+  public suiteCompleted(task: vscode.TaskExecution, goal: Goal, dir: string) : void {
     // extension.autotoolsDoneNoResult();
+    // FIXME: also updateTestDescriptions of children
+    let c = configuration.getCurrentMakefileConfiguration();
+    if (this.activeRun)
+        for (const d of goal.depends!) {
+            let bd : BuildTarget = new BuildTarget(dir, d.goal!);
+            d.trs = readTRS(bd, c);
+            this.updateGoalTRS(this.activeRun.run, d.test!, goal.trs?.global, dir);
+        }
+
     this.isBusy = false;
     this.testCompletedEvent.fire();
   }
 
   public run(test: TestItem, env: TestEnvironment) : void {
-    const runs = this.activeRuns.get(test);
-    if (!runs) {
-        // do nothing if a run is waiting for this
-        var cancelToken = new vscode.CancellationTokenSource();
-        env.run?.runHandler(new vscode.TestRunRequest([test], [], env.run), cancelToken.token);
-        cancelToken.dispose();
-    }
+    var cancelToken = new vscode.CancellationTokenSource();
+    env.run?.runHandler(new vscode.TestRunRequest([test], [], env.run), cancelToken.token);
+    cancelToken.dispose();
   }
   public async liverun(test: TestItem, env: TestEnvironment) : Promise<void> {
-    const runs = this.activeRuns.get(test);
-    if (!runs) {
-        // do nothing if a run is waiting for this
-        var cancelToken = new vscode.CancellationTokenSource();
-        this.runHandler(true, new vscode.TestRunRequest([test], [], env.run), cancelToken.token, env);
-        cancelToken.dispose();
-    }
+    var cancelToken = new vscode.CancellationTokenSource();
+    this.runHandler(true, new vscode.TestRunRequest([test], [], env.run), cancelToken.token, env);
+    cancelToken.dispose();
   }
 
   public async debug(test: TestItem, env: TestEnvironment) : Promise<void> {
-    const runs = this.activeRuns.get(test);
-    if (!runs) {
-        // do nothing if a run is waiting for this
-        var cancelToken = new vscode.CancellationTokenSource();
-        try {
-            env.debug?.runHandler(new vscode.TestRunRequest([test], [], env.run), cancelToken.token);
-        } catch (e) {
-            console.error("Failed to start debugger", test);
-        }
-        cancelToken.dispose();
-
+    var cancelToken = new vscode.CancellationTokenSource();
+    try {
+        env.debug?.runHandler(new vscode.TestRunRequest([test], [], env.run), cancelToken.token);
+    } catch (e) {
+        console.error("Failed to start debugger", test);
     }
+    cancelToken.dispose();
   }
   public addSuite(c: MakefileConfiguration, dir: string, sub: Goal) : void {
     sub.test =  this.controller.createTestItem(
@@ -181,6 +140,14 @@ export class MyTestController {
             ));
     this.testGoals.set(sub.test, sub);
     sub.test.tags = tags_none;
+  }
+  updateTestDescription(goal: Goal, dir: string) : void {
+    if (supportsTestEnvironments()) {
+        let envs = configuration.getTestEnvironments();
+        let num_applicable_envs = envs.filter((env) => !env.dirs || env.dirs.includes(dir)).length;
+        if (num_applicable_envs)
+            goal.test!.description = localize("autotools.test.desc", "{0}/{1} environments tested", goal.trs?.results.size ?? 0, num_applicable_envs);
+    }
   }
   public addTest(c: MakefileConfiguration, logpath: string, suite: TestItem, goal: Goal) : void {
 //    var testName : string = goal.task instanceof vscode.Task ? goal.task.name :
@@ -195,13 +162,7 @@ export class MyTestController {
     else
         goal.test.tags = tags_none;
 
-    if (supportsTestEnvironments()) {
-        let envs = configuration.getTestEnvironments();
-        let num_applicable_envs = envs.filter((env) => !env.dirs || env.dirs.includes(logpath)).length;
-        if (num_applicable_envs)
-            goal.test.description = localize("autotools.test.desc", "{0}/{1} environments tested", goal.trs?.results.size ?? 0, num_applicable_envs);
-    }
-
+    this.updateTestDescription(goal, logpath);
     suite.children.add(goal.test);
   }
   public addSubTest(suite: TestItem, sub: TestItem) : void {
@@ -219,24 +180,23 @@ export class MyTestController {
                 "Autotools TRS on " + env.run?.label,
             false
         );
-        this.updateTRS(run, suite);
+        this.updateTRS(run, suite, suite.id);
         run.end();
       // this.activate();
   }
-  public trsChange(test: TestItem) : void {
-    const runs = this.activeRuns.get(test);
-    if (!runs) {
+  public trsChange(test: TestItem, dir: string) : void {
+    if (!this.activeRun) {
         // do nothing if a run is waiting for this
         var env = configuration.getCurrentTestEnvironment();
         let run = this.controller.createTestRun(
                 new vscode.TestRunRequest([test], [], env.run),
                 "Manual run",
                 false);
-        this.updateTRS(run, test);
+        this.updateTRS(run, test, dir);
         run.end();
     }
   }
-  updateGoalTRS(run: TestRun, test: TestItem, trs: TRS | undefined) : void {
+  updateGoalTRS(run: TestRun, test: TestItem, trs: TRS | undefined, dir: string) : void {
     switch(trs) {
         case TRS.NONE: break;
         case TRS.ERROR: run.errored(test, new vscode.TestMessage("See log file")); break;
@@ -246,12 +206,15 @@ export class MyTestController {
         default: run.failed(test, new vscode.TestMessage(TRS_Info[TRS.FAIL].tooltip || "unk")); break;
     }
   }
-  updateTRS(run: TestRun, test: TestItem) : void {
+  updateTRS(run: TestRun, test: TestItem, dir: string) : void {
     let goal = this.testGoals.get(test);
-    if (goal && !(goal.flags & Goal.Flags.Test_Suite))
-        this.updateGoalTRS(run, test, goal.trs?.global);
-    else for(const [id, item]  of test.children)
-        this.updateTRS(run, item);
+    if (goal && !(goal.flags & Goal.Flags.Test_Suite)) {
+        this.updateGoalTRS(run, test, goal.trs?.global, dir);
+        this.updateTestDescription(goal, dir);
+    } else for(const [id, item]  of test.children) {
+        this.updateTRS(run, item, dir);
+        this.updateTestDescription(this.testGoals.get(item)!, dir);
+    }
   }
 
   constructor(public id: string, public label: string, public livecheckid: string | undefined) {
@@ -264,11 +227,11 @@ export class MyTestController {
     this.root = item;
   }
 
-  public onSavedAll() : void {
+  public async onSavedAll() : Promise<void> {
     if (this.livecheckid) {
         var test = this.controller.items.get(this.livecheckid);
         if (test) {
-            this.liverun(test, configuration.getCurrentTestEnvironment());
+            await this.liverun(test, configuration.getCurrentTestEnvironment());
         }
     }
   }
@@ -403,8 +366,8 @@ export class MyTestController {
   }
 
 
-  private runQueue : Map<RunDef, vscode.TestItem[]> =
-    new Map<RunDef, vscode.TestItem[]>();
+  private runQueue : Map<RunDef, Goal[]> =
+    new Map<RunDef, Goal[]>();
 
 
 
@@ -428,19 +391,29 @@ export class MyTestController {
         // Loop through all included tests, or all known tests, and add them to our queue
         let rundef : RunDef = {run: run, cancel: token, tmp_label: request.profile?.label, env: env, live: live};
         if (request.include) {
-            let runnable_in_env : vscode.TestItem[] = [];
+            let runnable_in_env : Goal[] = [];
             for (const t of request.include) {
                 // run.enqueued(t);
-                if (!live && (!env.dirs || (t.uri && env.dirs.includes(path.basename(t.uri.path))))) {
+                if (!env.dirs || (t.uri && env.dirs.includes(path.basename(t.uri.path)))) {
                     let goal = this.testGoals.get(t);
-                    if (goal) this.markSuiteEnqueued(run, goal, env);
-                    runnable_in_env.push(t);
+                    if (goal) {
+                        this.markSuiteEnqueued(run, goal, env);
+                        runnable_in_env.push(goal);
+                    }
                 }
             }
             this.runQueue.set(rundef, runnable_in_env);
         } else {
-            let top_check = configuration.getAllBuildTargets().get('')?.get('check')?.test;
-            if (top_check) this.runQueue.set(rundef, [top_check]);
+            let runnable : Goal[] = [];
+            let rr = configuration.getAllBuildTargets().forEach((v,dir) => {
+                if (!env.dirs || env.dirs.includes(dir))
+                    v.forEach((goal,name) => {
+                        if (goal.depends && (goal.flags & Goal.Flags.Test_Suite)) {
+                            runnable.push(goal);
+                        }
+                })
+            });
+            this.runQueue.set(rundef, runnable);
         }
 
         this.runQueuedTests();
@@ -470,8 +443,8 @@ export class MyTestController {
     private queueRunner: vscode.Disposable | undefined;
     private runningTask: vscode.Task | undefined;
     private activeRun : RunDef | undefined;
-    private activeQueue : vscode.TestItem[] = [];
-    private activeTest: vscode.TestItem | undefined;
+    private activeQueue : Goal[] = [];
+    private activeGoal: Goal | undefined;
     runQueuedTests() : void {
         if (!this.queueRunner) {
             this.queueRunner = this.testCompletedEvent.event(async e => {
@@ -486,7 +459,7 @@ export class MyTestController {
     async advanceQueue() : Promise<void> {
         if (this.activeRun) {
             do {
-                if (this.activeTest) {
+                if (this.activeGoal) {
                     //this.activeQueue = this.activeRun.cancel.isCancellationRequested ?
                         //this.activeQueue.filter(def => def != this.activeTest) : [];
                     if (!this.activeQueue.length) { // end of queued tests for this run
@@ -495,7 +468,7 @@ export class MyTestController {
                         this.activeRun.run.end();
                         extension.updateAllGrids();
                         this.activeRun = undefined;
-                        this.activeTest = undefined;
+                        this.activeGoal = undefined;
 
                         this.startNextRun();
                     }
@@ -506,7 +479,7 @@ export class MyTestController {
                     break;
                 } else
                     await this.startNextTest();
-            } while (this.activeRun && !this.activeTest);
+            } while (this.activeRun && !this.activeGoal);
         }
     }
     startNextRun() : void {
@@ -516,20 +489,24 @@ export class MyTestController {
     }
     async startNextTest() : Promise<void> {
         if (this.activeRun) {
-            this.activeTest = this.activeQueue.pop();
-            if (this.activeTest) {
-                let goal = this.testGoals.get(this.activeTest);
+            this.activeGoal = this.activeQueue.pop();
+            if (this.activeGoal) {
+                // let goal = this.testGoals.get(this.activeTest);
 
-                if (goal?.task instanceof Map) {
+                if (this.activeGoal?.task instanceof Map) {
                     this.runningTask = this.activeRun.live ?
-                        goal.livetask :
-                        goal.task.get(this.activeRun.env)
+                        this.activeGoal.livetask :
+                        this.activeGoal.task.get(this.activeRun.env)
                     assert(this.runningTask, "There must be a task for the env");
-                    if (this.runningTask) {
-                        this.activeRun.run.started(this.activeTest)
+                    if (this.runningTask && this.activeGoal.test) {
+                        this.activeRun.run.started(this.activeGoal.test)
                         await extension.waitToTouchMakefiles();
                         vscode.tasks.executeTask(this.runningTask)
-                            .then(e => (this.isBusy = true));
+                            .then(e => (this.isBusy = true),
+                            (r) =>
+                            false);
+                    } else { // `make check` from the top
+                        this.activeGoal = undefined;
                     }
                 } else
                     this.runningTask = undefined;

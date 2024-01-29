@@ -547,12 +547,12 @@ function updateEnvironmentsForCurrentMakefile(): void {
             env.SUBDIRS = "";
             // Suppress bash's error message "/bin/bash: line 74: /tmp/tmp-suite-log.tmp: Permission denied" to stderr
             env.am__sh_e_setup = 'set +e; exec 2> /dev/null';
-            env.LOG_DRIVER_FLAGS = `--env-name "${(e.hashCode).toString(36)}"`;
+            env.LOG_DRIVER_FLAGS = `--env-name "${e.name}" --env-id "${(e.hashCode).toString(36)}"`;
         }
         env = e.checkExecOptions?.env;
         if (env) {
             env.SUBDIRS = "";
-            env.LOG_DRIVER_FLAGS = `--env-name "${(e.hashCode).toString(36)}"`;
+            env.LOG_DRIVER_FLAGS = `--env-name "${e.name}" --env-id "${(e.hashCode).toString(36)}"`;
         }
     });
    

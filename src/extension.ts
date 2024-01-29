@@ -269,7 +269,7 @@ export class Extension {
                 this.updateOutlineBadge();
             }
             if ( goal.test && goal.trs.global != old_global && !(goal.flags & Goal.Flags.Test_Suite))
-                this.testController?.trsChange(goal.test);
+                this.testController?.trsChange(goal.test, dir);
 
         }
     }
@@ -292,7 +292,7 @@ export class Extension {
                     if (suite) {
                         let goal = suite.depends?.find((d) => d.goal === definition.test?.goal);
                         if (goal) {
-                            definition.test && goal.test && this.testController?.testCompleted(e.execution, goal.test, definition.test);
+                            definition.test && goal.test && this.testController!.testCompleted(e.execution, goal, definition.test);
                         }
                     }
                     this.autotoolsDoneNoResult();
@@ -301,7 +301,7 @@ export class Extension {
                         ?.get(definition.builddir)
                         ?.get('test-suite.log');
                     if (suite && suite.test) {
-                        this.testController?.suiteCompleted(e.execution);
+                        this.testController?.suiteCompleted(e.execution, suite, definition.builddir);
                     }
                     this.autotoolsDoneNoResult();
                 } else if (definition.type == "autotools") {
@@ -968,11 +968,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         await vscode.commands.executeCommand("workbench.files.action.showActiveFileInExplorer");
     }
 
-    context.subscriptions.push(vscode.workspace.onDidSaveTextDocument((f) => {
+    context.subscriptions.push(vscode.workspace.onDidSaveTextDocument(async (f) => {
         if (extension.testController && f.uri.scheme === "file" &&
             !ignoredSaveFiles.has(path.basename(f.uri.fsPath))) {
-            vscode.workspace.textDocuments.find((d) => d.isDirty) ||
-            extension.testController?.onSavedAll();
+            if (!vscode.workspace.textDocuments.some((d) => d.isDirty))
+                await extension.testController?.onSavedAll();
         }
     }));
 
