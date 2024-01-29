@@ -10,7 +10,7 @@ import { live } from './test';
 
 import * as nls from 'vscode-nls';
 import { PassThrough } from 'stream';
-import { BuildTarget, TRS, TRS_Info } from './make';
+import { BuildTarget, TRS, TRS_Info, TRSLookup } from './make';
 import { makeFullPath } from './util';
 nls.config({ messageFormat: nls.MessageFormat.bundle, bundleFormat: nls.BundleFormat.standalone })();
 const localize: nls.LocalizeFunc = nls.loadMessageBundle();
@@ -60,7 +60,7 @@ export class SuiteDecorations implements vscode.FileDecorationProvider {
         }
         if (!test)
             return {}; // This will log an error in ExtensionHost about invalid/empty deco
-        return TRS_Info[test.trs?.current ?? TRS.NONE];
+        return TRS_Info[test.trs?.results.get(configuration.getCurrentTestEnvironment().hashCode) ?? TRS.NONE];
 	}
 
 }

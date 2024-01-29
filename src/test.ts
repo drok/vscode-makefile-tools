@@ -197,8 +197,9 @@ export class MyTestController {
 
     if (supportsTestEnvironments()) {
         let envs = configuration.getTestEnvironments();
-        if (envs.length)
-            goal.test.description = localize("autotools.test.desc", "{0}/{1} environments tested", goal.trs?.num, envs.length);
+        let num_applicable_envs = envs.filter((env) => !env.dirs || env.dirs.includes(logpath)).length;
+        if (num_applicable_envs)
+            goal.test.description = localize("autotools.test.desc", "{0}/{1} environments tested", goal.trs?.results.size ?? 0, num_applicable_envs);
     }
 
     suite.children.add(goal.test);
@@ -427,14 +428,16 @@ export class MyTestController {
         // Loop through all included tests, or all known tests, and add them to our queue
         let rundef : RunDef = {run: run, cancel: token, tmp_label: request.profile?.label, env: env, live: live};
         if (request.include) {
+            let runnable_in_env : vscode.TestItem[] = [];
             for (const t of request.include) {
                 // run.enqueued(t);
-                if (!live) {
+                if (!live && (!env.dirs || (t.uri && env.dirs.includes(path.basename(t.uri.path))))) {
                     let goal = this.testGoals.get(t);
                     if (goal) this.markSuiteEnqueued(run, goal, env);
+                    runnable_in_env.push(t);
                 }
             }
-            this.runQueue.set(rundef, [...request.include]);
+            this.runQueue.set(rundef, runnable_in_env);
         } else {
             let top_check = configuration.getAllBuildTargets().get('')?.get('check')?.test;
             if (top_check) this.runQueue.set(rundef, [top_check]);

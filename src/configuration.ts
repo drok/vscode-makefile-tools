@@ -15,6 +15,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as multiStep from './multiStepInput';
 import { openSettings } from './extension';
+import { createHash } from 'crypto';
 import * as fs from 'fs';
 
 import * as nls from 'vscode-nls';
@@ -73,8 +74,15 @@ export interface TestEnvironment {
     // A name associated with this environment
     name: string;
 
+    // Directories where applicable
+    dirs?: string[];
+
     // A set of environment variables
     TESTS_ENVIRONMENT?: EnvironmentSetting[];
+
+    // Hash of the TESTS_ENVIRONMENT var as included in testExecOptions
+    // This includes the global TESTS_ENVIRONMENT
+    hashCode: number;
 
     // List of tests expected to fail
     XFAIL_TESTS?: string[];
@@ -486,13 +494,18 @@ export async function readTestEnvironments(): Promise<void> {
         }
         // element.testExecOptions = processExecutionOptions(element);
         // element.checkExecOptions = processExecutionOptions(element);
-        testEnvironments.push({
+        let e: TestEnvironment = {
             name: element.name,
             /* Need separate ExecOptions for test and check commands because test run with SUBDIRS env in updateEnvironmentsForCurrentMakefile() */
             testExecOptions: processExecutionOptions(element),
             checkExecOptions: processExecutionOptions(element),
             testDebugEnv: processDebugEnvironment(element),
-            XFAIL_TESTS: element.XFAIL_TESTS ? [...global_XFAIL_TESTS,...element.XFAIL_TESTS??[]] : global_XFAIL_TESTS});
+            hashCode: 0,
+            XFAIL_TESTS: element.XFAIL_TESTS ? [...global_XFAIL_TESTS,...element.XFAIL_TESTS??[]] : global_XFAIL_TESTS};
+            if (element.dirs)
+                e.dirs = element.dirs;
+            e.hashCode = envHash(e.testExecOptions?.env?.TESTS_ENVIRONMENT ?? '')
+            testEnvironments.push(e);
     });
 
     // Log the updated list of configuration names
@@ -502,7 +515,7 @@ export async function readTestEnvironments(): Promise<void> {
     if (testEnvironmentNames.length > 0) {
         logger.message("Defined autotools.test_environments: " + testEnvironmentNames.join(";"), "Verbose");
     } else {
-        testEnvironments = [ { name: "Default", "TESTS_ENVIRONMENT": [] } ];
+        testEnvironments = [ { name: "Default", "TESTS_ENVIRONMENT": [], hashCode: envHash('') } ];
     }
     extension.setTestEnvironment();
 }
@@ -534,12 +547,12 @@ function updateEnvironmentsForCurrentMakefile(): void {
             env.SUBDIRS = "";
             // Suppress bash's error message "/bin/bash: line 74: /tmp/tmp-suite-log.tmp: Permission denied" to stderr
             env.am__sh_e_setup = 'set +e; exec 2> /dev/null';
-            env.LOG_DRIVER_FLAGS = `--env-name "${e.name}"`;
+            env.LOG_DRIVER_FLAGS = `--env-name "${(e.hashCode).toString(36)}"`;
         }
         env = e.checkExecOptions?.env;
         if (env) {
             env.SUBDIRS = "";
-            env.LOG_DRIVER_FLAGS = `--env-name "${e.name}"`;
+            env.LOG_DRIVER_FLAGS = `--env-name "${(e.hashCode).toString(36)}"`;
         }
     });
    
@@ -583,7 +596,7 @@ export function getCurrentTestEnvironment() : TestEnvironment {
     return testEnvironments[0];
 }
 
-let testEnvironment : TestEnvironment = { name: "Default", TESTS_ENVIRONMENT: [] };
+let testEnvironment : TestEnvironment = { name: "Default", TESTS_ENVIRONMENT: [], hashCode: envHash('') };
 
 export async function readProjectTestEnvironment(): Promise<void> {
     let workspaceConfiguration: vscode.WorkspaceConfiguration = vscode.workspace.getConfiguration("autotools");
@@ -960,6 +973,9 @@ export async function setNewConfiguration(): Promise<void> {
     }
 }
 
+function envHash(e: string) : number {
+    return parseInt(createHash('md5').update(e).digest('hex').slice(0,13), 16);
+}
 // List of targets defined in the makefile project.
 // Parsed from the build log, configuration cache or live dry-run output at configure time.
 // Currently, this list contains any abstract intermediate target

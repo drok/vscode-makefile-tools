@@ -485,6 +485,13 @@
                             "description": "%autotools.configuration.test_environments.name.description%",
                             "examples": ["legacy", "modern", "future"]
                           },
+                          "dirs" : {
+                            "type": "array",
+                            "default": [],
+                            "description": "%autotools.configuration.test_environments.dirs.markdownDescription%",
+                            "items": { "type": "string" },
+                            "minItems": 1
+                          },
                           "TESTS_ENVIRONMENT" : {
                             "type": "array",
                             "default": [],

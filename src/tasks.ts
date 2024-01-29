@@ -190,10 +190,11 @@ export class AutoToolsTestTaskProvider implements MyTaskProvider {
                             });
 
                             /* Read existing TRS file to show correct last known status in the outline */
-                            d.trs = readTRS(test, cte, c);
-                            this.numFails += (d.trs.current == TRS.FAIL ? 1 : 0);
-                            this.numUnknown += ((d.trs.current == TRS.NONE || d.trs.current == TRS.ERROR) ? 1 : 0);
-                            this.numSuspect += (isSuspect(d.trs.current) ? 1 : 0);
+                            d.trs = readTRS(test, c);
+                            let current : TRS = d.trs.results.get(cte.hashCode) ?? TRS.NONE;
+                            this.numFails += (current == TRS.FAIL ? 1 : 0);
+                            this.numUnknown += ((current == TRS.NONE || current == TRS.ERROR) ? 1 : 0);
+                            this.numSuspect += (isSuspect(current) ? 1 : 0);
                             this.numTests++;
 
                             // tc.addTest(suite, d, trs);
@@ -248,6 +249,7 @@ export class AutoToolsCheckTaskProvider implements MyTaskProvider {
                 type: this.myType,
                 builddir: dir
             };
+            if (!env.dirs || env.dirs.includes(dir))
             for (let g of goals.values()) {
                 if (g.flags & (Goal.Flags.Test_Suite)) {
                 var newMap : Map<TestEnvironment, vscode.Task> = new Map();

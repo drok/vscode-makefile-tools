@@ -10,6 +10,7 @@ import * as fs from 'fs';
 import * as logger from './logger';
 import * as util from './util';
 import * as make from './make';
+import { TRS } from './make';
 import * as toolParser from './parser/tool';
 import * as gnumake from './parser/gnumake';
 import { Goal } from './parser/gnumake';
@@ -254,18 +255,20 @@ export class Extension {
             ?.depends?.find((d) => d.goal === log);
 
         if (goal) {
-            let old = goal.trs;
-            goal.trs = make.readTRS(new make.BuildTarget(dir, log), env, c);
-            if (goal.trs.current != old?.current) {
+            let old = goal.trs?.results.get(env.hashCode) ?? TRS.NONE;
+            let old_global = goal.trs?.global ?? TRS.NONE;
+            goal.trs = make.readTRS(new make.BuildTarget(dir, log), c);
+            let current : TRS = goal.trs.results.get(env.hashCode) ?? TRS.NONE;
+            if (current != old) {
                 this.suiteDecorator.update(vscode.Uri.from(
                     {authority: Extension.whoami, scheme: 'test', path: '/' + dir, query: log}));
                 this.suiteDecorator.update(vscode.Uri.from(
                     {authority: Extension.whoami, scheme: 'check', path: '/' + dir, query: 'test-suite.log'}));
-                this.failStatUpdate(old?.current || make.TRS.NONE, goal.trs.current);
+                this.failStatUpdate(old, current);
                 // Don't update the test suites. They are auto summarized
                 this.updateOutlineBadge();
             }
-            if ( goal.test && goal.trs.global != old?.global && !(goal.flags & Goal.Flags.Test_Suite))
+            if ( goal.test && goal.trs.global != old_global && !(goal.flags & Goal.Flags.Test_Suite))
                 this.testController?.trsChange(goal.test);
 
         }

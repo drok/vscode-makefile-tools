@@ -918,12 +918,8 @@ export enum TRS {
     XFAIL = 6
 }
 export interface TestResult {
-    // :global-test-result: outcome
+    results: Map<number, TRS>;
     global: TRS;
-    // :test-result: outcome
-    current: TRS;
-    // number of test-results found (one per environment)
-    num: number;
 };
 
 export const TRS_Info: { [key: number]: vscode.FileDecoration } = {
@@ -937,12 +933,22 @@ export const TRS_Info: { [key: number]: vscode.FileDecoration } = {
     [7]: { tooltip: 'THROW',   badge: '⁉️' },
   };
 
+export const TRSLookup : Map<string,TRS> = new Map([
+    ["PASS", TRS.PASS],
+    ["SKIP", TRS.SKIP],
+    ["FAIL", TRS.FAIL],
+    ["XFAIL", TRS.XFAIL],
+    ["XPASS", TRS.XPASS],
+    ["ERROR", TRS.ERROR],
+    ["NONE", TRS.NONE],
+]);
+
 export function isSuspect(trs: TRS) : boolean
 {
     return trs === TRS.ERROR || trs === TRS.XFAIL || trs === TRS.XPASS;
 }
 
-const noTRS : TestResult = { global: TRS.NONE, current: TRS.NONE, num: 0 };
+const noTRS : TestResult = { global: TRS.NONE, results: new Map<number, TRS>() };
 /**
  * Read the test result for a the specified TestEnvironemnt from a TRS file.
  * Compatibility with manually run tests (make check from the commandline),
@@ -955,53 +961,29 @@ const noTRS : TestResult = { global: TRS.NONE, current: TRS.NONE, num: 0 };
  * @param c Current build configuration.
  * @returns a {@linkcode make.TRS TRS enum value}
  */
-export function readTRS(b: BuildTarget, env: TestEnvironment, c: MakefileConfiguration) : TestResult
+export function readTRS(b: BuildTarget, c: MakefileConfiguration) : TestResult
 {
+    let te = configuration.getTestEnvironments();
     let trs = util.resolvePathToRoot(path.join(c.top_builddir, b.builddir, path.basename(b.goal, ".log") + ".trs"));
-    let hasEnv : boolean = !!env.checkExecOptions?.env?.TESTS_ENVIRONMENT.length;
-    let testResult : TestResult = { global: TRS.NONE, current: TRS.NONE, num: 0 };
+    let testResult: TestResult = { global: TRS.NONE, results: new Map<number, TRS>() };
     try {
         const fileContent = fs.readFileSync(trs, 'utf8');
         if (!fileContent)
             return noTRS;
         const lines = fileContent.split('\n');
 
-        let localResult : string = "-";
-        let globalResult : string = "NONE";
-
         for (const line of lines) {
             if (line.startsWith(':test-result:')) {
                 const result = line.split(' ', 4);
-                if (result[2] == env.name) {
-                    localResult = result[1];
-                } else if (!hasEnv && result.length == 2 && localResult == "-") {
-                    localResult = result[1];
-                }
-                testResult.num++;
+                if (result.length >= 3) {
+                    let envid = parseInt(result[2],36);
+                    if(te.some(e => e.hashCode == envid && (!e.dirs || e.dirs.includes(b.builddir))))
+                        testResult.results.set(envid, TRSLookup.get(result[1]) || TRS.NONE);
+                } else if (result.length == 2)
+                    testResult.results.set(0, TRSLookup.get(result[1]) || TRS.NONE);
             } else if (line.startsWith(':global-test-result:')) {
-                globalResult = line.split(' ', 2)[1];
+                testResult.global = TRSLookup.get(line.split(' ', 2)[1]) || TRS.NONE;
             }
-        }
-        switch (localResult) {
-            case "XPASS": testResult.current = TRS.XPASS; break;
-            case "PASS":  testResult.current = TRS.PASS; break;
-            case "SKIP":  testResult.current = TRS.SKIP; break;
-            case "ERROR": testResult.current = TRS.ERROR; break;
-            case "FAIL":  testResult.current = TRS.FAIL; break;
-            case "XFAIL": testResult.current = TRS.XFAIL; break;
-            case "NONE":  testResult.current = TRS.NONE; break;
-            case "-":     testResult.current = TRS.NONE; break;
-            default:      testResult.current = TRS.ERROR; break;
-        }
-        switch (globalResult) {
-            case "XPASS": testResult.global = TRS.XPASS; break;
-            case "PASS":  testResult.global = TRS.PASS; break;
-            case "SKIP":  testResult.global = TRS.SKIP; break;
-            case "ERROR": testResult.global = TRS.ERROR; break;
-            case "FAIL":  testResult.global = TRS.FAIL; break;
-            case "XFAIL": testResult.global = TRS.XFAIL; break;
-            case "NONE":  testResult.global = TRS.NONE; break;
-            default:      testResult.global = TRS.ERROR; break;
         }
     }
     catch (e) {
