@@ -24,7 +24,6 @@ import * as util from './util';
 import * as vscode from 'vscode';
 import * as ui from './ui';
 import { quote } from '@mergesium/shell-quote';
-import * as os from 'os';
 // import { updateTree } from './tree';
 
 import * as nls from 'vscode-nls';
