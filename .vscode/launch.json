@@ -32,6 +32,75 @@
             ]
         },
         {
+            "name": "Make Mergesium.rules empty me-check-recursive rule",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/make/make",
+            "args": [
+                    "V=1",
+                    "-C", "/home/radu/proj/lasso/build/Xenial",
+                    "-Resi",
+                    "me-check",
+                    "LOG_DRIVER=/home/radu/.vscode-server/extensions/autotools/bin/test-driver",
+                    "LOG_DRIVER_FLAGS=--env-name legacy",
+                    "--print-directory",
+                    "-I", "/home/radu/.vscode-server/extensions/autotools/include",
+                    "--eval", "include Mergesium.rules",
+                    "am__extra_recursive_targets=ne-check-recursive",
+                    "-db",
+                    "--trace"
+            ],
+            "stopAtEntry": false,
+            "cwd": "/home/radu/proj/lasso/build/Xenial",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Set Disassembly Flavor to Intel",
+                    "text": "-gdb-set disassembly-flavor intel",
+                    "ignoreFailures": true
+                }
+            ]
+        },
+        {
+            "name": "Make lasso incremental tests",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/make/make",
+            "args": [
+                    "-j1",
+                    "-r",
+                    "--trace",
+                    "--dry-run",
+                    "--silent",
+                    "--assume-new=tests.c",
+                    "test-suite.log"
+            ],
+            "stopAtEntry": true,
+            "cwd": "/home/radu/proj/lasso/build/Default/tests",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Set Disassembly Flavor to Intel",
+                    "text": "-gdb-set disassembly-flavor intel",
+                    "ignoreFailures": true
+                }
+            ]
+        },
+        {
             "name": "Launch Tests",
             "type": "extensionHost",
             "request": "launch",
