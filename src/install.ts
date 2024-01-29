@@ -27,6 +27,7 @@ AC_CONFIG_HEADERS([config.h])
 #                a high-quality, portable build
 # dist-bzip2   = 'make dist' will produce a tar.bz2 source tarball
 # no-dist-gzip = don't distribute in the tar.gz format
+# See https://www.gnu.org/software/automake/manual/html_node/List-of-Automake-options.html
 AM_INIT_AUTOMAKE([1.13.2 -Wall -Werror foreign dist-bzip2 no-dist-gzip])
 
 # Find a C/C++ compiler, and define the CC variable.
