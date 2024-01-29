@@ -245,7 +245,7 @@ export class Extension {
         /* The test driver moves the trs to trs.tmp when generating a new one. Avoid test status updating to 'NONE'
          * while tests are running.
          */
-        if (this.testController?.busy)
+        if (this.testController?.busyNonLiveTest)
             return;
         let dir = path.relative(util.resolvePathToRoot(c.top_builddir), path.dirname(uri.path));
         let log = path.basename(uri.path, ".trs") + ".log";
@@ -269,7 +269,11 @@ export class Extension {
                 this.updateOutlineBadge();
             }
             if ( goal.test && goal.trs.global != old_global && !(goal.flags & Goal.Flags.Test_Suite))
-                this.testController?.trsChange(goal.test, dir);
+                /* If there is an active test run, use it to log the TRS result.
+                 * Otherwise, create a new manual run
+                 */
+                if (!this.testController?.markActiveTestTRS(goal, dir))
+                    this.testController?.trsChange(goal.test, dir);
 
         }
     }

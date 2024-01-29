@@ -102,11 +102,11 @@ export class MyTestController {
     // extension.autotoolsDoneNoResult();
     // FIXME: also updateTestDescriptions of children
     let c = configuration.getCurrentMakefileConfiguration();
-    if (this.activeRun)
+    if (this.busyNonLiveTest)
         for (const d of goal.depends!) {
             let bd : BuildTarget = new BuildTarget(dir, d.goal!);
             d.trs = readTRS(bd, c);
-            this.updateGoalTRS(this.activeRun.run, d.test!, goal.trs?.global, dir);
+            this.updateGoalTRS(this.activeRun!.run, d.test!, d.trs?.global, dir);
         }
 
     this.isBusy = false;
@@ -455,7 +455,7 @@ export class MyTestController {
         }
     }
     private isBusy : boolean = false;
-    public get busy() : boolean { return this.isBusy; }
+    public get busyNonLiveTest() : boolean { return this.isBusy && !this.activeRun?.live; }
     async advanceQueue() : Promise<void> {
         if (this.activeRun) {
             do {
@@ -523,5 +523,12 @@ export class MyTestController {
                 for (const sub of g.depends)
                     this.markSuiteEnqueued(run, sub, env);
         }
+    }
+    markActiveTestTRS(goal: Goal, dir: string) : boolean {
+        if (this.activeRun && goal.test) {
+            this.updateTRS(this.activeRun.run, goal.test, dir);
+            return true;
+        }
+        return false;
     }
 }

@@ -272,7 +272,7 @@ export class AutoToolsCheckTaskProvider implements MyTaskProvider {
                     newMap.set(env, newTask);
                     targets.push(newTask);
                 });
-                g.livetask = new Task(kind, TaskScope.Workspace, 'Update test suite ' + (dir ? ('log in ' + dir) : 'log at the top')  + (' @ ' + env.name),
+                g.livetask = new Task(kind, TaskScope.Workspace, 'Update test suite ' + (dir ? ('log in ' + dir) : 'log at the top')  + (' @ ' + cte.name),
                     "autotools",
                     new ProcessExecution(
                         configuration.getMakePath(),
@@ -280,8 +280,8 @@ export class AutoToolsCheckTaskProvider implements MyTaskProvider {
                         .concat(dir ? ['-C', dir] : [])
                         .concat(c.makeArgs || [])
                         .concat(["-Resi",
-                            cte.testDebugEnv!.TEST_SUITE_LOG]),
-                        cte.testDebugEnv));
+                            "test-suite.log"]),
+                        cte.testExecOptions));
                 g.livetask.group = TaskGroup.Test;
                 g.livetask.presentationOptions = defaultCheckPresentation;
                 g.livetask.detail = localize("automake.livecheck", "$(checklist) $(broadcast) Test Suite Update");
