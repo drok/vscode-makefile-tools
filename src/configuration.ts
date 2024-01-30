@@ -96,6 +96,7 @@ export interface TestEnvironment {
     // Environemnts for single tests and for check suites
     testExecOptions?: vscode.ProcessExecutionOptions;
     checkExecOptions?: vscode.ProcessExecutionOptions;
+    updateExecOptions?: vscode.ProcessExecutionOptions;
     testDebugEnv?: { [key: string]: string }
 }
 
@@ -505,6 +506,7 @@ export async function readTestEnvironments(): Promise<void> {
             /* Need separate ExecOptions for test and check commands because test run with SUBDIRS env in updateEnvironmentsForCurrentMakefile() */
             testExecOptions: processExecutionOptions(element),
             checkExecOptions: processExecutionOptions(element),
+            updateExecOptions: processExecutionOptions(element),
             testDebugEnv: processDebugEnvironment(element),
             hashCode: 0,
             XFAIL_TESTS: element.XFAIL_TESTS ? [...global_XFAIL_TESTS,...element.XFAIL_TESTS??[]] : global_XFAIL_TESTS};
@@ -556,6 +558,12 @@ function updateEnvironmentsForCurrentMakefile(): void {
         env = e.checkExecOptions?.env;
         if (env) {
             env.SUBDIRS = "";
+            env.LOG_DRIVER_FLAGS = `--env-name "${e.name}" --env-id "${(e.hashCode).toString(36)}" --env-keep "$$ME_KEEP_ENV"`;
+        }
+        env = e.updateExecOptions?.env;
+        if (env) {
+            env.SUBDIRS = "";
+            env.am__set_TESTS_bases = "exit 0"
             env.LOG_DRIVER_FLAGS = `--env-name "${e.name}" --env-id "${(e.hashCode).toString(36)}" --env-keep "$$ME_KEEP_ENV"`;
         }
     });

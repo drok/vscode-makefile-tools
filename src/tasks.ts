@@ -33,6 +33,7 @@ const presentSilent : vscode.TaskPresentationOptions = {
 const defaultCheckPresentation : vscode.TaskPresentationOptions = {
     reveal: vscode.TaskRevealKind.Always,
     panel: vscode.TaskPanelKind.Dedicated,
+    echo: false,
     showReuseMessage: false }
 
 
@@ -179,7 +180,7 @@ export class AutoToolsTestTaskProvider implements MyTaskProvider {
                                     (c.top_builddir ? ['-C', c.top_builddir] : [])
                                     .concat(dir ? ['-C', dir] : [])
                                     .concat(c.makeArgs || [])
-                                    .concat(["-Rei",
+                                    .concat(["-Resi",
                                         "me-check",
                                         `ME_KEEP_ENV=${ME_KEEP_ENV}`,
                                         "--eval=include Mergesium.rules",
@@ -291,9 +292,9 @@ export class AutoToolsCheckTaskProvider implements MyTaskProvider {
                         .concat(traceLiveTestRuns ? ["--trace", "--silent"] : [])
                         .concat(["-Resi",
                             "test-suite.log",
-                            `ME_KEEP_ENV=${ME_KEEP_ENV}`,
+                            `ME_KEEP_ENV=${ME_KEEP_ENV}`
                         ]),
-                        cte.testExecOptions));
+                        cte.updateExecOptions));
                 g.livetask.group = TaskGroup.Test;
                 g.livetask.presentationOptions = defaultCheckPresentation;
                 g.livetask.detail = localize("automake.livecheck", "$(checklist) $(broadcast) Test Suite Update");
