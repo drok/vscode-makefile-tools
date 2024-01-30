@@ -230,6 +230,7 @@ export class AutoToolsTestTaskProvider implements MyTaskProvider {
 export class AutoToolsCheckTaskProvider implements MyTaskProvider {
 	readonly myType = 'check';
 	private myPromise: Thenable<Task[]> | undefined = undefined;
+    private checkAllTask: Task | undefined;
 
     provideTasks(): Thenable<Task[]> | undefined {
 		return this.myPromise;
@@ -290,6 +291,26 @@ export class AutoToolsCheckTaskProvider implements MyTaskProvider {
                 targets.push(g.livetask);
 
             }}});
+        this.checkAllTask = new Task({
+                type: this.myType,
+                builddir: ''}, TaskScope.Workspace, 'Run user test suite (make check)',
+            "autotools",
+            new ProcessExecution(
+                configuration.getMakePath(),
+                (c.top_builddir ? ['-C', c.top_builddir] : [])
+                .concat(c.makeArgs || [])
+                .concat(["-Resi",
+                    "check"]),
+                {
+                    env: {
+                        TESTS_ENVIRONMENT: ''
+                    }
+                }));
+        this.checkAllTask.group = TaskGroup.Test;
+        this.checkAllTask.presentationOptions = defaultCheckPresentation;
+        this.checkAllTask.detail = localize("autotools.check.noenv", "$(checklist) Run full test suite without test environment");
+        targets.push(this.checkAllTask);
+
         this.myPromise = Promise.resolve(targets);
     }
 
@@ -313,6 +334,18 @@ export class AutoToolsCheckTaskProvider implements MyTaskProvider {
                 .concat(check.TEST_SUITE_LOG ? 'TEST_SUITE_LOG=' +  check.TEST_SUITE_LOG : []),
                 configuration.getCurrentTestEnvironment().checkExecOptions));
 	}
+    public async checkAll() : Promise<void> {
+        if (this.checkAllTask) {
+            let isBusy: boolean = false;
+            await extension.waitToTouchMakefiles();
+            let reason = await vscode.tasks.executeTask(this.checkAllTask)
+                .then(e => (isBusy = true) && "ok", (r) => r.message);
+            if (!isBusy) {
+                logger.message(`ERROR: Failed to start task ${this.checkAllTask.name}`, 'Normal');
+                extension.autotoolsDoneNoResult();
+            }
+        }
+    }
 }
 
 export interface MyTaskProvider extends TaskProvider {

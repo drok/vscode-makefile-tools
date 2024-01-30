@@ -76,6 +76,7 @@ export class Extension {
     private autotoolsTask: AutoToolsBootstrapTaskProvider;
     private buildTasks: AutoToolsBuildTaskProvider;
     private testTasks: AutoToolsTestTaskProvider;
+    private checkTasks: AutoToolsCheckTaskProvider;
     private needTaskFetchBugWorkaround: boolean = true;
     private compilerFullPath ?: string;
     public readonly dryRunner : string;
@@ -90,11 +91,12 @@ export class Extension {
         this.autotoolsTask = new AutoToolsBootstrapTaskProvider();
         this.buildTasks = new AutoToolsBuildTaskProvider();
         this.testTasks = new AutoToolsTestTaskProvider();
+        this.checkTasks = new AutoToolsCheckTaskProvider();
         this.tasks = [
             this.autotoolsTask,
             this.buildTasks,
             this.testTasks,
-            new AutoToolsCheckTaskProvider(),
+            this.checkTasks,
         ];
         this.dryRunner = path.join(extensionContext.extensionPath, "bin/make" + (process.platform === 'win32' ? ".exe" : ""));
         this.testRunner = path.join(extensionContext.extensionPath, "bin/test-driver");
@@ -300,6 +302,7 @@ export class Extension {
                         }
                     }
                     this.autotoolsDoneNoResult();
+                    extension.updateAllGrids();
                 } else if (definition.type == 'check') {
                     let suite = configuration.getAllBuildTargets()
                         ?.get(definition.builddir)
@@ -308,6 +311,7 @@ export class Extension {
                         this.testController?.suiteCompleted(e.execution, suite, definition.builddir);
                     }
                     this.autotoolsDoneNoResult();
+                    extension.updateAllGrids();
                 } else if (definition.type == "autotools") {
                     this.autotoolsDoneNoResult();
                 }
@@ -519,6 +523,7 @@ export class Extension {
     public async waitToTouchMakefiles(): Promise<void> { await this.autotoolsTask.waitToTouchMakefiles(); }
 
     public build(target: make.BuildTarget): void { this.buildTasks.build(target); }
+    public async checkAll(): Promise<void> { await this.checkTasks.checkAll(); }
     public async configure(): Promise<boolean> {
         this.needTaskFetchBugWorkaround = false;
         var success =  await this.autotoolsTask.configure();
@@ -846,11 +851,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }));
 
     context.subscriptions.push(vscode.commands.registerCommand('autotools.outline.checkAll', async () => {
-        extension.build(make.t_check);
+        await extension.checkAll();
     }));
 
     context.subscriptions.push(vscode.commands.registerCommand('autotools.checkAll', async () => {
-        extension.build(make.t_check);
+        await extension.checkAll();
     }));
 
     context.subscriptions.push(vscode.commands.registerCommand('autotools.exportToIntelisense', async () => {
