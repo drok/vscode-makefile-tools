@@ -525,7 +525,7 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
             } else { this.working = true; return resolve();}});
     }
     public autotoolsDoneNoResult(): void {
-        this.working = false;
+        this.working = false; // This could be false already if the user runs the task from palette
         this.onFinishedWork.fire(false);
     }
     public get isWorking() : boolean {
