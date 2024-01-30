@@ -2,9 +2,12 @@
 import { Disposable, TextDocumentContentProvider, Uri, Event, EventEmitter, window, workspace, TextDocumentShowOptions } from 'vscode';
 import { CancellationToken } from 'vscode-jsonrpc';
 import { Goal } from './parser/gnumake';
-import { TestEnvironment, getAllBuildTargets, getCurrentMakefileConfiguration, getTestEnvironments } from './configuration';
+import { TestEnvironment, getAllBuildTargets, getCurrentMakefileConfiguration,
+    MakefileConfiguration,
+    getTestEnvironments } from './configuration';
 import { TRS, TRS_Info } from './make';
 import { extension, waitActivated } from './extension';
+import { slugify } from './util';
 import * as path from 'path';
 
 
@@ -54,13 +57,40 @@ export class TestGrid implements TextDocumentContentProvider {
         this.disposables.clear();
     }
 
+    configurationOutput(c: MakefileConfiguration) : string{
+        let text : string = '';
+        if (c.configureArgs?.length)
+            text = '  * `' + c.configureArgs.join('`\n  * `') + '`\n';
+        else
+            text = 'default (ie, configured with `configure` and no arguments)\n'
+
+        return `<details><summary>Build Configuration - ${c.name}</summary>
+
+## Build Configuration - ${c.name}
+
+${text}
+</details>
+`;
+    }
+    environmentsOutput(e: TestEnvironment[]) : string {
+
+        return e.map<string>(i => `### **${i.name}** environment
+
+|Variable|Value|
+|:---|:---|
+` +
+            (i.testDebugEnv ? Object.entries(i.testDebugEnv).map<string>(
+                ([k,v],n) => `|\`${k}\`|\`${v}\`|`).join('\n') : ''
+            ))
+            .join('\n\n');
+    }
     tabulateSuite(g: Goal, dir: string) : string {
         let text : string = '';
         if (g?.depends) {
             let envs = getTestEnvironments()
             .filter(e => !e.dirs || e.dirs.includes(dir));
-            text += `## ${dir}\n\n`;
-            text += '|Test|' + envs.map(e => e.name).join('|') + '|\n';
+            text += `### ${dir}\n\n`;
+            text += '|Test|' + envs.map(e => `[${e.name}](#${slugify(e.name + '-environment')})`).join('|') + '|\n';
             text += '|:---|' + ':---:|'.repeat(envs.length) + '\n';
 
             for (let t of g.depends) {
@@ -81,17 +111,29 @@ export class TestGrid implements TextDocumentContentProvider {
         let goals = getAllBuildTargets();
         let c = getCurrentMakefileConfiguration();
 
-        let text : string = `# Test Summary for ${extension.pkginfo?.name} ${extension.pkginfo?.version} - ${c.name}\n\n`;
+        let testResults : string = '';
 
         goals.forEach((goals, dir) => {
             for (let g of goals.values()) {
                 if (g.flags & (Goal.Flags.Test_Suite))
-                    text += this.tabulateSuite(g, dir);
+                    testResults += this.tabulateSuite(g, dir);
             }
 
         });
 
-        return Promise.resolve(text);
+        return Promise.resolve(`# Test Summary for ${extension.pkginfo?.name} ${extension.pkginfo?.version} - ${c.name}\n\n
+## Test Results
+
+${testResults}
+
+${this.configurationOutput(c)}
+<details><summary>Test Environments</summary>
+
+## Test Environments
+
+${this.environmentsOutput(getTestEnvironments())}
+</details>
+`);
     }
 
     generateDetailedTestContent(uri: Uri, disp: Disposable[]): Thenable<string> {
@@ -104,10 +146,23 @@ export class TestGrid implements TextDocumentContentProvider {
     
         // Generate markdown content for detailed test result document
         if (g && (g.flags & (Goal.Flags.Test_Suite))) {
-            let text : string = `# Test Suite ${suiteName} for ${extension.pkginfo?.name} ${extension.pkginfo?.version} - ${c.name}\n\n`;
+            let testResults : string = `# Test Suite ${suiteName} for ${extension.pkginfo?.name} ${extension.pkginfo?.version} - ${c.name}\n\n`;
 
-            text += this.tabulateSuite(g, suiteName);
-            return Promise.resolve(text);
+            testResults += this.tabulateSuite(g, suiteName);
+
+            return Promise.resolve(`# Test Suite **${suiteName}** for ${extension.pkginfo?.name} ${extension.pkginfo?.version} - ${c.name}\n\n
+## Test Results
+
+${testResults}
+
+${this.configurationOutput(c)}
+<details><summary>Test Environments</summary>
+
+## Test Environments
+
+${this.environmentsOutput(getTestEnvironments().filter(i => !i.dirs || i.dirs.includes(suiteName)))}
+</details>
+`);
         }
 
         return Promise.reject(new Error("Test Suite not found"));
