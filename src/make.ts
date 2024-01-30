@@ -51,7 +51,6 @@ export const t_clean = new BuildTarget("", "clean");
 // Leave positive error codes for make exit values
 export enum ConfigureBuildReturnCodeTypes {
     success = 0,
-    cancelled = -2,
     notFound = -3,
     outOfDate = -4,
     other = -5,
@@ -170,16 +169,7 @@ export var builtin_targets : Set<string> = new Set();
 // (other than default empty "" or the standard "all"), otherwise it would produce
 // a subset of all the targets involved in the makefile (only the ones triggered
 // by building the current target).
-export async function generateParseContent(progress: vscode.Progress<{}>,
-                                           cancel: vscode.CancellationToken,
-                                           recursive: boolean = false): Promise<ConfigureSubphaseStatus> {
-    if (cancel.isCancellationRequested) {
-        return {
-            retc: ConfigureBuildReturnCodeTypes.cancelled,
-            elapsed: 0
-        };
-    }
-
+export async function generateParseContent(recursive: boolean = false): Promise<ConfigureSubphaseStatus> {
     const makefilePath :string | undefined = configuration.getConfigurationMakefile();
     if (!makefilePath) {
         extension.resetCppToolsProvider();
@@ -605,59 +595,15 @@ export async function configure(triggeredBy: TriggeredBy): Promise<number> {
   await extension.waitToTouchMakefiles();
   try {
     ui.getUI().setLoading(ui.UIStatus.LOADING);
-    subphaseStats = await vscode.window.withProgress(
-      {
-        location: vscode.ProgressLocation.Notification,
-        title: localize("make.configuring.title", "Importing autotools configuration '{0}'", configuration.getCurrentMakefileConfiguration().name),
-        cancellable: true,
-      },
-      async (progress, cancel) => {
-        cancel.onCancellationRequested(async () => {
-          if (curPID !== -1) {
-            logger.message(
-              `Attempting to kill the make process (PID = ${curPID}) and all its children subprocesses...`
-            );
-            await vscode.window.withProgress(
-              {
-                location: vscode.ProgressLocation.Notification,
-                title: localize("make.confiuring.cancel.title", "Cancelling configure"),
-                cancellable: false,
-              },
-              async (progress) => {
-                return util.killTree(progress, curPID);
-              }
-            );
-          } else {
-            // The configure process may run make twice (or three times if the build target is reset),
-            // with parsing in between and after. There is also the CppTools IntelliSense custom provider update
-            // awaiting at various points. It is possible that the cancellation may happen when there is no make running.
-            logger.message("curPID is 0, we are in between make invocations.");
-          }
-
-          logger.message("Exiting early from the configure process.");
-
-          // We want a successful configure as soon as possible.
-          // The dirty state can help with that by triggering a new configure
-          // when the next relevant command occurs.
-          extension.getState().configureDirty = true;
-
-          retc = ConfigureBuildReturnCodeTypes.cancelled;
-        });
-
-        let r = await doConfigure(progress, cancel, readCache, configurationCache);
-        extension.autotoolsDoneNoResult();
-        return r;
-      }
-    );
+    subphaseStats = await doConfigure(readCache, configurationCache);
+    extension.autotoolsDoneNoResult();
 
     ui.getUI().setLoading(ui.UIStatus.OK);
     // If not cancelled already, analyze all doConfigure subphases
     // to decide how we should look at the final configure outcome.
     // retc is set to cancel in onCancellationRequested
     // and we don't need to look which subphase cancelled.
-    if (retc !== ConfigureBuildReturnCodeTypes.cancelled) {
-      retc = analyzeConfigureSubphases(subphaseStats);
-    }
+    retc = analyzeConfigureSubphases(subphaseStats);
 
     extension.getState().configureDirty = !(retc === ConfigureBuildReturnCodeTypes.success);
 
@@ -708,12 +654,9 @@ export async function configure(triggeredBy: TriggeredBy): Promise<number> {
 
     if (!isConfigurationEmpty(ConfigurationCache)) {
       // Rewrite the configuration cache according to the last updates of the internal arrays,
-      // but not if the configure was cancelled and not while running regression tests.
       if (
         configuration.getKeepConfigurationCache() &&
-        configurationCache &&
-        retc !== ConfigureBuildReturnCodeTypes.cancelled &&
-        process.env["MAKEFILE_TOOLS_TESTING"] !== "1"
+        configurationCache
       ) {
         util.writeFile(
           configurationCache,
@@ -732,13 +675,8 @@ export async function configure(triggeredBy: TriggeredBy): Promise<number> {
 
     logger.message(`Configure elapsed time: ${configureElapsedTime}`, "Verbose");
 
-    // Let's consider that a cancelled configure is not a complete configure,
-    // even if, depending when the cancel happened, the cache may have been loaded already.
-    // Cancelled configures reach this point too, because of the finally construct.
-    if (retc !== ConfigureBuildReturnCodeTypes.cancelled) {
-      extension.setCompletedConfigureInSession(true);
-    }
-
+    extension.setCompletedConfigureInSession(true);
+    
     telemetry.endSpanWithStatus(SpanStatusCode.OK, undefined, {
         numFiles: provider.fileIndex.size,
         numConfigs: configuration.getMakefileConfigurations().length,
@@ -760,13 +698,7 @@ export async function configure(triggeredBy: TriggeredBy): Promise<number> {
  * This function should not be called if there is no cache to load.
  * @param cacheFile - the filename including path of the cache in json format
  */
-async function loadConfigurationFromCache(progress: vscode.Progress<{}>, cancel: vscode.CancellationToken, cacheFile: string): Promise<ConfigureSubphaseStatus> {
-    if (cancel.isCancellationRequested) {
-        return {
-            retc: ConfigureBuildReturnCodeTypes.cancelled,
-            elapsed: 0
-        };
-    }
+async function loadConfigurationFromCache(cacheFile: string): Promise<ConfigureSubphaseStatus> {
 
     telemetry.startSpan("loadCache");
     let startTime: number = Date.now();
@@ -775,7 +707,6 @@ async function loadConfigurationFromCache(progress: vscode.Progress<{}>, cancel:
     let content: string | undefined = util.readFile(cacheFile);
     if (content) {
         try {
-            progress.report({ increment: 1, message: localize("make.configure.cache", "Importing cached configuration") });
             logger.message(`Configuring from cache: ${cacheFile}`, "Verbose");
             let configurationCache: ConfigurationCache = {
                 customConfigurationProvider: {
@@ -839,7 +770,7 @@ async function loadConfigurationFromCache(progress: vscode.Progress<{}>, cancel:
     }
 
     return {
-        retc: cancel.isCancellationRequested ? ConfigureBuildReturnCodeTypes.cancelled : ConfigureBuildReturnCodeTypes.success,
+        retc: ConfigureBuildReturnCodeTypes.success,
         elapsed: elapsedTime
     };
 }
@@ -849,7 +780,7 @@ async function loadConfigurationFromCache(progress: vscode.Progress<{}>, cancel:
 // Sometimes the targets do not need an update (for example, when there has been
 // a change in the current build target), as requested through the boolean.
 // This saves unnecessary parsing which may be signifficant for very big code bases.
-export async function doConfigure(progress: vscode.Progress<{}>, cancel: vscode.CancellationToken, readCache: boolean, cacheFile: string, recursiveDoConfigure: boolean = false): Promise<ConfigureSubphasesStatus> {
+export async function doConfigure(readCache: boolean, cacheFile: string, recursiveDoConfigure: boolean = false): Promise<ConfigureSubphasesStatus> {
     let subphaseStats: ConfigureSubphasesStatus = {};
 
     // If available, load all the configure constructs via json from the cache file.
@@ -861,10 +792,7 @@ export async function doConfigure(progress: vscode.Progress<{}>, cancel: vscode.
     // The loading from cache is cheap, but logging it (for Verbose level) may interfere unnecessarily
     // with the output channel, especially since that logging is not awaited for.
     if (!recursiveDoConfigure && !extension.getCompletedConfigureInSession() && readCache) {
-        subphaseStats.loadFromCache = await loadConfigurationFromCache(progress, cancel, cacheFile);
-        if (subphaseStats.loadFromCache.retc === ConfigureBuildReturnCodeTypes.cancelled) {
-            return subphaseStats;
-        }
+        subphaseStats.loadFromCache = await loadConfigurationFromCache(cacheFile);
     } else {
         logger.message("Loading configurations from cache is not necessary.", "Verbose");
     }
@@ -877,11 +805,9 @@ export async function doConfigure(progress: vscode.Progress<{}>, cancel: vscode.
         });
     // This generates the dryrun output (saving it on disk) or reads an alternative build log.
     // Timings for this sub-phase happen inside.
-    subphaseStats.generateParseContent = await generateParseContent(progress, cancel, recursiveDoConfigure);
+    subphaseStats.generateParseContent = await generateParseContent(recursiveDoConfigure);
 
     switch (subphaseStats.generateParseContent.retc) {
-        case ConfigureBuildReturnCodeTypes.cancelled:
-            telemetry.setSpanStatus(SpanStatusCode.ERROR, "Cancelled");
         case ConfigureBuildReturnCodeTypes.success:
             telemetry.setSpanStatus(SpanStatusCode.OK); break;
         default:
