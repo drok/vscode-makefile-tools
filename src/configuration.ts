@@ -551,14 +551,12 @@ function updateEnvironmentsForCurrentMakefile(): void {
         if (env) {
             env.SUBDIRS = "";
             // Suppress bash's error message "/bin/bash: line 74: /tmp/tmp-suite-log.tmp: Permission denied" to stderr
-            env.am__sh_e_setup = 'set +e; exec 2> /dev/null';
-            env.am__set_TESTS_bases = 'exit 0'; // don't rm *.trs and *.log when updating test suite
-            env.LOG_DRIVER_FLAGS = `--env-name "${e.name}" --env-id "${(e.hashCode).toString(36)}"`;
+            env.LOG_DRIVER_FLAGS = `--env-name "${e.name}" --env-id "${(e.hashCode).toString(36)}" --env-keep "$$ME_KEEP_ENV"`;
         }
         env = e.checkExecOptions?.env;
         if (env) {
             env.SUBDIRS = "";
-            env.LOG_DRIVER_FLAGS = `--env-name "${e.name}" --env-id "${(e.hashCode).toString(36)}"`;
+            env.LOG_DRIVER_FLAGS = `--env-name "${e.name}" --env-id "${(e.hashCode).toString(36)}" --env-keep "$$ME_KEEP_ENV"`;
         }
     });
    

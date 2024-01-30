@@ -156,6 +156,8 @@ export class AutoToolsTestTaskProvider implements MyTaskProvider {
                             if (f.endsWith(".trs"))
                                 extension.trsChange(c, cte, vscode.Uri.file(path.join(p,f)));
                         }));
+                        let envs = FilterEnvsByDir(e, dir);
+                        let ME_KEEP_ENV = KeepList(envs);
                         g.depends.forEach((d) => {
                             if(!d.goal)
                                 throw new Error("Invalid test.depends");
@@ -167,7 +169,7 @@ export class AutoToolsTestTaskProvider implements MyTaskProvider {
                             };
                             var newMap : Map<TestEnvironment, vscode.Task> = new Map();
                             d.task = newMap;
-                            e.forEach((env) => {
+                            envs.forEach((env) => {
                                 var newTask = new Task(kind, TaskScope.Workspace,
                                     "Run test \'" + dgoal + "\' " + ((dir ? ('in ' + dir) : 'at the top') + (' @ ' + env.name)),
                                 "autotools",
@@ -177,8 +179,9 @@ export class AutoToolsTestTaskProvider implements MyTaskProvider {
                                     (c.top_builddir ? ['-C', c.top_builddir] : [])
                                     .concat(dir ? ['-C', dir] : [])
                                     .concat(c.makeArgs || [])
-                                    .concat(["-Resi",
+                                    .concat(["-Rei",
                                         "me-check",
+                                        `ME_KEEP_ENV=${ME_KEEP_ENV}`,
                                         "--eval=include Mergesium.rules",
                                         "TEST_LOGS=" + test.goal
                                     ]), env.testExecOptions), );
@@ -255,7 +258,10 @@ export class AutoToolsCheckTaskProvider implements MyTaskProvider {
                 if (g.flags & (Goal.Flags.Test_Suite)) {
                 var newMap : Map<TestEnvironment, vscode.Task> = new Map();
                 g.task = newMap;
-                e.forEach((env) => {
+                let envs = FilterEnvsByDir(e, dir);
+                let ME_KEEP_ENV = KeepList(envs);
+
+                envs.forEach((env) => {
                     var newTask = new Task(kind, TaskScope.Workspace, 'Run test suite ' + (dir ? ('in ' + dir) : 'at the top') + (' @ ' + env.name),
                         "autotools",
                     new ProcessExecution(
@@ -265,6 +271,7 @@ export class AutoToolsCheckTaskProvider implements MyTaskProvider {
                         .concat(c.makeArgs || [])
                         .concat(["-Resi",
                             "me-check",
+                            `ME_KEEP_ENV=${ME_KEEP_ENV}`,
                             "--eval=include Mergesium.rules"]),
                         env.checkExecOptions));
                     newTask.group = TaskGroup.Test;
@@ -283,7 +290,9 @@ export class AutoToolsCheckTaskProvider implements MyTaskProvider {
                         .concat(c.makeArgs || [])
                         .concat(traceLiveTestRuns ? ["--trace", "--silent"] : [])
                         .concat(["-Resi",
-                            "test-suite.log"]),
+                            "test-suite.log",
+                            `ME_KEEP_ENV=${ME_KEEP_ENV}`,
+                        ]),
                         cte.testExecOptions));
                 g.livetask.group = TaskGroup.Test;
                 g.livetask.presentationOptions = defaultCheckPresentation;
@@ -588,6 +597,16 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
     }
 }
 
+// These two filters can be precalculated and stored in a Map<dir,{envlist,keeplist}>
+// They are only executed twice. Once for check tasks and once for test tasks, ie,
+// only when makefiles or settings change.
+// calling them repeatedly to save memory at expense of time
+function FilterEnvsByDir(e: TestEnvironment[], dir: string) : TestEnvironment[] {
+    return e.filter(i => !i.dirs || i.dirs.includes(dir));
+}
+function KeepList(e: TestEnvironment[]) : string {
+    return e.map(i => i.hashCode.toString(36)).join(',');
+}
 export interface BuildTask extends TaskDefinition {
     /*
      * The makefile goal that this task operates on
