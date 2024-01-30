@@ -243,6 +243,12 @@
                     "default": true,
                     "scope": "resource"
                 },
+                "autotools.traceLiveTestRuns": {
+                    "scope": "resource",
+                    "type": "boolean",
+                    "markdownDescription": "%autotools.configuration.traceLiveTestRuns.markdownDescription%",
+                    "default": false
+                },
                 "autotools.promptClean": {
                     "scope": "resource",
                     "type": "boolean",

@@ -272,13 +272,15 @@ export class AutoToolsCheckTaskProvider implements MyTaskProvider {
                     newMap.set(env, newTask);
                     targets.push(newTask);
                 });
+                let traceLiveTestRuns = configuration.gettraceLiveTestRuns();
                 g.livetask = new Task(kind, TaskScope.Workspace, 'Update test suite ' + (dir ? ('log in ' + dir) : 'log at the top')  + (' @ ' + cte.name),
                     "autotools",
                     new ProcessExecution(
-                        configuration.getMakePath(),
+                        traceLiveTestRuns ? extension.dryRunner : configuration.getMakePath(),
                         (c.top_builddir ? ['-C', c.top_builddir] : [])
                         .concat(dir ? ['-C', dir] : [])
                         .concat(c.makeArgs || [])
+                        .concat(traceLiveTestRuns ? ["--trace", "--silent"] : [])
                         .concat(["-Resi",
                             "test-suite.log"]),
                         cte.testExecOptions));

@@ -205,6 +205,12 @@ export function readpromptClean() : void {
     promptClean = util.getSetting<boolean>("promptClean") || true;
 }
 
+let traceLiveTestRuns: boolean;
+export function gettraceLiveTestRuns(): boolean { return traceLiveTestRuns; }
+export function readtraceLiveTestRuns() : void {
+    traceLiveTestRuns = util.getSettingOr<boolean>("traceLiveTestRuns", false);
+}
+
 let autoreconfWarnCross: boolean;
 export function getautoreconfWarnCross(): boolean { return autoreconfWarnCross; }
 export function readautoreconfWarnCross() : void {
@@ -678,6 +684,7 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
     await readMakePath();
     readkeepDryRuns();
     readkeepConfigurationCache();
+    readtraceLiveTestRuns();
     readpromptClean();
     readautoreconfWarnCross();
     readautoreconfWarnObsolete();
@@ -809,6 +816,14 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
                 updatedSettingsSubkeys.push(subKey);
             }
 
+            subKey = "traceLiveTestRuns";
+            let updatedtraceLiveTestRuns : boolean = util.getSettingOr<boolean>(subKey, false);
+            let updatedTestTasks : boolean = (updatedtraceLiveTestRuns !== traceLiveTestRuns);
+            if (updatedtraceLiveTestRuns !== traceLiveTestRuns) {
+                readtraceLiveTestRuns();
+                updatedSettingsSubkeys.push(subKey);
+            }
+
             subKey = "keepConfigurationCache";
             let updatedkeepConfigurationCache : boolean = util.getSettingOr<boolean>(subKey, false);
             if (updatedkeepConfigurationCache !== keepConfigurationCache) {
@@ -869,6 +884,8 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
             if (!extension.getState().configureDirty) {
                 if (updatedTestEnvironments) {
                     updateEnvironmentsForCurrentMakefile();
+                    extension.resyncTasks();
+                } else if (updatedTestTasks) {
                     extension.resyncTasks();
                 }
             } else
