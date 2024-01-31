@@ -530,10 +530,12 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
             if (destdir)
                 createDirectorySync(destdir);
 
+            let configureArgs = c.configureArgs || [];
+            configureArgs.push(configuration.getdisableMaintainerMode() ? '--disable-maintainer-mode' : '');
             let task = new Task(configurekind, TaskScope.Workspace,
                 localize("autotools.configure.task", "Prepare build directory"),
                 "Autotools task",
-                new ProcessExecution(resolvePathToRoot("configure"), c.configureArgs || [],
+                new ProcessExecution(resolvePathToRoot("configure"), configureArgs,
                     {cwd : destdir}));
             task.detail = localize("automake.configure.help", "$(tools) Configure build directory");
 

@@ -98,19 +98,20 @@ export interface pkgInfo {
     bugreport: string;
     url: string;
     automake: string;
+    maint?: string;
 }
 export async function getPackageJSON(): Promise<pkgInfo> {
     return new Promise<pkgInfo>(async (resolve, reject) => {
         let c = configuration.getCurrentMakefileConfiguration();
         let theinfo : pkgInfo | undefined;
 
-        if (extension.isConfigured()) {
+    if (extension.isConfigured()) {
             let info : string | undefined;
             const result: util.SpawnProcessResult = await util.spawnChildProcess(
                 path.join(c.top_builddir, "config.status"), ["--file=-:-"],
                 util.getWorkspaceRoot(),
                 true, true,
-                '{ "name": "@PACKAGE@", "version": "@VERSION@", "bugreport": "@PACKAGE_BUGREPORT@", "url": "@PACKAGE_URL@", "automake": "@AUTOMAKE@" }',
+                '{ "name": "@PACKAGE@", "version": "@VERSION@", "bugreport": "@PACKAGE_BUGREPORT@", "url": "@PACKAGE_URL@", "automake": "@AUTOMAKE@", "maint": "@MAINTAINER_MODE_FALSE@" }',
                 (x) => {info = x}, undefined);
             if (result.returnCode !== 0) return reject();
             if (info === undefined) return reject();

@@ -249,6 +249,12 @@
                     "markdownDescription": "%autotools.configuration.traceLiveTestRuns.markdownDescription%",
                     "default": false
                 },
+                "autotools.disableMaintainerMode": {
+                    "scope": "resource",
+                    "type": "boolean",
+                    "markdownDescription": "%autotools.configuration.disableMaintainerMode.markdownDescription%",
+                    "default": true
+                },
                 "autotools.promptClean": {
                     "scope": "resource",
                     "type": "boolean",

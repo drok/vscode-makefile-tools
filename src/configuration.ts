@@ -106,7 +106,7 @@ export interface EnvironmentSetting {
 }
 
 let currentMakefileConfigurationName: string | "Default";
-export async function setCurrentMakefileConfigurationName(configuration: string | undefined): Promise<void> {
+export function setCurrentMakefileConfigurationName(configuration: string | undefined): void {
     currentMakefileConfigurationName = configuration || "Default";
 }
 
@@ -210,6 +210,12 @@ let traceLiveTestRuns: boolean;
 export function gettraceLiveTestRuns(): boolean { return traceLiveTestRuns; }
 export function readtraceLiveTestRuns() : void {
     traceLiveTestRuns = util.getSettingOr<boolean>("traceLiveTestRuns", false);
+}
+
+let disableMaintainerMode: boolean;
+export function getdisableMaintainerMode(): boolean { return disableMaintainerMode; }
+export function readdisableMaintainerMode() : void {
+    disableMaintainerMode = util.getSettingOr<boolean>("disableMaintainerMode", true);
 }
 
 let autoreconfWarnCross: boolean;
@@ -567,7 +573,7 @@ function updateEnvironmentsForCurrentMakefile(): void {
             env.LOG_DRIVER_FLAGS = `--env-name "${e.name}" --env-id "${(e.hashCode).toString(36)}" --env-keep "$$ME_KEEP_ENV"`;
         }
     });
-   
+
 }
 function processExecutionOptions(env: TestEnvironment) : vscode.ProcessExecutionOptions {
     var vars : string[] = [];
@@ -691,6 +697,7 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
     readkeepDryRuns();
     readkeepConfigurationCache();
     readtraceLiveTestRuns();
+    readdisableMaintainerMode();
     readpromptClean();
     readautoreconfWarnCross();
     readautoreconfWarnObsolete();
@@ -705,6 +712,9 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
     setCurrentMakefileConfiguration(currentMakefileConfigurationName);
 
     await analyzeConfigureParams(false);
+
+    await promptMaintainerModeChange(false);
+
 
     // FIXME: seems wrong to do || make.t_all; this fn should probably be called
     // config arg after config is fully loaded.
@@ -830,6 +840,15 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
                 updatedSettingsSubkeys.push(subKey);
             }
 
+
+            subKey = "disableMaintainerMode";
+            let updateddisableMaintainerMode : boolean = util.getSettingOr<boolean>(subKey, false);
+            let updatedMaintainerMode : boolean = (updateddisableMaintainerMode !== disableMaintainerMode);
+            if (updatedMaintainerMode) {
+                readdisableMaintainerMode();
+                updatedSettingsSubkeys.push(subKey);
+            }
+
             subKey = "keepConfigurationCache";
             let updatedkeepConfigurationCache : boolean = util.getSettingOr<boolean>(subKey, false);
             if (updatedkeepConfigurationCache !== keepConfigurationCache) {
@@ -926,6 +945,11 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
                     logger.message(e.message);
                 }
             });
+
+            if (updatedMaintainerMode) {
+                await promptMaintainerModeChange(true);
+            }
+
             if (extension.getState().configureDirty) {
                 await make.configure(make.TriggeredBy.configureAfterConfigurationChange);
             }
@@ -943,6 +967,7 @@ export async function setConfigurationByName(configurationName: string | undefin
     // Refresh settings, they may reference variables or commands reading state configuration var (${configuration}).
     await initFromSettings();
     extension._projectOutlineProvider.update(currentMakefileConfigurationName);
+    await promptMaintainerModeChange(true);
 }
 
 class BuildConfigPickItem implements vscode.QuickPickItem {
@@ -994,6 +1019,43 @@ export async function setNewConfiguration(): Promise<void> {
 
         await make.configure(make.TriggeredBy.configureAfterConfigurationChange);
     }
+}
+
+let showingMaintainerPrompt: boolean = false;
+async function promptMaintainerModeChange(modal: boolean) : Promise<void> {
+    if ((!disableMaintainerMode || !!extension.pkginfo?.maint) || showingMaintainerPrompt)
+        return Promise.resolve();
+
+    const doit: string = localize("yes", "Yes");
+    const setit: string = localize("autotools.edit.setting", "Setting...");
+    const question: string = localize("autotools.should.update.build", "Maintainer Mode Changed. Reconfigure the '{0}' build with --disable-maintainer-mode?",
+        currentMakefileConfiguration.name);
+    showingMaintainerPrompt = true;
+
+    if (modal)
+        await vscode.window.showWarningMessage(
+            question,
+            doit, localize("no", "No"), setit)
+        .then(async (value) => {
+            showingMaintainerPrompt = false;
+            if (value === doit) {
+                await extension.configure();
+            } else if (value === setit) {
+                openSettings("autotools.disableMaintainerMode");
+            }
+        });
+    else
+        vscode.window.showWarningMessage(
+            question,
+            doit, localize("no", "No"), setit)
+        .then(async (value) => {
+            showingMaintainerPrompt = false;
+            if (value === doit) {
+                await extension.configure();
+            } else if (value === setit) {
+                openSettings("autotools.disableMaintainerMode");
+            }
+        });
 }
 
 function envHash(e: string) : number {
