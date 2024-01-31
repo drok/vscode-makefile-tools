@@ -295,6 +295,7 @@ export function setConfigurationProblemMatchers(problemMatchers: string[]): void
 // Analyze the settings of the current makefile configuration and the global workspace settings,
 // according to various merging rules and decide what make command and build log
 // apply to the current makefile configuration.
+export let initialConfigurationAttempted : boolean = false;
 export async function analyzeConfigureParams(reload: boolean, failIfUnconfigured : boolean): Promise<boolean> {
     let reason : string;
     let hasMakefile : boolean = false;
@@ -303,11 +304,16 @@ export async function analyzeConfigureParams(reload: boolean, failIfUnconfigured
 
     let isAutotools = extension.isAutotoolsProject();
     let bootstrapped = isAutotools && extension.isBootstrapped();
+    let configured = bootstrapped && extension.isConfigured();
+    // If initially not configured, an attempt is made to bootstrap and configure.
+    // This flag avoids the normal make.configure() call at the end of activate()
+    // proj is configured already at activation
+    initialConfigurationAttempted ||= !configured && !failIfUnconfigured;
     vscode.commands.executeCommand("setContext", "autotools:isBootstrapped", bootstrapped ? 1 : 2);
 
     if (isAutotools) {
         if (bootstrapped) {
-            if (extension.isConfigured() || (!failIfUnconfigured && await extension.configure())) {
+            if (configured || (!failIfUnconfigured && await extension.configure())) {
                 let relativeMakefile = findMakefile();
                 if (!reload) {
                     if (relativeMakefile) {

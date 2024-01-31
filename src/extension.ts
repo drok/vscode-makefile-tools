@@ -1029,7 +1029,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         _activatedEvent.fire(isActive);
         return;
     }
-    await make.configure(make.TriggeredBy.cleanConfigure);
+    if (!configuration.initialConfigurationAttempted)
+        await make.configure(make.TriggeredBy.cleanConfigure);
     isActive = true;
     _activatedEvent.fire(isActive);
 }
