@@ -302,6 +302,10 @@ export class Making implements Parser {
                 }
             }
         }
+            else {
+                logger.message("Found shared lib linker command: " + tool, "Verbose");
+                linkerTargetBinary = currentTarget;
+            }
 
         // It is not possible to have compilerTargetBinary and linkerTargetBinary both defined,
         // because a dry-run output line cannot be a compilation and an explicit link at the same time.
