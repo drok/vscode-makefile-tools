@@ -66,7 +66,7 @@ export class AutoToolsBuildTaskProvider implements MyTaskProvider {
                                 (c.top_builddir ? ['-C', c.top_builddir] : [])
                                 .concat(dir ? ['-C', dir] : [])
                                 .concat(c.makeArgs || [])
-                                .concat(g.goal)));
+                                .concat(g.goal)), "$gcc");
                         g.task.group = TaskGroup.Build;
                         g.task.detail =
                             (g.flags & Goal.Flags.Linked_binary) ? localize("automake.program", "$(combine) $(file-binary) Build program") :
@@ -93,7 +93,7 @@ export class AutoToolsBuildTaskProvider implements MyTaskProvider {
                 (c.top_builddir ? ['-C', c.top_builddir] : [])
                 .concat(g.builddir ? ['-C', g.builddir] : [])
                 .concat(c.makeArgs || [])
-                .concat(g.goal)));
+                .concat(g.goal)),"$gcc");
         task.group = TaskGroup.Build;
         //task.detail =
         //    (g.flags & Goal.Flags.Linked_binary) ? localize("automake.program", "$(combine) $(file-binary) Build program") :
@@ -116,7 +116,7 @@ export class AutoToolsBuildTaskProvider implements MyTaskProvider {
                 (c.top_builddir ? ['-C', c.top_builddir] : [])
                 .concat(target.builddir ? ['-C', target.builddir] : [])
                 .concat(c.makeArgs || [])
-                .concat(target.goal ?? t_all.goal)));
+                .concat(target.goal ?? t_all.goal)),"$gcc");
 	}
 }
 
@@ -185,7 +185,7 @@ export class AutoToolsTestTaskProvider implements MyTaskProvider {
                                         `ME_KEEP_ENV=${ME_KEEP_ENV}`,
                                         "--eval=include Mergesium.rules",
                                         "TEST_LOGS=" + test.goal
-                                    ]), env.testExecOptions), );
+                                    ]), env.testExecOptions),"$gcc");
                                 newTask.group = TaskGroup.Test;
                                 newTask.detail = localize("automake.test", "$(check) Run test '{0}'", path.basename(dgoal, ".log"));
                                 newTask.presentationOptions = presentSilent;
@@ -227,7 +227,7 @@ export class AutoToolsTestTaskProvider implements MyTaskProvider {
                 .concat(["-esi",
                     "check",
                     "TEST_LOGS=" + test.goal
-                ]), configuration.getCurrentTestEnvironment().testExecOptions));
+                ]), configuration.getCurrentTestEnvironment().testExecOptions),"$gcc");
 	}
 }
 
@@ -274,7 +274,7 @@ export class AutoToolsCheckTaskProvider implements MyTaskProvider {
                             "me-check",
                             `ME_KEEP_ENV=${ME_KEEP_ENV}`,
                             "--eval=include Mergesium.rules"]),
-                        env.checkExecOptions));
+                        env.checkExecOptions),"$gcc");
                     newTask.group = TaskGroup.Test;
                     newTask.detail = localize("automake.check", "$(checklist) Test Suite");
                     newTask.presentationOptions = defaultCheckPresentation;
@@ -294,7 +294,7 @@ export class AutoToolsCheckTaskProvider implements MyTaskProvider {
                             "test-suite.log",
                             `ME_KEEP_ENV=${ME_KEEP_ENV}`
                         ]),
-                        cte.updateExecOptions));
+                        cte.updateExecOptions), "$gcc");
                 g.livetask.group = TaskGroup.Test;
                 g.livetask.presentationOptions = defaultCheckPresentation;
                 g.livetask.detail = localize("automake.livecheck", "$(checklist) $(broadcast) Test Suite Update");
@@ -315,7 +315,7 @@ export class AutoToolsCheckTaskProvider implements MyTaskProvider {
                     env: {
                         TESTS_ENVIRONMENT: ''
                     }
-                }));
+                }),"$gcc");
         this.checkAllTask.group = TaskGroup.Test;
         this.checkAllTask.presentationOptions = defaultCheckPresentation;
         this.checkAllTask.detail = localize("autotools.check.noenv", "$(checklist) Run full test suite without test environment");
