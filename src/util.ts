@@ -157,64 +157,6 @@ export function toolPathInEnv(name: string): string | undefined {
     });
 }
 
-function taskKill(pid: number): Promise<void> {
-    return new Promise<void>((resolve, reject) => {
-        child_process.exec(`taskkill /pid ${pid} /T /F`, (error) => {
-            if (error) {
-                reject(error);
-            } else {
-                resolve();
-            }
-        });
-    });
-}
-
-export async function killTree(progress: vscode.Progress<{}>, pid: number): Promise<void> {
-    if (process.platform === 'win32') {
-        try {
-            await taskKill(pid);
-        } catch (e) {
-            logger.message(`Failed to kill process ${pid}: ${e}`);
-        }
-        return;
-    }
-
-    let children: number[] = [];
-    let stdoutStr: string = "";
-
-    let stdout: any = (result: string): void => {
-        stdoutStr += result;
-    };
-
-    try {
-        // pgrep should run on english, regardless of the system setting.
-        const result: SpawnProcessResult = await spawnChildProcess('pgrep', ['-P', pid.toString()], getWorkspaceRoot(), true, false, undefined, stdout);
-        if (!!stdoutStr.length) {
-            children = stdoutStr.split('\n').map((line: string) => Number.parseInt(line));
-
-            logger.message(`Found children subprocesses: ${stdoutStr}.`);
-            for (const other of children) {
-                if (other) {
-                    await killTree(progress, other);
-                }
-            }
-        }
-    } catch (e) {
-        logger.message(e.message);
-        throw e;
-    }
-
-    try {
-        logger.message(`Killing process PID = ${pid}`);
-        progress.report({ increment: 1, message: localize("utils.terminate.process", "Terminating process PID=${0} ...", pid) });
-        process.kill(pid, 'SIGINT');
-    } catch (e) {
-        if (e.code !== 'ESRCH') {
-            throw e;
-        }
-    }
-}
-
 // Environment variables helpers (inspired from CMake Tools utils).
 export interface EnvironmentVariables { [key: string]: string; }
 
