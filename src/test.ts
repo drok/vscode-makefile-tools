@@ -12,8 +12,10 @@ import { TestController,
 import { SSL_OP_DONT_INSERT_EMPTY_FRAGMENTS } from 'constants';
 import { makeFullPath } from './util';
 import { TRS_Info, readTRS } from './make';
-import { extension,
+import { Extension, extension,
+        telemetry,
         openEditor } from './extension';
+import { SpanStatusCode } from './tele';
 import { MakefileConfiguration } from './configuration';
 import { resolvePathToRoot } from './util';
 import * as util from './util';
@@ -34,6 +36,7 @@ interface RunDef {
     tmp_label: string | undefined;
     live: boolean;
     env: configuration.TestEnvironment;
+    stats : number[];// { P: number; F: number; XF: number; XP: number; E: number; S: number;}
 }
 
 const UpdateRe = /^Makefile:\d+: update target '(.+)' due to: (.+)$/;
@@ -205,6 +208,9 @@ export class MyTestController {
         case TRS.FAIL: run.failed(test, new vscode.TestMessage(TRS_Info[trs].tooltip || "fail")); break;
         default: run.failed(test, new vscode.TestMessage(TRS_Info[TRS.FAIL].tooltip || "unk")); break;
     }
+    if (this.activeRun)
+        this.activeRun.stats[trs ?? TRS.ERROR]++;
+
   }
   updateTRS(run: TestRun, test: TestItem, dir: string) : void {
     let goal = this.testGoals.get(test);
@@ -378,6 +384,8 @@ export class MyTestController {
         env: configuration.TestEnvironment
     ) {
         let name: string; // FIXME: The name is not shown in vscode 1.77.3 - how about 1.85?
+        telemetry.startSpan('run');
+        telemetry.setAttributes({l: live, n: request.include?.length });
         if (live) {
             if (request.include?.length == 1) name = `Live check - ${request.include[0].label}`;
             else name = 'Live check @ ${env.name}';
@@ -389,7 +397,8 @@ export class MyTestController {
         const queue: vscode.TestItem[] = [];
 
         // Loop through all included tests, or all known tests, and add them to our queue
-        let rundef : RunDef = {run: run, cancel: token, tmp_label: request.profile?.label, env: env, live: live};
+        let rundef : RunDef = {run: run, cancel: token, tmp_label: request.profile?.label, env: env, live: live,
+            stats: emptyRunStats()};
         if (request.include) {
             let runnable_in_env : Goal[] = [];
             for (const t of request.include) {
@@ -462,7 +471,7 @@ export class MyTestController {
                 if (!this.activeQueue.length) {
                     this.runQueue.delete(this.activeRun);
                     // this.activeRun.run.appendOutput(`Blah in ${this.activeRun.env.name} @ ${this.activeRun.tmp_label}\n`);
-                    this.activeRun.run.end();
+                    this.endRun();
                     extension.updateAllGrids();
                     this.activeRun = undefined;
                     this.activeGoal = undefined;
@@ -476,7 +485,16 @@ export class MyTestController {
                 } else
                     await this.startNextTest();
             } while (this.activeRun && this.activeGoal && !this.isBusy);
+
+            /* End test if a bug is found (activeGoal is undef in startNextTest) */
+            if (this.activeRun && !this.isBusy)
+                this.endRun();
         }
+    }
+    endRun() : void {
+        this.activeRun!.run.end();
+        telemetry.setAttributes({s: this.activeRun!.stats});
+        telemetry.endSpan();
     }
     startNextRun() : void {
         let next = this.runQueue.entries().next();
@@ -509,6 +527,11 @@ export class MyTestController {
                                     extension.autotoolsDoneNoResult();
                         }
                     } else { // `make check` from the top
+                        if (this.activeGoal.test) {
+                            telemetry.setSpanStatus(SpanStatusCode.ERROR, "no task for test");
+                            this.activeRun.run.errored(this.activeGoal.test,
+                                new vscode.TestMessage(new vscode.MarkdownString(`${Extension.whoami} BUG: - _no task defined for test_`)));
+                        }
                         this.activeGoal = undefined;
                     }
                 } else
@@ -532,3 +555,5 @@ export class MyTestController {
         return false;
     }
 }
+
+function emptyRunStats() : number[] { return [0,0,0,0,0,0,0]; }
