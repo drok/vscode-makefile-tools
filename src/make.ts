@@ -264,6 +264,7 @@ export async function generateParseContent(recursive: boolean = false): Promise<
         let parserStack: Parser[] = [build_tree];
         let linenumber: number = 0;
         let lineBuffer: string = "";
+        let parseFailedAt: number = 0;
 
         // Clear the existing Intellisense config from cache or previous parsing
         extension.resetCppToolsProvider();
@@ -299,6 +300,7 @@ export async function generateParseContent(recursive: boolean = false): Promise<
                 // result buffer.
                 lineBuffer = lines.pop() || "";
             }
+            if (parserStack.length) // avoid throwing repeatedly after a bug that depletes the stack
             try {
                 lines.forEach((s) => {
                     let parser = parserStack.pop();
@@ -345,7 +347,8 @@ export async function generateParseContent(recursive: boolean = false): Promise<
                     }
                 });
             } catch (e) {
-                logger.message(`Parser error (line ${linenumber}):` + e);
+                logger.message(`ERROR: Parser error (dryrun line ${linenumber}):` + e);
+                parseFailedAt = linenumber;
                 parserStack = [];
                 telemetry.logException(e);
                 throw new Error("Quit parse" + e);
@@ -416,6 +419,12 @@ export async function generateParseContent(recursive: boolean = false): Promise<
             extension.resetCppToolsProvider();
             // FIXME: Since dry-running failed, also unlink the configCache file
         } else {
+            if (parseFailedAt) {
+                /* Partial parse ... something in the make output could not be parsed */
+                telemetry.logEvent("ParseFailed", {proj: extension.pkginfo?.name, line: parseFailedAt});
+                var kbUrl : vscode.Uri = await extension.kbUrl();
+                logger.message('KB: ' + kbUrl.toString(true) + '#config-parse-fail', "Normal");
+            }
             // All done, notify that new data is available
             result.returnCode = extension.updateCppToolsProvider();
             export_stats = build_tree.stats;
