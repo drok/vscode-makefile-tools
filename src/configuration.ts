@@ -486,7 +486,7 @@ export async function readTestEnvironments(): Promise<void> {
     // We need to read "makefile.configurations" unexpanded first, because we may write back into these settings
     // in case we indentify "name" missing. We'll expand later, see end of function.
     let workspaceConfiguration: vscode.WorkspaceConfiguration = vscode.workspace.getConfiguration("autotools");
-    loadedTestEnvironments = workspaceConfiguration.get<TestEnvironment[]>("test_environments") || [];
+    loadedTestEnvironments = [nullTestEnvironment,...(workspaceConfiguration.get<TestEnvironment[]>("test_environments") || [])];
     let unnamedConfigurationId: number = 0;
     testEnvironments = [];
 
@@ -500,7 +500,7 @@ export async function readTestEnvironments(): Promise<void> {
         return k.name || unnamedPrefix;
     }));
     unnamedConfigurationNames = unnamedConfigurationNames.filter(item => (item && item.startsWith("Unnamed")));
-    var global_XFAIL_TESTS = getProjectTestEnvironment().XFAIL_TESTS??[];
+    var global_XFAIL_TESTS = gTestEnvironment.XFAIL_TESTS??[];
     loadedTestEnvironments.forEach(element => {
         if (!element.name) {
             // Just considering the possibility that there are already unnamed configurations
@@ -573,7 +573,7 @@ function updateEnvironmentsForCurrentMakefile(): void {
 }
 function processExecutionOptions(env: TestEnvironment) : vscode.ProcessExecutionOptions {
     var vars : string[] = [];
-    testEnvironment.TESTS_ENVIRONMENT?.forEach(e => {
+    gTestEnvironment.TESTS_ENVIRONMENT?.forEach(e => {
         e.name &&
             vars.push(`${e.name}=` + quote([`${e.value}`]));
     });
@@ -588,7 +588,7 @@ function processExecutionOptions(env: TestEnvironment) : vscode.ProcessExecution
 }
 function processDebugEnvironment(env: TestEnvironment) : { [key: string]: string } {
     var vars : { [key: string]: string } = {};
-    testEnvironment.TESTS_ENVIRONMENT?.forEach(e => {
+    gTestEnvironment.TESTS_ENVIRONMENT?.forEach(e => {
         e.name &&
             (vars[e.name] = e.value);
     });
@@ -603,27 +603,34 @@ export function getTestEnvironment(name: string) : TestEnvironment {
     return testEnvironments.find(k => k.name === name) || testEnvironments[0];
 }
 
-export function getProjectTestEnvironment() : TestEnvironment {
-    return testEnvironment;
-}
 export function getCurrentTestEnvironment() : TestEnvironment {
     return testEnvironments[0];
 }
 
-let testEnvironment : TestEnvironment = { name: "Default", TESTS_ENVIRONMENT: [], hashCode: envHash('') };
+let nullTestEnvironment : TestEnvironment = {
+        name: "<null>",
+        TESTS_ENVIRONMENT: [],
+        hashCode: envHash('')
+};
 
-export async function readProjectTestEnvironment(): Promise<void> {
+let gTestEnvironment : TestEnvironment = {
+    name: "global",
+    TESTS_ENVIRONMENT: [],
+    hashCode: -1
+};
+export async function readGlobalTestEnvironment(): Promise<void> {
     let workspaceConfiguration: vscode.WorkspaceConfiguration = vscode.workspace.getConfiguration("autotools");
-    testEnvironment.TESTS_ENVIRONMENT = workspaceConfiguration.get<EnvironmentSetting[]>("TESTS_ENVIRONMENT") ||
+    gTestEnvironment.TESTS_ENVIRONMENT = workspaceConfiguration.get<EnvironmentSetting[]>("TESTS_ENVIRONMENT") ||
         [];
 
-    testEnvironment.XFAIL_TESTS = workspaceConfiguration.get<string[]>("XFAIL_TESTS") || [];
+    gTestEnvironment.XFAIL_TESTS = workspaceConfiguration.get<string[]>("XFAIL_TESTS") || [];
+    nullTestEnvironment.XFAIL_TESTS = gTestEnvironment.XFAIL_TESTS;
 
     vscode.commands.executeCommand('setContext', "autotools:haveGlobalWaivers",
-        testEnvironment.XFAIL_TESTS?.length ? 1 : 2);
+        gTestEnvironment.XFAIL_TESTS?.length ? 1 : 2);
 
-    if (testEnvironment.XFAIL_TESTS && testEnvironment.XFAIL_TESTS.length > 0) {
-        logger.message("Defined autotools.XFAIL_TESTS: " + testEnvironment.XFAIL_TESTS.join(";"), "Verbose");
+    if (gTestEnvironment.XFAIL_TESTS && gTestEnvironment.XFAIL_TESTS.length > 0) {
+        logger.message("Defined autotools.XFAIL_TESTS: " + gTestEnvironment.XFAIL_TESTS.join(";"), "Verbose");
     }
 }
 
@@ -702,7 +709,7 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
     readautoreconfWarnGnu();
     readautoreconfWarnUnsupported();
     await readAutoreconfTool();
-    await readProjectTestEnvironment();
+    await readGlobalTestEnvironment();
     await readMakefileConfigurations(currentMakefileConfigurationName);
     await readTestEnvironments();
     setCurrentMakefileConfiguration(currentMakefileConfigurationName);
@@ -748,11 +755,11 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
                 updatedSettingsSubkeys.push(subKey);
             }
 
-            // Base tests environment XFAIL_TESTS is handled inside readProjectTestEnvironment()
+            // Base tests environment XFAIL_TESTS is handled inside readGlobalTestEnvironment()
             subKey = "TESTS_ENVIRONMENTS";
-            let oldProjectTestEnvironment = getProjectTestEnvironment();
-            await readProjectTestEnvironment();
-            if (!util.areEqual(oldProjectTestEnvironment, getProjectTestEnvironment())) {
+            let oldProjectTestEnvironment = gTestEnvironment;
+            await readGlobalTestEnvironment();
+            if (!util.areEqual(oldProjectTestEnvironment, gTestEnvironment)) {
                 updatedSettingsSubkeys.push(subKey);
                 updatedTestEnvironments = true;
             }
