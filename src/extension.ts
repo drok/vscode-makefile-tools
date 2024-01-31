@@ -102,7 +102,7 @@ export class Extension {
         this.testRunner = path.join(extensionContext.extensionPath, "bin/test-driver");
         this.rulesPath = path.join(extensionContext.extensionPath, "include")
 
-        extensionContext.subscriptions.push(vscode.commands.registerCommand('autotools.command.bootstrap', async () => {
+        extensionContext.subscriptions.push(vscode.commands.registerCommand('autotools.bootstrap', async () => {
             await this.autotoolsTask.bootstrap();
         }));
         extensionContext.subscriptions.push(vscode.commands.registerCommand('autotools.command.regen', async () => {
@@ -331,11 +331,17 @@ export class Extension {
                     await this.autotoolsTask.autotoolsDone(task.execution,
                             (typeof e.exitCode == 'number') ? e.exitCode : (e.exitCode ? 1 : 0));
                     if (!e.exitCode) {
-                        let r = await make.configure(make.TriggeredBy.configureAfterConfigurationChange);
-                        if (!r)
-                            if (this.testController) {
-                                this.testController.onSavedAll();
-                            };
+                        if (definition?.action == "bootstrap") {
+                            await configuration.analyzeConfigureParams(false, false);
+                        } else if (definition?.action == "regen" || definition?.action == "recheck" || definition?.action == "configure") {
+                            let r = await configuration.analyzeConfigureParams(false, true) &&
+                                !await make.configure(make.TriggeredBy.configureAfterConfigurationChange);
+                            if (r)
+                                if (this.testController) {
+                                    this.testController.onSavedAll();
+                                };
+                        }
+
                     }
                 }
             }
@@ -348,12 +354,15 @@ export class Extension {
             let cmd = this.autotoolsTask.bootstrap_cmd();
             if (cmd) {
                 const doit: string = localize("autotools.bootstrap.me", "Bootstrap");
-                vscode.window.showErrorMessage(
+                const setit: string = localize("autotools.edit.setting", "Setting...");
+                vscode.window.showWarningMessage(
                     localize("autotools.want.bootstrap", "The project needs to be bootstrapped ('{0}').", cmd.join(' ')),
                     doit,
-                    localize("autotools.cancel", "Cancel")).then((value) => {
+                    localize("autotools.cancel", "Cancel"), setit).then((value) => {
                     if (value === doit) {
                         this.autotoolsTask.bootstrap();
+                    } else if (value === setit) {
+                        openSettings("autotools.autoBootstrap");
                     }
                 });
             }
@@ -960,8 +969,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     context.subscriptions.push(vscode.commands.registerCommand('autotools.outline.setBuildConfiguration', () => {
         return vscode.commands.executeCommand("autotools.setBuildConfiguration");
     }));
-
-    vscode.commands.executeCommand("setContext", "autotools.isBootstrapped", extension.isBootstrapped());
 
     // Read from the workspace state before reading from settings,
     // becase the latter may use state info in variable expansion.

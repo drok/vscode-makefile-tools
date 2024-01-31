@@ -49,7 +49,7 @@
                 "title": "%autotools.command.addAutotools.title%"
             },
             {
-                "command": "autotools.command.bootstrap",
+                "command": "autotools.bootstrap",
                 "title": "%autotools.command.bootstrap.title%"
             },
             {
@@ -546,6 +546,11 @@
         "viewsWelcome": [
             {
                 "view": "autotools.outline",
+                "contents": "%autotools.welcome.bootstrap.markdownDescription%",
+                "when": "autotools:haveManifest == 1 && autotools:isBootstrapped > 1"
+            },
+            {
+                "view": "autotools.outline",
                 "contents": "%autotools.welcome.markdownDescription%",
                 "when": "autotools:haveManifest == 1 && autotools:haveConfigurations > 1"
             },
@@ -816,7 +821,7 @@
                     "when": "autotools:makefileFilePresent"
                 },
                 {
-                    "command": "autotools.command.bootstrap",
+                    "command": "autotools.bootstrap",
                     "when": "!autotools.isBootstrapped"
                 },
                 {

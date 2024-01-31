@@ -295,15 +295,19 @@ export function setConfigurationProblemMatchers(problemMatchers: string[]): void
 // Analyze the settings of the current makefile configuration and the global workspace settings,
 // according to various merging rules and decide what make command and build log
 // apply to the current makefile configuration.
-async function analyzeConfigureParams(reload: boolean): Promise<void> {
+export async function analyzeConfigureParams(reload: boolean, failIfUnconfigured : boolean): Promise<boolean> {
     let reason : string;
     let hasMakefile : boolean = false;
 
     extension.getState().configureDirty = false;
 
-    if (extension.isAutotoolsProject()) {
-        if (extension.isBootstrapped()) {
-            if (extension.isConfigured() || await extension.configure()) {
+    let isAutotools = extension.isAutotoolsProject();
+    let bootstrapped = isAutotools && extension.isBootstrapped();
+    vscode.commands.executeCommand("setContext", "autotools:isBootstrapped", bootstrapped ? 1 : 2);
+
+    if (isAutotools) {
+        if (bootstrapped) {
+            if (extension.isConfigured() || (!failIfUnconfigured && await extension.configure())) {
                 let relativeMakefile = findMakefile();
                 if (!reload) {
                     if (relativeMakefile) {
@@ -338,6 +342,7 @@ async function analyzeConfigureParams(reload: boolean): Promise<void> {
 
     telemetry.logEvent(reason, { reason: "init" });
     getProblemMatchersForConfiguration();
+    return Promise.resolve(hasMakefile);
 }
 
 function getMakefileConfiguration(configuration: string): MakefileConfiguration | undefined {
@@ -711,7 +716,7 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
     await readTestEnvironments();
     setCurrentMakefileConfiguration(currentMakefileConfigurationName);
 
-    await analyzeConfigureParams(false);
+    await analyzeConfigureParams(false, false);
 
     await promptMaintainerModeChange(false);
 
@@ -914,7 +919,7 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
                     extension.resyncTasks();
                 }
             } else
-                await analyzeConfigureParams(true);
+                await analyzeConfigureParams(true, false);
 
             // Report all the settings changes detected by now.
             // TODO: to avoid unnecessary telemetry processing, evaluate whether the changes done
@@ -1023,7 +1028,7 @@ export async function setNewConfiguration(): Promise<void> {
 
 let showingMaintainerPrompt: boolean = false;
 async function promptMaintainerModeChange(modal: boolean) : Promise<void> {
-    if ((!disableMaintainerMode || !!extension.pkginfo?.maint) || showingMaintainerPrompt)
+    if ((!disableMaintainerMode || !extension.pkginfo || !!extension.pkginfo?.maint) || showingMaintainerPrompt)
         return Promise.resolve();
 
     const doit: string = localize("yes", "Yes");

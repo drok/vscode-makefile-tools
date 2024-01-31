@@ -137,12 +137,17 @@ export async function getPackageJSON(): Promise<pkgInfo> {
                             "version": ac_init[4] ?? '',
                             "bugreport": ac_init[5] ?? '',
                             // 7 is tarname
-                            "url": ac_init[7] ?? '',
+                            "url": ac_init.slice(7).join(':') ?? '',
                             "automake": "unk",
                         };
                     }
                 }, undefined);
-            if (result.returnCode !== 0) return reject();
+            if (result.returnCode !== 0) theinfo = {
+                    name: "unk",
+                    version: "unk",
+                    bugreport: "unk",
+                    url: "unk",
+                    automake: "unk"}
             if (theinfo) return resolve(theinfo);
         }
 
