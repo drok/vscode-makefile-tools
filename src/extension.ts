@@ -760,6 +760,7 @@ export async function waitActivated() : Promise<boolean> {
     });
 }
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
+    try {
     let teleParams = await tele.getParams();
     extension = new Extension(context, teleParams);
 
@@ -1032,6 +1033,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         await make.configure(make.TriggeredBy.cleanConfigure);
     isActive = true;
     _activatedEvent.fire(isActive);
+    } catch (e) {
+        logger.message(`ERROR: Unepected activation exception: ${e}`, "Normal");
+    }
 }
 
 export async function outputLogHeader() : Promise<void> {
