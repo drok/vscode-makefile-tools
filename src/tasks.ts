@@ -390,7 +390,7 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
                 "Autotools task",
                 new ProcessExecution(b[0], b.slice(1)));
             this.bootstrapTask.group = TaskGroup.Build;
-            this.bootstrapTask.detail = localize("automake.bootstrap", "$(tools) Bootstrap project using '{0}'", b.join(' '));
+            this.bootstrapTask.detail = localize("autotools.bootstrap", "$(tools) Bootstrap project using '{0}'", b.join(' '));
 
             const helpkind: AutotoolsTask = {
                 type: this.myType,
