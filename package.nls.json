@@ -24,7 +24,6 @@
    "workbench.action.openWorkspaceSettings.title": "Preferences: Open Workspace Settings",
    "autotools.command.configure.help.title": "Autotools: Run `configure --help`",
    "autotools.exportToIntelisense.title": "Autotools: Export configuration to Intellisense",
-   "autotools.command.makefile.resetState.title": "Autotools: Reset the Makefile Tools Extension workspace state (For troubleshooting)",
    "autotools.configuration.views.makefile.outline.description": "Binary Goals",
    "autotools.configuration.views.testsuites.description": "Tests",
    "autotools.configuration.makefile.makePath.description": "The path to the make tool",

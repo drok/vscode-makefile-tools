@@ -170,10 +170,6 @@
                 "command": "autotools.outline.recheck",
                 "title": "%autotools.command.outline.recheck.title%",
                 "icon": "$(refresh)"
-            },
-            {
-                "command": "autotools.resetState",
-                "title": "%autotools.command.makefile.resetState.title%"
             }
         ],
         "problemMatchers": [

@@ -876,12 +876,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         await make.configure(make.TriggeredBy.configure);
     }));
 
-    // Reset state - useful for troubleshooting.
-    context.subscriptions.push(vscode.commands.registerCommand('autotools.resetState', () => {
-        telemetry.logEvent("commandResetState");
-        extension.getState().reset();
-    }));
-
     context.subscriptions.push(vscode.commands.registerCommand('autotools.outline.recheck', () => {
         telemetry.logEvent("recheck");
         extension.recheck(false);
