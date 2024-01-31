@@ -927,7 +927,7 @@ export const slugify = (...args: (string | number)[]): string => {
         .replace(/[\u0300-\u036f]/g, '') // remove all previously split accents
         .toLowerCase()
         .trim()
-        .replace(/[^a-z0-9\.\:_\- ]/g, '') // remove all chars not allowed in html identifiers (to be replaced)
+        .replace(/[^a-z0-9\.\:_\- ]/g, ' ') // remove all chars not allowed in html identifiers (to be replaced)
         .replace(/\s+/g, '-') // separator
 }
 
