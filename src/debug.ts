@@ -42,8 +42,8 @@ class MyConfiguration implements vscode.DebugConfiguration {
         this.environment = [];
         this.args = [];
         this.stopAtEntry = true;
-        this.preLaunchTask = "autotools: build '" + built.goal + "'" +
-            (built.builddir ? " in " + built.builddir : "");
+        this.preLaunchTask = "autotools: build " + built.goal + "" +
+            (built.builddir ? (' in ' + built.builddir) : ' at the top');
         this.cwd = "$(command:autotools.builddir)";
         this.setupCommands = defaultSetupCommands;
     }
@@ -94,8 +94,8 @@ export class DebugNow implements vscode.DebugConfiguration {
         }
         this.args = [];
         this.stopAtEntry = true;
-        this.preLaunchTask = buildit ? "autotools: build '" + built.goal + "'" +
-                (built.builddir ? " in " + built.builddir : "") : undefined;
+        this.preLaunchTask = buildit ? "autotools: build " + built.goal +
+            (built.builddir ? (' in ' + built.builddir) : ' at the top') : undefined;
         this.cwd = resolvePathToRoot(path.join(c.top_builddir, built.builddir));
         this.setupCommands = defaultSetupCommands;
     }

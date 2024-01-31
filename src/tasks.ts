@@ -59,7 +59,7 @@ export class AutoToolsBuildTaskProvider implements MyTaskProvider {
                             type: this.myType,
                             target: new BuildTarget(dir, g.goal)
                         };
-                        g.task = new Task(kind, TaskScope.Workspace, "build '" + g.goal + "' in " + dir,
+                        g.task = new Task(kind, TaskScope.Workspace, "build " + g.goal + (dir ? (' in ' + dir) : ' at the top'),
                             "autotools",
                             new ProcessExecution(
                                 configuration.getMakePath(),
@@ -86,7 +86,7 @@ export class AutoToolsBuildTaskProvider implements MyTaskProvider {
             target: g
         };
         let c = configuration.getCurrentMakefileConfiguration();
-        var task = new Task(kind, TaskScope.Workspace, "build '" + g.goal + "'",
+        var task = new Task(kind, TaskScope.Workspace, "build " + g.goal,
             "autotools",
             new ProcessExecution(
                 configuration.getMakePath(),
