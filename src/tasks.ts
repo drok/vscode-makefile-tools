@@ -400,7 +400,7 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
                 localize("autotools.configure.help.task", "Display package configuration options"),
                 "Autotools task",
                 new ProcessExecution("./configure", ["--help"]));
-            this.helpTask.detail = localize("automake.configure.help", "$(tools) Output package configuration options using 'configure --help'");
+            this.helpTask.detail = localize("autotools.configure.help", "$(tools) Output package configuration options using 'configure --help'");
         }
     }
 	provideTasks(): Thenable<Task[]> | undefined {
