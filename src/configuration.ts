@@ -541,21 +541,6 @@ export async function readTestEnvironments(): Promise<void> {
 
 function updateEnvironmentsForCurrentMakefile(): void {
     // FIXME: store this R/O file somewhere global, to avoid updating environments per current makefile
-    let nolog_file = util.resolvePathToRoot(path.join(currentMakefileConfiguration.top_builddir,"no-partial-suite-log"));
-    let tmp = nolog_file + '.tmp';
-    try {
-        fs.stat(tmp, (err) => {
-            if (err?.code === 'ENOENT') {
-                fs.createWriteStream(tmp, {flags: 'w'})
-                .on('close', () => fs.chmodSync(tmp, "0444"))
-                .close();
-            }
-        });
-    } catch (err) {
-        // Ignore. If chmod failed, the summary will be printed when single tests are run.
-        // Ugly, but no reason to alarm the user.
-    }
-//    currentMakefileConfiguration.nologs = new Map();
     testEnvironments.forEach((e) => {
         // These options are static, and not relevant to the end-user. Avoid displaying them to the user
         // FIXME: generate a proper tmpfile with extension .tmp and make it
