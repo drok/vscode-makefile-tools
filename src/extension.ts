@@ -147,6 +147,11 @@ export class Extension {
     public async readPkgInfo() : Promise<void> {
         this.pkginfo = await make.getPackageJSON().catch(() => undefined);
     }
+    public kbUrlStatic : vscode.Uri = vscode.Uri.from({
+        scheme: 'https',
+        authority: 'autotools.mergesium.com',
+        path: '/kb/unknown'});
+
     public async kbUrl() : Promise<vscode.Uri> {
         if (!this.pkginfo)
             this.pkginfo = await make.getPackageJSON().catch(() => undefined);
@@ -154,7 +159,7 @@ export class Extension {
         if (!this.pkginfo)
             return Promise.reject();
 
-        var url = vscode.Uri.from({
+        this.kbUrlStatic = vscode.Uri.from({
             scheme: 'https',
             authority: 'autotools.mergesium.com',
             path: '/kb/' + util.slugify(this.pkginfo?.name ?? 'unknown'),
@@ -164,7 +169,7 @@ export class Extension {
                 'v=' + util.slugify('s-' + this.pkginfo?.version) :
                 this.pkginfo?.version ? 'v=' + util.slugify(this.pkginfo?.version) : undefined
         });
-        return Promise.resolve(url);
+        return Promise.resolve(this.kbUrlStatic);
     }
     async gotoKnowledgeBase() {
         let kburl = await this.kbUrl();

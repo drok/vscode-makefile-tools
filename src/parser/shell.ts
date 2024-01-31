@@ -15,7 +15,7 @@ import * as vscode from 'vscode';
 import {Parser, ParserDisp} from '../parser';
 import { parse, quote } from '@mergesium/shell-quote';
 // import  from '../extension';
-import { extension } from '../extension';
+import { extension, telemetry } from '../extension';
 import { Making } from './tool';
 import { Make, EnteringRE, CopyrightRE, ExecutingRE } from './gnumake';
 
@@ -162,6 +162,14 @@ export class Tool implements ToolInvocation {
  * Parse shell grammar (see Manpage bash "SHELL GRAMMAR") to obtain the arguments of a tool invocation,
  * eg the -D or -I options of a compiler.
  */
+let failureReported : number = 0;
+const failToParseTool : Tool = new Tool(
+    "",
+    ":", // toolFullPath,
+    undefined,
+    true, // toolFound,
+    ["unknown-tool", "unknown-arg"]
+);
 export class Executing implements Parser {
     // constructor(goal: string) { this.goal = goal; }
     static makeArgs(): string[] { return [
@@ -203,9 +211,19 @@ export class Executing implements Parser {
             return [ParserDisp.Leave, this];
         }
         // FIXME: line could be emitted by a script snippet, and it could throw the parser. try Catch here.
-        let makes = new Making(parseToolCmd(line), this);
-        if (makes.done())
-            this.makes.push(makes);
+        try {
+            let makes = new Making(parseToolCmd(line), this);
+            if (makes.done())
+                this.makes.push(makes);
+        } catch (e) {
+            if (failureReported < 6) {
+                telemetry.logEvent("ParseFailed", {proj: extension.pkginfo?.name});
+                logger.message(`ERROR: Failed to parse recipe for '${this.make.file}'`, "Normal");
+                if (!failureReported) logger.message('KB: ' + extension.kbUrlStatic.toString(true) + '#' + util.slugify(`config-parse-fail-${this.make.file}`), "Normal");
+                this.makes.push(new Making(failToParseTool, this));
+                failureReported++;
+            }
+        }
         return [ParserDisp.Leave, this];
     }
     push(sub: Parser) {
