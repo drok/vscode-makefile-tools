@@ -92,8 +92,11 @@ export class MyTestController {
   public testCompleted(task: vscode.TaskExecution, goal: Goal, target: BuildTarget) : void {
     let test : TestItem = goal.test!;
     if (this.activeRun) {
+        let old = goal.trs;
         goal.trs = readTRS(target, configuration.getCurrentMakefileConfiguration());
         this.updateGoalTRS(this.activeRun.run, test, goal.trs?.global, target.builddir);
+        if (this.activeRun.env == configuration.getCurrentTestEnvironment())
+            extension.updateTRSInPanel(this.activeRun.env, old, goal, target.builddir);
     }
     this.updateTestDescription(goal, target.builddir);
 
@@ -105,11 +108,16 @@ export class MyTestController {
     // extension.autotoolsDoneNoResult();
     // FIXME: also updateTestDescriptions of children
     let c = configuration.getCurrentMakefileConfiguration();
+    let updatePanel = (this.activeRun!.env == configuration.getCurrentTestEnvironment());
     if (this.busyNonLiveTest)
         for (const d of goal.depends!) {
             let bd : BuildTarget = new BuildTarget(dir, d.goal!);
+            let old = goal.trs;
             d.trs = readTRS(bd, c);
             this.updateGoalTRS(this.activeRun!.run, d.test!, d.trs?.global, dir);
+            if (updatePanel) {
+                extension.updateTRSInPanel(this.activeRun!.env, old, d, dir);
+            }
         }
 
     this.isBusy = false;
