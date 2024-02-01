@@ -71,7 +71,7 @@ export class Making implements Parser {
                 case 'set':
                 case 'case':
                 case ':':
-                case 'depbase=`echo':
+                case 'depbase=':
                 case 'fail=':
                 case 'Making':
                     return;

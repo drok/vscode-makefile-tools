@@ -98,7 +98,7 @@ export class Tool implements ToolInvocation {
         let removedOptArg : boolean = true;
         // TODO: Avoid this song and dance with removing optargs by having Intellisense ignore the args it doesn't care about
         return this.argv
-            .filter(arg => !unwanted.find(excluded => {
+            .filter(a => !unwanted.find(excluded => {
                 // Expect options with required parts have the optarg either attached to the opt
                 // or the next word. For excluded opts, remove the opt and the optarg
                 if (!removedOptArg) {
@@ -106,13 +106,13 @@ export class Tool implements ToolInvocation {
                     removedOptArg = true;
                     return true;
                 }
-                removedOptArg = !((arg == ("-" + excluded) || (arg == "--" + excluded)));
+                removedOptArg = !((a == ("-" + excluded) || (a == "--" + excluded)));
                 if (!removedOptArg)
                     return true;
-                removedOptArg = arg.startsWith("-" + excluded) || arg.startsWith("--" + excluded + "=");
+                removedOptArg = a.startsWith("-" + excluded) || a.startsWith("--" + excluded + "=");
                 if (removedOptArg)
                     return true;
-                removedOptArg = !(arg.startsWith("-" + excluded) || arg.startsWith("--" + excluded));
+                removedOptArg = !(a.startsWith("-" + excluded) || a.startsWith("--" + excluded));
                 return !removedOptArg;
             }));
     }
@@ -120,19 +120,19 @@ export class Tool implements ToolInvocation {
     filterArgs(wanted: string): string[] {
         let isOptArg : boolean = false;
         return this.argv
-            .map(arg => {
+            .map(a => {
                 // Expect options with required parts have the optarg either attached to the opt
                 // or the next word. For excluded opts, remove the opt and the optarg
                 if (isOptArg) {
                     // if the optarg was not attached, this next word is it. remove it outright
                     isOptArg = false;
-                    return arg;
+                    return a;
                 }
-                isOptArg = ((arg == ("-" + wanted) || (arg == "--" + wanted)));
+                isOptArg = ((a == ("-" + wanted) || (a == "--" + wanted)));
                 if (isOptArg)
                     return "";
-                if (arg.startsWith("-" + wanted)) return arg.slice(wanted.length + 1);
-                if (arg.startsWith("--" + wanted + "=")) return arg.slice(wanted.length + 3);
+                if (a.startsWith("-" + wanted)) return a.slice(wanted.length + 1);
+                if (a.startsWith("--" + wanted + "=")) return a.slice(wanted.length + 3);
                 return "";
             })
             .filter(v => v !== "");
@@ -245,28 +245,24 @@ export class Executing implements Parser {
     linebuf : string = "";
 }
 
-const LibtoolRE = /^[^\s]+ [^\s]+\/libtool .* (?:--mode=(\w+)) (.*) (?:\`test -f .*\`)?([^`\s]+)\s*$/;
-const VpathRE = /^(.*) (?:\`test -f .*\`)([^`\s]+)\s*$/;
-
+const LibtoolRE = /^[^\s]+ [^\s]+\/libtool .* (?:--mode=(\w+)) (.*)\s*$/;
+const TickRe = /`[^`]*`/g;
 // Parse a command line, removing comments, compound statements (||, &&)
 // redirections, and unescaping shell escape sequences
 function parseToolCmd(line: string) : Tool {
+    line = line.replace(TickRe,'');
     let libtool_cmd = LibtoolRE.exec(line);
     let ltmode : string | undefined;
     if (libtool_cmd) {
         /* If this is is libtool, remove the VPATH test and everything before --mode=compile */
-        line = libtool_cmd[2] + ' ' + libtool_cmd[3];
+        line = libtool_cmd[2];
         ltmode = libtool_cmd[1];
         /* TODO : Use libtool_cmd[1] = compile | link */
-    } else {
-        let vpath_cmd = VpathRE.exec(line);
-        if (vpath_cmd) {
-            line = vpath_cmd[1] + ' ' + vpath_cmd[2];
-        }
     }
     let parsedCmdLine = parse(line);
     let numArgs: number = parsedCmdLine.findIndex(v => typeof v !== "string");
-    numArgs = numArgs == -1 ? parsedCmdLine.length : numArgs + 1;
+    if (numArgs != -1)
+        parsedCmdLine = parsedCmdLine.slice(0, numArgs);
 
     let tool = new Tool(
         // don't use join and neither paths/filenames processed above if we want to keep the exact text in the makefile
@@ -275,7 +271,7 @@ function parseToolCmd(line: string) : Tool {
         "", // toolFullPath,
         ltmode,
         true, // toolFound,
-        parsedCmdLine.slice(0, numArgs) as string[]
+        parsedCmdLine as string[]
     );
     tool.fullPath = tool.argv.shift() || "";
     return tool;
