@@ -64,9 +64,10 @@ export class TestGrid implements TextDocumentContentProvider {
         else
             text = 'default (ie, configured with `configure` and no arguments)\n'
 
-        return `<details><summary>Build Configuration - ${c.name}</summary>
+        let name = escapeHtml(c.name);
+        return `<details><summary>Build Configuration - ${name}</summary>
 
-## Build Configuration - ${c.name}
+## Build Configuration - ${name}
 
 ${text}
 </details>
@@ -74,13 +75,13 @@ ${text}
     }
     environmentsOutput(e: TestEnvironment[]) : string {
 
-        return e.map<string>(i => `### **${i.name}** environment
+        return e.map<string>(i => `### **${escapeHtml(i.name)}** environment
 
 |Variable|Value|
 |:---|:---|
 ` +
             (i.testDebugEnv ? Object.entries(i.testDebugEnv).map<string>(
-                ([k,v],n) => `|\`${k}\`|\`${v}\`|`).join('\n') : ''
+                ([k,v],n) => `|\`${k}\`|\`${escapeHtml(v)}\`|`).join('\n') : ''
             ))
             .join('\n\n');
     }
@@ -90,7 +91,7 @@ ${text}
             let envs = getTestEnvironments()
             .filter(e => !e.dirs || e.dirs.includes(dir));
             text += `### ${dir}\n\n`;
-            text += '|Test|' + envs.map(e => `[${e.name}](#${slugify(e.name + '-environment')})`).join('|') + '|\n';
+            text += '|Test|' + envs.map((e,i) => i ? `[${escapeHtml(e.name)}](#${slugify(e.name + '-environment')})` : escapeHtml(e.name)).join('|') + '|\n';
             text += '|:---|' + ':---:|'.repeat(envs.length) + '\n';
 
             for (let t of g.depends) {
@@ -131,7 +132,7 @@ ${this.configurationOutput(c)}
 
 ## Test Environments
 
-${this.environmentsOutput(getTestEnvironments())}
+${this.environmentsOutput(getTestEnvironments().slice(1))}
 </details>
 `);
     }
@@ -177,4 +178,17 @@ ${this.environmentsOutput(getTestEnvironments().filter(i => !i.dirs || i.dirs.in
         // update only the affected docs.
         this.disposables.forEach((d,k) => this.update(k));
     }
+}
+
+var entityMap : {[key: string]: string}= {
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': '&quot;',
+    "'": '&#39;',
+    "/": '&#x2F;'
+};
+
+function escapeHtml(source: string) {
+    return String(source).replace(/[&<>"'\/]/g, s => entityMap[s]);
 }
