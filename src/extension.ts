@@ -254,6 +254,7 @@ export class Extension {
          */
         if (this.testController?.busyNonLiveTest)
             return;
+        /* This is only used when the FS changes without a testRun in progress */
         let dir = path.relative(util.resolvePathToRoot(c.top_builddir), path.dirname(uri.path));
         let log = path.basename(uri.path, ".trs") + ".log";
         let goal = configuration.getAllBuildTargets()
@@ -262,19 +263,10 @@ export class Extension {
             ?.depends?.find((d) => d.goal === log);
 
         if (goal) {
-            let old = goal.trs?.results.get(env.hashCode) ?? TRS.NONE;
-            let old_global = goal.trs?.global ?? TRS.NONE;
+            let old = goal.trs;
             goal.trs = make.readTRS(new make.BuildTarget(dir, log), c);
-            let current : TRS = goal.trs.results.get(env.hashCode) ?? TRS.NONE;
-            if (current != old) {
-                this.suiteDecorator.update(vscode.Uri.from(
-                    {authority: Extension.whoami, scheme: 'test', path: '/' + dir, query: log}));
-                this.suiteDecorator.update(vscode.Uri.from(
-                    {authority: Extension.whoami, scheme: 'check', path: '/' + dir, query: 'test-suite.log'}));
-                this.failStatUpdate(old, current);
-                // Don't update the test suites. They are auto summarized
-                this.updateOutlineBadge();
-            }
+            this.updateTRSInPanel(env, old, goal, dir);
+            let old_global = goal.trs?.global ?? TRS.NONE;
             if ( goal.test && goal.trs.global != old_global && !(goal.flags & Goal.Flags.Test_Suite))
                 /* If there is an active test run, use it to log the TRS result.
                  * Otherwise, create a new manual run
@@ -284,7 +276,19 @@ export class Extension {
 
         }
     }
-
+    public updateTRSInPanel(env: TestEnvironment, old: make.TestResult | undefined, goal: Goal, dir: string) : void {
+        let current : TRS = goal.trs!.results.get(env.hashCode) ?? TRS.ERROR;
+        let oldTRS = old?.results.get(env.hashCode)!; // ?? TRS.NONE;
+        if (current != oldTRS) {
+            this.suiteDecorator.update(vscode.Uri.from(
+                {authority: Extension.whoami, scheme: 'test', path: '/' + dir, query: goal.goal}));
+            //this.suiteDecorator.update(vscode.Uri.from(
+            //    {authority: Extension.whoami, scheme: 'check', path: '/' + dir, query: 'test-suite.log'}));
+            this.failStatUpdate(oldTRS, current);
+            // Don't update the test suites. They are auto summarized
+            this.updateOutlineBadge();
+        }
+    }
 
     public registerTasks(): void {
         // FIXME: Implement Disposable
