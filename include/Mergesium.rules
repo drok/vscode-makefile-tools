@@ -3,7 +3,7 @@
 
 .MAKE: me-check
 
-me-check: all-am
+me-check: check-am $(BUILT_SOURCES)
 	@list='$(RECHECK_LOGS)';           test -z "$$list" || rm -f $$list
 	@set +e; $(am__set_TESTS_bases); \
 	log_list=`for i in $$bases; do echo $$i.log; done`; \
