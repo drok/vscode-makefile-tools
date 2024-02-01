@@ -82,7 +82,7 @@ function delTag(tag: vscode.TestTag, test: TestItem) : vscode.TestTag[] | undefi
 
 export class MyTestController {
   private root: TestItem | undefined;
-  private readonly controller: vscode.TestController;
+  private controller: vscode.TestController;
   // private runProfiles: vscode.TestRunProfile[];
   // private debugProfiles: vscode.TestRunProfile[];
   private coverageProfile: vscode.TestRunProfile | undefined;
@@ -173,6 +173,12 @@ export class MyTestController {
   }
 
   public clear() : void {
+    configuration.getAllBuildTargets().forEach(d => {
+        d.forEach(g => {
+            g.test = undefined;
+        })
+    });
+    this.testGoals = new WeakMap<vscode.TestItem, Goal>();
     this.controller.items.replace([]);
   }
   public update(suite: TestItem) : void { // FIXME: call with suite[], and createTestRun once for all suites.
@@ -348,7 +354,11 @@ export class MyTestController {
           }
       }
   }
-  public activate(): void {
+  public restart(): void {
+    this.controller = vscode.tests.createTestController(this.id, this.label);
+    this.activate();
+  }
+  activate(): void {
       configuration.getTestEnvironments().map(env => {
         env.debug = this.controller.createRunProfile(
             localize('autotools.test.debug.profile.name', '{0}: Debug "{1}" environment', extension.pkginfo?.name || "Autotools", env.name),
@@ -368,6 +378,7 @@ export class MyTestController {
         });
   }
   public deactivate() : void {
+    this.clear();
     this.controller.dispose();
   }
 

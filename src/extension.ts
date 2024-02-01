@@ -450,8 +450,10 @@ export class Extension {
             if (!this.testController) {
                 this.testController = new MyTestController(
                     Extension.whoami, "Autotools tests", extension.getState().liveCheckId);
+            } else {
+                this.testController?.deactivate();
+                this.testController?.restart();
             }
-            this.testController.clear();
         } else {
             this.testController?.deactivate();
             this.testController = undefined;
