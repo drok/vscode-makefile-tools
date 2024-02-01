@@ -3,7 +3,7 @@
     "displayName": "Autotools Integration",
     "description": "Import autotools configuration into C/C++ IntelliSense",
     "version": "0.1.0",
-    "publisher": "mergesium",
+    "publisher": "Mergesium",
     "preview": true,
     "icon": "res/autotools.png",
     "readme": "README.md",
@@ -17,13 +17,13 @@
     "extensionKind": ["workspace"],
     "bugs": {
         "url": "https://github.com/Mergesium/autotools/issues",
-        "email": "autotools-support@mergesium.com"
+        "email": "autotools-support@Mergesium.com"
     },
     "repository": {
         "type": "git",
         "url": "https://github.com/Mergesium/autotools"
     },
-    "homepage": "https://autotools.mergesium.com",
+    "homepage": "https://autotools.Mergesium.com",
     "qna": "https://github.com/Mergesium/autotools/discussions/categories/q-a",
     "keywords": [
         "C",
