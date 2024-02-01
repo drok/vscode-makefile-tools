@@ -42,8 +42,10 @@ class MyConfiguration implements vscode.DebugConfiguration {
         this.environment = [];
         this.args = [];
         this.stopAtEntry = true;
-        this.preLaunchTask = "autotools: build " + built.goal + "" +
-            (built.builddir ? (' in ' + built.builddir) : ' at the top');
+        // cpptools understands tasks to be those it can provide itself.
+        // this.preLaunchTask = "autotools: build " + built.goal + "" +
+        //     (built.builddir ? (' in ' + built.builddir) : ' at the top');
+
         this.cwd = "$(command:autotools.builddir)";
         this.setupCommands = defaultSetupCommands;
     }
@@ -55,7 +57,7 @@ class MyConfiguration implements vscode.DebugConfiguration {
     environment: { name: string, value: string }[];
     args: string[];
     stopAtEntry: boolean;
-    preLaunchTask: string;
+    // preLaunchTask: string;
     cwd: string;
     setupCommands: { description: string, text: string, ignoreFailures: boolean }[];
 }
@@ -94,8 +96,8 @@ export class DebugNow implements vscode.DebugConfiguration {
         }
         this.args = [];
         this.stopAtEntry = true;
-        this.preLaunchTask = buildit ? "autotools: build " + built.goal +
-            (built.builddir ? (' in ' + built.builddir) : ' at the top') : undefined;
+        //this.preLaunchTask = buildit ? "autotools: build " + built.goal +
+        //    (built.builddir ? (' in ' + built.builddir) : ' at the top') : undefined;
         this.cwd = resolvePathToRoot(path.join(c.top_builddir, built.builddir));
         this.setupCommands = defaultSetupCommands;
     }
@@ -107,7 +109,7 @@ export class DebugNow implements vscode.DebugConfiguration {
     environment: { name: string, value: string }[];
     args: string[];
     stopAtEntry: boolean;
-    preLaunchTask: string | undefined;
+    //preLaunchTask: string | undefined;
     cwd: string;
     setupCommands: { description: string, text: string, ignoreFailures: boolean }[];
 }
