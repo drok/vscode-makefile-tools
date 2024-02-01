@@ -7,7 +7,7 @@
 // or dependencies on a real build)
 
 import * as configuration from '../configuration';
-import { TestEnvironment } from '../configuration';
+import { TestEnvironment, traits } from '../configuration';
 import * as logger from '../logger';
 import * as make from '../make';
 import * as util from '../util';
@@ -148,6 +148,10 @@ export class Make implements Parser {
                             // tests with spaces in their names, please send PR.
                             this.config_header = new Set(v.variable?.value.split(' '));
                             return true;
+                        case "TESTS_ENVIRONMENT":
+                            traits.overrides_TESTS_ENVIRONMENT = true;
+                            logger.message(`WARN: ${this.dir} Makefile overrides ${v.variable.name} with '${v.variable.value}'`, 'Normal'); break;
+
                     }
                     return false;
                 });
@@ -365,6 +369,7 @@ export class Variable implements Parser {
                 let variable = VariableDefinitionRe.exec(line);
                 if (variable) {
                     switch (variable[1]) {
+                        case "TESTS_ENVIRONMENT":
                         case "TESTS": this.variable = { name: variable[1], value: variable[2] }; break;
                     }
                 }

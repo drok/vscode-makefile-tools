@@ -4,7 +4,7 @@
 // Support for make operations
 
 import * as configuration from './configuration';
-import { MakefileConfiguration, TestEnvironment } from './configuration';
+import { MakefileConfiguration, TestEnvironment, traits } from './configuration';
 import * as cpp from 'vscode-cpptools';
 import * as cpptools from './cpptools';
 import {extension, telemetry} from './extension';
@@ -428,6 +428,7 @@ export async function generateParseContent(recursive: boolean = false): Promise<
             // All done, notify that new data is available
             result.returnCode = extension.updateCppToolsProvider();
             export_stats = build_tree.stats;
+            configuration.accountForTraits();
             extension.updateTasks(build_tree);
             extension.updateWatchers();
             telemetry.setAttributes({
@@ -811,6 +812,9 @@ export async function doConfigure(readCache: boolean, cacheFile: string, recursi
     } else {
         logger.message("Loading configurations from cache is not necessary.", "Verbose");
     }
+
+    /* Reset traits collected from parsing the makefile */
+    traits.overrides_TESTS_ENVIRONMENT = false;
 
     let s = telemetry.startSpan("import");
     telemetry.setAttributes({
