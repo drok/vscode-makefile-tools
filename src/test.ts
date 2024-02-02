@@ -11,7 +11,7 @@ import { TestController,
         TestRun } from 'vscode';
 import { SSL_OP_DONT_INSERT_EMPTY_FRAGMENTS } from 'constants';
 import { makeFullPath } from './util';
-import { TRS_Info, readTRS } from './make';
+import { TRS_Info, readTRS, emptyRunStats } from './make';
 import { Extension, extension,
         telemetry,
         openEditor } from './extension';
@@ -573,4 +573,3 @@ export class MyTestController {
     }
 }
 
-function emptyRunStats() : number[] { return [0,0,0,0,0,0,0]; }
