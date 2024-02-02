@@ -222,7 +222,7 @@ export class Executing implements Parser {
                 telemetry.setSpanStatus(SpanStatusCode.ERROR, "ParseFailed");
                 logger.message(`ERROR: Failed to parse recipe for '${this.make.file}'`, "Normal");
                 if (!failureReported) logger.message('KB: ' + extension.kbUrlStatic.toString(true) + '#' + util.slugify(`config-parse-fail-${this.make.file}`), "Normal");
-                this.makes.push(new Making(failToParseTool, this));
+                this.makes.push(new Making([failToParseTool], this));
                 failureReported++;
             }
         }
@@ -251,7 +251,7 @@ const LibtoolRE = /^[^\s]+ [^\s]+\/libtool .* (?:--mode=(\w+)) (.*)\s*$/;
 const TickRe = /`[^`]*`/g;
 // Parse a command line, removing comments, compound statements (||, &&)
 // redirections, and unescaping shell escape sequences
-function parseToolCmd(line: string) : Tool {
+function parseToolCmd(line: string) : Tool[] {
     line = line.replace(TickRe,'');
     let libtool_cmd = LibtoolRE.exec(line);
     let ltmode : string | undefined;
@@ -262,19 +262,29 @@ function parseToolCmd(line: string) : Tool {
         /* TODO : Use libtool_cmd[1] = compile | link */
     }
     let parsedCmdLine = parse(line);
-    let numArgs: number = parsedCmdLine.findIndex(v => typeof v !== "string");
-    if (numArgs != -1)
-        parsedCmdLine = parsedCmdLine.slice(0, numArgs);
+    let tools : Tool[] = [];
+    do {
+        // FIXME:
+        // "echo 9.4.114-6ec1f > .version-t && mv .version-t .version"
+        // In this case, '.version-t' is considered a tool invocation
+        // incorrectly
+        let cmd = parsedCmdLine;
+        let numArgs: number = parsedCmdLine.findIndex(v => typeof v !== "string");
+        if (numArgs != -1)
+            cmd = parsedCmdLine.slice(0, numArgs);
+        parsedCmdLine = parsedCmdLine.slice(cmd.length+1);
 
-    let tool = new Tool(
-        // don't use join and neither paths/filenames processed above if we want to keep the exact text in the makefile
-        // match[1] + match[2],
-        "",
-        "", // toolFullPath,
-        ltmode,
-        true, // toolFound,
-        parsedCmdLine as string[]
-    );
-    tool.fullPath = tool.argv.shift() || "";
-    return tool;
+        let tool = new Tool(
+            // don't use join and neither paths/filenames processed above if we want to keep the exact text in the makefile
+            // match[1] + match[2],
+            "",
+            "", // toolFullPath,
+            ltmode,
+            true, // toolFound,
+            cmd as string[]
+        );
+        tool.fullPath = tool.argv.shift() || "";
+        tools.push(tool);
+    } while (parsedCmdLine.length)
+    return tools;
 }
