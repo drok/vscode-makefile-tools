@@ -67,31 +67,28 @@ export class TestGrid implements TextDocumentContentProvider {
         let name = escapeHtml(c.name);
         return `<details><summary>Build Configuration - ${name}</summary>
 
-## Build Configuration - ${name}
-
 ${text}
 </details>
 `;
     }
     environmentsOutput(e: TestEnvironment[]) : string {
 
-        return e.map<string>(i => `### **${escapeHtml(i.name)}** environment
+        return e.map<string>(i => i.testDebugEnv ? `### **${escapeHtml(i.name)}** environment
 
-|Variable|Value|
-|:---|:---|
+${!i.testDebugEnv ? "No test environment is set" : "|Variable|Value|\n|:---|:---|"}
 ` +
             (i.testDebugEnv ? Object.entries(i.testDebugEnv).map<string>(
                 ([k,v],n) => `|\`${k}\`|\`${escapeHtml(v)}\`|`).join('\n') : ''
-            ))
+            ) : '')
             .join('\n\n');
     }
-    tabulateSuite(g: Goal, dir: string) : string {
+    tabulateSuite(g: Goal, dir: string, heading: boolean) : string {
         let text : string = '';
         if (g?.depends) {
             let envs = getTestEnvironments()
             .filter(e => !e.dirs || e.dirs.includes(dir));
-            text += `### ${dir}\n\n`;
-            text += '|Test|' + envs.map((e,i) => i ? `[${escapeHtml(e.name)}](#${slugify(e.name + '-environment')})` : escapeHtml(e.name)).join('|') + '|\n';
+            if (heading) text += `### ${dir}\n\n`;
+            text += '|Test|' + envs.map((e,i) => e.testDebugEnv ? `[${escapeHtml(e.name)}](#${slugify(e.name + '-environment')})` : escapeHtml(e.name)).join('|') + '|\n';
             text += '|:---|' + ':---:|'.repeat(envs.length) + '\n';
 
             for (let t of g.depends) {
@@ -117,7 +114,7 @@ ${text}
         goals.forEach((goals, dir) => {
             for (let g of goals.values()) {
                 if (g.flags & (Goal.Flags.Test_Suite))
-                    testResults += this.tabulateSuite(g, dir);
+                    testResults += this.tabulateSuite(g, dir, true);
             }
 
         });
@@ -129,8 +126,6 @@ ${testResults}
 
 ${this.configurationOutput(c)}
 <details><summary>Test Environments</summary>
-
-## Test Environments
 
 ${this.environmentsOutput(getTestEnvironments().slice(1))}
 </details>
@@ -147,19 +142,12 @@ ${this.environmentsOutput(getTestEnvironments().slice(1))}
     
         // Generate markdown content for detailed test result document
         if (g && (g.flags & (Goal.Flags.Test_Suite))) {
-            let testResults : string = `# Test Suite ${suiteName} for ${extension.pkginfo?.name} ${extension.pkginfo?.version} - ${c.name}\n\n`;
-
-            testResults += this.tabulateSuite(g, suiteName);
 
             return Promise.resolve(`# Test Suite **${suiteName}** for ${extension.pkginfo?.name} ${extension.pkginfo?.version} - ${c.name}\n\n
-## Test Results
-
-${testResults}
+${this.tabulateSuite(g, suiteName, false)}
 
 ${this.configurationOutput(c)}
 <details><summary>Test Environments</summary>
-
-## Test Environments
 
 ${this.environmentsOutput(getTestEnvironments().filter(i => !i.dirs || i.dirs.includes(suiteName)))}
 </details>
