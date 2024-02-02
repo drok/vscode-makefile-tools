@@ -41,10 +41,18 @@ const localize: nls.LocalizeFunc = nls.loadMessageBundle();
 //    3. default make tool and args
 
 export var traits : {
-    overrides_TESTS_ENVIRONMENT: boolean
+    overrides_TESTS_ENVIRONMENT: boolean;
+    log_drivers: Set<string>;
 } = {
-    overrides_TESTS_ENVIRONMENT: false
+    overrides_TESTS_ENVIRONMENT: false,
+    log_drivers: new Set<string>()
 };
+export function clearTraits() {
+    traits = {
+        overrides_TESTS_ENVIRONMENT: false,
+        log_drivers: new Set<string>()
+    };
+}
 export interface MakefileConfiguration {
     // A name associated with a particular build command process and args/options
     name: string;
@@ -498,7 +506,7 @@ export async function readTestEnvironments(): Promise<void> {
     // We need to read "makefile.configurations" unexpanded first, because we may write back into these settings
     // in case we indentify "name" missing. We'll expand later, see end of function.
     let workspaceConfiguration: vscode.WorkspaceConfiguration = vscode.workspace.getConfiguration("autotools");
-    loadedTestEnvironments = [nullTestEnvironment,...(workspaceConfiguration.get<TestEnvironment[]>("test_environments") || [])];
+    loadedTestEnvironments = [nullTestEnvironment(),...(workspaceConfiguration.get<TestEnvironment[]>("test_environments") || [])];
     let unnamedConfigurationId: number = 0;
 
     vscode.commands.executeCommand('setContext', "autotools:haveEnvironments",
@@ -541,26 +549,42 @@ export async function readTestEnvironments(): Promise<void> {
 
 function updateEnvironmentsForTraits(): void {
     if (traits.overrides_TESTS_ENVIRONMENT) {
-        testEnvironments = [nullTestEnvironment];
-        return;
+        testEnvironments = [nullTestEnvironment()];
+    } else {
+        var global_XFAIL_TESTS = gTestEnvironment.XFAIL_TESTS??[];
+        testEnvironments = [];
+        loadedTestEnvironments.forEach(element => {
+            let e: TestEnvironment = {
+                name: element.name,
+                /* Need separate ExecOptions for test and check commands because test run with SUBDIRS env in updateEnvironmentsForCurrentMakefile() */
+                testExecOptions: processExecutionOptions(element),
+                checkExecOptions: processExecutionOptions(element),
+                updateExecOptions: processExecutionOptions(element),
+                testDebugEnv: processDebugEnvironment(element),
+                hashCode: 0,
+                XFAIL_TESTS: element.XFAIL_TESTS ? [...global_XFAIL_TESTS,...element.XFAIL_TESTS??[]] : global_XFAIL_TESTS};
+                if (element.dirs)
+                    e.dirs = element.dirs;
+                e.hashCode = envHash(e.testExecOptions?.env?.TESTS_ENVIRONMENT ?? '')
+                testEnvironments.push(e);
+        });
     }
-    var global_XFAIL_TESTS = gTestEnvironment.XFAIL_TESTS??[];
-    testEnvironments = [];
-    loadedTestEnvironments.forEach(element => {
-        let e: TestEnvironment = {
-            name: element.name,
-            /* Need separate ExecOptions for test and check commands because test run with SUBDIRS env in updateEnvironmentsForCurrentMakefile() */
-            testExecOptions: processExecutionOptions(element),
-            checkExecOptions: processExecutionOptions(element),
-            updateExecOptions: processExecutionOptions(element),
-            testDebugEnv: processDebugEnvironment(element),
-            hashCode: 0,
-            XFAIL_TESTS: element.XFAIL_TESTS ? [...global_XFAIL_TESTS,...element.XFAIL_TESTS??[]] : global_XFAIL_TESTS};
-            if (element.dirs)
-                e.dirs = element.dirs;
-            e.hashCode = envHash(e.testExecOptions?.env?.TESTS_ENVIRONMENT ?? '')
-            testEnvironments.push(e);
-    });
+    traits.log_drivers.forEach(d => {
+        testEnvironments.forEach(e => {
+            let driver_flags = `--env-name "${e.name}" --env-id "${(e.hashCode).toString(36)}" --env-keep "$$ME_KEEP_ENV"`;
+            e.testDebugEnv![d] = extension.testRunner;
+            e.testDebugEnv![d + '_FLAGS'] = driver_flags;
+
+            e.testExecOptions!.env![d] = extension.testRunner;
+            e.testExecOptions!.env![d + '_FLAGS'] = driver_flags;
+
+            e.checkExecOptions!.env![d] = extension.testRunner;
+            e.checkExecOptions!.env![d + '_FLAGS' ] = driver_flags;
+
+            e.updateExecOptions!.env![d] = extension.testRunner;
+            e.updateExecOptions!.env![d + '_FLAGS'] = driver_flags;
+        })
+    })
     extension.setTestEnvironment();
 }
 
@@ -634,11 +658,12 @@ export function getCurrentTestEnvironment() : TestEnvironment {
     return testEnvironments[0];
 }
 
-let nullTestEnvironment : TestEnvironment = {
-        name: "<null>",
-        TESTS_ENVIRONMENT: [],
-        hashCode: envHash('')
-};
+function nullTestEnvironment() : TestEnvironment {
+        return {
+            name: "<null>",
+            TESTS_ENVIRONMENT: [],
+            hashCode: envHash('')}
+}
 
 let gTestEnvironment : TestEnvironment = {
     name: "global",
@@ -651,7 +676,6 @@ export async function readGlobalTestEnvironment(): Promise<void> {
         [];
 
     gTestEnvironment.XFAIL_TESTS = workspaceConfiguration.get<string[]>("XFAIL_TESTS") || [];
-    nullTestEnvironment.XFAIL_TESTS = gTestEnvironment.XFAIL_TESTS;
 
     vscode.commands.executeCommand('setContext', "autotools:haveGlobalWaivers",
         gTestEnvironment.XFAIL_TESTS?.length ? 1 : 2);
