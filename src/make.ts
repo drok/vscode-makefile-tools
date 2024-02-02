@@ -232,6 +232,7 @@ export async function generateParseContent(recursive: boolean = false): Promise<
         makeArgs.push("--assume-old=configure"); // Only works in-tree
 
     makeArgs.push(
+        "GMOFILES=", // Avoid po and pot files being built with msgmerge
     // rejecting GNU make's builtin variables and rules because automake
     // generates implicit rules to cover all the targets. It does not rely
     // on builtins
