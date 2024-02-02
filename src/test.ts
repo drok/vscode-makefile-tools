@@ -173,7 +173,6 @@ export class MyTestController {
     else
         goal.test.tags = tags_none;
 
-    this.updateTestDescription(goal, logpath);
     suite.children.add(goal.test);
   }
   public addSubTest(suite: TestItem, sub: TestItem) : void {
@@ -215,7 +214,7 @@ export class MyTestController {
   }
   updateGoalTRS(run: TestRun, test: TestItem, trs: TRS | undefined, dir: string) : void {
     switch(trs) {
-        case TRS.NONE: break;
+        case TRS.NONE: run.skipped(test); break;
         case TRS.ERROR: run.errored(test, new vscode.TestMessage("See log file")); break;
         case TRS.SKIP: run.skipped(test); break;
         case TRS.PASS: run.passed(test); break;
@@ -233,7 +232,6 @@ export class MyTestController {
         this.updateTestDescription(goal, dir);
     } else for(const [id, item]  of test.children) {
         this.updateTRS(run, item, dir);
-        this.updateTestDescription(this.testGoals.get(item)!, dir);
     }
   }
 

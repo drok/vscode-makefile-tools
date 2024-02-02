@@ -200,7 +200,7 @@ export class AutoToolsTestTaskProvider implements MyTaskProvider {
                             this.numUnknown += ((current == TRS.NONE || current == TRS.ERROR) ? 1 : 0);
                             this.numSuspect += (isSuspect(current) ? 1 : 0);
                             this.numTests++;
-
+                            extension.updateTRSInPanel(cte,undefined,d,dir);
                             // tc.addTest(suite, d, trs);
                         });
                     }
