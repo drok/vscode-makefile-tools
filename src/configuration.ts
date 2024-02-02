@@ -549,7 +549,13 @@ export async function readTestEnvironments(): Promise<void> {
 
 function updateEnvironmentsForTraits(): void {
     if (traits.overrides_TESTS_ENVIRONMENT) {
-        testEnvironments = [nullTestEnvironment()];
+        let e: TestEnvironment = nullTestEnvironment();
+        e.testExecOptions = processExecutionOptions(e);
+        e.checkExecOptions = processExecutionOptions(e);
+        e.updateExecOptions = processExecutionOptions(e);
+        e.testDebugEnv = processDebugEnvironment(e);
+        e.XFAIL_TESTS = gTestEnvironment.XFAIL_TESTS??[];
+        testEnvironments = [e];
     } else {
         var global_XFAIL_TESTS = gTestEnvironment.XFAIL_TESTS??[];
         testEnvironments = [];

@@ -156,7 +156,7 @@ export class Make implements Parser {
                             break;
                         default:
                             if (v.variable.name.endsWith("LOG_DRIVER")) {
-                                if (v.variable.value != '$(SHELL) $(top_srcdir)/test-driver') {
+                                if (v.variable.value != '$(SHELL) $(top_srcdir)/test-driver' && v.variable.value != '$(SHELL) $(top_srcdir)/build-aux/test-driver') {
                                     /* Customized test driver. */
                                     logger.message(`WARN: ${this.dir} uses ${v.variable.name}=${v.variable.value}; ${Extension.whoami} will override it.`, 'Normal');
                                     telemetry.logEvent("warn-log-driver", {n: v.variable.name, v: v.variable.value}, undefined, true);
