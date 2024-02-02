@@ -818,15 +818,15 @@
                 },
                 {
                     "command": "autotools.bootstrap",
-                    "when": "!autotools.isBootstrapped"
+                    "when": "!autotools:isBootstrapped"
                 },
                 {
                     "command": "autotools.configure",
-                    "when": "autotools.isBootstrapped"
+                    "when": "autotools:isBootstrapped"
                 },
                 {
                     "command": "autotools.command.regen",
-                    "when": "autotools.isBootstrapped"
+                    "when": "autotools:isBootstrapped"
                 },
                 {
                     "command": "autotools.newConfiguration",
