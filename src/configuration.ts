@@ -572,8 +572,6 @@ function updateEnvironmentsForTraits(): void {
     traits.log_drivers.forEach(d => {
         testEnvironments.forEach(e => {
             let driver_flags = `--env-name "${e.name}" --env-id "${(e.hashCode).toString(36)}" --env-keep "$$ME_KEEP_ENV"`;
-            e.testDebugEnv![d] = extension.testRunner;
-            e.testDebugEnv![d + '_FLAGS'] = driver_flags;
 
             e.testExecOptions!.env![d] = extension.testRunner;
             e.testExecOptions!.env![d + '_FLAGS'] = driver_flags;
