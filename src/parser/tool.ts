@@ -52,47 +52,49 @@ export class Making implements Parser {
     static makeArgs(): string[] { return [
         // Nothing
     ];};
-    constructor(tool : ToolInvocation, caller: Executing) {
-        if (typeof tool.fullPath == "string") {
+    constructor(tools : ToolInvocation[], caller: Executing) {
+        for (const tool of tools) {
+            if (typeof tool.fullPath == "string") {
 
-            /* automake uses mv and other utils. Skip them, they don't compile
-             * This list doesn't need to be complete. If non-compiler commands get through,
-             * any extracted garbage will be overwritten by the last valid compiler command.
-             * This pre-filtering is only meant to cut down on obvious noise like
-             * "Found compiler commandd: mv ..."
-             */
-            switch (tool.fullPath) {
-                case 'mv':
-                case 'rm':
-                case 'touch':
-                case 'cd':
-                case 'test':
-                case 'mkdir':
-                case 'if':
-                case 'echo':
-                case 'set':
-                case 'case':
-                case ':':
-                case 'depbase=':
-                case 'fail=':
-                case 'Making':
-                    return;
-            }
+                /* automake uses mv and other utils. Skip them, they don't compile
+                * This list doesn't need to be complete. If non-compiler commands get through,
+                * any extracted garbage will be overwritten by the last valid compiler command.
+                * This pre-filtering is only meant to cut down on obvious noise like
+                * "Found compiler commandd: mv ..."
+                */
+                switch (tool.fullPath) {
+                    case 'mv':
+                    case 'rm':
+                    case 'touch':
+                    case 'cd':
+                    case 'test':
+                    case 'mkdir':
+                    case 'if':
+                    case 'echo':
+                    case 'set':
+                    case 'case':
+                    case ':':
+                    case 'depbase=':
+                    case 'fail=':
+                    case 'Making':
+                        continue;
+                }
 
-            //throw new Error("compilerTool.fullPath is not a string (eg, subshell)");
-            /* FIXME: this isCompiler() functionality is a placeholder */
-            if (tool.ltmode === 'link') {
-                this.handleLinkerCommand(tool, caller.currentDir, caller.currentTarget);
-            } else {
-                var srcDir = util.resolvePathToRoot(caller.make.dir);
-                if(ObjectFileRE.test(caller.currentTarget)) {
-                    this.handleCompilerCommand(tool, caller.currentDir, srcDir);
+                //throw new Error("compilerTool.fullPath is not a string (eg, subshell)");
+                /* FIXME: this isCompiler() functionality is a placeholder */
+                if (tool.ltmode === 'link') {
+                    this.handleLinkerCommand(tool, caller.currentDir, caller.currentTarget);
                 } else {
-                    /* FIXME: Do this if Flags.Linked_Target - but the rule is printed after exec. Tweak dry-runner ?*/
-                    if (linkers.includes(path.basename(tool.fullPath)))
-                        this.handleLinkerCommand(tool, caller.currentDir, caller.currentTarget);
-                    else if (tool.argv.length && typeof tool.argv[0] == "string" && path.basename(tool.argv[0]) == "libtool" && tool.hasArg(["mode=link"]))
-                        this.handleLinkerCommand(tool, caller.currentDir, caller.currentTarget);
+                    var srcDir = util.resolvePathToRoot(caller.make.dir);
+                    if(ObjectFileRE.test(caller.currentTarget)) {
+                        this.handleCompilerCommand(tool, caller.currentDir, srcDir);
+                    } else {
+                        /* FIXME: Do this if Flags.Linked_Target - but the rule is printed after exec. Tweak dry-runner ?*/
+                        if (linkers.includes(path.basename(tool.fullPath)))
+                            this.handleLinkerCommand(tool, caller.currentDir, caller.currentTarget);
+                        else if (tool.argv.length && typeof tool.argv[0] == "string" && path.basename(tool.argv[0]) == "libtool" && tool.hasArg(["mode=link"]))
+                            this.handleLinkerCommand(tool, caller.currentDir, caller.currentTarget);
+                    }
                 }
             }
         }
