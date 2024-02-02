@@ -479,16 +479,6 @@ export class Goal extends Node implements Parser {
                 if (info) {
                     switch (info[1]) {
                         case "Command line target.":
-                        case "File does not exist.":
-                        case "File has been updated.":
-                        case "File has not been updated.":
-                        case "File is very old.":
-                        case "Implicit rule search has been done.":
-                        case "Implicit rule search has not been done.":
-                        case "Modification time never checked.":
-                        case "Phony target (prerequisite of .PHONY).":
-                        case "Precious file (prerequisite of .PRECIOUS).":
-                        case "Successfully updated.":
                             return [ParserDisp.Continue, this];
                         case "Failed to be updated.":
                             /* FIXME: This should be handled */
