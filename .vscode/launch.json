@@ -32,6 +32,36 @@
             ]
         },
         {
+            "name": "Make coreutils dry",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/make/make",
+            "args": [
+                    "-j1",
+                    "--output-sync=none",
+                    "--dry-run",
+                    "--print-data-base",
+                    "V=1"
+            ],
+            "stopAtEntry": false,
+            "cwd": "/tmp/coreutils/build/Default/gnulib-tests",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Set Disassembly Flavor to Intel",
+                    "text": "-gdb-set disassembly-flavor intel",
+                    "ignoreFailures": true
+                }
+            ]
+        },
+        {
             "name": "Make Mergesium.rules empty me-check-recursive rule",
             "type": "cppdbg",
             "request": "launch",
@@ -120,6 +150,23 @@
                 "MAKEFILE_TOOLS_TESTING": "1",
                 "WindowsSDKVersion": "12.3.45678.9\\"
             },
+            "preLaunchTask": "compile",
+        },
+        {
+            "name": "Launch Extension with --new-window",
+            "type": "extensionHost",
+            "request": "launch",
+            "runtimeExecutable": "${execPath}",
+            "args": [
+
+                "--extensionDevelopmentPath=${workspaceFolder}",
+                "--new-window",
+
+            ],
+            "sourceMaps": true,
+            "outFiles": [
+                "${workspaceFolder}/out/**/*.js"
+            ],
             "preLaunchTask": "compile",
         },
         {
