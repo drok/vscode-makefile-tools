@@ -18,6 +18,7 @@ import { Executing } from './shell';
 import { Node } from '../tree';
 
 import * as nls from 'vscode-nls';
+import { Extension, telemetry } from '../extension';
 nls.config({ messageFormat: nls.MessageFormat.bundle, bundleFormat: nls.BundleFormat.standalone })();
 const localize: nls.LocalizeFunc = nls.loadMessageBundle();
 
@@ -140,18 +141,29 @@ export class Make implements Parser {
                 this.goals = sub.goals;
                 this.test_suite = sub.test_suite;
                 sub.variables.some((v) => {
-                    switch (v.variable?.name) {
+                    if (v.variable)
+                    switch (v.variable.name) {
                         case "CONFIG_HEADER":
                             // Targets with spaces in their names are not supported
                             // because make doesn't support them, at least not without
                             // significant song and dance. If you need to support
                             // tests with spaces in their names, please send PR.
-                            this.config_header = new Set(v.variable?.value.split(' '));
+                            this.config_header = new Set(v.variable.value.split(' '));
                             return true;
                         case "TESTS_ENVIRONMENT":
                             traits.overrides_TESTS_ENVIRONMENT = true;
                             logger.message(`WARN: ${this.dir} Makefile overrides ${v.variable.name} with '${v.variable.value}'`, 'Normal');
                             break;
+                        default:
+                            if (v.variable.name.endsWith("LOG_DRIVER")) {
+                                if (v.variable.value != '$(SHELL) $(top_srcdir)/test-driver' && v.variable.value != '$(SHELL) $(top_srcdir)/build-aux/test-driver') {
+                                    /* Customized test driver. */
+                                    logger.message(`WARN: ${this.dir} uses ${v.variable.name}=${v.variable.value}; ${Extension.whoami} will override it.`, 'Normal');
+                                    telemetry.logEvent("warn-log-driver", {n: v.variable.name, v: v.variable.value}, undefined, true);
+                                }
+                                if (v.variable.name != "LOG_DRIVER") // This is overriden by default
+                                    traits.log_drivers.add(v.variable.name);
+                            }
                     }
                     return false;
                 });
@@ -371,6 +383,9 @@ export class Variable implements Parser {
                     switch (variable[1]) {
                         case "TESTS_ENVIRONMENT":
                         case "TESTS": this.variable = { name: variable[1], value: variable[2] }; break;
+                        default:
+                            if (variable[1].endsWith('LOG_DRIVER'))
+                                this.variable = { name: variable[1], value: variable[2] }; break;
                     }
                 }
             }

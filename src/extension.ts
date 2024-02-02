@@ -283,15 +283,26 @@ export class Extension {
 
         }
     }
+    private unsupported_log_count : number = 0;
     public updateTRSInPanel(env: TestEnvironment, old: make.TestResult | undefined, goal: Goal, dir: string) : void {
-        let current : TRS = goal.trs!.results.get(env.hashCode) ?? TRS.ERROR;
-        let oldTRS = old?.results.get(env.hashCode)!; // ?? TRS.NONE;
-        if (current != oldTRS) {
+        /* The ?? defaults are needed when the test is not using my LOG_DRIVER
+         * .. the TRS in the file will not have the hashCode
+         *
+         */
+        let current : TRS | undefined = goal.trs!.results.get(env.hashCode);
+        let oldTRS = old?.results.get(env.hashCode) ?? TRS.NONE;
+        if (current === undefined && old !== undefined) {
+            if (this.unsupported_log_count++ < 4) {
+                logger.message(`ERORR: The test ${dir}/${goal.goal} did not use the ${Extension.whoami} LOG_DRIVER. Per-environment results not available.`);
+                telemetry.setSpanStatus(SpanStatusCode.ERROR, "unknown ?_LOG_DRIVER");
+            }
+        } else
+        if ((current ?? TRS.NONE) != oldTRS) {
             this.suiteDecorator.update(vscode.Uri.from(
                 {authority: Extension.whoami, scheme: 'test', path: '/' + dir, query: goal.goal}));
             //this.suiteDecorator.update(vscode.Uri.from(
             //    {authority: Extension.whoami, scheme: 'check', path: '/' + dir, query: 'test-suite.log'}));
-            this.failStatUpdate(oldTRS, current);
+            this.failStatUpdate(oldTRS, current ?? TRS.NONE);
             // Don't update the test suites. They are auto summarized
             this.updateOutlineBadge();
         }

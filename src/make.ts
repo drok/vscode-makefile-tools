@@ -4,7 +4,7 @@
 // Support for make operations
 
 import * as configuration from './configuration';
-import { MakefileConfiguration, TestEnvironment, traits } from './configuration';
+import { MakefileConfiguration, clearTraits } from './configuration';
 import * as cpp from 'vscode-cpptools';
 import * as cpptools from './cpptools';
 import {extension, telemetry} from './extension';
@@ -811,7 +811,7 @@ export async function doConfigure(readCache: boolean, cacheFile: string, recursi
     }
 
     /* Reset traits collected from parsing the makefile */
-    traits.overrides_TESTS_ENVIRONMENT = false;
+    clearTraits();
 
     let s = telemetry.startSpan("import");
     telemetry.setAttributes({
