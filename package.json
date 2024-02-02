@@ -931,6 +931,16 @@
                     "group": "navigation@30"
                 }
             ],
+            "testing/item/context": [
+                {
+                    "command": "autotools.command.testgrid.item",
+                    "group": "navigation@3"
+                },
+                {
+                    "command": "autotools.command.testgrid.top",
+                    "group": "navigation@4"
+                }
+            ],
             "view/title": [
                 {
                     "command": "autotools.command.testgrid.top",
