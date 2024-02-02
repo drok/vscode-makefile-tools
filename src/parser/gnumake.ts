@@ -241,7 +241,7 @@ export class Make implements Parser {
                 rea[4], this.dir));
             make.builtin_targets.add(this.dir + "/" + rea[4]);
         }
-        this.file = rea[4] || rea[5];
+        this.file = rea[4] ?? rea[5];
     }
     dir: string = 'first';
     section: MakeSection;
