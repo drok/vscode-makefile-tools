@@ -52,8 +52,9 @@ export function message(message: string, loggingLevel?: string): void {
     }
 
     let channel: vscode.OutputChannel = getOutputChannel();
-    channel.appendLine(message);
+    channel.appendLine((loggingLevel && loggingLevel != 'Normal') ? message : truncate(message));
 }
+const truncate = (input: string) => input.length > 150 ? `${input.substring(0, 150)}...` : input;
 
 // This is used for a few scenarios where the message already has end of line incorporated.
 // Example: stdout/stderr of a child process read before the stream is closed.

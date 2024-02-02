@@ -150,8 +150,8 @@ export class Make implements Parser {
                             return true;
                         case "TESTS_ENVIRONMENT":
                             traits.overrides_TESTS_ENVIRONMENT = true;
-                            logger.message(`WARN: ${this.dir} Makefile overrides ${v.variable.name} with '${v.variable.value}'`, 'Normal'); break;
-
+                            logger.message(`WARN: ${this.dir} Makefile overrides ${v.variable.name} with '${v.variable.value}'`, 'Normal');
+                            break;
                     }
                     return false;
                 });
