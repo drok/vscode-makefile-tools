@@ -27,6 +27,7 @@ import * as ui from './ui';
 import { resolvePathToRoot,
          checkFileExistsSync } from './util';
 import * as vscode from 'vscode';
+import { TestItem } from 'vscode';
 import * as cpp from 'vscode-cpptools';
 import * as debugProvider from './debug';
 import { DebugNow } from './debug';
@@ -127,17 +128,23 @@ export class Extension {
             await focusPreviewedDocument(summary);
         }));
 
-        extensionContext.subscriptions.push(vscode.commands.registerCommand('autotools.command.testgrid.item', async (sub: tree.SubNode) => {
+        extensionContext.subscriptions.push(vscode.commands.registerCommand('autotools.command.testgrid.item', async (sub: tree.SubNode | TestItem) => {
             telemetry.logEvent("itemgrid");
-            if (sub.submake.test_suite) {
+            let dir : string | undefined;
+            if (sub instanceof tree.SubNode && sub.submake.test_suite) {
+                dir = sub.submake.dir;
+            } else if (instanceOfTestItem(sub)) {
+                dir = sub.parent?.id ?? sub.id;
+            }
+            if (dir) {
                 let summary : vscode.Uri = vscode.Uri.from({
                     scheme: TestGrid.scheme,
                     authority: "mergesium.autotools",
-                    path: '/' + sub.submake.dir,
+                    path: '/' + dir,
                 });
                 await focusPreviewedDocument(summary);
             }
-        }));
+    }));
 
         debugProvider.activate(extensionContext);
 
@@ -1113,4 +1120,8 @@ async function focusPreviewedDocument(uri: vscode.Uri) : Promise<void> {
         });
         if (!opened) await vscode.commands.executeCommand("markdown.showPreview", summary);
     }
+}
+
+function instanceOfTestItem(object: any): object is TestItem {
+    return 'id' in object;
 }
