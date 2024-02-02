@@ -92,10 +92,18 @@ export class MyTelemetry implements Disposable {
         return this.sdk.shutdown();
     }
 
-    public logEvent(eventName: string, attributes?: api.Attributes, span?: Span) {
+    public logEvent(eventName: string, attributes?: api.Attributes, span?: Span, unusual?: boolean) {
         if (!this.spans.length)
             this.startSpan('def');
         let s : Span = span || this.spans[this.spans.length - 1];
+        if (unusual) {
+            let traceState = s.spanContext().traceState;
+            if (!traceState) {
+                traceState = new Wanted("unusual");
+                s.spanContext().traceState = traceState;
+            }
+            traceState?.set("unusual", "true");
+        }
         s.addEvent(eventName, attributes);
     }
     public logException(exception: Error, span?: Span) {
