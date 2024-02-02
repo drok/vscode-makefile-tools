@@ -412,13 +412,13 @@ export async function generateParseContent(recursive: boolean = false): Promise<
             if (result.returnCode !== null) {
                 await util.reportDryRunError(dryrunFile);
             }
-            telemetry.logEvent("DryRunFailed", {returnCode: result.returnCode});
+            telemetry.logEvent("DryRunFailed", {returnCode: result.returnCode}, undefined, true);
             extension.resetCppToolsProvider();
             // FIXME: Since dry-running failed, also unlink the configCache file
         } else {
             if (parseFailedAt) {
                 /* Partial parse ... something in the make output could not be parsed */
-                telemetry.logEvent("ParseFailed", {proj: extension.pkginfo?.name, line: parseFailedAt});
+                telemetry.logEvent("ParseFailed", {proj: extension.pkginfo?.name, line: parseFailedAt}, undefined, true);
                 var kbUrl : vscode.Uri = await extension.kbUrl();
                 logger.message('KB: ' + kbUrl.toString(true) + '#config-parse-fail', "Normal");
             }

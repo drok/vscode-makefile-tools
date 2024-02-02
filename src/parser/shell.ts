@@ -18,6 +18,7 @@ import { parse, quote } from '@mergesium/shell-quote';
 import { extension, telemetry } from '../extension';
 import { Making } from './tool';
 import { Make, EnteringRE, CopyrightRE, ExecutingRE } from './gnumake';
+import { SpanStatusCode } from '@opentelemetry/api';
 
 export interface PreprocessDryRunOutputReturnType {
     retc: number;
@@ -218,6 +219,7 @@ export class Executing implements Parser {
         } catch (e) {
             if (failureReported < 6) {
                 telemetry.logEvent("ParseFailed", {proj: extension.pkginfo?.name});
+                telemetry.setSpanStatus(SpanStatusCode.ERROR, "ParseFailed");
                 logger.message(`ERROR: Failed to parse recipe for '${this.make.file}'`, "Normal");
                 if (!failureReported) logger.message('KB: ' + extension.kbUrlStatic.toString(true) + '#' + util.slugify(`config-parse-fail-${this.make.file}`), "Normal");
                 this.makes.push(new Making(failToParseTool, this));
