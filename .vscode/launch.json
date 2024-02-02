@@ -13,7 +13,7 @@
                     "--print-data-base",
                     "V=1"
             ],
-            "stopAtEntry": true,
+            "stopAtEntry": false,
             "cwd": "/home/radu/proj/curl/build/Mergesium-Debug/src",
             "environment": [],
             "externalConsole": false,
