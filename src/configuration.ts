@@ -1074,6 +1074,10 @@ export async function setNewConfiguration(): Promise<void> {
 
 let showingMaintainerPrompt: boolean = false;
 async function promptMaintainerModeChange(modal: boolean) : Promise<void> {
+
+    /* TODO: this idea needs work. auto-rechecking should be disabled, etc.  */
+    return Promise.resolve();
+
     let pinfo = extension.pkginfo;
     if ((!disableMaintainerMode || !pinfo || !pinfo?.maint) || showingMaintainerPrompt)
         return Promise.resolve();
