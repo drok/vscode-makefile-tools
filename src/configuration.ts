@@ -1052,7 +1052,8 @@ export async function setNewConfiguration(): Promise<void> {
 
 let showingMaintainerPrompt: boolean = false;
 async function promptMaintainerModeChange(modal: boolean) : Promise<void> {
-    if ((!disableMaintainerMode || !extension.pkginfo || !!extension.pkginfo?.maint) || showingMaintainerPrompt)
+    let pinfo = extension.pkginfo;
+    if ((!disableMaintainerMode || !pinfo || !pinfo?.maint) || showingMaintainerPrompt)
         return Promise.resolve();
 
     const doit: string = localize("yes", "Yes");
