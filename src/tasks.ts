@@ -598,7 +598,8 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
                 logger.showOutputChannel();
             }
         }
-        this.isErroredConfiguration = (exitCode != 0);
+        if (this.working)
+            this.isErroredConfiguration = (exitCode != 0);
     }
 }
 
