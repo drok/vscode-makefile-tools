@@ -237,9 +237,9 @@ export class Extension {
                 !(result == make.TRS.NONE || result == make.TRS.ERROR))
             this.testTasks.numUnknown--;
 
-        if (oldresult == make.TRS.FAIL)
+        if (oldresult == make.TRS.FAIL || oldresult == make.TRS.XPASS)
             this.testTasks.numFails--;
-        else if (result == make.TRS.FAIL)
+        else if (result == make.TRS.FAIL || result == make.TRS.XPASS)
             this.testTasks.numFails++;
 
         if (make.isSuspect(oldresult))

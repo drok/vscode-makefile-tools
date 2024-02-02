@@ -883,10 +883,10 @@ export const TRSLookup : Map<string,TRS> = new Map([
     ["ERROR", TRS.ERROR],
     ["NONE", TRS.NONE],
 ]);
-
+export function emptyRunStats() : number[] { return [0,0,0,0,0,0,0]; }
 export function isSuspect(trs: TRS) : boolean
 {
-    return trs === TRS.ERROR || trs === TRS.XFAIL || trs === TRS.XPASS;
+    return trs === TRS.ERROR || trs === TRS.XFAIL;
 }
 
 const noTRS : TestResult = { global: TRS.NONE, results: new Map<number, TRS>() };

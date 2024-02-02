@@ -11,7 +11,7 @@ import { Goal } from './parser/gnumake';
 import { assert, error } from 'console';
 import * as configuration from './configuration';
 import { TestEnvironment } from './configuration';
-import { BuildTarget, t_all, t_none, readTRS, TRS, isSuspect } from './make';
+import { BuildTarget, t_all, t_none, readTRS, TRS, isSuspect, emptyRunStats } from './make';
 import { resolvePathToRoot, checkFileExistsSync, createDirectorySync } from './util';
 import * as vscode from 'vscode';
 
@@ -195,11 +195,13 @@ export class AutoToolsTestTaskProvider implements MyTaskProvider {
 
                             /* Read existing TRS file to show correct last known status in the outline */
                             d.trs = readTRS(test, c);
-                            let current : TRS = d.trs.results.get(cte.hashCode) ?? TRS.NONE;
-                            this.numFails += (current == TRS.FAIL ? 1 : 0);
-                            this.numUnknown += ((current == TRS.NONE || current == TRS.ERROR) ? 1 : 0);
-                            this.numSuspect += (isSuspect(current) ? 1 : 0);
-                            this.numTests++;
+                            //let current : TRS = d.trs.results.get(cte.hashCode) ?? TRS.NONE;
+                            let results : number[] = emptyRunStats();
+                            d.trs.results.forEach(v => results[v]++);
+                            this.numFails += results[TRS.FAIL] + results[TRS.XPASS];
+                            this.numUnknown += results[TRS.NONE] + results[TRS.ERROR] + (envs.length - d.trs.results.size);
+                            this.numSuspect += results[TRS.ERROR] + results[TRS.XFAIL];
+                            this.numTests+=envs.length;
                             extension.updateTRSInPanel(cte,undefined,d,dir);
                             // tc.addTest(suite, d, trs);
                         });
