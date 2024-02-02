@@ -18,6 +18,8 @@ import * as shellParser from './shell';
 import { ToolInvocation} from './shell';
 import { Parser, ParserDisp, EmptyLine } from '../parser';
 import { Executing } from './shell';
+import { telemetry } from '../extension';
+import { SpanStatusCode } from '@opentelemetry/api';
 
 // List of compiler tools plus the most common aliases cc and c++
 // ++ needs to be escaped for the regular expression in parseLineAsTool.
@@ -319,6 +321,7 @@ export class Making implements Parser {
         // We need to ignore the $ anywhere else in the linker command line so that we don't lose
         // valid target binaries.
         if (!targetBinary || targetBinary.includes("$")) {
+            telemetry.setSpanStatus(SpanStatusCode.ERROR, "linker target not ID");
             throw new Error("targets should never have dollar signs");
         } else
             this.targetBinaries.push(targetBinary);
