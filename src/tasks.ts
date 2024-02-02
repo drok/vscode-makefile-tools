@@ -146,7 +146,7 @@ export class AutoToolsTestTaskProvider implements MyTaskProvider {
         let tc = extension.testController;
         let t = configuration.getAllBuildTargets();
         let cte = configuration.getCurrentTestEnvironment();
-        let e = make.supportsTestEnvironments() ? configuration.getTestEnvironments() : [cte];
+        let e = configuration.getTestEnvironments();
         t.forEach((goals, dir) => {
             for (let g of goals.values()) {
                 if (g.flags & Goal.Flags.Test_Suite) {
@@ -247,7 +247,7 @@ export class AutoToolsCheckTaskProvider implements MyTaskProvider {
     }
     changeConfiguration(c: configuration.MakefileConfiguration, disposables: vscode.Disposable[]) {
         var targets : Task[] = [];
-        let e = make.supportsTestEnvironments() ? configuration.getTestEnvironments() : [];
+        let e = configuration.getTestEnvironments();
         var cte = configuration.getCurrentTestEnvironment();
         configuration.getAllBuildTargets().forEach((goals, dir) => {
             const kind: CheckTask = {

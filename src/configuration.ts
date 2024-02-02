@@ -299,7 +299,7 @@ export function setConfigurationProblemMatchers(problemMatchers: string[]): void
 export function accountForTraits(): void {
     if (traits.overrides_TESTS_ENVIRONMENT) {
         logger.message(`WARNING: The ${extension.pkginfo?.name} package overrides test environment settings. Disabling environments.`, 'Normal');
-        logger.message(`KB: ${extension.kbUrlStatic}#overrides-test-environments`, 'Normal');
+        logger.message(`KB: ${extension.kbUrlStatic.toString(true)}#overrides-test-environments`, 'Normal');
     }
     updateEnvironmentsForTraits();
     updateEnvironmentsForCurrentMakefile();
@@ -486,7 +486,7 @@ export async function readMakefileConfigurations(currentConfigurationName : stri
 
 let testEnvironments: TestEnvironment[] = [];
 export function getTestEnvironments(): TestEnvironment[] {
-    return traits.overrides_TESTS_ENVIRONMENT ? [testEnvironments[0]] : testEnvironments; }
+    return testEnvironments; }
 
 let loadedTestEnvironments: TestEnvironment[] = [];
 export function getLoadedEnvironments(): TestEnvironment[] { return loadedTestEnvironments; }
@@ -540,6 +540,10 @@ export async function readTestEnvironments(): Promise<void> {
 }
 
 function updateEnvironmentsForTraits(): void {
+    if (traits.overrides_TESTS_ENVIRONMENT) {
+        testEnvironments = [nullTestEnvironment];
+        return;
+    }
     var global_XFAIL_TESTS = gTestEnvironment.XFAIL_TESTS??[];
     testEnvironments = [];
     loadedTestEnvironments.forEach(element => {

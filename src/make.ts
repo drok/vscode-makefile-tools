@@ -166,10 +166,6 @@ export function getStats() : AutotoolsStats {
     return export_stats;
 }
 
-export function supportsTestEnvironments() : boolean {
-    return true;
-}
-
 export var builtin_targets : Set<string> = new Set();
 // Targets need to parse a dryrun make invocation that does not include a target name
 // (other than default empty "" or the standard "all"), otherwise it would produce

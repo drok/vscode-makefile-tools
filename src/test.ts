@@ -2,7 +2,7 @@ import * as path from 'path';
 import { runInNewContext } from 'vm';
 import * as vscode from 'vscode';
 import { Goal, Make } from './parser/gnumake';
-import { BuildTarget, TRS, supportsTestEnvironments } from './make';
+import { BuildTarget, TRS } from './make';
 import { TestController,
         EventEmitter,
         TestItemCollection,
@@ -20,7 +20,7 @@ import { MakefileConfiguration } from './configuration';
 import { resolvePathToRoot } from './util';
 import * as util from './util';
 import * as configuration from "./configuration";
-import { TestEnvironment } from './configuration';
+import { TestEnvironment, traits } from './configuration';
 import { isDebuggable } from './debug';
 import * as logger from './logger';
 import * as fs from 'fs';
@@ -153,7 +153,7 @@ export class MyTestController {
     sub.test.tags = tags_none;
   }
   updateTestDescription(goal: Goal, dir: string) : void {
-    if (supportsTestEnvironments()) {
+    if (!traits.overrides_TESTS_ENVIRONMENT) {
         let envs = configuration.getTestEnvironments();
         let num_applicable_envs = envs.filter((env) => !env.dirs || env.dirs.includes(dir)).length;
         if (num_applicable_envs)
