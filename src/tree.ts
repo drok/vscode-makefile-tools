@@ -57,8 +57,8 @@ export class SubNode extends Node {
                 .join(',');
             this.item.collapsibleState = vscode.TreeItemCollapsibleState.Collapsed;
             if (this.flags & Goal.Flags.Test_Suite) {
-                this.item.description = localize("autotools.subnode.suite", "{0} tests, {1} subdirs",
-                    this.submake.stats.tests, this.submake.stats.subdirs);
+                this.item.description = this.submake.stats.tests ? localize("autotools.subnode.suite", "{0} tests",
+                    this.submake.stats.tests) : undefined;
                 this.item.resourceUri = vscode.Uri.from({
                         scheme: "check",
                         authority: Extension.whoami,
@@ -66,8 +66,8 @@ export class SubNode extends Node {
                         query: 'test-suite.log'
                     });
             } else {
-                this.item.description = localize("autotools.subnode.programs", "{0} programs, {1} subdirs",
-                    this.submake.stats.programs, this.submake.stats.subdirs);
+                this.item.description = this.submake.stats.programs ? localize("autotools.subnode.programs", "{0} programs",
+                    this.submake.stats.programs) : undefined;
             }
             this.item.tooltip =  this.submake.dir;
         }
