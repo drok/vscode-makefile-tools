@@ -302,7 +302,8 @@ export class Extension {
                 {authority: Extension.whoami, scheme: 'test', path: '/' + dir, query: goal.goal}));
             //this.suiteDecorator.update(vscode.Uri.from(
             //    {authority: Extension.whoami, scheme: 'check', path: '/' + dir, query: 'test-suite.log'}));
-            this.failStatUpdate(oldTRS, current ?? TRS.NONE);
+            if (old !== undefined) // Don't update when TRS's are initially read from disk
+                this.failStatUpdate(oldTRS, current ?? TRS.NONE);
             // Don't update the test suites. They are auto summarized
             this.updateOutlineBadge();
         }
