@@ -1058,6 +1058,18 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     isActive = true;
     _activatedEvent.fire(isActive);
     } catch (e) {
+        /* Can be caused by:
+            extensionHost.js:
+            Exception has occurred: Error: EEXIST: file already exists, open '/home/radu/.vscode-server/data/User/workspaceStorage/ad45d8b1a8e4f48738c477fbc86abc47/vscode.lock'
+
+            Exception has occurred: Error: kill ESRCH
+            t process.kill (node:internal/process/per_thread:220:13)
+	at h (/home/radu/.vscode-server/bin/704ed70d4fd1c6bd6342c436f1ede30d1cff4710/out/vs/workbench/api/node/extensionHostProcess.js:106:3576)
+	at w (/home/radu/.vscode-server/bin/704ed70d4fd1c6bd6342c436f1ede30d1cff4710/out/vs/workbench/api/node/extensionHostProcess.js:106:4069)
+	at async O.g (/home/radu/.vscode-server/bin/704ed70d4fd1c6bd6342c436f1ede30d1cff4710/out/vs/workbench/api/node/extensionHostProcess.js:106:1824)
+	at async O.h (/home/radu/.vscode-server/bin/704ed70d4fd1c6bd6342c436f1ede30d1cff4710/out/vs/workbench/api/node/extensionHostProcess.js:101:131918)
+
+        */
         logger.message(`ERROR: Unepected activation exception: ${e}`, "Normal");
     }
 }
