@@ -150,6 +150,18 @@
 
             },
             {
+                "command": "autotools.visit.packageURL",
+                "icon": "$(comment)",
+                "title": "%autotools.command.visit.packageURL.title%"
+
+            },
+            {
+                "command": "autotools.visit.packageBugs",
+                "icon": "$(comment)",
+                "title": "%autotools.command.visit.packageBugs.title%"
+
+            },
+            {
                 "command": "autotools.exportToIntelisense",
                 "title": "%autotools.exportToIntelisense.title%"
             },
@@ -540,6 +552,21 @@
         }
         ],
         "viewsWelcome": [
+            {
+                "view": "autotools.outline",
+                "contents": "%autotools.welcome.parsing.markdownDescription%",
+                "when": "autotools:makefileFilePresent"
+            },
+            {
+                "view": "autotools.outline",
+                "contents": "%autotools.welcome.packageURL.markdownDescription%",
+                "when": "autotools:packageHasURL == 1"
+            },
+            {
+                "view": "autotools.outline",
+                "contents": "%autotools.welcome.packageBugs.markdownDescription%",
+                "when": "autotools:packageHasIssues == 1"
+            },
             {
                 "view": "autotools.outline",
                 "contents": "%autotools.welcome.bootstrap.markdownDescription%",

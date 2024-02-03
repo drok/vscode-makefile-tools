@@ -115,6 +115,16 @@ export class Extension {
         extensionContext.subscriptions.push(vscode.commands.registerCommand('autotools.visit.knowledgeBase', async () => {
             await this.gotoKnowledgeBase();
         }));
+        extensionContext.subscriptions.push(vscode.commands.registerCommand('autotools.visit.packageURL', async () => {
+            telemetry.logEvent("packageURL");
+            if (this.pkginfo?.url)
+                vscode.commands.executeCommand('vscode.open', this.pkginfo.url);
+        }));
+        extensionContext.subscriptions.push(vscode.commands.registerCommand('autotools.visit.packageBugs', async () => {
+            telemetry.logEvent("packageBugs");
+            if (this.pkginfo?.bugreport)
+                vscode.commands.executeCommand('vscode.open', this.pkginfo.bugreport);
+        }));
         extensionContext.subscriptions.push(vscode.commands.registerCommand('autotools.command.openKnowledgeBase', async () => {
             await this.gotoKnowledgeBase();
         }));
@@ -153,6 +163,10 @@ export class Extension {
     // Force read pkginfo even if already set, used when configure.ac changes
     public async readPkgInfo() : Promise<void> {
         this.pkginfo = await make.getPackageJSON().catch(() => undefined);
+        vscode.commands.executeCommand("setContext", "autotools:packageHasURL",
+            this.pkginfo?.url ? 1 : 2);
+        vscode.commands.executeCommand("setContext", "autotools:packageHasIssues",
+            this.pkginfo?.bugreport ? 1 : 2);
     }
     public kbUrlStatic : vscode.Uri = vscode.Uri.from({
         scheme: 'https',
@@ -161,7 +175,7 @@ export class Extension {
 
     public async kbUrl() : Promise<vscode.Uri> {
         if (!this.pkginfo)
-            this.pkginfo = await make.getPackageJSON().catch(() => undefined);
+            await this.readPkgInfo();
 
         if (!this.pkginfo)
             return Promise.reject();
@@ -1053,7 +1067,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         return;
     }
     if (!configuration.initialConfigurationAttempted)
-        await make.configure(make.TriggeredBy.cleanConfigure);
+        util.scheduleTask<void>(() => make.configure(make.TriggeredBy.cleanConfigure));
     isActive = true;
     _activatedEvent.fire(isActive);
     } catch (e) {
