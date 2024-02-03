@@ -244,6 +244,9 @@ export class ProjectOutlineProvider implements vscode.TreeDataProvider<Node> {
         this.updateTree();
     }
 
+    clear() : void {
+        this.updateTargets(new Make('', ''));
+    }
     // Updates the tree when settings.json changes
     updateTargets(build_tree: Make) : void {
         this.tree = build_tree;
@@ -307,10 +310,15 @@ export class ProjectTestsProvider implements vscode.TreeDataProvider<Node> {
     }
 
     // Updates the tree when build configuration changes
+    public allTests : Goal[] = [];
     async update(configuration: string): Promise<void> {
+        this.allTests = [];
         this.updateTree();
     }
 
+    clear() : void {
+        this.updateTargets(new Make('', ''));
+    }
     // Updates the tree when settings.json changes
     updateTargets(build_tree: Make) : void {
         this.tree = build_tree;
