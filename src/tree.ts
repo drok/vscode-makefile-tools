@@ -39,11 +39,9 @@ export class SubNode extends Node {
         if (!(this.flags & Goal.Flags.Test_Suite)) {
             goals.push(...[...this.submake.goals.values()]
                 // Bit of a hack to hardcode excluding test_program
-                .filter(goal => (goal.flags & this.flags) && !(goal.flags & Goal.Flags.Test_Program))
-                .map(goal => new TaskNode(goal, this.submake)));
+                .filter(goal => (goal.flags & this.flags) && !(goal.flags & Goal.Flags.Test_Program)));
         } else if (this.submake.test_suite?.depends)
-            goals.push(...this.submake.test_suite.depends
-                    .map(test => new TaskNode(test, this.submake)));
+            goals.push(...this.submake.test_suite.depends);
         return goals;
     }
 
@@ -87,52 +85,6 @@ export class SubNode extends Node {
     }
 }
 
-export class TaskNode extends Node {
-    constructor(public goal: Goal, private make: Make) {
-        super();
-    }
-
-    getChildren(): Node[] {
-        return [];
-    }
-
-    private item : vscode.TreeItem | undefined;
-    getTreeItem(): vscode.TreeItem {
-        if (!this.goal.goal)
-            throw new Error("Unexpected null goal");
-        if (!this.item) {
-            this.item = new vscode.TreeItem(this.goal.goal);
-            this.item.collapsibleState = vscode.TreeItemCollapsibleState.None;
-            this.item.tooltip = this.goal.goal;
-            this.item.contextValue = ["nodeType=task"]
-                .concat((this.goal.flags & Goal.Flags.Linked_binary) ? ['nodeType=build'] : [])
-    //            .concat((this.goal.flags & Goal.Flags.Test_Progam) ? ['nodeType=test'] : [])
-                .concat((this.goal.flags & Goal.Flags.Test_Log) ? ['nodeType=test'] : [])
-                .concat((this.goal.flags & Goal.Flags.Test_Log) &&
-                    // Add different kind of supported test programs here
-                    (this.goal.depends && (this.goal.depends[0].flags & Goal.Flags.Linked_binary)) ? ['nodeType=bintest'] : [])
-                .join(',');
-            if (!this.goal.task)
-                return this.item;
-
-            if (this.goal.flags & Goal.Flags.Test_Log) {
-                this.item.resourceUri = vscode.Uri.from({
-                    scheme: "test",
-                    authority: Extension.whoami,
-                    path: '/' +  this.make.dir,
-                    query:  this.goal.goal,
-                });
-            }
-        }
-        return this.item;
-    }
-    logfile() : string | undefined {
-        return this.goal.test?.id;
-    }
-
-}
-
-
 export class TaskSection extends Node {
     constructor(private tree: Make, private _name: string, private flag: number) {
         super();
@@ -146,11 +98,9 @@ export class TaskSection extends Node {
             let goals : Node[] = [...this.tree.submake.values()]
                 .map(sub => new SubNode(sub, this.flag));
             goals.push(...[...this.tree.goals.values()]
-                .filter(goal => goal.flags & this.flag)
-                .map(goal => new TaskNode(goal, this.tree)));
+                .filter(goal => goal.flags & this.flag));
             if ((this.flag & Goal.Flags.Test_Suite) && this.tree.test_suite?.depends)
-                goals.push(...this.tree.test_suite.depends
-                    .map(test => new TaskNode(test, this.tree)));
+                goals.push(...this.tree.test_suite.depends);
             return goals;
     }
 
@@ -263,8 +213,7 @@ export class ProjectOutlineProvider implements vscode.TreeDataProvider<Node> {
             goals = [...this.tree.submake.values()]
                 .map(sub => new SubNode(sub, Goal.Flags.Linked_binary));
             goals.push(...[...this.tree.goals.values()]
-                .filter(goal => goal.flags & Goal.Flags.Linked_binary)
-                .map(goal => new TaskNode(goal, this.tree)));
+                .filter(goal => goal.flags & Goal.Flags.Linked_binary));
         } else {
             goals = node.getChildren();
         }
@@ -329,12 +278,10 @@ export class ProjectTestsProvider implements vscode.TreeDataProvider<Node> {
             goals = [...this.tree.submake.values()]
                 .map(sub => new SubNode(sub, Goal.Flags.Test_Suite));
             goals.push(...[...this.tree.goals.values()]
-                .filter(goal => goal.flags & Goal.Flags.Test_Suite)
-                .map(goal => new TaskNode(goal, this.tree)));
+                .filter(goal => goal.flags & Goal.Flags.Test_Suite));
             if (this.tree.test_suite?.depends)
                 goals
-                .push(...this.tree.test_suite.depends
-                .map(test => new TaskNode(test, this.tree)));
+                .push(...this.tree.test_suite.depends);
         } else {
             goals = node.getChildren();
         }
