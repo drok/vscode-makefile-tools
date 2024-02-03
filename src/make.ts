@@ -97,8 +97,18 @@ export interface pkgInfo {
     version: string;
     bugreport: string;
     url: string;
+    tarname: string;
     automake: string;
     maint?: string;
+}
+function fixupPackageURLs(theinfo: pkgInfo) : void {
+    if (!theinfo.url && theinfo.tarname && theinfo.name.startsWith('GNU '))
+        theinfo.url = `http://www.gnu.org/software/${theinfo.tarname}/`;
+    if (theinfo.bugreport) {
+        let url = vscode.Uri.parse(theinfo.bugreport);
+        if (!url.scheme || url.scheme == 'file')
+            theinfo.bugreport = `mailto:${theinfo.bugreport}`;
+    }
 }
 export async function getPackageJSON(): Promise<pkgInfo> {
     return new Promise<pkgInfo>(async (resolve, reject) => {
@@ -111,13 +121,14 @@ export async function getPackageJSON(): Promise<pkgInfo> {
                 path.join(c.top_builddir, "config.status"), ["--file=-:-"],
                 util.getWorkspaceRoot(),
                 true, true,
-                '{ "name": "@PACKAGE@", "version": "@VERSION@", "bugreport": "@PACKAGE_BUGREPORT@", "url": "@PACKAGE_URL@", "automake": "@AUTOMAKE@", "maint": "@MAINTAINER_MODE_FALSE@" }',
+                '{ "name": "@PACKAGE@", "version": "@VERSION@", "tarname": "@PACKAGE_TARNAME@", "bugreport": "@PACKAGE_BUGREPORT@", "url": "@PACKAGE_URL@", "automake": "@AUTOMAKE@", "maint": "@MAINTAINER_MODE_FALSE@" }',
                 (x) => {info = x}, undefined);
             if (result.returnCode !== 0) return reject();
             if (info === undefined) return reject();
             try {
                 theinfo = JSON.parse(info || "");
                 if (theinfo) {
+                    fixupPackageURLs(theinfo);
                     return resolve(theinfo);
                 }
             } catch (e) {
@@ -136,16 +147,18 @@ export async function getPackageJSON(): Promise<pkgInfo> {
                             "name": ac_init[3],
                             "version": ac_init[4] ?? '',
                             "bugreport": ac_init[5] ?? '',
-                            // 7 is tarname
+                            "tarname": ac_init[6] ?? '',
                             "url": ac_init.slice(7).join(':') ?? '',
                             "automake": "unk",
                         };
+                        fixupPackageURLs(theinfo);
                     }
                 }, undefined);
             if (result.returnCode !== 0) theinfo = {
                     name: "unk",
                     version: "unk",
                     bugreport: "unk",
+                    tarname: "unk",
                     url: "unk",
                     automake: "unk"}
             if (theinfo) return resolve(theinfo);
