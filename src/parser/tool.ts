@@ -322,8 +322,10 @@ export class Making implements Parser {
         // Additionally, for linker commands, ignore any dollar if present in the target binary name.
         // We need to ignore the $ anywhere else in the linker command line so that we don't lose
         // valid target binaries.
-        if (!targetBinary || targetBinary.includes("$")) {
+        if (!targetBinary) {
             telemetry.setSpanStatus(SpanStatusCode.ERROR, "linker target not ID");
+        } else if (targetBinary.includes("$")) {
+            telemetry.setSpanStatus(SpanStatusCode.ERROR, "linker target has $");
             throw new Error("targets should never have dollar signs");
         } else
             this.targetBinaries.push(targetBinary);
