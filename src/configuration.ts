@@ -138,6 +138,7 @@ export async function setCurrentMakefileConfiguration(configuration: string | un
     }
     statusBar.setConfiguration(currentMakefileConfiguration.name, currentMakefileConfiguration.top_builddir);
     logger.message(`Selected build configuration is "${configuration}" in ${currentMakefileConfiguration.top_builddir}`);
+    if (testEnvironments.length) setBuildEnvPath();
     extension.onConfigurationSelect(currentMakefileConfiguration);
 }
 
@@ -342,6 +343,9 @@ export async function analyzeConfigureParams(reload: boolean, failIfUnconfigured
                         extension.createPanel();
                         await logMakeCmd(relativeMakefile);
                         extension.setConfiguration(currentMakefileConfigurationName);
+                        extension._projectOutlineProvider?.clear();
+                        extension._projectTestSuitesProvider?.clear();
+                                        // extension.setConfiguration(currentMakefileConfigurationName);
                         reason = "ok";
                         hasMakefile = true;
                     } else {
@@ -544,7 +548,6 @@ export async function readTestEnvironments(): Promise<void> {
     if (testEnvironmentNames.length > 0) {
         logger.message("Defined autotools.test_environments: " + testEnvironmentNames.join(";"), "Verbose");
     }
-    extension.setTestEnvironment();
 }
 
 function updateEnvironmentsForTraits(): void {
@@ -589,7 +592,8 @@ function updateEnvironmentsForTraits(): void {
             e.updateExecOptions!.env![d + '_FLAGS'] = driver_flags;
         })
     })
-    extension.setTestEnvironment();
+    setBuildEnvPath();
+    extension.setTestEnvironmentName(getCurrentTestEnvironment().name);
 }
 
 function updateEnvironmentsForCurrentMakefile(): void {
@@ -660,6 +664,14 @@ export function getTestEnvironment(name: string) : TestEnvironment {
 
 export function getCurrentTestEnvironment() : TestEnvironment {
     return testEnvironments[0];
+}
+
+let buildEnvPath : string = '';
+function setBuildEnvPath() : void {
+    buildEnvPath = `/${getCurrentTestEnvironment().hashCode.toString(36)}/${buildDirHash(currentMakefileConfiguration).toString(36)}`;
+}
+export function getBuildEnvPath() : string {
+    return buildEnvPath;
 }
 
 function nullTestEnvironment() : TestEnvironment {
@@ -766,7 +778,7 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
     await readGlobalTestEnvironment();
     await readMakefileConfigurations(currentMakefileConfigurationName);
     await readTestEnvironments();
-    setCurrentMakefileConfiguration(currentMakefileConfigurationName);
+    await setCurrentMakefileConfiguration(currentMakefileConfigurationName);
 
     await analyzeConfigureParams(false, false);
 
@@ -1120,6 +1132,11 @@ async function promptMaintainerModeChange(modal: boolean) : Promise<void> {
         });
 }
 
+function buildDirHash(c: MakefileConfiguration) : number {
+    return parseInt(createHash('md5').update(
+        (c.configureArgs?.join(',') ?? '')+`buildDir=${c.top_builddir}`
+    ).digest('hex').slice(0,13), 16);
+}
 function envHash(e: string) : number {
     return parseInt(createHash('md5').update(e).digest('hex').slice(0,13), 16);
 }

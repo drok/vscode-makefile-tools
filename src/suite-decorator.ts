@@ -4,7 +4,7 @@
  */
 import * as vscode from 'vscode';
 import * as configuration from './configuration';
-import { Extension  } from './extension';
+import { Extension, extension  } from './extension';
 import { Goal, Make } from './parser/gnumake';
 import { live } from './test';
 
@@ -29,8 +29,6 @@ export class SuiteDecorations implements vscode.FileDecorationProvider {
 		uri: vscode.Uri,
 		_token: vscode.CancellationToken,
 	): vscode.ProviderResult<vscode.FileDecoration> {
-        if (uri.authority != Extension.whoami)
-            return undefined;
 		// const query = fromFileChangeNodeUri(uri);
         let test : Goal | undefined;
         if (uri.scheme == "check") {
@@ -51,12 +49,10 @@ export class SuiteDecorations implements vscode.FileDecorationProvider {
                 return { badge: ' '};
         } else
         if (uri.scheme == "test") {
-            let goals = configuration.getAllBuildTargets();
-            let g = goals
-                .get(uri.path.substring(1));
-            let suite : Goal | undefined = g?.get("test-suite.log");
-            test = suite // FIXME: PERF: this does a linear search for each test
-                ?.depends?.find(t => t.goal == uri.query);
+            if (uri.path == configuration.getBuildEnvPath()) {
+                //let at = extension._projectTestSuitesProvider.allTests;
+                test = extension._projectTestSuitesProvider.allTests[parseInt(uri.query)];
+            }
         }
         if (!test)
             return {}; // This will log an error in ExtensionHost about invalid/empty deco

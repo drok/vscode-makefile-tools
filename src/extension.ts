@@ -211,9 +211,8 @@ export class Extension {
             this._projectOutlineTreeView.description = `${projname} - ${name}`;
         }
     }
-    public setTestEnvironment() {
+    public setTestEnvironmentName(name: string) {
         if (this._projectTestSuitesView) {
-            var name = configuration.getCurrentTestEnvironment().name;
             this._projectTestSuitesView.description = `env: "${name}"`;
         }
     }
@@ -298,8 +297,8 @@ export class Extension {
             }
         } else
         if ((current ?? TRS.NONE) != oldTRS) {
-            this.suiteDecorator.update(vscode.Uri.from(
-                {authority: Extension.whoami, scheme: 'test', path: '/' + dir, query: goal.goal}));
+            goal.treeItem?.resourceUri && this.suiteDecorator.update(goal.treeItem.resourceUri);//  vscode.Uri.from(
+//                {authority: Extension.whoami, scheme: 'test', path: '/' + dir, query: goal.goal}));
             //this.suiteDecorator.update(vscode.Uri.from(
             //    {authority: Extension.whoami, scheme: 'check', path: '/' + dir, query: 'test-suite.log'}));
             if (old !== undefined) // Don't update when TRS's are initially read from disk
@@ -463,8 +462,6 @@ export class Extension {
     }
     public updateTasks(build_tree: gnumake.Make): void {
         this.buildTree = build_tree;
-        this.configDisposables.forEach((d) => d.dispose());
-        this.configDisposables = [];
         if (!build_tree.hasStats) {
             countStats(build_tree);
             build_tree.hasStats = true;
@@ -531,8 +528,9 @@ export class Extension {
     }
 
     public onConfigurationSelect(c: configuration.MakefileConfiguration) : void {
-        this.tasks.forEach((provider) => provider.changeConfiguration(c, this.configDisposables));
-        this.setConfiguration(c.name);
+        // this.tasks.forEach((provider) => provider.changeConfiguration(c, this.configDisposables));
+        this.configDisposables.forEach((d) => d.dispose());
+        this.configDisposables = [];
     }
     public bootstrap(): void { this.autotoolsTask.bootstrap(); }
     // config.status (just re-output)
@@ -1071,7 +1069,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 	at async O.h (/home/radu/.vscode-server/bin/704ed70d4fd1c6bd6342c436f1ede30d1cff4710/out/vs/workbench/api/node/extensionHostProcess.js:101:131918)
 
         */
-        logger.message(`ERROR: Unepected activation exception: ${e}`, "Normal");
+        logger.message(`ERROR: Unexpected activation exception: ${e}`, "Normal");
     }
 }
 

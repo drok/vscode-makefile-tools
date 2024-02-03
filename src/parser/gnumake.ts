@@ -18,7 +18,7 @@ import { Executing } from './shell';
 import { Node } from '../tree';
 
 import * as nls from 'vscode-nls';
-import { Extension, telemetry } from '../extension';
+import { Extension, extension, telemetry } from '../extension';
 nls.config({ messageFormat: nls.MessageFormat.bundle, bundleFormat: nls.BundleFormat.standalone })();
 const localize: nls.LocalizeFunc = nls.loadMessageBundle();
 
@@ -420,6 +420,7 @@ const AutomakeNoiseRe = new RegExp('^(' +
 const AutomakeTestLogRe = /^.*\.log$/;
 const GoalRecipeRe = /^recipe to execute \((built-in|from '(.*)', line (\d+))\):/;
 const GoalsEndRe = /^# files hash-table stats:$/;
+const _empty = '';
 /**
  * Parse information about a single goal, differentiating phony targets,
  * and expandable to handle other flags that Make keeps about each target
@@ -542,50 +543,57 @@ export class Goal extends Node implements Parser {
         else
             return [];
     }
-    private item : vscode.TreeItem | undefined;
+    public treeItem : vscode.TreeItem | undefined;
     getTreeItem(): vscode.TreeItem {
         if (!this.goal)
             throw new Error("Unexpected null goal");
-        if (!this.item) {
-            this.item = new vscode.TreeItem(this.goal);
-            this.item.collapsibleState = vscode.TreeItemCollapsibleState.None;
-            this.item.tooltip = this.goal;
-            this.item.contextValue = ["nodeType=task"]
+        if (!this.treeItem) {
+            this.treeItem = new vscode.TreeItem(this.goal);
+            this.treeItem.collapsibleState = vscode.TreeItemCollapsibleState.None;
+            this.treeItem.tooltip = this.goal;
+            this.treeItem.contextValue = ["nodeType=task"]
                 .concat((this.flags & Goal.Flags.Linked_binary) ? ['nodeType=build'] : [])
                 .concat((this.flags & Goal.Flags.Test_Log) ? ['nodeType=test'] : [])
                 .concat((this.flags & Goal.Flags.Test_Log) &&
                     (this.depends && (this.depends[0].flags & Goal.Flags.Linked_binary)) ? ['nodeType=bintest'] : [])
                 .join(',');
             if (!this.task)
-                return this.item;
+                return this.treeItem;
 
             if (this.flags & Goal.Flags.Test_Log) {
-                this.item.contextValue = (this.depends && (this.depends[0].flags & Goal.Flags.Linked_binary)) ?
+                this.treeItem.contextValue = (this.depends && (this.depends[0].flags & Goal.Flags.Linked_binary)) ?
                     'nodeType=task,nodeType=test,nodeType=bintest' :
                     'nodeType=task,nodeType=test';
-                this.item.resourceUri = vscode.Uri.from({
+                this.treeItem.resourceUri = vscode.Uri.from({
                     scheme: "test",
-                    authority: Extension.whoami,
-                    path: '/' +  this.make.dir,
-                    query:  this.goal,
+                    authority: _empty,//Extension.whoami,
+                    fragment: _empty,
+                    path: configuration.getBuildEnvPath(),
+                    query:  extension._projectTestSuitesProvider.allTests.length.toString(),
                 });
+                extension._projectTestSuitesProvider.allTests.push(this);
             } else
             if (this.flags & Goal.Flags.Test_Suite) {
-                this.item.description = this.make.stats.tests ?
+                this.treeItem.description = this.make.stats.tests ?
                     localize("autotools.subnode.suite", "{0} tests", this.make.stats.tests) : undefined;
-                this.item.tooltip =  this.make.dir;
-                this.item.resourceUri = vscode.Uri.from({
+                this.treeItem.tooltip =  this.make.dir;
+                // must satisfy the isURI test otherwise it is reallocated and the refernce won't
+                // match in privideFileDecoration.
+                // test is at https://github.com/microsoft/vscode/blob/main/src/vs/base/common/uri.ts#L98
+                this.treeItem.resourceUri = vscode.Uri.from({
                     scheme: "check",
-                    authority: Extension.whoami,
+                    authority: _empty,//Extension.whoami,
+                    fragment: _empty,
                     path: '/' + this.make.dir,
                     query: 'test-suite.log'
                 });
+                this.treeItem.resourceUri = vscode.Uri.parse(this.treeItem.resourceUri.toString(true));
             } else
             if (this.flags & Goal.Flags.Linked_binary) {
-                this.item.contextValue = 'nodeType=task,nodeType=build';
+                this.treeItem.contextValue = 'nodeType=task,nodeType=build';
             }
         }
-        return this.item;
+        return this.treeItem;
     }
 
     logfile(): string | undefined {
