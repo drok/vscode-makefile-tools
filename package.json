@@ -776,7 +776,7 @@
                         "default": "Run test-suite 'check'"
                     },
                     "check": {
-                        "description": "%autotools.taskDefinitions.check.description%",
+                        "description": "%autotools.taskDefinitions.task.check.description%",
                         "properties": {
                             "builddir": {
                                 "type": "string",
@@ -785,11 +785,11 @@
                             },
                             "TESTS": {
                                 "type": "array",
-                                "description": "%autotools.taskDefinitions.check.tests.markdownDescription%"
+                                "description": "%autotools.taskDefinitions.task.check.tests.markdownDescription%"
                             },
                             "TEST_SUITE_LOG": {
                                 "type": "string",
-                                "description": "%autotools.taskDefinitions.check.log.markdownDescription%"
+                                "description": "%autotools.taskDefinitions.task.check.log.markdownDescription%"
                             }
                         }
                     }
