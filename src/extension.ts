@@ -912,12 +912,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         extension.configure();
     }));
 
-    context.subscriptions.push(vscode.commands.registerCommand('autotools.build', async (sub: tree.TaskNode) => {
+    context.subscriptions.push(vscode.commands.registerCommand('autotools.build', async (goal: Goal) => {
         telemetry.logEvent("build");
-        if (!sub.goal?.task)
+        if (!goal.task)
             throw new Error("Missing build task on TaskNode");
-        if (sub.goal.task instanceof vscode.Task)
-            return await vscode.tasks.executeTask(sub.goal.task);
+        if (goal.task instanceof vscode.Task)
+            return await vscode.tasks.executeTask(goal.task);
     }));
 
     context.subscriptions.push(vscode.commands.registerCommand('autotools.livecheck', async (sub: tree.SubNode) => {
@@ -963,21 +963,21 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             await openEditor(configureAc);
     }));
 
-    context.subscriptions.push(vscode.commands.registerCommand('autotools.test', (sub: tree.TaskNode) => {
+    context.subscriptions.push(vscode.commands.registerCommand('autotools.test', (goal: Goal) => {
         telemetry.logEvent("test");
-        if (!sub.goal.task)
+        if (!goal.task)
             throw new Error("Missing test task on TaskNode");
-        if (sub.goal.test && extension.testController)
-            return extension.testController.run(sub.goal.test, configuration.getCurrentTestEnvironment());
+        if (goal.test && extension.testController)
+            return extension.testController.run(goal.test, configuration.getCurrentTestEnvironment());
         //return await vscode.tasks.executeTask(sub.goal.task);
     }));
 
-    context.subscriptions.push(vscode.commands.registerCommand('autotools.debug', async (sub: tree.TaskNode) => {
+    context.subscriptions.push(vscode.commands.registerCommand('autotools.debug', async (goal: Goal) => {
         telemetry.logEvent("debug");
-        if (!sub.goal.task)
+        if (!goal.task)
             throw new Error("Missing test task on TaskNode");
-        if (sub.goal.test && extension.testController)
-            extension.testController.debug(sub.goal.test, configuration.getCurrentTestEnvironment());
+        if (goal.test && extension.testController)
+            extension.testController.debug(goal.test, configuration.getCurrentTestEnvironment());
 
 //        const definition: TestTask = <any>sub.goal.task.get.definition;
 //            if (definition?.type == 'test' && sub.goal && definition.test)

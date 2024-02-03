@@ -137,8 +137,8 @@ export class Make implements Parser {
             // Can the work of parsing additional enterings be avoided?
             // only save data for the all-recursive target
             if (!targets.has(this.dir) || true) {
-                targets.set(this.dir, sub.goals);
-                this.goals = sub.goals;
+                targets.set(this.dir, sub.make.goals);
+                this.goals = sub.make.goals;
                 this.test_suite = sub.test_suite;
                 sub.variables.some((v) => {
                     if (v.variable)
@@ -215,7 +215,6 @@ export class Make implements Parser {
         } else if (sub instanceof EmptyLine) { return undefined; }
         throw new Error(`Unexpected push in Make ${sub}`);
     }
-
     // recursively merge a submake into my submake
     mergeSubmake(other: Make) {
         other.submake.forEach((submake,dir) => {
@@ -274,15 +273,14 @@ const VariablesRE = /^# Variables$/;
  */
 export class Database implements Parser {
     // constructor() { this.goals = []; }
-    constructor (make: Make) {
-        this.goals = make.goals;
+    constructor (public make: Make) {
     }
     static makeArgs(): string[] { return [
         "--print-data-base",
     ];};
     ingest (line: string) : [ParserDisp, Parser] {
         if (FilesRE.test(line))
-            return [ParserDisp.Enter, new EmptyLine(new Goal())];
+            return [ParserDisp.Enter, new EmptyLine(new Goal(this.make))];
         if (VariablesRE.test(line))
             return [ParserDisp.Enter, new EmptyLine(new Variable())];
         return [ParserDisp.Continue, this];
@@ -304,7 +302,7 @@ export class Database implements Parser {
                         Goal.Flags.Not_a_target |
                         Goal.Flags.Automake_noise
                         )))
-                    this.goals.set(sub.goal, sub);
+                    this.make.goals.set(sub.goal, sub);
 
                 if (sub.flags & Goal.Flags.Test_Suite) {
                     this.test_suite = sub;
@@ -313,7 +311,7 @@ export class Database implements Parser {
                 // TODO: check automake source code. is this guaranteed?
                 if (this.test_suite && (sub.flags & Goal.Flags.Linked_binary))
                     sub.flags |= Goal.Flags.Test_Program;
-                return new Goal(); /* look for more Goals */
+                return new Goal(this.make); /* look for more Goals */
             }
         } else if (sub instanceof Variable) {
             if (!sub.flags) { /* End-of-variables */
@@ -326,7 +324,6 @@ export class Database implements Parser {
         } else if (sub instanceof EmptyLine) { return undefined; }
         throw new Error(`Unexpected push in ${sub}`);
     }
-    goals : Map<string,Goal>;
     variables : Variable[] = [];
     test_suite : Goal | undefined;
 }
@@ -520,11 +517,11 @@ export class Goal extends Node implements Parser {
                         this.flags |= Goal.Flags.Test_Suite;
                         this.depends = goal[2].split(' ')
                             .filter(s => s)
-                            .map(s => new Goal(s, Goal.Flags.Test_Log));
+                            .map(s => new Goal(this.make, s, Goal.Flags.Test_Log));
                     } else if (AutomakeTestLogRe.test(goal[1])) {
                         this.flags |= Goal.Flags.Test_Log;
                         this.depends = goal[2].split(' ')
-                            .map(s => new Goal(s, Goal.Flags.Test_Program));
+                            .map(s => new Goal(this.make, s, Goal.Flags.Test_Program));
                     }
                 } else if (!this.flags) {
                     // .test.log: (ie, implicit rules)
@@ -539,22 +536,63 @@ export class Goal extends Node implements Parser {
         return undefined; /* The end of the Recipe is the end of the Goal */
     }
     getChildren(): Node[] {
-        return [];
+        if ((this.flags & Goal.Flags.Test_Suite)) {
+            return this.depends ?? []
+        }
+        else
+            return [];
     }
+    private item : vscode.TreeItem | undefined;
     getTreeItem(): vscode.TreeItem {
-        const item: vscode.TreeItem = new vscode.TreeItem(this.goal || "unk");
-        item.collapsibleState = vscode.TreeItemCollapsibleState.None;
-        item.tooltip = localize("automake.goal.tooltip", "FIXME: better tooltip");
-        item.contextValue = [
-            `nodeType=buildTarget`,
-        ].join(',');
-        return item;
-    }
-    logfile(): string | undefined {
-        return undefined;
+        if (!this.goal)
+            throw new Error("Unexpected null goal");
+        if (!this.item) {
+            this.item = new vscode.TreeItem(this.goal);
+            this.item.collapsibleState = vscode.TreeItemCollapsibleState.None;
+            this.item.tooltip = this.goal;
+            this.item.contextValue = ["nodeType=task"]
+                .concat((this.flags & Goal.Flags.Linked_binary) ? ['nodeType=build'] : [])
+                .concat((this.flags & Goal.Flags.Test_Log) ? ['nodeType=test'] : [])
+                .concat((this.flags & Goal.Flags.Test_Log) &&
+                    (this.depends && (this.depends[0].flags & Goal.Flags.Linked_binary)) ? ['nodeType=bintest'] : [])
+                .join(',');
+            if (!this.task)
+                return this.item;
+
+            if (this.flags & Goal.Flags.Test_Log) {
+                this.item.contextValue = (this.depends && (this.depends[0].flags & Goal.Flags.Linked_binary)) ?
+                    'nodeType=task,nodeType=test,nodeType=bintest' :
+                    'nodeType=task,nodeType=test';
+                this.item.resourceUri = vscode.Uri.from({
+                    scheme: "test",
+                    authority: Extension.whoami,
+                    path: '/' +  this.make.dir,
+                    query:  this.goal,
+                });
+            } else
+            if (this.flags & Goal.Flags.Test_Suite) {
+                this.item.description = this.make.stats.tests ?
+                    localize("autotools.subnode.suite", "{0} tests", this.make.stats.tests) : undefined;
+                this.item.tooltip =  this.make.dir;
+                this.item.resourceUri = vscode.Uri.from({
+                    scheme: "check",
+                    authority: Extension.whoami,
+                    path: '/' + this.make.dir,
+                    query: 'test-suite.log'
+                });
+            } else
+            if (this.flags & Goal.Flags.Linked_binary) {
+                this.item.contextValue = 'nodeType=task,nodeType=build';
+            }
+        }
+        return this.item;
     }
 
-    constructor(public goal: string | undefined = undefined,
+    logfile(): string | undefined {
+        return this.test?.id;
+    }
+
+    constructor(private make: Make, public goal: string | undefined = undefined,
         public flags: number = Goal.Flags.None) {
         super();
     }
