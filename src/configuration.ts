@@ -691,6 +691,14 @@ export function getBuildEnvPath() : string {
     return buildEnvPath;
 }
 
+let buildEnvPath : string = '';
+function setBuildEnvPath() : void {
+    buildEnvPath = `/${getCurrentTestEnvironment().hashCode.toString(36)}/${buildDirHash(currentMakefileConfiguration).toString(36)}`;
+}
+export function getBuildEnvPath() : string {
+    return buildEnvPath;
+}
+
 function nullTestEnvironment() : TestEnvironment {
         return {
             name: "<null>",

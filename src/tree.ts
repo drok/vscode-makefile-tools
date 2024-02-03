@@ -248,6 +248,7 @@ export class ProjectTestsProvider implements vscode.TreeDataProvider<Node> {
     // alltests is an array used to find the decoration for each test
     public all : Map<string,Goal> = new Map();
     async update(configuration: string): Promise<void> {
+        this.allTests = [];
         this.updateTree();
     }
 

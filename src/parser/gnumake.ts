@@ -559,7 +559,7 @@ export class Goal extends Node implements Parser {
         else
             return [];
     }
-    private item : vscode.TreeItem | undefined;
+    public treeItem : vscode.TreeItem | undefined;
     getTreeItem(): vscode.TreeItem {
         if (!this.goal)
             throw new Error("Unexpected null goal");
