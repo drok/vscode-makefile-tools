@@ -162,7 +162,8 @@ export class Extension {
     }
     // Force read pkginfo even if already set, used when configure.ac changes
     public async readPkgInfo() : Promise<void> {
-        this.pkginfo = await make.getPackageJSON().catch(() => undefined);
+        this.pkginfo = await make.getPackageJSON().catch<undefined>(() =>
+            Promise.resolve(undefined));
         vscode.commands.executeCommand("setContext", "autotools:packageHasURL",
             this.pkginfo?.url ? 1 : 2);
         vscode.commands.executeCommand("setContext", "autotools:packageHasIssues",
@@ -178,7 +179,7 @@ export class Extension {
             await this.readPkgInfo();
 
         if (!this.pkginfo)
-            return Promise.reject();
+            return Promise.resolve(this.kbUrlStatic);
 
         this.kbUrlStatic = vscode.Uri.from({
             scheme: 'https',
