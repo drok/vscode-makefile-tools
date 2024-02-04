@@ -317,6 +317,11 @@ export async function analyzeConfigureParams(reload: boolean, failIfUnconfigured
 
     extension.getState().configureDirty = false;
 
+    /* If there is no configuration, this will redetect the default build directory
+     * Otherwise, it's a noop.
+     */
+    await setCurrentMakefileConfiguration(currentMakefileConfigurationName);
+
     let isAutotools = extension.isAutotoolsProject();
     let bootstrapped = isAutotools && extension.isBootstrapped();
     let configured = bootstrapped && extension.isConfigured();
@@ -331,8 +336,8 @@ export async function analyzeConfigureParams(reload: boolean, failIfUnconfigured
             if (configured || (!failIfUnconfigured && await extension.configure())) {
                 let relativeMakefile = findMakefile();
                 if (!reload) {
+                    let kbUrl = await extension.kbUrl();
                     if (relativeMakefile) {
-                        await extension.kbUrl(); // Needed to read pkginfo
                         extension._projectOutlineProvider.update(currentMakefileConfigurationName);
                         extension.createPanel();
                         await logMakeCmd(relativeMakefile);
@@ -343,7 +348,11 @@ export async function analyzeConfigureParams(reload: boolean, failIfUnconfigured
                         reason = "ok";
                         hasMakefile = true;
                     } else {
-                        logger.message('Configuration succeeded but there is no makefile for');
+                        logger.message('Configuration succeeded but there is no makefile.');
+                        logger.message('KB: ' + kbUrl.toString(true) + '#no-makefile-found', "Normal");
+                        /* Override the bootstrapped context so the welcome button "Bootstrap is shown" */
+                        vscode.commands.executeCommand("setContext", "autotools:isBootstrapped", 2);
+                        telemetry.setSpanStatus(SpanStatusCode.ERROR, "no-makefile");
                         reason = "configured-noMakefile"
                     }
                 } else
@@ -771,10 +780,7 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
     await readGlobalTestEnvironment();
     await readMakefileConfigurations(currentMakefileConfigurationName);
     await readTestEnvironments();
-    await setCurrentMakefileConfiguration(currentMakefileConfigurationName);
-
-    await analyzeConfigureParams(false, false);
-
+    // await setCurrentMakefileConfiguration(currentMakefileConfigurationName);
 
     // FIXME: seems wrong to do || make.t_all; this fn should probably be called
     // config arg after config is fully loaded.
@@ -1014,6 +1020,7 @@ export async function setConfigurationByName(configurationName: string | undefin
     logger.message(`Setting configuration - ${currentMakefileConfigurationName}`);
     // Refresh settings, they may reference variables or commands reading state configuration var (${configuration}).
     await initFromSettings();
+    await analyzeConfigureParams(false, false);
     extension._projectOutlineProvider.update(currentMakefileConfigurationName);
 }
 

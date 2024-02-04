@@ -120,6 +120,14 @@ export class Extension {
             if (this.pkginfo?.url)
                 vscode.commands.executeCommand('vscode.open', this.pkginfo.url);
         }));
+        extensionContext.subscriptions.push(vscode.commands.registerCommand('autotools.gotoBuildDirectory', async (goal: Goal) => {
+            telemetry.logEvent("gotoBuildDir");
+            vscode.commands.executeCommand('revealInExplorer', vscode.Uri.from({
+                scheme: 'file',
+                path: util.resolvePathToRoot(configuration.getCurrentMakefileConfiguration().top_builddir)
+            }));
+        }));
+
         extensionContext.subscriptions.push(vscode.commands.registerCommand('autotools.visit.packageBugs', async () => {
             telemetry.logEvent("packageBugs");
             if (this.pkginfo?.bugreport)
@@ -323,6 +331,26 @@ export class Extension {
         }
     }
 
+    public bootstrapWithPrompt() : void  {
+        if (!this.autotoolsTask.isBootstrapped()) {
+            let cmd = this.autotoolsTask.bootstrap_cmd();
+            if (cmd) {
+                const doit: string = localize("autotools.bootstrap.me", "Bootstrap");
+                const setit: string = localize("autotools.edit.setting", "Setting...");
+                vscode.window.showWarningMessage(
+                    localize("autotools.want.bootstrap", "The project needs to be bootstrapped ('{0}').", cmd.join(' ')),
+                    doit,
+                    localize("autotools.cancel", "Cancel"), setit).then((value) => {
+                    if (value === doit) {
+                        this.autotoolsTask.bootstrap();
+                    } else if (value === setit) {
+                        openSettings("autotools.autoBootstrap");
+                    }
+                });
+            }
+        }
+    }
+
     public registerTasks(): void {
         // FIXME: Implement Disposable
         this.tasks.forEach((provider) => vscode.tasks.registerTaskProvider(provider.myType, provider));
@@ -368,8 +396,8 @@ export class Extension {
                 } else if (definition.type == 'check') {
                 } else if (definition.type == "autotools") {
                     const definition: AutotoolsTask = <any>task.definition;
-                    if (definition?.action == "regen" || definition?.action == "recheck")
-                        ui.getUI().setStatus(e.exitCode ? ui.UIStatus.ERR : ui.UIStatus.OK);
+                    ui.getUI().setStatus(e.exitCode ? ui.UIStatus.ERR : ui.UIStatus.OK);
+                    //if (definition?.action == "regen" || definition?.action == "recheck")
                     await this.autotoolsTask.autotoolsDone(task.execution,
                             (typeof e.exitCode == 'number') ? e.exitCode : (e.exitCode ? 1 : 0));
                     if (!e.exitCode) {
@@ -392,23 +420,8 @@ export class Extension {
         vscode.commands.executeCommand("setContext", "autotools:isAutotoolsProject",
             this.isAutotoolsProject() ? 1 : 2);
 
-        if (!this.autotoolsTask.isBootstrapped()) {
-            let cmd = this.autotoolsTask.bootstrap_cmd();
-            if (cmd) {
-                const doit: string = localize("autotools.bootstrap.me", "Bootstrap");
-                const setit: string = localize("autotools.edit.setting", "Setting...");
-                vscode.window.showWarningMessage(
-                    localize("autotools.want.bootstrap", "The project needs to be bootstrapped ('{0}').", cmd.join(' ')),
-                    doit,
-                    localize("autotools.cancel", "Cancel"), setit).then((value) => {
-                    if (value === doit) {
-                        this.autotoolsTask.bootstrap();
-                    } else if (value === setit) {
-                        openSettings("autotools.autoBootstrap");
-                    }
-                });
-            }
-        }
+    }
+    tasksBugWorkaround() : void {
         if (this.needTaskFetchBugWorkaround && this.isAutotoolsProject()) {
             // FIXME: This is a workaround for vscode not parsing tasks.json prior to fetchTasks()
             const kind:BuildTask = {
@@ -558,6 +571,7 @@ export class Extension {
                 statusBar.show();
                 configuration.initFromState();
                 await configuration.initFromSettings(true);
+                await configuration.analyzeConfigureParams(false, false);
                 await outputLogHeader();
                 await extension.configure();
                 return Promise.resolve();
@@ -585,6 +599,7 @@ export class Extension {
             logger.message('Configuring can be re-attempted with "Autotools: Configure"', "Normal");
             logger.message('KB: ' + kbUrl.toString(true) + '#config-fail', "Normal");
         }
+        this.updateMakefileFilePresent(success);
         return success;
     };
     public isAutotoolsProject(): boolean { return !!configuration.getConfigureAc(); }
@@ -592,7 +607,7 @@ export class Extension {
     public isConfigured(): boolean { return this.autotoolsTask.isConfigured(configuration.getCurrentMakefileConfiguration()); }
 
     public updateMakefileFilePresent(newValue: boolean): void {
-        vscode.commands.executeCommand("setContext", "autotools:makefileFilePresent", newValue);
+        vscode.commands.executeCommand("setContext", "autotools:makefileFilePresent", newValue ? 1 : 2);
     }
 
     public getState(): state.StateManager { return this.mementoState; }
@@ -1008,15 +1023,25 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         return vscode.commands.executeCommand("autotools.setBuildConfiguration");
     }));
 
+    extension.registerTasks();
+
+    let configureAc = AutoToolsBootstrapTaskProvider.manifests.find((m) => checkFileExistsSync(resolvePathToRoot(m)));
+    configuration.setConfigureAc(configureAc);
+
     // Read from the workspace state before reading from settings,
     // becase the latter may use state info in variable expansion.
     if (extension.isAutotoolsProject()) {
         statusBar.show();
         configuration.initFromState();
         await configuration.initFromSettings(true);
+
+        extension.bootstrapWithPrompt();
+
+        await configuration.analyzeConfigureParams(false, false);
         await outputLogHeader();
     }
 
+    extension.tasksBugWorkaround();
     const openFile = async (fileUri: vscode.Uri) => {
         await vscode.commands.executeCommand("vscode.open", fileUri);
         await vscode.commands.executeCommand("workbench.files.action.showActiveFileInExplorer");
@@ -1041,8 +1066,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             )
             await extension.testController?.onOpenedDocument();
     }));
-
-    extension.registerTasks();
 
     if (vscode.workspace.workspaceFolders) {
         let configureAc = vscode.workspace.createFileSystemWatcher(
