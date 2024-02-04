@@ -44,6 +44,10 @@ export function clearOutputChannel(): void {
 }
 
 //TODO: implement more verbosity levels for the output log
+/* if the logging level is "Normal", lines are tuncated to 250 char.
+ * If not set, no truncation.
+ * if set to other levels, no truncation
+ */
 export function message(message: string, loggingLevel?: string): void {
     // Print the message only if the intended logging level matches the settings
     // or if no loggingLevel restriction is provided.
@@ -52,9 +56,9 @@ export function message(message: string, loggingLevel?: string): void {
     }
 
     let channel: vscode.OutputChannel = getOutputChannel();
-    channel.appendLine((loggingLevel && loggingLevel != 'Normal') ? message : truncate(message));
+    channel.appendLine((!loggingLevel || loggingLevel != 'Normal') ? message : truncate(message));
 }
-const truncate = (input: string) => input.length > 150 ? `${input.substring(0, 150)}...` : input;
+const truncate = (input: string) => input.length > 250 ? `${input.substring(0, 250)}...` : input;
 
 // This is used for a few scenarios where the message already has end of line incorporated.
 // Example: stdout/stderr of a child process read before the stream is closed.
