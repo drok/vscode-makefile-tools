@@ -103,45 +103,46 @@ export interface pkgInfo {
 }
 function fixupPackageURLs(theinfo: pkgInfo) : void {
     if (!theinfo.url && theinfo.tarname && theinfo.name.startsWith('GNU '))
-        theinfo.url = `http://www.gnu.org/software/${theinfo.tarname}/`;
+        theinfo.url = `https://www.gnu.org/software/${theinfo.tarname}/`;
     if (theinfo.bugreport) {
         let url = vscode.Uri.parse(theinfo.bugreport);
         if (!url.scheme || url.scheme == 'file')
             theinfo.bugreport = `mailto:${theinfo.bugreport}`;
     }
 }
-export async function getPackageJSON(): Promise<pkgInfo> {
-    return new Promise<pkgInfo>(async (resolve, reject) => {
+export async function getPackageJSON(): Promise<pkgInfo | undefined> {
+    return new Promise<pkgInfo|undefined>(async (resolve, reject) => {
         let c = configuration.getCurrentMakefileConfiguration();
         let theinfo : pkgInfo | undefined;
 
-    if (extension.isConfigured()) {
-            let info : string | undefined;
-            const result: util.SpawnProcessResult = await util.spawnChildProcess(
-                path.join(c.top_builddir, "config.status"), ["--file=-:-"],
-                util.getWorkspaceRoot(),
-                true, true,
-                '{ "name": "@PACKAGE@", "version": "@VERSION@", "tarname": "@PACKAGE_TARNAME@", "bugreport": "@PACKAGE_BUGREPORT@", "url": "@PACKAGE_URL@", "automake": "@AUTOMAKE@", "maint": "@MAINTAINER_MODE_FALSE@" }',
-                (x) => {info = x}, undefined);
-            if (result.returnCode !== 0) return reject();
-            if (info === undefined) return reject();
+        if (extension.isConfigured()) {
             try {
-                theinfo = JSON.parse(info || "");
+                let info : string | undefined;
+                const result: util.SpawnProcessResult = await util.spawnChildProcess(
+                    util.resolvePathToRoot(path.join(c.top_builddir, "config.status")), ["--file=-:-"],
+                    util.getWorkspaceRoot(),
+                    true, true,
+                    '{ "name": "@PACKAGE@", "version": "@VERSION@", "tarname": "@PACKAGE_TARNAME@", "bugreport": "@PACKAGE_BUGREPORT@", "url": "@PACKAGE_URL@", "automake": "@AUTOMAKE@", "maint": "@MAINTAINER_MODE_FALSE@" }',
+                    (x) => {info = x}, undefined).catch<util.SpawnProcessResult>((r) => Promise.resolve({ returnCode: 33, signal: "ERR" }));
+                if (result.returnCode !== 0) return resolve(undefined);
+                if (info === undefined) return resolve(undefined);
+                    theinfo = JSON.parse(info || "");
                 if (theinfo) {
                     fixupPackageURLs(theinfo);
                     return resolve(theinfo);
                 }
+                else resolve(undefined);
             } catch (e) {
-                return reject();
+                return resolve(undefined);
             }
         } else {
             const result: util.SpawnProcessResult = await util.spawnChildProcess(
-                "autoconf", ["--trace=AC_INIT"],
+                "autoconf", ["--trace=AC_INIT:\\$f%%%\\$l%%%\\$n%%%\\${%%%}%"],
                 util.getWorkspaceRoot(),
                 true, true,
                 undefined,
                 (x) => {
-                    var ac_init = x.trimEnd().split(':');
+                    var ac_init = x.trimEnd().split('%%%');
                     if (ac_init && ac_init.length > 4 && ac_init[0] == "configure.ac" && ac_init[2] == "AC_INIT") {
                         theinfo = {
                             "name": ac_init[3],
@@ -154,13 +155,7 @@ export async function getPackageJSON(): Promise<pkgInfo> {
                         fixupPackageURLs(theinfo);
                     }
                 }, undefined);
-            if (result.returnCode !== 0) theinfo = {
-                    name: "unk",
-                    version: "unk",
-                    bugreport: "unk",
-                    tarname: "unk",
-                    url: "unk",
-                    automake: "unk"}
+            if (result.returnCode !== 0) resolve(undefined);
             if (theinfo) return resolve(theinfo);
         }
 
