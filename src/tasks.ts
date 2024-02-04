@@ -17,12 +17,13 @@ import * as vscode from 'vscode';
 
 import * as nls from 'vscode-nls';
 import { Script } from 'vm';
-import { extension } from './extension';
+import { extension, telemetry } from './extension';
 import * as util from './util';
 import * as make from './make';
 import * as logger from './logger';
 import { env } from 'process';
 import * as ui from './ui';
+import { SpanStatusCode } from '@opentelemetry/api';
 nls.config({ messageFormat: nls.MessageFormat.bundle, bundleFormat: nls.BundleFormat.standalone })();
 const localize: nls.LocalizeFunc = nls.loadMessageBundle();
 
@@ -45,11 +46,11 @@ export class AutoToolsBuildTaskProvider implements MyTaskProvider {
 		return this.myPromise;
 	}
 
+    changeConfiguration(c: configuration.MakefileConfiguration, disposables: vscode.Disposable[]) {
+        this.myPromise = Promise.resolve([])
+    }
     public update(disposables: vscode.Disposable[]) {
         let c = configuration.getCurrentMakefileConfiguration();
-        this.changeConfiguration(c, disposables);
-    }
-    changeConfiguration(c: configuration.MakefileConfiguration, disposables: vscode.Disposable[]) {
         var targets: Task[] = [];
         configuration.getAllBuildTargets().forEach((goals, dir) => {
             for (let g of goals.values()) {
@@ -133,11 +134,11 @@ export class AutoToolsTestTaskProvider implements MyTaskProvider {
 		return this.myPromise;
 	}
 
+    changeConfiguration(c: configuration.MakefileConfiguration, disposables: vscode.Disposable[]) {
+        this.myPromise = Promise.resolve([])
+    }
     public update(disposables: vscode.Disposable[]) {
         let c = configuration.getCurrentMakefileConfiguration();
-        this.changeConfiguration(c, disposables);
-    }
-    changeConfiguration(c: configuration.MakefileConfiguration, disposables: vscode.Disposable[]) {
         var targets: Task[] = [];
         this.numFails = 0;
         this.numTests = 0;
@@ -242,12 +243,11 @@ export class AutoToolsCheckTaskProvider implements MyTaskProvider {
 		return this.myPromise;
 	}
 
-    update(disposables: vscode.Disposable[]) {
-
-        let c = configuration.getCurrentMakefileConfiguration();
-        this.changeConfiguration(c, disposables);
-    }
     changeConfiguration(c: configuration.MakefileConfiguration, disposables: vscode.Disposable[]) {
+        this.myPromise = Promise.resolve([])
+    }
+    public update(disposables: vscode.Disposable[]) {
+        let c = configuration.getCurrentMakefileConfiguration();
         var targets : Task[] = [];
         let e = configuration.getTestEnvironments();
         var cte = configuration.getCurrentTestEnvironment();
@@ -448,8 +448,7 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
         return !this.isErroredConfiguration &&
             checkFileExistsSync(resolvePathToRoot(path.join(c.top_builddir, "config.status")));
     }
-    update(disposables: vscode.Disposable[]): void {
-    }
+
     changeConfiguration(c: configuration.MakefileConfiguration, disposables: vscode.Disposable[])
     {
         if (this.bootstrapTask) {
@@ -482,6 +481,12 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
                     this.recheckTask
                 ]);
         }
+        else {
+            telemetry.setSpanStatus(SpanStatusCode.ERROR, "no-bootstrap-task");
+            this.myPromise = Promise.reject("Runtime error - no bootstrap task")
+        }
+    }
+    update(disposables: vscode.Disposable[]): void {
     }
     public async bootstrap(): Promise<void> {
         if (this.bootstrapTask) {

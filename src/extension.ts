@@ -543,7 +543,7 @@ export class Extension {
     }
 
     public onConfigurationSelect(c: configuration.MakefileConfiguration) : void {
-        // this.tasks.forEach((provider) => provider.changeConfiguration(c, this.configDisposables));
+        this.tasks.forEach((provider) => provider.changeConfiguration(c, this.configDisposables));
         this.configDisposables.forEach((d) => d.dispose());
         this.configDisposables = [];
     }
