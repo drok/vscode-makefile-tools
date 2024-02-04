@@ -7,7 +7,7 @@ import * as configuration from './configuration';
 import { MakefileConfiguration, clearTraits } from './configuration';
 import * as cpp from 'vscode-cpptools';
 import * as cpptools from './cpptools';
-import {extension, telemetry} from './extension';
+import {Extension, extension, telemetry} from './extension';
 import * as tele from './tele';
 import { Attributes, SpanStatusCode } from './tele';
 import * as fs from 'fs';
@@ -51,8 +51,9 @@ export const t_clean = new BuildTarget("", "clean");
 // Leave positive error codes for make exit values
 export enum ConfigureBuildReturnCodeTypes {
     success = 0,
+    describedError = 2,
+    outOfDate = 1,
     notFound = -3,
-    outOfDate = -4,
     other = -5,
     saveFailed = -6,
     fullFeatureFalse = -7,
@@ -240,6 +241,11 @@ export async function generateParseContent(recursive: boolean = false): Promise<
         makeArgs.push("--assume-old=configure"); // Only works in-tree
 
     makeArgs.push(
+        /* Don't stop for errors like "No rule to make ..." because those say
+         * what can be done. Dry running is concerned with what *should* be done.
+         */
+        "--keep-going",
+
         "GMOFILES=", // Avoid po and pot files being built with msgmerge
     // rejecting GNU make's builtin variables and rules because automake
     // generates implicit rules to cover all the targets. It does not rely
@@ -410,18 +416,26 @@ export async function generateParseContent(recursive: boolean = false): Promise<
         // because it "can't fail". It represents only display of database and no targets are actually run.
         // try syntax error
         if (result.returnCode !== ConfigureBuildReturnCodeTypes.success) {
-            logger.message("Exporting project config from Makefiles failed.");
-            logger.message(completeErr);
+            var kbUrl : vscode.Uri = await extension.kbUrl();
+            logger.message(completeErr
+                .replace(/^(.* No rule to make target.*)$/gm, "WARNING: $&\nWARNING: This leads to debugging out-of-date programs.")
+                .replace(/^(.* overriding recipe for target*)$/gm, `WARNING: $&\nWARNING: Discovered test tasks will not run as the maintainers expect.\nKB: ${kbUrl.toString(true)}#overrides-check-target`)
 
-            // Report the standard dry-run error & guide only when the configure was not cancelled
-            // by the user (which causes retCode to be null).
-            // Also don't write the cache if this operation was cancelled
-            // because it may be incomplete and affect a future non clean configure.
-            if (result.returnCode !== null) {
+            );
+
+            if (result.returnCode == ConfigureBuildReturnCodeTypes.describedError) {
+                telemetry.logEvent("DryRunWarned", {n: completeErr.split('\n').length}, undefined, true);
+                logger.message("Exporting project config succeeded with warnings.");
+            } else if (result.returnCode == ConfigureBuildReturnCodeTypes.outOfDate) {
+                telemetry.logEvent("DryRunFailed", {returnCode: result.returnCode}, undefined, true);
+                logger.message("Exporting project config from Makefiles failed.");
+            }
+
+            if (result.returnCode == ConfigureBuildReturnCodeTypes.describedError) {
+                logger.message('KB: ' + kbUrl.toString(true) + '#dry-run-warnings', "Normal");
+            } else {
                 await util.reportDryRunError(dryrunFile);
             }
-            telemetry.logEvent("DryRunFailed", {returnCode: result.returnCode}, undefined, true);
-            extension.resetCppToolsProvider();
             // FIXME: Since dry-running failed, also unlink the configCache file
         } else {
             if (parseFailedAt) {
@@ -430,19 +444,27 @@ export async function generateParseContent(recursive: boolean = false): Promise<
                 var kbUrl : vscode.Uri = await extension.kbUrl();
                 logger.message('KB: ' + kbUrl.toString(true) + '#config-parse-fail', "Normal");
             }
+        }
+        /* Now decide whether to import (partial) data or reset Intellisense */
+        if (result.returnCode !== ConfigureBuildReturnCodeTypes.success &&
+            result.returnCode != ConfigureBuildReturnCodeTypes.outOfDate &&
+            result.returnCode != ConfigureBuildReturnCodeTypes.describedError) {
+            /* Reset, to make it obvious that something very wrong happened */
+            extension.resetCppToolsProvider();
+        } else {
             // All done, notify that new data is available
             result.returnCode = extension.updateCppToolsProvider();
             export_stats = build_tree.stats;
             configuration.accountForTraits();
             extension.updateTasks(build_tree);
             extension.updateWatchers();
-            telemetry.setAttributes({
-                    stats: [ linenumber,
-                        build_tree.stats.programs,
-                        build_tree.stats.tests,
-                        build_tree.stats.checks ]
-            });
         }
+        telemetry.setAttributes({
+            stats: [ linenumber,
+                build_tree.stats.programs,
+                build_tree.stats.tests,
+                build_tree.stats.checks ]
+        });
         ui.getUI().setStatus(result.returnCode !== ConfigureBuildReturnCodeTypes.success ? ui.UIStatus.ERR : ui.UIStatus.OK);
 
         // Update the projname because the dry-run may have updated config.status
