@@ -65,6 +65,7 @@ suite('Fake dryrun parsing', /*async*/() => {
       configuration.setCurrentMakefileConfiguration("Default");
       configuration.initFromState();
       await configuration.initFromSettings();
+      await configuration.analyzeConfigureParams(false, false);
 
       // We define extension log here as opposed to in the fake repro .vscode/settings.json
       // because the logging produced at the first project load has too few important data to verify and much variations
@@ -108,6 +109,8 @@ suite('Fake dryrun parsing', /*async*/() => {
          configuration.setCurrentMakefileConfiguration("Default");
          configuration.initFromState();
          await configuration.initFromSettings();
+         await configuration.analyzeConfigureParams(false, false);
+
    
          // We define extension log here as opposed to in the fake repro .vscode/settings.json
          // because the logging produced at the first project load has too few important data to verify and much variations
@@ -152,6 +155,7 @@ suite('Fake dryrun parsing', /*async*/() => {
          configuration.setCurrentMakefileConfiguration("Default");
          configuration.initFromState();
          await configuration.initFromSettings();
+         await configuration.analyzeConfigureParams(false, false);
 
          // Extension log is defined in the test .vscode/settings.json but delete it now
          // because we are interested to compare against a baseline from this point further.
@@ -204,6 +208,7 @@ suite('Fake dryrun parsing', /*async*/() => {
          configuration.setCurrentMakefileConfiguration("Default");
          configuration.initFromState();
          await configuration.initFromSettings();
+         await configuration.analyzeConfigureParams(false, false);
    
          // Extension log is defined in the test .vscode/settings.json but delete it now
          // because we are interested to compare against a baseline from this point further.
@@ -243,6 +248,7 @@ suite('Fake dryrun parsing', /*async*/() => {
          configuration.setCurrentMakefileConfiguration("Default");
          configuration.initFromState();
          await configuration.initFromSettings();
+         await configuration.analyzeConfigureParams(false, false);
    
          // Extension log is defined in the test .vscode/settings.json but delete it now
          // because we are interested to compare against a baseline from this point further.
@@ -282,6 +288,7 @@ suite('Fake dryrun parsing', /*async*/() => {
          configuration.setCurrentMakefileConfiguration("Default");
          configuration.initFromState();
          await configuration.initFromSettings();
+         await configuration.analyzeConfigureParams(false, false);
    
          // Extension log is defined in the test .vscode/settings.json but delete it now
          // because we are interested to compare against a baseline from this point further.
@@ -319,6 +326,7 @@ suite('Fake dryrun parsing', /*async*/() => {
       configuration.setCurrentMakefileConfiguration("Default");
       configuration.initFromState();
       await configuration.initFromSettings();
+      await configuration.analyzeConfigureParams(false, false);
 
       // Extension log is defined in the test .vscode/settings.json but delete it now
       // because we are interested to compare against a baseline from this point further.
@@ -359,6 +367,7 @@ suite('Fake dryrun parsing', /*async*/() => {
       configuration.setCurrentMakefileConfiguration("Default");
       configuration.initFromState();
       await configuration.initFromSettings();
+      await configuration.analyzeConfigureParams(false, false);
 
       configuration.prepareConfigurationsQuickPick();
       await configuration.setConfigurationByName("varexp");

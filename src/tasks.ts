@@ -386,29 +386,15 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
             "configure.in",
     ];
     constructor() {
-        let b = this.bootstrap_cmd();
-        if (b) {
-            const kind: AutotoolsTask = {
-                type: this.myType,
-                action: 'bootstrap'
-            };
-            this.bootstrapTask = new Task(kind, TaskScope.Workspace,
-                localize("autotools.bootstrap.task", "Bootstrap autotools"),
-                "Autotools task",
-                new ProcessExecution(b[0], b.slice(1)));
-            this.bootstrapTask.group = TaskGroup.Build;
-            this.bootstrapTask.detail = localize("autotools.bootstrap", "$(tools) Bootstrap project using '{0}'", b.join(' '));
-
-            const helpkind: AutotoolsTask = {
-                type: this.myType,
-                action: 'help'
-            };
-            this.helpTask = new Task(helpkind, TaskScope.Workspace,
-                localize("autotools.configure.help.task", "Display package configuration options"),
-                "Autotools task",
-                new ProcessExecution("./configure", ["--help"]));
-            this.helpTask.detail = localize("autotools.configure.help", "$(tools) Output package configuration options using 'configure --help'");
-        }
+        const helpkind: AutotoolsTask = {
+            type: this.myType,
+            action: 'help'
+        };
+        this.helpTask = new Task(helpkind, TaskScope.Workspace,
+            localize("autotools.configure.help.task", "Display package configuration options"),
+            "Autotools task",
+            new ProcessExecution("./configure", ["--help"]));
+        this.helpTask.detail = localize("autotools.configure.help", "$(tools) Output package configuration options using 'configure --help'");
     }
 	provideTasks(): Thenable<Task[]> | undefined {
         if (this.bootstrapTask) {
@@ -430,9 +416,7 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
     public bootstrap_cmd(): string[] | undefined {
         if (this.the_bootstrap_cmd)
             return this.the_bootstrap_cmd;
-        let configureAc = AutoToolsBootstrapTaskProvider.manifests.find((m) => checkFileExistsSync(resolvePathToRoot(m)));
-        configuration.setConfigureAc(configureAc);
-        if (!configureAc) {
+        if (!configuration.getConfigureAc()) {
             return undefined;
         } else {
             for (const script of boostrap_scripts) {
@@ -454,7 +438,19 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
 
     changeConfiguration(c: configuration.MakefileConfiguration, disposables: vscode.Disposable[])
     {
-        if (this.bootstrapTask) {
+        let b = this.bootstrap_cmd();
+        if (b) {
+            const kind: AutotoolsTask = {
+                type: this.myType,
+                action: 'bootstrap'
+            };
+            this.bootstrapTask = new Task(kind, TaskScope.Workspace,
+                localize("autotools.bootstrap.task", "Bootstrap autotools"),
+                "Autotools task",
+                new ProcessExecution(b[0], b.slice(1)));
+            this.bootstrapTask.group = TaskGroup.Build;
+            this.bootstrapTask.detail = localize("autotools.bootstrap", "$(tools) Bootstrap project using '{0}'", b.join(' '));
+
             var autoreconf : string = configuration.autoreconfCmd().join(' ');
 
             this.regenTask = new Task({type: this.myType, action: 'regen'},
