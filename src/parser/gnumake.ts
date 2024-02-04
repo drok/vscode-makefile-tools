@@ -442,11 +442,9 @@ export class Goal extends Node implements Parser {
 
         /* Flags gathered from automake (recipe hints like $(LINK) */
         Linked_binary: 256,
-        Static_library: 512,
         Test_Suite: 1024,
         Test_Program: 2048,
         Test_Log: 4096,
-        Library: 8192,
     };
     public trs?: make.TestResult;
 
@@ -610,7 +608,6 @@ export class Goal extends Node implements Parser {
     test: vscode.TestItem | undefined;
 }
 
-const LibraryRe = /\.(la|a|so|dll)$/;
 const LinkerRe = /\$\(\w*LINK\)\s/;
 const RanlibRe = /\$\(RANLIB\)\s/;
 const TestRe = /\$\(AM_TESTS_FD_REDIRECT\)\s/;
@@ -628,12 +625,7 @@ export class Recipe implements Parser {
         if (line == "")
             return [ParserDisp.Leave, this];
         if (LinkerRe.test(line)) {
-            if (this.goal.goal && LibraryRe.test(this.goal.goal))
-                this.goal.flags |= Goal.Flags.Library;
-            else
-                this.goal.flags |= Goal.Flags.Linked_binary;
-        } else if (RanlibRe.test(line)) {
-            this.goal.flags |= Goal.Flags.Static_library;
+            this.goal.flags |= Goal.Flags.Linked_binary;
         }
         if (TestRe.test(line))
             this.goal.flags |= Goal.Flags.Test_Log;

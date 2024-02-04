@@ -60,7 +60,7 @@ export class AutoToolsBuildTaskProvider implements MyTaskProvider {
         var targets: Task[] = [];
         configuration.getAllBuildTargets().forEach((goals, dir) => {
             for (let g of goals.values()) {
-                if (g.flags & (Goal.Flags.Static_library | Goal.Flags.Linked_binary)) {
+                if (g.flags & (Goal.Flags.Linked_binary)) {
                     if (g.goal) {
                         const kind: BuildTask = {
                             type: this.myType,
@@ -77,7 +77,6 @@ export class AutoToolsBuildTaskProvider implements MyTaskProvider {
                         g.task.group = TaskGroup.Build;
                         g.task.detail =
                             (g.flags & Goal.Flags.Linked_binary) ? localize("automake.program", "$(combine) $(file-binary) Build program") :
-                            (g.flags & Goal.Flags.Static_library) ? localize("automake.ranlib", "$(combine) $(library) Build static library") :
                             localize("automake.build", "$(combine) Build");
                         targets.push(g.task);
                     }
