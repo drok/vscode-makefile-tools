@@ -211,9 +211,9 @@ export class ProjectOutlineProvider implements vscode.TreeDataProvider<Node> {
         let goals : Node[];
         if (!node) {
             goals = [...this.tree.submake.values()]
-                .map(sub => new SubNode(sub, Goal.Flags.Linked_binary|Goal.Flags.Library));
+                .map(sub => new SubNode(sub, Goal.Flags.Linked_binary));
             goals.push(...[...this.tree.goals.values()]
-                .filter(goal => goal.flags & Goal.Flags.Linked_binary|Goal.Flags.Library));
+                .filter(goal => goal.flags & Goal.Flags.Linked_binary));
         } else {
             goals = node.getChildren();
         }
