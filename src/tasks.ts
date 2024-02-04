@@ -38,6 +38,12 @@ const defaultCheckPresentation : vscode.TaskPresentationOptions = {
     showReuseMessage: false }
 
 
+const boostrap_scripts : string[] = [
+    "bootstrap",
+    "bootstrap.sh",
+    "autogen.sh",
+];
+
 export class AutoToolsBuildTaskProvider implements MyTaskProvider {
 	readonly myType = 'build';
 	private myPromise: Thenable<Task[]> | undefined = undefined;
@@ -430,13 +436,11 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
         if (!configureAc) {
             return undefined;
         } else {
-            let script = resolvePathToRoot("bootstrap");
-            if (checkFileExistsSync(script))
-                return [script];
-
-            script = resolvePathToRoot("autogen.sh");
-            if (checkFileExistsSync(script))
-                return [script];
+            for (const script of boostrap_scripts) {
+                let fullpath = resolvePathToRoot(script);
+                if (checkFileExistsSync(fullpath))
+                    return [fullpath];
+            }
         }
         return configuration.autoreconfCmd().concat('-i');
     }
@@ -473,9 +477,7 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
             this.recheckTask.presentationOptions = presentSilent;
             this.recheckTask.detail = localize("autotools.recheck", "$(sync) Update configuration. See [config.status invocation - --recheck](https://www.gnu.org/software/autoconf/manual/autoconf-2.69/html_node/config_002estatus-Invocation.html)");
 
-            this.myPromise = Promise.resolve([this.regenTask]
-                .concat(this.bootstrapTask ?? []));
-                this.myPromise = Promise.resolve([
+            this.myPromise = Promise.resolve([
                     this.bootstrapTask,
                     this.regenTask,
                     this.recheckTask
