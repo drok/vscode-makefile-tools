@@ -225,12 +225,6 @@ export function readtraceLiveTestRuns() : void {
     traceLiveTestRuns = util.getSettingOr<boolean>("traceLiveTestRuns", false);
 }
 
-let disableMaintainerMode: boolean;
-export function getdisableMaintainerMode(): boolean { return disableMaintainerMode; }
-export function readdisableMaintainerMode() : void {
-    disableMaintainerMode = util.getSettingOr<boolean>("disableMaintainerMode", true);
-}
-
 let autoreconfWarnCross: boolean;
 export function getautoreconfWarnCross(): boolean { return autoreconfWarnCross; }
 export function readautoreconfWarnCross() : void {
@@ -766,7 +760,6 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
     readkeepDryRuns();
     readkeepConfigurationCache();
     readtraceLiveTestRuns();
-    readdisableMaintainerMode();
     readpromptClean();
     readautoreconfWarnCross();
     readautoreconfWarnObsolete();
@@ -781,8 +774,6 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
     await setCurrentMakefileConfiguration(currentMakefileConfigurationName);
 
     await analyzeConfigureParams(false, false);
-
-    await promptMaintainerModeChange(false);
 
 
     // FIXME: seems wrong to do || make.t_all; this fn should probably be called
@@ -910,14 +901,6 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
             }
 
 
-            subKey = "disableMaintainerMode";
-            let updateddisableMaintainerMode : boolean = util.getSettingOr<boolean>(subKey, false);
-            let updatedMaintainerMode : boolean = (updateddisableMaintainerMode !== disableMaintainerMode);
-            if (updatedMaintainerMode) {
-                readdisableMaintainerMode();
-                updatedSettingsSubkeys.push(subKey);
-            }
-
             subKey = "keepConfigurationCache";
             let updatedkeepConfigurationCache : boolean = util.getSettingOr<boolean>(subKey, false);
             if (updatedkeepConfigurationCache !== keepConfigurationCache) {
@@ -1015,10 +998,6 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
                 }
             });
 
-            if (updatedMaintainerMode) {
-                await promptMaintainerModeChange(true);
-            }
-
             if (extension.getState().configureDirty) {
                 await make.configure(make.TriggeredBy.configureAfterConfigurationChange);
             }
@@ -1036,7 +1015,6 @@ export async function setConfigurationByName(configurationName: string | undefin
     // Refresh settings, they may reference variables or commands reading state configuration var (${configuration}).
     await initFromSettings();
     extension._projectOutlineProvider.update(currentMakefileConfigurationName);
-    await promptMaintainerModeChange(true);
 }
 
 class BuildConfigPickItem implements vscode.QuickPickItem {
@@ -1088,48 +1066,6 @@ export async function setNewConfiguration(): Promise<void> {
 
         await make.configure(make.TriggeredBy.configureAfterConfigurationChange);
     }
-}
-
-let showingMaintainerPrompt: boolean = false;
-async function promptMaintainerModeChange(modal: boolean) : Promise<void> {
-
-    /* TODO: this idea needs work. auto-rechecking should be disabled, etc.  */
-    return Promise.resolve();
-
-    let pinfo = extension.pkginfo;
-    if ((!disableMaintainerMode || !pinfo || !pinfo?.maint) || showingMaintainerPrompt)
-        return Promise.resolve();
-
-    const doit: string = localize("yes", "Yes");
-    const setit: string = localize("autotools.edit.setting", "Setting...");
-    const question: string = localize("autotools.should.update.build", "Maintainer Mode Changed. Reconfigure the '{0}' build with --disable-maintainer-mode?",
-        currentMakefileConfiguration.name);
-    showingMaintainerPrompt = true;
-
-    if (modal)
-        await vscode.window.showWarningMessage(
-            question,
-            doit, localize("no", "No"), setit)
-        .then(async (value) => {
-            showingMaintainerPrompt = false;
-            if (value === doit) {
-                await extension.configure();
-            } else if (value === setit) {
-                openSettings("autotools.disableMaintainerMode");
-            }
-        });
-    else
-        vscode.window.showWarningMessage(
-            question,
-            doit, localize("no", "No"), setit)
-        .then(async (value) => {
-            showingMaintainerPrompt = false;
-            if (value === doit) {
-                await extension.configure();
-            } else if (value === setit) {
-                openSettings("autotools.disableMaintainerMode");
-            }
-        });
 }
 
 function buildDirHash(c: MakefileConfiguration) : number {

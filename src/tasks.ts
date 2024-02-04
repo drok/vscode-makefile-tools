@@ -540,7 +540,6 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
                 createDirectorySync(destdir);
 
             let configureArgs = c.configureArgs || [];
-            configureArgs.push(configuration.getdisableMaintainerMode() ? '--disable-maintainer-mode' : '');
             let task = new Task(configurekind, TaskScope.Workspace,
                 localize("autotools.configure.task", "Prepare build directory"),
                 "Autotools task",
