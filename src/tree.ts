@@ -278,6 +278,9 @@ export class ProjectTestsProvider implements vscode.TreeDataProvider<Node> {
     getChildren(node?: Node): Node[] {
         let goals : Node[];
         if (!node) {
+            if (!this.tree.stats.checks)
+                return []; // ie, show the welcome message
+
             goals = [...this.tree.submake.values()]
                 .map(sub => new SubNode(sub, Goal.Flags.Test_Suite));
             goals.push(...[...this.tree.goals.values()]

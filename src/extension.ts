@@ -493,6 +493,8 @@ export class Extension {
         if (!build_tree.hasStats) {
             countStats(build_tree);
             build_tree.hasStats = true;
+
+            vscode.commands.executeCommand('setContext', "autotools:haveParallelHarness", build_tree.stats.checks ? 1 : 2);
         }
         if (build_tree.stats.checks) {
             if (!this.testController) {

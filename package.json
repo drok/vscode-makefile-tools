@@ -582,6 +582,11 @@
                 "when": "autotools:haveManifest > 1"
             },
             {
+                "view": "autotools.tests",
+                "contents": "%autotools.welcome.tests.none.markdownDescription%",
+                "when": "autotools:haveParallelHarness > 1"
+            },
+            {
                 "view": "debug",
                 "contents": "%autotools.welcome.debug.auto.markdownDescription%",
                 "when": "autotools:haveConfigurations == 1"
