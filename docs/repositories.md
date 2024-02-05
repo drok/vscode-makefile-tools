@@ -1,75 +1,75 @@
-| Repository  | GitHub URL | Prerequisites (commands to run in terminal before using Makefile Tools)  | Extension settings | Notes | Works? (Y/N) |
-|--|--|--|--|--|--|
-| 8cc | [https://github.com/rui314/8cc.git](https://github.com/rui314/8cc.git) | | | | Yes |
-| Apache Thrift | [https://github.com/apache/thrift.git](https://github.com/apache/thrift.git) | ./bootstrap.sh && ./configure | | always-make is long (triggers reconfigure) | Yes |
-| ARMmbedTLS | [https://github.com/remonbonbon/makefile-example.git](https://github.com/remonbonbon/makefile-example.git) | | | | Yes |
-| async-profiler | [https://github.com/jvm-profiling-tools/async-profiler.git](https://github.com/jvm-profiling-tools/async-profiler.git)| | | | Yes |
-| Bitcoin core integration/staging tree | [https://github.com/bitcoin/bitcoin.git](https://github.com/bitcoin/bitcoin.git) | | | always-make is long (triggers reconfigure) | Yes |
-| [BusyBox](https://github.com/mirror/busybox)[^non] | | | | [#92](https://github.com/microsoft/vscode-makefile-tools/issues/92) | Yes |
-| CircuitPython | [https://github.com/adafruit/circuitpython](https://github.com/adafruit/circuitpython)| | Root folder board configuration<br>    "makefile.configurations": \[<br>        {<br>            "name": "mpy-cross",<br>            "makeArgs": \[<br>                "-C mpy-cross",<br>            \]<br>        },<br>        {<br>            "name": "circuitplayground\_express",<br>            "makeArgs": \[<br>                "-C ports/atmel-samd",<br>                "BOARD=circuitplayground\_express"<br>            \]<br>        },<br>        {<br>            "name": "feather\_m0\_basic",<br>            "makeArgs": \[<br>                "-C ports/atmel-samd",<br>                "BOARD=feather\_m0\_basic"<br>            \]<br>        }<br>    \]<br>}<br><br>Subfolder ports board configuration<br>"makefile.configurations": \[<br>        {<br>            "name": "circuitplayground\_express",<br>            "makeArgs": \["BOARD=circuitplayground\_express"\]<br>        }<br>    \] | Build guide: https://learn.adafruit.com/building-circuitpython/build-circuitpython<br>Configurations shared for building from the root or opening a ports subdirectory | Yes |
-| clib | [https://github.com/clibs/clib](https://github.com/clibs/clib) | | | | Yes |
-| c-lightning | [https://github.com/ElementsProject/lightning.git](https://github.com/ElementsProject/lightning.git) | ./configure | | always-make is long (triggers reconfigure) | Yes |
-| [Cmake](https://github.com/Kitware/CMake)[^non] | | ./bootstrap | | doesn't detect launch targets because the linker commands are too cryptic, with or without V=1 | Yes |
-| CPython | [https://github.com/python/cpython.git](https://github.com/python/cpython.git)| ./configure || | Yes |
-| ctypes.sh | [https://github.com/taviso/ctypes.sh.git](https://github.com/taviso/ctypes.sh.git) | ./autogen.sh && ./configure | | | Yes |
-| CURL | [https://github.com/curl/curl.git](https://github.com/curl/curl.git) | autoreconf -fiv && ./configure | | configure takes very long (even with always-make or buildLog workarounds)<br><br>https://github.com/microsoft/vscode-makefile-tools/issues/93 | Yes |
-| dpdk | [https://github.com/DPDK/dpdk.git](https://github.com/DPDK/dpdk.git)| | | | No. Doesn't work because make calls into meson, ninja which don't provide useful output to parse |
-| dtwmcmd | [https://github.com/cdesktopenv/dtwmcmd.git](https://github.com/cdesktopenv/dtwmcmd.git) | /.configure | | | Yes |
-| duktape | [https://github.com/svaarala/duktape.git](https://github.com/svaarala/duktape.git) | | | | Yes |
-| Embedded Makefile Flow | [https://github.com/davepfeiffer/embedded-makefile-flow.git](https://github.com/davepfeiffer/embedded-makefile-flow.git) | | | | Yes |
-| [ffmpeg](https://github.com/FFmpeg/FFmpeg)[^non] | | ./configure | | | | Yes |
-| FIDO | [https://github.com/FidoProject/Fido.git](https://github.com/FidoProject/Fido.git)| | | minor issue (launch target finds an object file, not binary, for dryrun):<br>https://github.com/microsoft/vscode-makefile-tools/issues/94 | Yes |
-| FreeBSD | [https://github.com/freebsd/freebsd.git](https://github.com/freebsd/freebsd.git)| | | [https://github.com/microsoft/vscode-makefile-tools/issues/95](https://github.com/microsoft/vscode-makefile-tools/issues/95) | No. BSD make syntax not yet supported |
-| gcc | [https://github.com/gcc-mirror/gcc.git](https://github.com/gcc-mirror/gcc.git) | ./configure, set target to "all" specifically for more complete results | | | Yes |
-| Git | [https://github.com/git/git.git](https://github.com/git/git.git) | ./configure | | | Yes |
-| Google AFL | [https://github.com/google/AFL.git](https://github.com/google/AFL.git)| | | | Yes |
-| Google Protocol Buffers | [https://github.com/protocolbuffers/protobuf.git](https://github.com/protocolbuffers/protobuf.git) | ./autogen.sh && ./configure | | | Yes |
-| Greenplum Database (GPDB) | [https://github.com/greenplum-db/gpdb.git](https://github.com/greenplum-db/gpdb.git) | ./configure --without-readline --without-zstd | | always-make is long (triggers reconfigure) | Yes |
-| imgui | [https://github.com/ocornut/imgui.git](https://github.com/ocornut/imgui.git)| | | Create one wrapping makefile in root:<br>all:<br>   $(MAKE) -C ./examples/example\_sdl\_metal/<br>   $(MAKE) -C ./examples/example\_glfw\_metal/<br>   $(MAKE) -C ./examples/example\_glfw\_opengl2/<br>   $(MAKE) -C ./examples/example\_null/<br>   $(MAKE) -C ./examples/example\_glfw\_opengl3/<br>   $(MAKE) -C ./examples/example\_emscripten\_opengl3/<br>   $(MAKE) -C ./examples/example\_sdl\_opengl2/<br>   $(MAKE) -C ./examples/example\_glut\_opengl2/<br>   $(MAKE) -C ./examples/example\_sdl\_opengl3/<br><br>Change \` back tick with shell command in many of these leaf makefiles. Example:<br>#  CXXFLAGS += \`sdl2-config --cflags\`<br>   CXXFLAGS += $(shell sdl2-config --cflags) | Yes |
-| Jemalloc | [https://github.com/jemalloc/jemalloc.git](https://github.com/jemalloc/jemalloc.git) | ./autogen.sh && ./configure | | [https://github.com/microsoft/vscode-makefile-tools/issues/96](https://github.com/microsoft/vscode-makefile-tools/issues/96)| Yes |
-| Lbrycrd | [https://github.com/lbryio/lbrycrd.git](https://github.com/lbryio/lbrycrd.git) | ./autogen.sh && ./configure --with-incompatible-bdb | The build needs V=1 to produce useful output for the extension.<br>Always-make is slow (triggers reconfigure). | | Yes |
-| libass | [https://github.com/libass/libass.git](https://github.com/libass/libass.git) | ./autogen.sh && ./configure | | [https://github.com/microsoft/vscode-makefile-tools/issues/96](https://github.com/microsoft/vscode-makefile-tools/issues/96) | Yes |
-| libav | [https://github.com/libav/libav.git](https://github.com/libav/libav.git) | ./configure | | [https://github.com/microsoft/vscode-makefile-tools/issues/97](https://github.com/microsoft/vscode-makefile-tools/issues/97) | Yes |
-| libsvm | [https://github.com/cjlin1/libsvm.git](https://github.com/cjlin1/libsvm.git) | | | | Yes |
-| libtommath | [https://github.com/libtom/libtommath.git](https://github.com/libtom/libtommath.git)| | |  | Yes |
-| libtorrent | [https://github.com/rakshasa/libtorrent.git](https://github.com/rakshasa/libtorrent.git) | ./autogen.sh && ./configure | | | Yes |
-| linux kernel | [https://github.com/torvalds/linux](https://github.com/torvalds/linux) | make distclean defconfig clean | | Always-make may trigger reconfigure for some linux kernel setups.<br>When make is invoked by the exension (during configure or build) it may wait for user input indefiniely: watch for timeout bottom right popup.<br> | Yes |
-| lk | [https://github.com/littlekernel/lk.git](https://github.com/littlekernel/lk.git) | | makefile.configurations.makeArgs: PROJECT=armemu-test | build.log has no commands, it's too cryptic even if V=1. dryrun doesn't have this problem.<br>dryrun has very long lines that makes parsing slow. Disable MAKECONFIGHEADER in make/macros.mk to fix. | Yes |
-| lz4 | [https://github.com/lz4/lz4.git](https://github.com/lz4/lz4.git) | | | | Yes |
-| [make](https://github.com/mirror/make) | 4.1 :X:| ./bootstrap && ./configure | | fail at #dry-run | Yes |
-| Mesa 3d | [https://gitlab.freedesktop.org/mesa/mesa.git](https://gitlab.freedesktop.org/mesa/mesa.git) | NOCONFIGURE=1 ./autogen.sh && ./configure --enable-llvm | | always-make is long (triggers reconfigure) | Yes |
-| micropython | [https://github.com/micropython/micropython.git](https://github.com/micropython/micropython.git) | | | Create wrapper makefile in the root folder:<br>all:<br>$(MAKE) -C ./mpy-cross<br>$(MAKE) submodules deplibs -C ./ports/unix<br>$(MAKE) -C ./ports/unix<br>$(MAKE) submodules -C ./ports/stm32<br>$(MAKE) -C ./ports/stm32<br>Needs a real build before the dryrun invoked by the configure (various resources are needed even by the dryrun)<br> | Yes |
-| Mono | [https://github.com/mono/mono.git](https://github.com/mono/mono.git) | ./autogen.sh && ./configure | | Can't use the build log because we don't support yet dolt (see split-fsharp.c). Dryrun produces useful output though.<br>https://github.com/microsoft/vscode-makefile-tools/issues/99<br>Always-make takes long (triggers reconfigure).| Yes |
-| Nano | [https://github.com/madnight/nano.git](https://github.com/madnight/nano.git) | ./autogen.sh && ./configure | | The build log is cryptic even with V=1 and the extension can't parse it. The dryrun log is fine though. | Yes |
-| NetBSD | [https://www.netbsd.org/](https://www.netbsd.org/)| | | [https://github.com/microsoft/vscode-makefile-tools/issues/95](https://github.com/microsoft/vscode-makefile-tools/issues/95) | No. BSD make syntax not yet supported |
-| Node | [https://github.com/nodejs/node.git](https://github.com/nodejs/node.git) | ./configure && /usr/bin/python3.7 tools/gyp\_node.py -f make | makefile.configurations.makeArgs: "BUILDTYPE=Debug -C out " | |Yes |
-| [OpenBSD](https://www.openbsd.org/)[^non] | | | | [https://github.com/microsoft/vscode-makefile-tools/issues/95](https://github.com/microsoft/vscode-makefile-tools/issues/95) | No. BSD make syntax not yet supported |
-| openh264 | [https://github.com/cisco/openh264.git](https://github.com/cisco/openh264.git)| | | for build log, V=1 is more cryptic than without | Yes |
-| PCapPlusPlus | [https://github.com/seladb/PcapPlusPlus.git](https://github.com/seladb/PcapPlusPlus.git) | Various OS specific configure scripts in the root | | The build output is very cryptic even with v=1 | Yes |
-| [PHP](https://github.com/php/php-src) | [#config-fail](https://autotools.mergesium.com/kb/php?v=8.4.0-dev#config-fail) | ./buildconf && ./configure | | | Yes |
-| PostgreSQL | [https://github.com/postgres/postgres.git](https://github.com/postgres/postgres.git) | ./configure | | Headers squiggles without a real build before configure.<br>One file compiled many times differently (src/common/ip.c) during the all or default makefile target. | Yes |
+| Repository | Builder | Last Checked | Status / Notes | Works? |
+|--|--|--|--|--|
+| [8cc](https://github.com/rui314/8cc) | make | Jan 24 | |
+| [Apache Thrift](https://github.com/apache/thrift) | autotools | Jan 24 | [dry-run-warnings](v=0.20.0#dry-run-warnings), serial-tests | |
+| [Makefile Example](https://github.com/remonbonbon/makefile-example) | make | Jan 24 | |
+| [async-profiler](https://github.com/jvm-profiling-tools/async-profiler) | make | Jan 24 | |
+| [Bitcoin core integration/staging tree](https://github.com/bitcoin/bitcoin) | autotools | Jan 24 | needs C++20 |
+| [BusyBox](https://github.com/mirror/busybox)[^non] | | [ms #92](https://github.com/microsoft/vscode-makefile-tools/issues/92) |
+| [CircuitPython](https://github.com/adafruit/circuitpython) | make | Jan 24 | |
+| [clib](https://github.com/clibs/clib) | make | Jan 24 | | | |
+| [c-lightning](https://github.com/ElementsProject/lightning) | make | Jan 24 | |
+| [Cmake](https://github.com/Kitware/CMake)[^non] | |
+| [CPython](https://github.com/python/cpython) | autoconf | Jan 24 | |
+| [ctypes.sh](https://github.com/taviso/ctypes.sh) | autotools | Jan 24 |  |
+| [CURL](https://github.com/curl/curl) | autotools,CMake | Jan 24 | [ms #93](https://github.com/microsoft/vscode-makefile-tools/issues/93) |
+| [dpdk](https://github.com/DPDK/dpdk) | make | Jan 24 | |
+| [dtwmcmd](https://github.com/cdesktopenv/dtwmcmd) | autotools | Jan 24 | |
+| [duktape](https://github.com/svaarala/duktape) | make | Jan 24 | |
+| [Embedded Makefile Flow](https://github.com/davepfeiffer/embedded-makefile-flow) | make | Jan 24 | |
+| [ffmpeg](https://github.com/FFmpeg/FFmpeg)[^non] | | |
+| [FIDO](https://github.com/FidoProject/Fido) | make | Jan 24 | [ms #94](https://github.com/microsoft/vscode-makefile-tools/issues/94) |
+| [FreeBSD](https://github.com/freebsd/freebsd) | make | Jan 24 | [ms #95](https://github.com/microsoft/vscode-makefile-tools/issues/95) |
+| [gcc](https://github.com/gcc-mirror/gcc) | autoconf+autogen | Jan 24 | |
+| [Git](https://github.com/git/git) | autoconf | Jan 24 | |
+| [Google AFL](https://github.com/google/AFL) | make | Jan 24 | |
+| [Google Protocol Buffers](https://github.com/protocolbuffers/protobuf) | CMake | Jan 24 | |
+| [Greenplum Database (GPDB)](https://github.com/greenplum-db/gpdb) | autoconf(.in) | Jan 24 | |
+| [imgui](https://github.com/ocornut/imgui) | ?? | Jan 24 | |
+| [Jemalloc](https://github.com/jemalloc/jemalloc) | autotools | Jan 24 | [ms #96](https://github.com/microsoft/vscode-makefile-tools/issues/96)| |
+| [Lbrycrd](https://github.com/lbryio/lbrycrd) | autotools | Jan 24 | |
+| [libass](https://github.com/libass/libass) | autotools | Jan 24 | [ms #96](https://github.com/microsoft/vscode-makefile-tools/issues/96) |
+| [libav](https://github.com/libav/libav) | make | Jan 24 | [ms #97](https://github.com/microsoft/vscode-makefile-tools/issues/97) |
+| [libsvm](https://github.com/cjlin1/libsvm) | make 4.4k Jan 24 | | | | Yes |
+| [libtommath](https://github.com/libtom/libtommath) | make 622 Jan 24 | | |  | Yes |
+| [libtorrent](https://github.com/rakshasa/libtorrent) | autotools | Jan 24 | |
+| [linux kernel](https://github.com/torvalds/linux) | make | Jan 24 | |
+| [lk](https://github.com/littlekernel/lk.git) | make | Jan 24 | |
+| [lz4](https://github.com/lz4/lz4) | make | Jan 24 |
+| [make](https://github.com/mirror/make) | autotools | Jan 24 | v=4.1 | Yes |
+| [Mesa 3d](https://gitlab.freedesktop.org/mesa/mesa) | meson | Jan 24 | |
+| [micropython](https://github.com/micropython/micropython) | ?? | Jan 24 | |
+| [Mono](https://github.com/mono/mono) | autotools | Jan 24 | |
+| [Nano](https://github.com/madnight/nano) | autotools | Jan 24 | |
+| [NetBSD](https://anonhg.netbsd.org/) | make | Jan 24 | | [ms #95](https://github.com/microsoft/vscode-makefile-tools/issues/95) |
+| [Node](https://github.com/nodejs/node) | make | Jan 24 | |
+| [OpenBSD](https://www.openbsd.org/)[^non] | | | | [ms #95](https://github.com/microsoft/vscode-makefile-tools/issues/95) |
+| [openh264](https://github.com/cisco/openh264) | meson | Jan 24 | |
+| [PCapPlusPlus](https://github.com/seladb/PcapPlusPlus) | CMake | Jan 24 |
+| [PHP](https://github.com/php/php-src) | autoconf | Jan 24 | [#config-fail](v=8.4.0-dev#config-fail) | |
+| [PostgreSQL](https://github.com/postgres/postgres) | make,meson | Jan 24 | |
 | [qemu](https://github.com/qemu/qemu)[^non] | | ./configure | | | Yes |
-| Recommender | [https://github.com/GHamrouni/Recommender.git](https://github.com/GHamrouni/Recommender.git) | | | | Yes |
+| [Recommender](https://github.com/GHamrouni/Recommender) | make | Jan 24 | |
 | [Redis](https://github.com/redis/redis)[^non] | | | | | Yes |
-| Sample Makefile for C++ | [https://github.com/remonbonbon/makefile-example.git](https://github.com/remonbonbon/makefile-example.git) | | | | Yes |
-| scummvm | [https://github.com/scummvm/scummvm.git](https://github.com/scummvm/scummvm.git) | ./configure --disable-all-engines --enable-engine=director --enable-asan | |the build log has no compilation/linker commands (with or without V=1) dryrun works fine  | Yes |
-| semver.c | [https://github.com/h2non/semver.c.git](https://github.com/h2non/semver.c.git) | | | | Yes |
-| SerenityOS | [https://github.com/SerenityOS/serenity.git](https://github.com/SerenityOS/serenity.git) | | Makefile not in root:<br>Define makefile.configurations.makefilePath to "./Base/home/anon/Source/little/Makefile" and define makefile.configurations.makeArgs to \["-C ./Base/home/anon/Source/little"\] | | Yes |
-| sled | [https://github.com/shinyblink/sled.git](https://github.com/shinyblink/sled.git) | | | | Yes |
-| [Strace](https://github.com/strace/strace) | [#config-parse-fail](https://autotools.mergesium.com/kb/strace?v=st_esyscmd_s-.-build-aux-git-version-gen-.tarball-version-#config-parse-fail) | ./bootstrap && ./configure | | build log cryptic even with V=1 | Yes |
-| [swig](https://github.com/swig/swig) | [#dry-run](https://autotools.mergesium.com/kb/swig?v=4.2.1#dry-run) | autogen and configure | | Always-make causes infinite loop<br>https://github.com/microsoft/vscode-makefile-tools/issues/98 - hand-crafted Makefile.in, no `all` target | Yes |
+| [Sample Makefile for C++](https://github.com/remonbonbon/makefile-example) | make | Jan 24 | |
+| [scummvm](https://github.com/scummvm/scummvm) | make | Jan 24 | |
+| [semver.c](https://github.com/h2non/semver.c) | make | Jan 24 | |
+| [SerenityOS](https://github.com/SerenityOS/serenity) | CMake | Jan 24 | |
+| [sled](https://github.com/shinyblink/sled) | gnumake | Jan 24 | |
+| [Strace](https://github.com/strace/strace) | autotools | jan 24 | [#config-parse-fail](v=st_esyscmd_s-.-build-aux-git-version-gen-.tarball-version-#config-parse-fail) | |
+| [swig](https://github.com/swig/swig) | autoconf | Jan 24 | [#dry-run](v=4.2.1#dry-run), [ms #98](https://github.com/microsoft/vscode-makefile-tools/issues/98) |
 | [Tinyvm](https://github.com/jakogut/tinyvm)[^non] | | | | | Yes |
-| TscanCode | [https://github.com/Tencent/TscanCode.git](https://github.com/Tencent/TscanCode.git)| | Makefile not in root, set makefile.configurations.makefilePath to "./trunk/Makefile"<br>and makefile.configurations.makeArgs" to \["-C ./trunk"\]| | Yes |
-| Tundra | [https://github.com/deplinenoise/tundra.git](https://github.com/deplinenoise/tundra.git) | | | | Yes |
-| ucx | [https://github.com/openucx/ucx.gitk](https://github.com/openucx/ucx.gitk) | ./auogen.sh && ./configure --disable-numa | | always-make very long (triggers reconfigure) | Yes |
-| UPX | [https://github.com/upx/upx.git](https://github.com/upx/upx.git)| | | | Yes |
-| [vim](https://github.com/vim/vim)[^non] | | | | | Yes |
-| [VLC](https://github.com/videolan/vlc) | | ./bootstrap && ./configure | | always-make long (triggers reconfigure).<br>the build log is offering limited informaion, needs dolt support. Dryrun output is fine.<br>https://github.com/microsoft/vscode-makefile-tools/issues/99 | Yes |
-| vlfeat | [https://github.com/vlfeat/vlfeat.git](https://github.com/vlfeat/vlfeat.git)| | | | Yes |
-| Wine | [https://github.com/wine-mirror/wine.git](https://github.com/wine-mirror/wine.git) | ./configure --without-x --without-freetype | | | Yes |
-| wiredtiger | [https://github.com/wiredtiger/wiredtiger.git](https://github.com/wiredtiger/wiredtiger.git) | ./autogen.sh && ./configure | | always-make very long (triggers reconfigure) | Yes |
-| ZFS | [https://github.com/openzfs/zfs.git](https://github.com/openzfs/zfs.git) | ./autogen.sh && ./configure | | The build ouput is too cryptic (no commands) even with V=1<br>Bogus object launch target identified:<br>https://github.com/microsoft/vscode-makefile-tools/issues/94 | Yes |
-| zinit | [https://github.com/zdharma/zinit.git](https://github.com/zdharma/zinit.git) | zmodules/configure | makefile.configurations.makefilePath: "zmodules/makefile"<br>makefile.configurations.makeArgs: \["V=1", "-C zmodules"\] | The output of the build is useless unless V=1 (dryrun output is fine without) | Yes |
+| [TscanCode](https://github.com/Tencent/TscanCode)| make | Jan 24 | |
+| [Tundra](https://github.com/deplinenoise/tundra)[^non] | |
+| [ucx](https://github.com/openucx/ucx) | CMake | Jan 24 | |
+| [UPX](https://github.com/upx/upx)[^non] | CMake | Jan 24 | |
+| [vim](https://github.com/vim/vim)[^non] | make | Jan 24 | |
+| [VLC](https://github.com/videolan/vlc) | autotools, meson | Jan 24 | [ms #99](https://github.com/microsoft/vscode-makefile-tools/issues/99) |
+| [vlfeat](https://github.com/vlfeat/vlfeat) | make | Jan 24 | |
+| [Wine](https://github.com/wine-mirror/wine) | autoconf | Jan 24 | |
+| [wiredtiger](https://github.com/wiredtiger/wiredtiger) | CMake | Jan 24 | |
+| [ZFS](https://github.com/openzfs/zfs) | autotools | Jan 24 | [ms #94](https://github.com/microsoft/vscode-makefile-tools/issues/94) |
+| [zi](https://github.com/z-shell/zi) | ?? | Jan 24 | |
 
 
 [^non]: Does not use autotools
