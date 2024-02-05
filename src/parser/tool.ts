@@ -70,15 +70,30 @@ export class Making implements Parser {
                     case 'test':
                     case 'mkdir':
                     case 'if':
+                    case 'then':
+                    case 'elif':
+                    case 'else':
+                    case 'fi':
                     case 'echo':
                     case 'set':
                     case 'case':
+                    case 'esac':
+                    case 'exit':
                     case ':':
+                    case '}':
                     case 'depbase=':
-                    case 'fail=':
                     case 'Making':
+                    case 'target_option=k':
+                    case 'has_opt=no':
+                    case 'skip_next=no':
+                    case 'sane_makeflags=':
+                    case '':
                         continue;
+                    case 'fail=':
+                    case 'CDPATH=:': // This is the start of the recursive script. No need to look at all pieces
+                        return;
                 }
+                if (tool.fullPath == ext.extension.dryRunner) continue;
 
                 //throw new Error("compilerTool.fullPath is not a string (eg, subshell)");
                 /* FIXME: this isCompiler() functionality is a placeholder */
@@ -87,6 +102,11 @@ export class Making implements Parser {
                 } else {
                     var srcDir = util.resolvePathToRoot(caller.make.dir);
                     if(ObjectFileRE.test(caller.currentTarget)) {
+                        // FIXME: handleCompilerCommand is async ... can I call from here?
+                        // on cygwin the paths are resolved asynchronously, but elsewhere, sync
+                        // At the moment, I think 'makeFullPath' does not need to call cygpath to convert into a windows/driveletter path
+                        // for the purposes, I can pass a posix path to Intellisense and let it sort Out
+                        // cygwin paths
                         this.handleCompilerCommand(tool, caller.currentDir, srcDir);
                     } else {
                         /* FIXME: Do this if Flags.Linked_Target - but the rule is printed after exec. Tweak dry-runner ?*/
