@@ -131,6 +131,43 @@
             ]
         },
         {
+            "name": "Make debug why la recipe not output",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/make/make",
+            "args": [
+                    "-j1",
+                    "-r",
+                    "--trace",
+                    "--dry-run",
+                    "--silent",
+                    "--print-data-base",
+                    "--always-make",
+                    "-k",
+                    "--output-sync=none",
+                    "V=1",
+                    "all",
+                    "check",
+            ],
+            "stopAtEntry": false,
+            "cwd": "/tmp/ctypes.sh/build/Default/src",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Set Disassembly Flavor to Intel",
+                    "text": "-gdb-set disassembly-flavor intel",
+                    "ignoreFailures": true
+                }
+            ]
+        },
+        {
             "name": "Launch Tests",
             "type": "extensionHost",
             "request": "launch",
