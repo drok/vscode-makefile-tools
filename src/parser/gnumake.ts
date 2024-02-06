@@ -601,6 +601,10 @@ export class Goal extends Node implements Parser {
     constructor(private make: Make, public goal: string | undefined = undefined,
         public flags: number = Goal.Flags.None) {
         super();
+        /* TODO: Implement check-local suite (eg, gnumake)
+        if (goal == 'check-local')
+            traits.has_local_suite = true;
+        */
     }
     depends: Goal[] | undefined = undefined;
     livetask: vscode.Task | undefined;

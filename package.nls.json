@@ -52,6 +52,7 @@
    "autotools.welcome.packageURL.markdownDescription": "Check for [known issues](command:autotools.visit.knowledgeBase) in the knowledge base.\n\nPackage [home page](command:autotools.visit.packageURL)",
    "autotools.welcome.packageBugs.markdownDescription": "Package [bug report](command:autotools.visit.packageBugs)",
    "autotools.welcome.tests.none.markdownDescription": "There are no [Parallel Harness](https://www.gnu.org/software/automake/manual/html_node/Parallel-Test-Harness.html) tests.\nThe older (and discouraged) Serial Test Harness is [not yet supported](https://github.com/Mergesium/autotools/issues/5)",
+   "autotools.welcome.tests.homegrown-suite.markdownDescription": "A 'check' target exists, possibly implementing a homegrown test suite. Run it with 'Autotools: run all tests (make check)' from palette or panel menu.",
    "autotools.configurations.configureArgs.title": "Arguments for the configure script",
    "autotools.configuration.makefile.configurations.problemMatchers.description": "Problem matcher names to use when building the current target",
    "autotools.configuration.makefile.loggingLevel.description": "The logging level for the makefile tools extension",
