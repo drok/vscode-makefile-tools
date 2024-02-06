@@ -1093,9 +1093,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         return;
     }
     if (!configuration.initialConfigurationAttempted)
-        util.scheduleTask<void>(() => make.configure(make.TriggeredBy.cleanConfigure));
-    isActive = true;
-    _activatedEvent.fire(isActive);
+        util.scheduleAsyncTask<void>(async () => {
+            await make.configure(make.TriggeredBy.cleanConfigure);
+            isActive = true;
+            _activatedEvent.fire(isActive);
+            });
+    else {
+        isActive = true;
+        _activatedEvent.fire(isActive);
+    }
     } catch (e) {
         /* Can be caused by:
             extensionHost.js:
