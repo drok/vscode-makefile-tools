@@ -587,6 +587,11 @@
                 "when": "autotools:haveParallelHarness > 1"
             },
             {
+                "view": "autotools.tests",
+                "contents": "%autotools.welcome.tests.homegrown-suite.markdownDescription%",
+                "when": "autotools:haveHomeGrownSuite == 1"
+            },
+            {
                 "view": "debug",
                 "contents": "%autotools.welcome.debug.auto.markdownDescription%",
                 "when": "autotools:haveConfigurations == 1"
