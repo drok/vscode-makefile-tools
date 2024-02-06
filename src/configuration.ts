@@ -131,13 +131,19 @@ export function getCurrentMakefileConfiguration(): MakefileConfiguration { retur
 export async function setCurrentMakefileConfiguration(configuration: string | undefined): Promise<void> {
     // Create a read-only file used to block autmake TEST_SUITE outputting summaries for indiv. tests.
     // Used in tasks.ts with
+    let oldconfig = currentMakefileConfigurationName;
+    let olddir = currentMakefileConfiguration?.top_builddir;
     currentMakefileConfiguration = (configuration && getMakefileConfiguration(configuration)) || {
         name: "Default",
         top_builddir: defaultBuildFolder(),
         isDefault: true,
     }
     statusBar.setConfiguration(currentMakefileConfiguration.name, currentMakefileConfiguration.top_builddir);
-    logger.message(`Selected build configuration is "${configuration}" in ${currentMakefileConfiguration.top_builddir}`);
+    if (configuration != oldconfig || currentMakefileConfiguration.top_builddir != olddir) {
+        logger.message(`Selected build configuration is "${configuration}" in ${currentMakefileConfiguration.top_builddir}`);
+    } else {
+        logger.message(`Selected build configuration is "${configuration}" in ${currentMakefileConfiguration.top_builddir}`, 'Verbose');
+    }
     if (testEnvironments.length) setBuildEnvPath();
     extension.onConfigurationSelect(currentMakefileConfiguration);
 }
