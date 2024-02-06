@@ -158,7 +158,7 @@ export class ConfigurationNode extends Node {
     }
 
 //    private hasGoalKind(flag: number) : boolean {
-//        
+//
 //    }
     getChildren(): Node[] {
         let children: Node[] = [];
