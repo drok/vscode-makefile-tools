@@ -100,14 +100,13 @@ export class Making implements Parser {
                 if (tool.ltmode === 'link') {
                     this.handleLinkerCommand(tool, caller.currentDir, caller.currentTarget);
                 } else {
-                    var srcDir = util.resolvePathToRoot(caller.make.dir);
                     if(ObjectFileRE.test(caller.currentTarget)) {
                         // FIXME: handleCompilerCommand is async ... can I call from here?
                         // on cygwin the paths are resolved asynchronously, but elsewhere, sync
                         // At the moment, I think 'makeFullPath' does not need to call cygpath to convert into a windows/driveletter path
                         // for the purposes, I can pass a posix path to Intellisense and let it sort Out
                         // cygwin paths
-                        this.handleCompilerCommand(tool, caller.currentDir, srcDir);
+                        this.handleCompilerCommand(tool, caller.currentDir);
                     } else {
                         /* FIXME: Do this if Flags.Linked_Target - but the rule is printed after exec. Tweak dry-runner ?*/
                         if (linkers.includes(path.basename(tool.fullPath)))
@@ -128,7 +127,7 @@ export class Making implements Parser {
     done() : boolean { return true; }
 
 
-    async handleCompilerCommand(compilerTool : ToolInvocation, currentPath: string, srcDir : string): Promise<void> {
+    async handleCompilerCommand(compilerTool : ToolInvocation, currentPath: string): Promise<void> {
         // If ccache wraps the compiler, parse again the remaining command line and we should obtain
         // the real compiler name.
         //if (compilerTool && path.parse(compilerTool.pathInMakefile).name.endsWith("ccache")) {
@@ -170,7 +169,7 @@ export class Making implements Parser {
         // Parse the source files
         let file: string = compilerTool.argv[compilerTool.argv.length-1];
         // TODO: the src file could be a built src (ie, in currentDir) #16
-        file = await util.makeFullPath(file, srcDir);
+        file = await util.makeFullPath(file, currentPath);
 
         // The language represented by this compilation command (-x is for GCC)
         let xlanguage = compilerTool.filterArgs("x");
