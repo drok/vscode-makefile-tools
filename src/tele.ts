@@ -11,6 +11,7 @@ import { Resource } from '@opentelemetry/resources'
 import { TraceState } from '@opentelemetry/api'
 import { env } from 'vscode';
 import { getSettingOr } from './util';
+import { Extension, openSettings } from './extension';
 // import * as util from './util'
 import * as vscode from 'vscode'
 
@@ -217,7 +218,7 @@ class TailSamplingProcessor implements SpanProcessor {
 }
 
 /**
- * 
+ *
  * @abstract Params Telemetry Sampling parameters
  * @member s - Sampling rate for non-error, non-unusual traces
  * @member e - Sampling rate for error traces
@@ -227,34 +228,73 @@ export interface Params {
     s: number;
     u: number;
     e: number;
+    /*
+     * pre_ok = ok to run if pre-rel
+     * pre_update = request user update
+     */
+    pre_ok?: number;
+    pre_update?: number;
 }
 
+/* Example - conf[] where each conf = Params as array.
+[[0,.9,.9,.9],[1,1,.4,3,1,1,0]]
+[
+  [
+    0,    // 0 - applies to all versions
+    0.9,  // sample = 90%
+    0.9,  // unusual = 90%
+    0.9   // errors = 90%
+          // implies = no pre release allowed
+  ],
+  [
+    1,    // applies to myVersion == 1
+    1,    // sample 100%
+    0.4,  // unusual = 40%
+    0.9,  // errors = 90%
+    1,    // pre-release = ok to run
+    1     // pre-release = request to update
+  ]
+]
+
+
+ */
 export async function getParams() : Promise<Params> {
     // let r : Params | undefined;
     if (env.isTelemetryEnabled) {
         let z = await new Promise<Params>(resolve => {
             dns.resolveTxt("log.autotools.mergesium.com", (err, text : string[][]) => {
             if (!err) {
+                let param: Params = {s: 0.1, u: 0.4, e: 1}; // defaults
                 for (const t of text) {
                     for (const tt of t) {
                         try {
                             let r = JSON.parse(tt);
-                            if (Array.isArray(r) && r.length == 3 &&
-                                !r.some(i => isNaN(Number(i))))
-                                resolve({s:r[0], u:r[1], e:r[2]});
+                            if (Array.isArray(r) && !r.some(i => !Array.isArray(i) || i.some(iv => isNaN(Number(iv))))) {
+                                for (const conf of r) {
+                                    if (conf[0] == 0 || conf[0] >= myVersion) {
+                                        if (conf.length >= 4)
+                                            param = {s:conf[1], u:conf[2], e:conf[3], pre_ok: 0};
+                                        if (conf.length >= 5)
+                                            param.pre_ok = conf[4];
+                                        if (conf.length >= 6)
+                                            param.pre_update = conf[5];
+                                    }
+                                    if (conf[0] >= myVersion) break;
+                                }
+                            }
                         } catch (e) {
                             console.debug("err", e);
                         }
                     }
                 }
-                resolve({s: 0.1, u: 0.4, e: 1}); /* If I botch the JSON string in TXT */
+                resolve(param); /* If I botch the JSON string in TXT */
             } else {
                 switch (err.code) {
                     case "ENOTFOUND": /* If I forget to set the defaults in DNS */
                         resolve({s: 0.1, u: 0.5, e: 1});
                         break;
                     default: /* Reasonable defaults in case of resolver errors */
-                        resolve({s: 0.1, u: 0.4, e: 1});
+                        resolve({s: 0.1, u: 0.4, e: 1}); // unknown pre-release, retry if running on a pre-rel
                         break;
                 }
             }
@@ -266,6 +306,8 @@ export async function getParams() : Promise<Params> {
          * If enabled later, it's probably because something is not working,
          * and user wants it reported.
          */
-        s: 1, u: 1, e: 1,
+        s: 1, u: 1, e: 1
     };
 }
+
+const myVersion = 1;
