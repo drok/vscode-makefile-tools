@@ -262,6 +262,13 @@
                     "type": "boolean",
                     "markdownDescription": "%autotools.configuration.promptClean.description%",
                     "default": true
+                },
+                "autotools.telemetry": {
+                    "order": 2,
+                    "scope": "resource",
+                    "type": "boolean",
+                    "default": true,
+                    "markdownDescription": "%autotools.configuration.telemetry.markdownDescription%"
                 }
             }
         },
