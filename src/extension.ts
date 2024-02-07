@@ -816,7 +816,10 @@ export async function waitActivated() : Promise<boolean> {
 }
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
     try {
-    let teleParams = await tele.getParams();
+    let teleParams = await tele.gatePreRelease(context);
+    if (!teleParams) {
+        return;
+    }
     extension = new Extension(context, teleParams);
 
     context.subscriptions.push(vscode.commands.registerCommand('autotools.setBuildConfiguration', async () => {
@@ -1124,6 +1127,7 @@ export async function outputLogHeader() : Promise<void> {
     var kburl = await extension.kbUrl();
     if (extension.pkginfo/* && !currentMakefileConfiguration*/) {
         let pkg = extension.pkginfo;
+        logger.message(`Autotools Integration ${extension.extensionContext.extension.packageJSON.version} - **pre-release** expires ${Extension.expires}`, "Normal");
         logger.message(localize('autotools.package.coordinates', "Package \"{0}\" version {1} - bug reports: {2}, url: {3}",
         pkg.name || "unknown", pkg.version || "unk", pkg.bugreport || "unknown", pkg.url || "unknown"), "Normal");
         logger.message(localize('autotools.ref.kb', "Knowledge Base: {0}", kburl.toString(true)), "Normal");
