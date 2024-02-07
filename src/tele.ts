@@ -10,6 +10,7 @@ import { AsyncHooksContextManager } from '@opentelemetry/context-async-hooks';
 import { Resource } from '@opentelemetry/resources'
 import { TraceState } from '@opentelemetry/api'
 import { env } from 'vscode';
+import { getSettingOr } from './util';
 // import * as util from './util'
 import * as vscode from 'vscode'
 
@@ -59,7 +60,7 @@ export class MyTelemetry implements Disposable {
         contextManager.enable();
         api.context.setGlobalContextManager(contextManager);
 
-        if (env.isTelemetryEnabled) {
+        if (env.isTelemetryEnabled && getSettingOr<boolean>("telemetry", true)) {
             this.sdk.start();
         }
         this.disposables.push(env.onDidChangeTelemetryEnabled((e) => {
