@@ -310,7 +310,6 @@ export function accountForTraits(): void {
         logger.message(`KB: ${extension.kbUrlStatic.toString(true)}#overrides-test-environments`, 'Normal');
     }
     updateEnvironmentsForTraits();
-    updateEnvironmentsForCurrentMakefile();
 }
 // Analyze the settings of the current makefile configuration and the global workspace settings,
 // according to various merging rules and decide what make command and build log
@@ -590,12 +589,15 @@ function updateEnvironmentsForTraits(): void {
         testEnvironments.forEach(e => {
             let driver_flags = `--env-name "${e.name}" --env-id "${(e.hashCode).toString(36)}" --env-keep "$$ME_KEEP_ENV"`;
 
+            e.testExecOptions!.env!['LOG_DRIVER_FLAGS'] = driver_flags;
             e.testExecOptions!.env![d] = extension.testRunner;
             e.testExecOptions!.env![d + '_FLAGS'] = driver_flags;
 
+            e.checkExecOptions!.env!['LOG_DRIVER_FLAGS'] = driver_flags;
             e.checkExecOptions!.env![d] = extension.testRunner;
             e.checkExecOptions!.env![d + '_FLAGS' ] = driver_flags;
 
+            e.updateExecOptions!.env!['LOG_DRIVER_FLAGS'] = driver_flags;
             e.updateExecOptions!.env![d] = extension.testRunner;
             e.updateExecOptions!.env![d + '_FLAGS'] = driver_flags;
         })
@@ -604,32 +606,6 @@ function updateEnvironmentsForTraits(): void {
     extension.setTestEnvironmentName(getCurrentTestEnvironment().name);
 }
 
-function updateEnvironmentsForCurrentMakefile(): void {
-    // FIXME: store this R/O file somewhere global, to avoid updating environments per current makefile
-    testEnvironments.forEach((e) => {
-        // These options are static, and not relevant to the end-user. Avoid displaying them to the user
-        // FIXME: generate a proper tmpfile with extension .tmp and make it
-        // readonly, This prevents the test suite summary being printed.
-        let env = e.testExecOptions?.env;
-        if (env) {
-            env.SUBDIRS = "";
-            // Suppress bash's error message "/bin/bash: line 74: /tmp/tmp-suite-log.tmp: Permission denied" to stderr
-            env.LOG_DRIVER_FLAGS = `--env-name "${e.name}" --env-id "${(e.hashCode).toString(36)}" --env-keep "$$ME_KEEP_ENV"`;
-        }
-        env = e.checkExecOptions?.env;
-        if (env) {
-            env.SUBDIRS = "";
-            env.LOG_DRIVER_FLAGS = `--env-name "${e.name}" --env-id "${(e.hashCode).toString(36)}" --env-keep "$$ME_KEEP_ENV"`;
-        }
-        env = e.updateExecOptions?.env;
-        if (env) {
-            env.SUBDIRS = "";
-            env.am__set_TESTS_bases = "exit 0"
-            env.LOG_DRIVER_FLAGS = `--env-name "${e.name}" --env-id "${(e.hashCode).toString(36)}" --env-keep "$$ME_KEEP_ENV"`;
-        }
-    });
-
-}
 function processExecutionOptions(env: TestEnvironment) : vscode.ProcessExecutionOptions {
     if (traits.overrides_TESTS_ENVIRONMENT) {
         return { env: {
