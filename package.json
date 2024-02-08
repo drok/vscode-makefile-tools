@@ -467,22 +467,11 @@
             "properties": {
                 "autotools.TESTS_ENVIRONMENT" : {
                     "order": 1,
-                    "type": "array",
-                    "default": [],
+                    "type": "object",
+                    "default": {},
                     "title": "%autotools.configuration.tests_environment.TESTS_ENVIRONMENT.global.title%",
                     "markdownDescription": "%autotools.configuration.tests_environment.TESTS_ENVIRONMENT.global.markdownDescription%",
-                    "items": {
-                        "type": "object",
-                        "default": {},
-                        "properties": {
-                            "name": {
-                                "type": "string"
-                            },
-                            "value": {
-                                "type": "string"
-                            }
-                        }
-                    }
+                    "additionalProperties": { "type": "string" }
                 },
                 "autotools.XFAIL_TESTS" : {
                     "order": 2,
@@ -517,21 +506,10 @@
                             "minItems": 1
                           },
                           "TESTS_ENVIRONMENT" : {
-                            "type": "array",
-                            "default": [],
+                            "type": "object",
+                            "default": {},
                             "title": "%autotools.configuration.tests_environment.TESTS_ENVIRONMENT.sub.title%",
-                            "items": {
-                                "type": "object",
-                                "default": {},
-                                "properties": {
-                                    "name": {
-                                        "type": "string"
-                                    },
-                                    "value": {
-                                        "type": "string"
-                                    }
-                                }
-                            }
+                            "additionalProperties": { "type": "string" }
                           },
                           "XFAIL_TESTS" : {
                             "type": "array",
@@ -546,9 +524,10 @@
                         "title": "%autotools.configuration.tests_environment.title%",
                         "default": {
                             "name": "modern",
-                            "TESTS_ENVIRONMENT": [
-                                { "name": "VAR1", "value": "modern-1" }, {"name": "VAR2", "value": "mod2"}
-                            ]
+                            "TESTS_ENVIRONMENT": {
+                                "VAR1": "modern-1",
+                                "VAR2": "mod2"
+                            }
                         }
                     }
                 }

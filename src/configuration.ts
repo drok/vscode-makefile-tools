@@ -91,7 +91,7 @@ export interface TestEnvironment {
     dirs?: string[];
 
     // A set of environment variables
-    TESTS_ENVIRONMENT?: EnvironmentSetting[];
+    TESTS_ENVIRONMENT?: EnvironmentSetting;
 
     // Hash of the TESTS_ENVIRONMENT var as included in testExecOptions
     // This includes the global TESTS_ENVIRONMENT
@@ -114,8 +114,7 @@ export interface TestEnvironment {
 }
 
 export interface EnvironmentSetting {
-    name: string;
-    value: string;
+    [key: string]: string;
 }
 
 let currentMakefileConfigurationName: string | "Default";
@@ -639,30 +638,34 @@ function processExecutionOptions(env: TestEnvironment) : vscode.ProcessExecution
         } };
     }
     var vars : string[] = [];
-    gTestEnvironment.TESTS_ENVIRONMENT?.forEach(e => {
-        e.name &&
-            vars.push(`${e.name}=` + quote([`${e.value}`]));
-    });
-    env.TESTS_ENVIRONMENT?.forEach(e => {
-        e.name &&
-            vars.push(`${e.name}=` + quote([`${e.value}`]));
-    });
+    if (gTestEnvironment.TESTS_ENVIRONMENT)
+        Object.entries(gTestEnvironment.TESTS_ENVIRONMENT).forEach(([name,value]) => {
+            name &&
+                vars.push(`${name}=` + quote([`${value}`]));
+        });
+    if (env.TESTS_ENVIRONMENT)
+        Object.entries(env.TESTS_ENVIRONMENT).forEach(([name,value]) => {
+            name &&
+                vars.push(`${name}=` + quote([`${value}`]));
+        });
     return { env: { TESTS_ENVIRONMENT: vars.join(' '),
         MAKEFLAGS: "-I " + extension.rulesPath,
         LOG_DRIVER: extension.testRunner
     } };
 }
 function processDebugEnvironment(env: TestEnvironment) : { [key: string]: string } {
-    var vars : { [key: string]: string } = {};
+    var vars : EnvironmentSetting = {};
     if (traits.overrides_TESTS_ENVIRONMENT)
         return vars;
-    gTestEnvironment.TESTS_ENVIRONMENT?.forEach(e => {
-        e.name &&
-            (vars[e.name] = e.value);
+    if (gTestEnvironment.TESTS_ENVIRONMENT)
+        Object.entries(gTestEnvironment.TESTS_ENVIRONMENT).forEach(([name,value]) => {
+        name &&
+            (vars[name] = value);
     });
-    env.TESTS_ENVIRONMENT?.forEach(e => {
-        e.name &&
-            (vars[e.name] = e.value);
+    if (env.TESTS_ENVIRONMENT)
+        Object.entries(env.TESTS_ENVIRONMENT).forEach(([name,value]) => {
+        name &&
+            (vars[name] = value);
     });
     return vars;
 }
@@ -686,19 +689,19 @@ export function getBuildEnvPath() : string {
 function nullTestEnvironment() : TestEnvironment {
         return {
             name: "<null>",
-            TESTS_ENVIRONMENT: [],
+            TESTS_ENVIRONMENT: {},
             hashCode: envHash('')}
 }
 
 let gTestEnvironment : TestEnvironment = {
     name: "global",
-    TESTS_ENVIRONMENT: [],
+    TESTS_ENVIRONMENT: {},
     hashCode: -1
 };
 export async function readGlobalTestEnvironment(): Promise<void> {
     let workspaceConfiguration: vscode.WorkspaceConfiguration = vscode.workspace.getConfiguration("autotools");
-    gTestEnvironment.TESTS_ENVIRONMENT = workspaceConfiguration.get<EnvironmentSetting[]>("TESTS_ENVIRONMENT") ||
-        [];
+    gTestEnvironment.TESTS_ENVIRONMENT = workspaceConfiguration.get<EnvironmentSetting>("TESTS_ENVIRONMENT") ||
+        {};
 
     gTestEnvironment.XFAIL_TESTS = workspaceConfiguration.get<string[]>("XFAIL_TESTS") || [];
 
