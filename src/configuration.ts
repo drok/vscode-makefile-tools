@@ -604,7 +604,7 @@ function updateEnvironmentsForTraits(): void {
             e.checkExecOptions!.env![d] = extension.testRunner;
             e.checkExecOptions!.env![d + '_FLAGS' ] = driver_flags;
 
-            e.updateExecOptions!.env!['am__set_TESTS_bases'] = 'exit 0';
+            e.updateExecOptions!.env!['am__set_TESTS_bases'] = 'touch $@ && exit 0';
             e.updateExecOptions!.env!['LOG_DRIVER_FLAGS'] = driver_flags;
             e.updateExecOptions!.env![d] = extension.testRunner;
             e.updateExecOptions!.env![d + '_FLAGS'] = driver_flags;
