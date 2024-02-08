@@ -12,6 +12,8 @@ import * as nls from 'vscode-nls';
 import { PassThrough } from 'stream';
 import { BuildTarget, TRS, TRS_Info, TRSLookup } from './make';
 import { makeFullPath } from './util';
+import * as path from 'path';
+
 nls.config({ messageFormat: nls.MessageFormat.bundle, bundleFormat: nls.BundleFormat.standalone })();
 const localize: nls.LocalizeFunc = nls.loadMessageBundle();
 
@@ -35,7 +37,7 @@ export class SuiteDecorations implements vscode.FileDecorationProvider {
             let goals = configuration.getAllBuildTargets();
             let g = goals
                 .get(uri.path.substring(1))
-                ?.get(uri.query);
+                ?.get("test-suite.log");
             if (g?.test?.tags?.includes(live)) {
                 return { tooltip: "live run", badge: '⚡'}
             }
@@ -49,7 +51,7 @@ export class SuiteDecorations implements vscode.FileDecorationProvider {
                 return { badge: ' '};
         } else
         if (uri.scheme == "test") {
-            if (uri.path == configuration.getBuildEnvPath()) {
+            if (uri.path.startsWith(configuration.getBuildEnvPath())) {
                 //let at = extension._projectTestSuitesProvider.allTests;
                 test = extension._projectTestSuitesProvider.allTests[parseInt(uri.query)];
             }

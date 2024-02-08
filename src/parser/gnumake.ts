@@ -541,57 +541,50 @@ export class Goal extends Node implements Parser {
         else
             return [];
     }
-    public treeItem : vscode.TreeItem | undefined;
     getTreeItem(): vscode.TreeItem {
         if (!this.goal)
             throw new Error("Unexpected null goal");
-        if (!this.treeItem) {
-            this.treeItem = new vscode.TreeItem(this.goal);
-            this.treeItem.collapsibleState = vscode.TreeItemCollapsibleState.None;
-            this.treeItem.tooltip = this.goal;
-            this.treeItem.contextValue = ["nodeType=task"]
-                .concat((this.flags & Goal.Flags.Linked_binary) ? ['nodeType=build'] : [])
-                .concat((this.flags & Goal.Flags.Test_Log) ? ['nodeType=test'] : [])
-                .concat((this.flags & Goal.Flags.Test_Log) &&
-                    (this.depends && (this.depends[0].flags & Goal.Flags.Linked_binary)) ? ['nodeType=bintest'] : [])
-                .join(',');
-            if (!this.task)
-                return this.treeItem;
+        let item = new vscode.TreeItem(this.goal);
+        item.collapsibleState = vscode.TreeItemCollapsibleState.None;
+        item.tooltip = this.goal;
+        item.contextValue = ["nodeType=task"]
+            .concat((this.flags & Goal.Flags.Linked_binary) ? ['nodeType=build'] : [])
+            .concat((this.flags & Goal.Flags.Test_Log) ? ['nodeType=test'] : [])
+            .concat((this.flags & Goal.Flags.Test_Log) &&
+                (this.depends && (this.depends[0].flags & Goal.Flags.Linked_binary)) ? ['nodeType=bintest'] : [])
+            .join(',');
+        if (!this.task)
+            return item;
 
-            if (this.flags & Goal.Flags.Test_Log) {
-                this.treeItem.contextValue = (this.depends && (this.depends[0].flags & Goal.Flags.Linked_binary)) ?
-                    'nodeType=task,nodeType=test,nodeType=bintest' :
-                    'nodeType=task,nodeType=test';
-                this.treeItem.resourceUri = vscode.Uri.from({
-                    scheme: "test",
-                    authority: _empty,//Extension.whoami,
-                    fragment: _empty,
-                    path: configuration.getBuildEnvPath(),
-                    query:  extension._projectTestSuitesProvider.allTests.length.toString(),
-                });
-                extension._projectTestSuitesProvider.allTests.push(this);
-            } else
-            if (this.flags & Goal.Flags.Test_Suite) {
-                this.treeItem.description = this.make.stats.tests ?
-                    localize("autotools.subnode.suite", "{0} tests", this.make.stats.tests) : undefined;
-                this.treeItem.tooltip =  this.make.dir;
-                // must satisfy the isURI test otherwise it is reallocated and the refernce won't
-                // match in privideFileDecoration.
-                // test is at https://github.com/microsoft/vscode/blob/main/src/vs/base/common/uri.ts#L98
-                this.treeItem.resourceUri = vscode.Uri.from({
-                    scheme: "check",
-                    authority: _empty,//Extension.whoami,
-                    fragment: _empty,
-                    path: '/' + this.make.dir,
-                    query: 'test-suite.log'
-                });
-                this.treeItem.resourceUri = vscode.Uri.parse(this.treeItem.resourceUri.toString(true));
-            } else
-            if (this.flags & Goal.Flags.Linked_binary) {
-                this.treeItem.contextValue = 'nodeType=task,nodeType=build';
-            }
+        if (this.flags & Goal.Flags.Test_Log) {
+            item.contextValue = (this.depends && (this.depends[0].flags & Goal.Flags.Linked_binary)) ?
+                'nodeType=task,nodeType=test,nodeType=bintest' :
+                'nodeType=task,nodeType=test';
+            item.resourceUri = this.getURI();
+            extension._projectTestSuitesProvider.allTests.push(this);
+        } else
+        if (this.flags & Goal.Flags.Test_Suite) {
+            item.description = this.make.stats.tests ?
+                localize("autotools.subnode.suite", "{0} tests", this.make.stats.tests) : undefined;
+            item.tooltip =  this.make.dir;
+            // must satisfy the isURI test otherwise it is reallocated and the refernce won't
+            // match in privideFileDecoration.
+            // test is at https://github.com/microsoft/vscode/blob/main/src/vs/base/common/uri.ts#L98
+            item.resourceUri = this.getURI();
+        } else
+        if (this.flags & Goal.Flags.Linked_binary) {
+            item.contextValue = 'nodeType=task,nodeType=build';
         }
-        return this.treeItem;
+        return item;
+    }
+    getURI() : vscode.Uri {
+        return vscode.Uri.from({
+            scheme: (this.flags & Goal.Flags.Test_Suite) ? "check" : "test",
+            authority: _empty,//Extension.whoami,
+            fragment: _empty,
+            path: path.join(configuration.getBuildEnvPath(),this.make.dir,this.goal!),
+            query: (this.flags & Goal.Flags.Test_Log) ? extension._projectTestSuitesProvider.allTests.length.toString() : undefined
+        });
     }
 
     logfile(): string | undefined {
@@ -607,7 +600,7 @@ export class Goal extends Node implements Parser {
         */
     }
     depends: Goal[] | undefined = undefined;
-    livetask: vscode.Task | undefined;
+    livetask: Map<TestEnvironment,vscode.Task> | undefined;
     task: vscode.Task | Map<TestEnvironment,vscode.Task> | undefined;
     test: vscode.TestItem | undefined;
 }

@@ -293,16 +293,19 @@ export class Extension {
 
         if (goal) {
             let old = goal.trs;
-            goal.trs = make.readTRS(new make.BuildTarget(dir, log), c);
+            let newTRS = make.readTRS(new make.BuildTarget(dir, log), c);
+            if (newTRS.results.size)
+                goal.trs = newTRS;
+            else
+              return; // TRS file moved to .tmp
             this.updateTRSInPanel(env, old, goal, dir);
             let old_global = goal.trs?.global ?? TRS.NONE;
-            if ( goal.test && goal.trs.global != old_global && !(goal.flags & Goal.Flags.Test_Suite))
+            if ( ((goal.test && goal.trs.global != old_global) || this.testController?.busy) && !(goal.flags & Goal.Flags.Test_Suite))
                 /* If there is an active test run, use it to log the TRS result.
                  * Otherwise, create a new manual run
                  */
                 if (!this.testController?.markActiveTestTRS(goal, dir))
-                    this.testController?.trsChange(goal.test, dir);
-
+                    goal.test && this.testController?.trsChange(goal.test, dir);
         }
     }
     private unsupported_log_count : number = 0;
@@ -320,7 +323,7 @@ export class Extension {
             }
         } else
         if ((current ?? TRS.NONE) != oldTRS) {
-            goal.treeItem?.resourceUri && this.suiteDecorator.update(goal.treeItem.resourceUri);//  vscode.Uri.from(
+            (old != undefined) && this.suiteDecorator.update(goal.getURI());//  vscode.Uri.from(
 //                {authority: Extension.whoami, scheme: 'test', path: '/' + dir, query: goal.goal}));
             //this.suiteDecorator.update(vscode.Uri.from(
             //    {authority: Extension.whoami, scheme: 'check', path: '/' + dir, query: 'test-suite.log'}));
@@ -1023,6 +1026,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
     context.subscriptions.push(vscode.commands.registerCommand('autotools.outline.setBuildConfiguration', () => {
         return vscode.commands.executeCommand("autotools.setBuildConfiguration");
+    }));
+
+    context.subscriptions.push(vscode.commands.registerCommand('autotools.outline.setTestEnvironment', () => {
+        return configuration.setNewEnvironment();
     }));
 
     extension.registerTasks();

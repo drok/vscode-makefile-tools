@@ -112,13 +112,15 @@ export class MyTestController {
     if (this.busyNonLiveTest)
         for (const d of goal.depends!) {
             let bd : BuildTarget = new BuildTarget(dir, d.goal!);
-            let old = goal.trs;
+            let old = d.trs;
             d.trs = readTRS(bd, c);
             this.updateGoalTRS(this.activeRun!.run, d.test!, d.trs?.global, dir);
             if (updatePanel) {
                 extension.updateTRSInPanel(this.activeRun!.env, old, d, dir);
             }
         }
+    // else
+        //this.activeRun?.run.passed(this.activeGoal!.test!); // FIXME: need actual pass / fail  for the suite
 
     this.isBusy = false;
     this.testCompletedEvent.fire();
@@ -481,6 +483,7 @@ export class MyTestController {
         }
     }
     private isBusy : boolean = false;
+    public get busy() : boolean { return this.isBusy; }
     public get busyNonLiveTest() : boolean { return this.isBusy && !this.activeRun?.live; }
     async advanceQueue() : Promise<void> {
         if (this.activeRun) {
@@ -526,7 +529,7 @@ export class MyTestController {
 
                 if (this.activeGoal?.task instanceof Map) {
                     this.runningTask = this.activeRun.live ?
-                        this.activeGoal.livetask :
+                        this.activeGoal.livetask?.get(this.activeRun.env) :
                         this.activeGoal.task.get(this.activeRun.env)
                     assert(this.runningTask, "There must be a task for the env");
                     if (this.runningTask && this.activeGoal.test) {

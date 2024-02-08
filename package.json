@@ -179,6 +179,11 @@
                 "icon": "$(arrow-swap)"
             },
             {
+                "command": "autotools.outline.setTestEnvironment",
+                "title": "%autotools.command.setTestEnvironment.title%",
+                "icon": "$(arrow-swap)"
+            },
+            {
                 "command": "autotools.outline.recheck",
                 "title": "%autotools.command.outline.recheck.title%",
                 "icon": "$(refresh)"
@@ -896,6 +901,10 @@
                 {
                     "command": "autotools.outline.setBuildConfiguration",
                     "when": "never"
+                },
+                {
+                    "command": "autotools.outline.setTestEnvironment",
+                    "when": "never"
                 }
             ],
             "testing/item/context": [
@@ -943,6 +952,16 @@
                     "command": "autotools.outline.recheck",
                     "when": "view == autotools.outline",
                     "group": "navigation@2"
+                },
+                {
+                    "command": "autotools.outline.setBuildConfiguration",
+                    "when": "view == autotools.outline",
+                    "group": "navigation@1"
+                },
+                {
+                    "command": "autotools.outline.setTestEnvironment",
+                    "when": "view == autotools.tests",
+                    "group": "navigation@1"
                 }
             ],
             "view/item/context": [
@@ -1005,11 +1024,6 @@
                     "command": "autotools.outline.recheck",
                     "when": "view == autotools.outline && viewItem =~ /nodeType=configuration/",
                     "group": "1_stateActions@1"
-                },
-                {
-                    "command": "autotools.outline.setBuildConfiguration",
-                    "when": "view == autotools.outline && viewItem =~ /nodeType=configuration/",
-                    "group": "inline@10"
                 }
             ]
         }

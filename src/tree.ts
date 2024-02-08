@@ -313,9 +313,9 @@ export class ProjectTestsProvider implements vscode.TreeDataProvider<Node> {
     }
 
     // Updates the tree when build configuration changes
+    // alltests is an array used to find the decoration for each test
     public allTests : Goal[] = [];
     async update(configuration: string): Promise<void> {
-        this.allTests = [];
         this.updateTree();
     }
 
@@ -329,6 +329,7 @@ export class ProjectTestsProvider implements vscode.TreeDataProvider<Node> {
     }
 
     updateTree(): void {
+        this.allTests = []; // it will be refilled with goals that are currently displayed
         this._changeEvent.fire(null);
     }
 }

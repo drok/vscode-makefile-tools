@@ -160,6 +160,7 @@ export class AutoToolsTestTaskProvider implements MyTaskProvider {
                     if (g.goal && g.depends) {
                         let p : string = util.resolvePathToRoot(path.join(c.top_builddir, dir));
                         disposables.push(new util.MyFileWatcher(p, (e, f) => {
+                            let cte = configuration.getCurrentTestEnvironment();
                             if (f.endsWith(".trs"))
                                 extension.trsChange(c, cte, vscode.Uri.file(path.join(p,f)));
                         }));
@@ -208,6 +209,7 @@ export class AutoToolsTestTaskProvider implements MyTaskProvider {
                             this.numUnknown += results[TRS.NONE] + results[TRS.ERROR] + (envs.length - d.trs.results.size);
                             this.numSuspect += results[TRS.ERROR] + results[TRS.XFAIL];
                             this.numTests+=envs.length;
+
                             extension.updateTRSInPanel(cte,undefined,d,dir);
                             // tc.addTest(suite, d, trs);
                         });
@@ -255,7 +257,7 @@ export class AutoToolsCheckTaskProvider implements MyTaskProvider {
         let c = configuration.getCurrentMakefileConfiguration();
         var targets : Task[] = [];
         let e = configuration.getTestEnvironments();
-        var cte = configuration.getCurrentTestEnvironment();
+        let traceLiveTestRuns = configuration.gettraceLiveTestRuns();
         configuration.getAllBuildTargets().forEach((goals, dir) => {
             const kind: CheckTask = {
                 type: this.myType,
@@ -265,7 +267,9 @@ export class AutoToolsCheckTaskProvider implements MyTaskProvider {
             for (let g of goals.values()) {
                 if (g.flags & (Goal.Flags.Test_Suite)) {
                 var newMap : Map<TestEnvironment, vscode.Task> = new Map();
+                var newLiveMap : Map<TestEnvironment, vscode.Task> = new Map();
                 g.task = newMap;
+                g.livetask = newLiveMap;
                 let envs = FilterEnvsByDir(e, dir);
                 let ME_KEEP_ENV = KeepList(envs);
 
@@ -287,9 +291,8 @@ export class AutoToolsCheckTaskProvider implements MyTaskProvider {
                     newTask.presentationOptions = defaultCheckPresentation;
                     newMap.set(env, newTask);
                     targets.push(newTask);
-                });
-                let traceLiveTestRuns = configuration.gettraceLiveTestRuns();
-                g.livetask = new Task(kind, TaskScope.Workspace, 'Update test suite ' + (dir ? ('log in ' + dir) : 'log at the top')  + (' @ ' + cte.name),
+
+                    newTask = new Task(kind, TaskScope.Workspace, 'Update test suite ' + (dir ? ('log in ' + dir) : 'log at the top')  + (' @ ' + env.name),
                     "autotools",
                     new ProcessExecution(
                         traceLiveTestRuns ? extension.dryRunner : configuration.getMakePath(),
@@ -301,11 +304,13 @@ export class AutoToolsCheckTaskProvider implements MyTaskProvider {
                             "test-suite.log",
                             `ME_KEEP_ENV=${ME_KEEP_ENV}`
                         ]),
-                        cte.updateExecOptions), "$gcc");
-                g.livetask.group = TaskGroup.Test;
-                g.livetask.presentationOptions = defaultCheckPresentation;
-                g.livetask.detail = localize("automake.livecheck", "$(checklist) $(broadcast) Test Suite Update");
-                targets.push(g.livetask);
+                        env.updateExecOptions), "$gcc");
+                    newTask.group = TaskGroup.Test;
+                    newTask.presentationOptions = defaultCheckPresentation;
+                    newTask.detail = localize("automake.livecheck", "$(checklist) $(broadcast) Test Suite Update");
+                    newLiveMap.set(env, newTask);
+                    targets.push(newTask);
+                });
 
             }}});
         this.checkAllTask = new Task({

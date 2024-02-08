@@ -24,6 +24,7 @@ import { Disposable } from 'vscode-jsonrpc';
 import { AutoToolsBuildTaskProvider, BuildTask } from './tasks';
 import { assert } from 'console';
 import { parse, quote } from '@mergesium/shell-quote';
+import { env } from 'process';
 
 nls.config({ messageFormat: nls.MessageFormat.bundle, bundleFormat: nls.BundleFormat.standalone })();
 const localize: nls.LocalizeFunc = nls.loadMessageBundle();
@@ -151,6 +152,12 @@ export async function setCurrentMakefileConfiguration(configuration: string | un
 export function readCurrentMakefileConfiguration(): void {
     let buildConfiguration : string | undefined = extension.getState().buildConfiguration;
     setCurrentMakefileConfigurationName(buildConfiguration);
+}
+
+// Read the current configuration from workspace state, update status bar item
+export function readCurrentTestEnvironment(): void {
+    let state : string | undefined = extension.getState().testEnvironment;
+    setCurrentTestEnvironmentName(state);
 }
 
 // The default make tool is "make"
@@ -603,8 +610,9 @@ function updateEnvironmentsForTraits(): void {
             e.updateExecOptions!.env![d + '_FLAGS'] = driver_flags;
         })
     })
+    let newName = setCurrentTestEnvironment(currentTestEnvironmentName);
     setBuildEnvPath();
-    extension.setTestEnvironmentName(getCurrentTestEnvironment().name);
+    extension.setTestEnvironmentName(newName);
 }
 
 function processExecutionOptions(env: TestEnvironment) : vscode.ProcessExecutionOptions {
@@ -651,8 +659,20 @@ export function getTestEnvironment(name: string) : TestEnvironment {
     return testEnvironments.find(k => k.name === name) || testEnvironments[0];
 }
 
+let currentTestEnvironmentName : string;
+function setCurrentTestEnvironmentName(name : string | undefined) {
+    currentTestEnvironmentName = name ?? nullTestEnvironment().name;
+}
+let currentTestEnvironment : TestEnvironment;
 export function getCurrentTestEnvironment() : TestEnvironment {
-    return testEnvironments[0];
+    return currentTestEnvironment;
+}
+function setCurrentTestEnvironment(name: string | undefined) : string {
+    let newEnv = (name ? testEnvironments.find(e =>
+            e.name == name
+    ) : undefined);
+    currentTestEnvironment = newEnv ?? testEnvironments[0];
+    return currentTestEnvironment.name;
 }
 
 let buildEnvPath : string = '';
@@ -743,6 +763,7 @@ export async function getCurrentTarget(): Promise<make.BuildTarget> {
 // and commands become available to be run in settings via expansion.
 export function initFromState(): void {
    readCurrentMakefileConfiguration();
+   readCurrentTestEnvironment();
 }
 
 // Initialization from settings (or backup default rules).
@@ -1010,34 +1031,31 @@ export async function setConfigurationByName(configurationName: string | undefin
     extension._projectOutlineProvider.update(currentMakefileConfigurationName);
 }
 
-class BuildConfigPickItem implements vscode.QuickPickItem {
+class PickItem implements vscode.QuickPickItem {
 
-    constructor(public label: string, public description?: string, public detail?: string) {
-        this.label = label;
-        this.description = description;
-        this.detail = detail;
+    constructor(public item: any | undefined, public label: string, public description?: string, public detail?: string) {
     }
     public kind?: vscode.QuickPickItemKind;
 }
-const editOrCreatePick : BuildConfigPickItem = new BuildConfigPickItem(localize("autotools.edit.setting", "New/Edit ..."));
-export function prepareConfigurationsQuickPick(): BuildConfigPickItem[] {
-    const items: BuildConfigPickItem[] = makefileConfigurations.map<BuildConfigPickItem>((k =>
-        new BuildConfigPickItem(k.name, k.top_builddir, k.configureArgs ? "Args: " + k.configureArgs.join(" ") : undefined)
+const editOrCreatePick : PickItem = new PickItem(undefined, localize("autotools.edit.setting", "New/Edit ..."));
+export function prepareConfigurationsQuickPick(): PickItem[] {
+    const items: PickItem[] = makefileConfigurations.map<PickItem>((k =>
+        new PickItem(k, k.name, k.top_builddir, k.configureArgs ? "Args: " + k.configureArgs.join(" ") : undefined)
         ));
 
     if (items.length === 0) {
         logger.message("No configurations defined in autotools.configurations setting.");
-        items.push(new BuildConfigPickItem("Default", undefined, undefined));
+        items.push(new PickItem(undefined, "Default", undefined, undefined));
     }
 
-    items.push({label: 'Add/Edit...', kind: vscode.QuickPickItemKind.Separator}, editOrCreatePick);
+    items.push({item: undefined, label: 'Add/Edit...', kind: vscode.QuickPickItemKind.Separator}, editOrCreatePick);
     return items;
 }
 
 // Fill a drop-down with all the configuration names defined by the user in autotools.configurations setting.
 // Triggers a cpptools configuration provider update after selection.
 export async function setNewConfiguration(): Promise<void> {
-    const items: BuildConfigPickItem[] = prepareConfigurationsQuickPick();
+    const items: PickItem[] = prepareConfigurationsQuickPick();
 
     let options: vscode.QuickPickOptions = {
         placeHolder: localize("autotools.selectConfiguration", "Select a build configuration"),
@@ -1046,7 +1064,7 @@ export async function setNewConfiguration(): Promise<void> {
         matchOnDetail: true
     };
     options.ignoreFocusOut = true; // so that the logger and the quick pick don't compete over focus
-    const chosen: BuildConfigPickItem | undefined = await vscode.window.showQuickPick(items, options);
+    const chosen: PickItem | undefined = await vscode.window.showQuickPick(items, options);
     if (chosen && chosen.label !== currentMakefileConfiguration.name) {
         telemetry.logEvent("changeConfig", { to: chosen.label });
 
@@ -1058,6 +1076,52 @@ export async function setNewConfiguration(): Promise<void> {
         await setConfigurationByName(chosen.label);
 
         await make.configure(make.TriggeredBy.configureAfterConfigurationChange);
+    }
+}
+
+
+export function prepareEnvQuickPick(): PickItem[] {
+    const items: PickItem[] = testEnvironments.map<PickItem>((k =>
+        new PickItem(k, k.name, k.dirs ? k.dirs.join(", ") : "all suites", k.testExecOptions?.env?.TESTS_ENVIRONMENT || "no vars")
+        ));
+
+    if (items.length === 0) {
+        logger.message("No configurations defined in autotools.configurations setting.");
+        items.push(new PickItem(testEnvironments[0], testEnvironments[0].name, "all suites", JSON.stringify(testEnvironments[0].TESTS_ENVIRONMENT)));
+    }
+
+    items.push({item: undefined, label: 'Add/Edit...', kind: vscode.QuickPickItemKind.Separator}, editOrCreatePick);
+    return items;
+}
+
+// Fill a drop-down with all the configuration names defined by the user in autotools.configurations setting.
+// Triggers a cpptools configuration provider update after selection.
+export async function setNewEnvironment(): Promise<void> {
+    const items: PickItem[] = prepareEnvQuickPick();
+
+    let options: vscode.QuickPickOptions = {
+        placeHolder: localize("autotools.selectTestEnvironment", "Select a test environment"),
+        title: localize("autotools.selectEnvironment", "Test Environment selection"),
+        matchOnDescription: false,
+        matchOnDetail: true
+    };
+    options.ignoreFocusOut = true; // so that the logger and the quick pick don't compete over focus
+    const chosen: PickItem | undefined = await vscode.window.showQuickPick(items, options);
+    if (chosen && chosen.item !== getCurrentTestEnvironment()) {
+
+        if (chosen === editOrCreatePick) {
+            telemetry.logEvent("editCreateEnv");
+            await openSettings("autotools.configurations");
+            return;
+        } else {
+            telemetry.logEvent("changeEnv", { to: chosen.label });
+        }
+
+        let newName = setCurrentTestEnvironment(chosen.item.name);
+        setBuildEnvPath();
+        extension.getState().testEnvironment = newName;
+        extension.setTestEnvironmentName(newName);
+        extension._projectTestSuitesProvider.updateTree();
     }
 }
 
