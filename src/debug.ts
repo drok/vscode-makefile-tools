@@ -182,7 +182,8 @@ class MyDebugProvider implements DebugConfigurationProvider {
   resolveDebugConfigurationWithSubstitutedVariables?(folder: WorkspaceFolder | undefined,
         debugConfiguration: DebugConfiguration, token?: vscode.CancellationToken): ProviderResult<DebugConfiguration> {
     // return this.resolveDebugConfiguration(folder, debugConfiguration);
-    //debugConfiguration.type = "cppdbg";
+    if (debugConfiguration.type == "autotools")
+        debugConfiguration.type = "cppdbg";
     return debugConfiguration;
   }
 
