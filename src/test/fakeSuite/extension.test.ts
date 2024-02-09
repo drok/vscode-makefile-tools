@@ -36,6 +36,8 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
 import { extension } from '../../extension';
+import { MyTelemetry } from '../../tele';
+import { Span, SpanKind } from '@opentelemetry/api';
 
 // TODO: refactor initialization and cleanup of each test
 suite('Fake dryrun parsing', /*async*/() => {
@@ -62,10 +64,11 @@ suite('Fake dryrun parsing', /*async*/() => {
       // Settings reset from the previous test run.
       extension.getState().reset(false);
       await vscode.workspace.getConfiguration("makefile").update("launchConfigurations", undefined);
-      configuration.setCurrentMakefileConfiguration("Default");
+      //configuration.setCurrentMakefileConfiguration("Default");
       configuration.initFromState();
-      await configuration.initFromSettings();
-      await configuration.analyzeConfigureParams(false, false);
+      //let span: Span = new Span();
+      //await configuration.initFromSettings(false, span);
+      //await configuration.analyzeConfigureParams(span, false, false);
 
       // We define extension log here as opposed to in the fake repro .vscode/settings.json
       // because the logging produced at the first project load has too few important data to verify and much variations
@@ -81,7 +84,7 @@ suite('Fake dryrun parsing', /*async*/() => {
       }
 
       configuration.prepareConfigurationsQuickPick();
-      await configuration.setConfigurationByName("complex_escaped_quotes");
+      // await configuration.setConfigurationByName("complex_escaped_quotes");
 
       // Compare the output log with the baseline
       // TODO: incorporate relevant diff snippets into the test log.
@@ -106,10 +109,10 @@ suite('Fake dryrun parsing', /*async*/() => {
          // Settings reset from the previous test run.
          extension.getState().reset(false);
          await vscode.workspace.getConfiguration("makefile").update("launchConfigurations", undefined);
-         configuration.setCurrentMakefileConfiguration("Default");
+         //configuration.setCurrentMakefileConfiguration("Default");
          configuration.initFromState();
-         await configuration.initFromSettings();
-         await configuration.analyzeConfigureParams(false, false);
+         // await configuration.initFromSettings();
+         // await configuration.analyzeConfigureParams(false, false);
 
    
          // We define extension log here as opposed to in the fake repro .vscode/settings.json
@@ -126,7 +129,7 @@ suite('Fake dryrun parsing', /*async*/() => {
          }
 
          configuration.prepareConfigurationsQuickPick();
-         await configuration.setConfigurationByName("complex_escaped_quotes_winOnly");
+         // await configuration.setConfigurationByName("complex_escaped_quotes_winOnly");
 
          // Compare the output log with the baseline
          // TODO: incorporate relevant diff snippets into the test log.
@@ -152,10 +155,10 @@ suite('Fake dryrun parsing', /*async*/() => {
          // Settings reset from the previous test run.
          extension.getState().reset(false);
          await vscode.workspace.getConfiguration("makefile").update("launchConfigurations", undefined);
-         configuration.setCurrentMakefileConfiguration("Default");
+         //configuration.setCurrentMakefileConfiguration("Default");
          configuration.initFromState();
-         await configuration.initFromSettings();
-         await configuration.analyzeConfigureParams(false, false);
+         // await configuration.initFromSettings();
+         // await configuration.analyzeConfigureParams(false, false);
 
          // Extension log is defined in the test .vscode/settings.json but delete it now
          // because we are interested to compare against a baseline from this point further.
@@ -165,14 +168,14 @@ suite('Fake dryrun parsing', /*async*/() => {
          }
 
          configuration.prepareConfigurationsQuickPick();
-         await configuration.setConfigurationByName("InterestingSmallMakefile_windows_configDebug");
+         // await configuration.setConfigurationByName("InterestingSmallMakefile_windows_configDebug");
 
          // A bit more coverage, "RelSize" and "RelSpeed" are set up
          // to exercise different combinations of pre-created build log and/or make tools.
          // No configure is necessary to be run here, it is enough to look at what happens
          // when changing a configuration.
-         await configuration.setConfigurationByName("InterestingSmallMakefile_windows_configRelSize");
-         await configuration.setConfigurationByName("InterestingSmallMakefile_windows_configRelSpeed");
+         /// await configuration.setConfigurationByName("InterestingSmallMakefile_windows_configRelSize");
+         /// await configuration.setConfigurationByName("InterestingSmallMakefile_windows_configRelSpeed");
 
          // InterestingSmallMakefile_windows_configRelSpeed constructs a more interesting build command.
          let Execute_Arch3: BuildTarget = new BuildTarget("", "Execute_Arch3");
@@ -205,10 +208,10 @@ suite('Fake dryrun parsing', /*async*/() => {
          // Settings reset from the previous test run.
          extension.getState().reset(false);
          await vscode.workspace.getConfiguration("makefile").update("launchConfigurations", undefined);
-         configuration.setCurrentMakefileConfiguration("Default");
+         //configuration.setCurrentMakefileConfiguration("Default");
          configuration.initFromState();
-         await configuration.initFromSettings();
-         await configuration.analyzeConfigureParams(false, false);
+         // await configuration.initFromSettings();
+         // await configuration.analyzeConfigureParams(false, false);
    
          // Extension log is defined in the test .vscode/settings.json but delete it now
          // because we are interested to compare against a baseline from this point further.
@@ -218,7 +221,7 @@ suite('Fake dryrun parsing', /*async*/() => {
          }
 
          configuration.prepareConfigurationsQuickPick();
-         await configuration.setConfigurationByName(process.platform === "linux" ? "8cc_linux" : "8cc_mingw");
+         // await configuration.setConfigurationByName(process.platform === "linux" ? "8cc_linux" : "8cc_mingw");
 
          let all: BuildTarget = make.t_all;
          // FIXME: Rework await configuration.setTargetByName(all);
@@ -245,10 +248,10 @@ suite('Fake dryrun parsing', /*async*/() => {
          // Settings reset from the previous test run.
          extension.getState().reset(false);
          await vscode.workspace.getConfiguration("makefile").update("launchConfigurations", undefined);
-         configuration.setCurrentMakefileConfiguration("Default");
+         //configuration.setCurrentMakefileConfiguration("Default");
          configuration.initFromState();
-         await configuration.initFromSettings();
-         await configuration.analyzeConfigureParams(false, false);
+         // await configuration.initFromSettings();
+         // await configuration.analyzeConfigureParams(false, false);
    
          // Extension log is defined in the test .vscode/settings.json but delete it now
          // because we are interested to compare against a baseline from this point further.
@@ -258,7 +261,7 @@ suite('Fake dryrun parsing', /*async*/() => {
          }
 
          configuration.prepareConfigurationsQuickPick();
-         await configuration.setConfigurationByName(process.platform === "linux" ? "Fido_linux" : "Fido_mingw");
+         // await configuration.setConfigurationByName(process.platform === "linux" ? "Fido_linux" : "Fido_mingw");
 
          let foo_o: BuildTarget = new BuildTarget("", "bin/foo.o");
          // FIXME: rework await configuration.setTargetByName(foo_o);
@@ -285,10 +288,10 @@ suite('Fake dryrun parsing', /*async*/() => {
          // Settings reset from the previous test run.
          extension.getState().reset(false);
          await vscode.workspace.getConfiguration("makefile").update("launchConfigurations", undefined);
-         configuration.setCurrentMakefileConfiguration("Default");
+         //configuration.setCurrentMakefileConfiguration("Default");
          configuration.initFromState();
-         await configuration.initFromSettings();
-         await configuration.analyzeConfigureParams(false, false);
+         // await configuration.initFromSettings();
+         // await configuration.analyzeConfigureParams(false, false);
    
          // Extension log is defined in the test .vscode/settings.json but delete it now
          // because we are interested to compare against a baseline from this point further.
@@ -298,7 +301,7 @@ suite('Fake dryrun parsing', /*async*/() => {
          }
 
          configuration.prepareConfigurationsQuickPick();
-         await configuration.setConfigurationByName(process.platform === "linux" ? "tinyvm_linux_pedantic" : "tinyvm_mingw_pedantic");
+         // await configuration.setConfigurationByName(process.platform === "linux" ? "tinyvm_linux_pedantic" : "tinyvm_mingw_pedantic");
 
          let tvmi: BuildTarget = new BuildTarget("", "tvmi");
          // FIXME: rework await configuration.setTargetByName(tvmi);
@@ -323,10 +326,10 @@ suite('Fake dryrun parsing', /*async*/() => {
       // Settings reset from the previous test run.
       extension.getState().reset(false);
       await vscode.workspace.getConfiguration("makefile").update("launchConfigurations", undefined);
-      configuration.setCurrentMakefileConfiguration("Default");
+      //configuration.setCurrentMakefileConfiguration("Default");
       configuration.initFromState();
-      await configuration.initFromSettings();
-      await configuration.analyzeConfigureParams(false, false);
+      // await configuration.initFromSettings();
+      // await configuration.analyzeConfigureParams(false, false);
 
       // Extension log is defined in the test .vscode/settings.json but delete it now
       // because we are interested to compare against a baseline from this point further.
@@ -337,7 +340,7 @@ suite('Fake dryrun parsing', /*async*/() => {
 
       configuration.prepareConfigurationsQuickPick();
 
-      await configuration.setConfigurationByName("test-make-f");
+      // await configuration.setConfigurationByName("test-make-f");
 
 //    FIXME: invoke runTask to make the current target
 //      await configuration.setConfigurationByName("test-make-C");
@@ -364,13 +367,13 @@ suite('Fake dryrun parsing', /*async*/() => {
       // Settings reset from the previous test run.
       extension.getState().reset(false);
       await vscode.workspace.getConfiguration("makefile").update("launchConfigurations", undefined);
-      configuration.setCurrentMakefileConfiguration("Default");
+      // configuration.setCurrentMakefileConfiguration("Default");
       configuration.initFromState();
-      await configuration.initFromSettings();
-      await configuration.analyzeConfigureParams(false, false);
+      // await configuration.initFromSettings();
+      // await configuration.analyzeConfigureParams(false, false);
 
       configuration.prepareConfigurationsQuickPick();
-      await configuration.setConfigurationByName("varexp");
+      // await configuration.setConfigurationByName("varexp");
       // FIXME: rework await configuration.setTargetByName(make.t_all);
 
       // Delete extension log a bit later than other tests. For this one, we only care to capture varexp.

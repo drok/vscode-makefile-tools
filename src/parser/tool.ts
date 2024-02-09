@@ -98,7 +98,7 @@ export class Making implements Parser {
                 //throw new Error("compilerTool.fullPath is not a string (eg, subshell)");
                 /* FIXME: this isCompiler() functionality is a placeholder */
                 if (tool.ltmode === 'link') {
-                    this.handleLinkerCommand(tool, caller.currentDir, caller.currentTarget);
+                    this.handleLinkerCommand(tool, caller);
                 } else {
                     if(ObjectFileRE.test(caller.currentTarget)) {
                         // FIXME: handleCompilerCommand is async ... can I call from here?
@@ -106,13 +106,13 @@ export class Making implements Parser {
                         // At the moment, I think 'makeFullPath' does not need to call cygpath to convert into a windows/driveletter path
                         // for the purposes, I can pass a posix path to Intellisense and let it sort Out
                         // cygwin paths
-                        this.handleCompilerCommand(tool, caller.currentDir);
+                        this.handleCompilerCommand(tool, caller);
                     } else {
                         /* FIXME: Do this if Flags.Linked_Target - but the rule is printed after exec. Tweak dry-runner ?*/
                         if (linkers.includes(path.basename(tool.fullPath)))
-                            this.handleLinkerCommand(tool, caller.currentDir, caller.currentTarget);
+                            this.handleLinkerCommand(tool, caller);
                         else if (tool.argv.length && typeof tool.argv[0] == "string" && path.basename(tool.argv[0]) == "libtool" && tool.hasArg(["mode=link"]))
-                            this.handleLinkerCommand(tool, caller.currentDir, caller.currentTarget);
+                            this.handleLinkerCommand(tool, caller);
                     }
                 }
             }
@@ -127,7 +127,8 @@ export class Making implements Parser {
     done() : boolean { return true; }
 
 
-    async handleCompilerCommand(compilerTool : ToolInvocation, currentPath: string): Promise<void> {
+    async handleCompilerCommand(compilerTool : ToolInvocation, caller: Executing): Promise<void> {
+        let currentPath = caller.currentDir;
         // If ccache wraps the compiler, parse again the remaining command line and we should obtain
         // the real compiler name.
         //if (compilerTool && path.parse(compilerTool.pathInMakefile).name.endsWith("ccache")) {
@@ -213,7 +214,7 @@ export class Making implements Parser {
         }
     } // handleCompilerCommand function
 
-    async handleLinkerCommand(tool : ToolInvocation, currentPath : string, currentTarget : string): Promise<void> {
+    async handleLinkerCommand(tool : ToolInvocation, c : Executing): Promise<void> {
 
         // A target binary is usually produced by the linker with the /out or /o switch,
         // but there are several scenarios (for win32 Microsoft cl.exe)
@@ -267,14 +268,14 @@ export class Making implements Parser {
                 }
 
                 if (compilerTargetBinary) {
-                    compilerTargetBinary = await util.makeFullPath(compilerTargetBinary, currentPath);
+                    compilerTargetBinary = await util.makeFullPath(compilerTargetBinary, c.currentDir);
                 }
             }
         }
 
         if (tool.ltmode === 'link') {
             logger.message("Found LT linker command: " + tool, "Verbose");
-            linkerTargetBinary = currentTarget;
+            linkerTargetBinary = c.currentTarget;
         } else
         // TODO: implement launch support for DLLs and LIBs, besides executables.
         if (!tool.hasArg(["dll", "lib", "shared"])) {
@@ -321,13 +322,13 @@ export class Making implements Parser {
                 } else {
                     linkerTargetBinary = util.removeSurroundingQuotes(linkerTargetBinary);
                     logger.message("Producing target binary: " + linkerTargetBinary, "Verbose");
-                    linkerTargetBinary = await util.makeFullPath(linkerTargetBinary, currentPath);
+                    linkerTargetBinary = await util.makeFullPath(linkerTargetBinary, c.currentDir);
                 }
             }
         }
             else {
                 logger.message("Found shared lib linker command: " + tool, "Verbose");
-                linkerTargetBinary = currentTarget;
+                linkerTargetBinary = c.currentTarget;
             }
 
         // It is not possible to have compilerTargetBinary and linkerTargetBinary both defined,
@@ -342,9 +343,9 @@ export class Making implements Parser {
         // We need to ignore the $ anywhere else in the linker command line so that we don't lose
         // valid target binaries.
         if (!targetBinary) {
-            telemetry.setSpanStatus(SpanStatusCode.ERROR, "linker target not ID");
+            telemetry.setSpanStatus(c.make.span, SpanStatusCode.ERROR, "linker target not ID");
         } else if (targetBinary.includes("$")) {
-            telemetry.setSpanStatus(SpanStatusCode.ERROR, "linker target has $");
+            telemetry.setSpanStatus(c.make.span, SpanStatusCode.ERROR, "linker target has $");
             throw new Error("targets should never have dollar signs");
         } else
             this.targetBinaries.push(targetBinary);

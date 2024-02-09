@@ -23,7 +23,7 @@ import * as make from './make';
 import * as logger from './logger';
 import { env } from 'process';
 import * as ui from './ui';
-import { SpanStatusCode } from '@opentelemetry/api';
+import { Span, SpanStatusCode } from '@opentelemetry/api';
 nls.config({ messageFormat: nls.MessageFormat.bundle, bundleFormat: nls.BundleFormat.standalone })();
 const localize: nls.LocalizeFunc = nls.loadMessageBundle();
 
@@ -52,7 +52,7 @@ export class AutoToolsBuildTaskProvider implements MyTaskProvider {
 		return this.myPromise;
 	}
 
-    changeConfiguration(c: configuration.MakefileConfiguration, disposables: vscode.Disposable[]) {
+    changeConfiguration(c: configuration.MakefileConfiguration, disposables: vscode.Disposable[]) : void {
         this.myPromise = Promise.resolve([])
     }
     public update(disposables: vscode.Disposable[]) {
@@ -139,7 +139,7 @@ export class AutoToolsTestTaskProvider implements MyTaskProvider {
 		return this.myPromise;
 	}
 
-    changeConfiguration(c: configuration.MakefileConfiguration, disposables: vscode.Disposable[]) {
+    changeConfiguration(c: configuration.MakefileConfiguration, disposables: vscode.Disposable[]) : void {
         this.myPromise = Promise.resolve([])
     }
     public update(disposables: vscode.Disposable[]) {
@@ -250,7 +250,7 @@ export class AutoToolsCheckTaskProvider implements MyTaskProvider {
 		return this.myPromise;
 	}
 
-    changeConfiguration(c: configuration.MakefileConfiguration, disposables: vscode.Disposable[]) {
+    changeConfiguration(c: configuration.MakefileConfiguration, disposables: vscode.Disposable[]) : void {
         this.myPromise = Promise.resolve([])
     }
     public update(disposables: vscode.Disposable[]) {
@@ -441,7 +441,7 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
             checkFileExistsSync(resolvePathToRoot(path.join(c.top_builddir, "config.status")));
     }
 
-    changeConfiguration(c: configuration.MakefileConfiguration, disposables: vscode.Disposable[])
+    changeConfiguration(c: configuration.MakefileConfiguration, disposables: vscode.Disposable[]) : void
     {
         let b = this.bootstrap_cmd();
         if (b) {
@@ -450,7 +450,7 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
                 action: 'bootstrap'
             };
             this.bootstrapTask = new Task(kind, TaskScope.Workspace,
-                localize("autotools.bootstrap.task", "Bootstrap autotools"),
+                localize("autotools.bootstrap.task", "Bootstrap {0}", extension.getProjectName()),
                 "Autotools task",
                 new ProcessExecution(b[0], b.slice(1)));
             this.bootstrapTask.group = TaskGroup.Build;
@@ -484,19 +484,24 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
                 ]);
         }
         else {
-            telemetry.setSpanStatus(SpanStatusCode.ERROR, "no-bootstrap-task");
+            telemetry.setSpanStatus(extension.journey, SpanStatusCode.ERROR, "no-bootstrap-task");
             this.myPromise = Promise.reject("Runtime error - no bootstrap task")
         }
     }
     update(disposables: vscode.Disposable[]): void {
     }
-    public async bootstrap(): Promise<void> {
+    public async bootstrap(): Promise<vscode.TaskExecution | undefined> {
         if (this.bootstrapTask) {
             await this.waitToTouchMakefiles();
-            vscode.tasks.executeTask(this.bootstrapTask).then(() => {
+            return await vscode.tasks.executeTask(this.bootstrapTask).then((te: vscode.TaskExecution) => {
                 ui.getUI().setLoading(ui.UIStatus.LOADING);
+                return te;
+            },(e) => {
+                ui.getUI().setLoading(ui.UIStatus.ERR);
+                return undefined;
             });
         }
+        return undefined;
     }
     public async regen(): Promise<void> {
         // Use regenWorking to avoid restarting when already running.
@@ -526,7 +531,7 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
             await vscode.tasks.executeTask(this.helpTask);
         }
     }
-    public async configure(): Promise<boolean> {
+    public async configure(span: Span): Promise<boolean> {
         let c = configuration.getCurrentMakefileConfiguration();
         let success = false;
 
@@ -550,7 +555,10 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
             await this.waitToTouchMakefiles();
             vscode.tasks.executeTask(task)
                 .then((e) => {
+                    extension.running.set(e, span);
                     !e.task.execution && this.autotoolsDoneNoResult();
+            }, (err) => {
+                telemetry.setSpanStatus(span, SpanStatusCode.ERROR, err);
             });
 
             success = await new Promise<boolean>(resolve => {

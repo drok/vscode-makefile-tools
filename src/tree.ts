@@ -14,6 +14,7 @@ import * as vscode from 'vscode';
 import * as nls from 'vscode-nls';
 import { Extension, extension } from './extension';
 import { assert } from 'console';
+import { Span } from '@opentelemetry/api';
 nls.config({ messageFormat: nls.MessageFormat.bundle, bundleFormat: nls.BundleFormat.standalone })();
 const localize: nls.LocalizeFunc = nls.loadMessageBundle();
 
@@ -196,10 +197,10 @@ export class ProjectOutlineProvider implements vscode.TreeDataProvider<Node> {
     private readonly _changeEvent = new vscode.EventEmitter<Node | null>();
     //private readonly _unsetString = localize("Unset", "Unset");
 
-    constructor(private configuration: string | undefined) {
+    private tree: Make;
+    constructor(span: Span, private configuration: string | undefined) {
+        this.tree = new Make(span, '', '')
     }
-
-    private tree: Make = new Make('', '');
 
     get onDidChangeTreeData(): any {
         return this._changeEvent.event;
@@ -245,7 +246,7 @@ export class ProjectOutlineProvider implements vscode.TreeDataProvider<Node> {
     }
 
     clear() : void {
-        this.updateTargets(new Make('', ''));
+        this.updateTargets(new Make(extension.journey, '', ''));
     }
     // Updates the tree when settings.json changes
     updateTargets(build_tree: Make) : void {
@@ -261,9 +262,10 @@ export class ProjectOutlineProvider implements vscode.TreeDataProvider<Node> {
 export class ProjectTestsProvider implements vscode.TreeDataProvider<Node> {
     private readonly _changeEvent = new vscode.EventEmitter<Node | null>();
 
-    constructor() {
+    private tree: Make;
+    constructor(span: Span) {
+        this.tree = new Make(span, '', '')
     }
-    private tree: Make = new Make('', '');
 
     public refresh(): any {
         this._changeEvent.fire(null);
@@ -320,7 +322,7 @@ export class ProjectTestsProvider implements vscode.TreeDataProvider<Node> {
     }
 
     clear() : void {
-        this.updateTargets(new Make('', ''));
+        this.updateTargets(new Make(extension.journey, '', ''));
     }
     // Updates the tree when settings.json changes
     updateTargets(build_tree: Make) : void {

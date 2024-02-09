@@ -709,7 +709,7 @@ export async function expandVariablesInSetting(settingId: string, settingVal: st
     let preprocStr: string = settingVal.replace(/\\\$\{/mg, "ESCAPED_VARIABLE_EXPANSION");
     if (preprocStr !== settingVal) {
         logger.message(`Detected escaped variable expansion patterns in setting '${settingId}', within value '${settingVal}'.`);
-        telemetry.logEvent("varexp", {var: settingId, val: settingVal});
+        telemetry.logEvent(extension.journey, "varexp", {var: settingId, val: settingVal});
         settingVal = preprocStr;
     }
 

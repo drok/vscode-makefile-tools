@@ -19,6 +19,7 @@ import { Node } from '../tree';
 
 import * as nls from 'vscode-nls';
 import { Extension, extension, telemetry } from '../extension';
+import { Span } from '@opentelemetry/api';
 nls.config({ messageFormat: nls.MessageFormat.bundle, bundleFormat: nls.BundleFormat.standalone })();
 const localize: nls.LocalizeFunc = nls.loadMessageBundle();
 
@@ -46,7 +47,7 @@ const RecursingRE = /^Making (.*) in (.*)$/;
  * and Make to parse submake output.
  */
 export class Make implements Parser {
-    constructor(dir: string, public root: string)
+    constructor(public span: Span, dir: string, public root: string)
     {
         this.dir = path.relative(root, dir);
         this.section = MakeSection.Starting;
@@ -112,7 +113,7 @@ export class Make implements Parser {
                 let entering = EnteringRE.exec(line);
                 if (entering) { // This should only happen once at the top of the stack
                     // this.section = MakeSection.Making;
-                    return [ParserDisp.Enter, new Make(entering[1], this.root)];
+                    return [ParserDisp.Enter, new Make(this.span, entering[1], this.root)];
                 }
                 let copyright = CopyrightRE.test(line);
                 if (copyright) {
@@ -159,7 +160,7 @@ export class Make implements Parser {
                                 if (v.variable.value != '$(SHELL) $(top_srcdir)/test-driver' && v.variable.value != '$(SHELL) $(top_srcdir)/build-aux/test-driver') {
                                     /* Customized test driver. */
                                     logger.message(`WARN: ${this.dir} uses ${v.variable.name}=${v.variable.value}; ${Extension.whoami} will override it.`, 'Normal');
-                                    telemetry.logEvent("warn-log-driver", {n: v.variable.name, v: v.variable.value}, undefined, true);
+                                    telemetry.logEvent(this.span, "warn-log-driver", {n: v.variable.name, v: v.variable.value}, true);
                                 }
                                 if (v.variable.name != "LOG_DRIVER") // This is overriden by default
                                     traits.log_drivers.add(v.variable.name);

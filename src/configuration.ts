@@ -25,6 +25,7 @@ import { AutoToolsBuildTaskProvider, BuildTask } from './tasks';
 import { assert } from 'console';
 import { parse, quote } from '@mergesium/shell-quote';
 import { env } from 'process';
+import { Span } from '@opentelemetry/api';
 
 nls.config({ messageFormat: nls.MessageFormat.bundle, bundleFormat: nls.BundleFormat.standalone })();
 const localize: nls.LocalizeFunc = nls.loadMessageBundle();
@@ -118,6 +119,10 @@ export interface EnvironmentSetting {
     [key: string]: string;
 }
 
+export function getFolder() : string {
+    return vscode.workspace.workspaceFolders ?
+        (vscode.workspace.workspaceFolders[0].name) : 'xx';
+}
 let currentMakefileConfigurationName: string | "Default";
 export function setCurrentMakefileConfigurationName(configuration: string | undefined): void {
     currentMakefileConfigurationName = configuration || "Default";
@@ -128,7 +133,7 @@ export function setCurrentMakefileConfigurationName(configuration: string | unde
 // If no particular current configuration is defined in settings, set to 'Default'.
 let currentMakefileConfiguration: MakefileConfiguration;
 export function getCurrentMakefileConfiguration(): MakefileConfiguration { return currentMakefileConfiguration; }
-export async function setCurrentMakefileConfiguration(configuration: string | undefined): Promise<void> {
+export async function setCurrentMakefileConfiguration(configuration: string | undefined, span: Span): Promise<void> {
     // Create a read-only file used to block autmake TEST_SUITE outputting summaries for indiv. tests.
     // Used in tasks.ts with
     let oldconfig = currentMakefileConfigurationName;
@@ -322,16 +327,17 @@ export function accountForTraits(): void {
 // according to various merging rules and decide what make command and build log
 // apply to the current makefile configuration.
 export let initialConfigurationAttempted : boolean = false;
-export async function analyzeConfigureParams(reload: boolean, failIfUnconfigured : boolean): Promise<boolean> {
+export async function analyzeConfigureParams(parentSpan: Span, reload: boolean, failIfUnconfigured : boolean): Promise<boolean> {
     let reason : string;
     let hasMakefile : boolean = false;
+    let span = telemetry.startSpan("an", parentSpan);
 
     extension.getState().configureDirty = false;
 
     /* If there is no configuration, this will redetect the default build directory
      * Otherwise, it's a noop.
      */
-    await setCurrentMakefileConfiguration(currentMakefileConfigurationName);
+    await setCurrentMakefileConfiguration(currentMakefileConfigurationName, span);
 
     let isAutotools = extension.isAutotoolsProject();
     let bootstrapped = isAutotools && extension.isBootstrapped();
@@ -344,7 +350,7 @@ export async function analyzeConfigureParams(reload: boolean, failIfUnconfigured
 
     if (isAutotools) {
         if (bootstrapped) {
-            if (configured || (!failIfUnconfigured && await extension.configure())) {
+            if (configured || (!failIfUnconfigured && await extension.configure(span))) {
                 let relativeMakefile = findMakefile();
                 if (!reload) {
                     let kbUrl = await extension.kbUrl();
@@ -363,7 +369,7 @@ export async function analyzeConfigureParams(reload: boolean, failIfUnconfigured
                         logger.message('KB: ' + kbUrl.toString(true) + '#no-makefile-found', "Normal");
                         /* Override the bootstrapped context so the welcome button "Bootstrap is shown" */
                         vscode.commands.executeCommand("setContext", "autotools:isBootstrapped", 2);
-                        telemetry.setSpanStatus(SpanStatusCode.ERROR, "no-makefile");
+                        telemetry.setSpanStatus(span, SpanStatusCode.ERROR, "no-makefile");
                         reason = "configured-noMakefile"
                     }
                 } else
@@ -383,7 +389,8 @@ export async function analyzeConfigureParams(reload: boolean, failIfUnconfigured
         reason = "n/a";
     }
 
-    telemetry.logEvent(reason, { reason: "init" });
+    telemetry.logEvent(span, reason, { reason: "init" });
+    span.end();
     getProblemMatchersForConfiguration();
     return Promise.resolve(hasMakefile);
 }
@@ -453,7 +460,7 @@ export function getMakefileConfigurations(): MakefileConfiguration[] { return ma
 export function setMakefileConfigurations(configurations: MakefileConfiguration[]): void { makefileConfigurations = configurations; }
 
 // Read make configurations optionally defined by the user in settings: makefile.configurations.
-export async function readMakefileConfigurations(currentConfigurationName : string): Promise<void> {
+export async function readMakefileConfigurations(currentConfigurationName : string, span: Span): Promise<void> {
     // We need to read "makefile.configurations" unexpanded first, because we may write back into these settings
     // in case we indentify "name" missing. We'll expand later, see end of function.
     let workspaceConfiguration: vscode.WorkspaceConfiguration = vscode.workspace.getConfiguration("autotools");
@@ -506,7 +513,7 @@ export async function readMakefileConfigurations(currentConfigurationName : stri
     if (currentConfigurationName && currentConfigurationName !== "Default" && !makefileConfigurationNames.includes(currentConfigurationName)) {
         logger.message(`Current makefile configuration ${currentConfigurationName} is no longer present in the available list.` +
             ` Re-setting the current makefile configuration to default.`);
-        await setConfigurationByName(undefined);
+        await setConfigurationByName(undefined, span);
     }
 }
 
@@ -770,7 +777,7 @@ export function initFromState(): void {
 // This is called at activation time (with activation boolean being passed as true explicitly)
 // or after any change in the configuration/build-target workspace state variables, in which case
 // we need a refresh of all settings expanding ${configuration} or ${buildTarget}.
-export async function initFromSettings(activation: boolean = false): Promise<void> {
+export async function initFromSettings(activation: boolean = false, span: Span): Promise<void> {
     readLoggingLevel();
     await readMakePath();
     readkeepDryRuns();
@@ -785,7 +792,7 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
     readautoreconfWarnUnsupported();
     await readAutoreconfTool();
     await readGlobalTestEnvironment();
-    await readMakefileConfigurations(currentMakefileConfigurationName);
+    await readMakefileConfigurations(currentMakefileConfigurationName, span);
     await readTestEnvironments();
     // await setCurrentMakefileConfiguration(currentMakefileConfigurationName);
 
@@ -806,7 +813,7 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
             const keyRoot: string = "autotools";
             let subKey: string;
 
-            telemetry.startSpan("updateSettings");
+            let span = telemetry.startSpan("uS", extension.journey);
             subKey = "loggingLevel";
             let updatedLoggingLevel : string | undefined = await util.getExpandedSetting<string>(subKey);
             if (updatedLoggingLevel !== loggingLevel) {
@@ -853,7 +860,7 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
                 }
             });
             if (!util.areEqual(updatedMakefileConfigurations, makefileConfigurations)) {
-                await readMakefileConfigurations(currentMakefileConfigurationName);
+                await readMakefileConfigurations(currentMakefileConfigurationName, span);
                 //await setCurrentMakefileConfiguration(currentMakefileConfigurationName);
             }
             // TODO: should call an onConfigurationUpdate(updatedConfiguration);
@@ -868,10 +875,10 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
                             oldConfig.configureArgs);
                     extension.getState().configureDirty = true;
 
-                    await setCurrentMakefileConfiguration(currentMakefileConfigurationName);
+                    await setCurrentMakefileConfiguration(currentMakefileConfigurationName, span);
                     var configuring : Promise<boolean> | undefined;
                     if (needConfigure) {
-                        configuring = extension.configure();
+                        configuring = extension.configure(span);
                     }
 
                     if (promptClean) {
@@ -979,7 +986,7 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
                     extension.resyncTasks();
                 }
             } else
-                await analyzeConfigureParams(true, false);
+                await analyzeConfigureParams(span, true, false);
 
             // Report all the settings changes detected by now.
             // TODO: to avoid unnecessary telemetry processing, evaluate whether the changes done
@@ -1012,22 +1019,22 @@ export async function initFromSettings(activation: boolean = false): Promise<voi
             });
 
             if (extension.getState().configureDirty) {
-                await make.configure(make.TriggeredBy.configureAfterConfigurationChange);
+                await make.configure(span, make.TriggeredBy.configureAfterConfigurationChange);
             }
-            telemetry.endSpanWithStatus(SpanStatusCode.OK, undefined, {
+            telemetry.endSpanWithStatus(span, SpanStatusCode.OK, undefined, {
                 changed: updatedSettingsSubkeys.join(",")
             });
         }
     });
 }
 
-export async function setConfigurationByName(configurationName: string | undefined): Promise<void> {
+export async function setConfigurationByName(configurationName: string | undefined, span: Span): Promise<void> {
     setCurrentMakefileConfigurationName(configurationName);
     extension.getState().buildConfiguration = configurationName;
     logger.message(`Setting configuration - ${currentMakefileConfigurationName}`);
     // Refresh settings, they may reference variables or commands reading state configuration var (${configuration}).
-    await initFromSettings();
-    await analyzeConfigureParams(false, false);
+    await initFromSettings(true, span);
+    await analyzeConfigureParams(span, false, false);
     extension._projectOutlineProvider.update(currentMakefileConfigurationName);
 }
 
@@ -1054,7 +1061,7 @@ export function prepareConfigurationsQuickPick(): PickItem[] {
 
 // Fill a drop-down with all the configuration names defined by the user in autotools.configurations setting.
 // Triggers a cpptools configuration provider update after selection.
-export async function setNewConfiguration(): Promise<void> {
+export async function setNewConfiguration(span: Span): Promise<void> {
     const items: PickItem[] = prepareConfigurationsQuickPick();
 
     let options: vscode.QuickPickOptions = {
@@ -1066,16 +1073,18 @@ export async function setNewConfiguration(): Promise<void> {
     options.ignoreFocusOut = true; // so that the logger and the quick pick don't compete over focus
     const chosen: PickItem | undefined = await vscode.window.showQuickPick(items, options);
     if (chosen && chosen.label !== currentMakefileConfiguration.name) {
-        telemetry.logEvent("changeConfig", { to: chosen.label });
+        let newC = telemetry.startSpan("newC", extension.journey);
+        telemetry.logEvent(newC, "changeConfig", { to: chosen.label });
 
         if (chosen === editOrCreatePick) {
             await openSettings("autotools.configurations");
             return;
         }
 
-        await setConfigurationByName(chosen.label);
+        await setConfigurationByName(chosen.label, span);
 
-        await make.configure(make.TriggeredBy.configureAfterConfigurationChange);
+        await make.configure(newC, make.TriggeredBy.configureAfterConfigurationChange);
+        newC.end();
     }
 }
 
@@ -1110,11 +1119,11 @@ export async function setNewEnvironment(): Promise<void> {
     if (chosen && chosen.item !== getCurrentTestEnvironment()) {
 
         if (chosen === editOrCreatePick) {
-            telemetry.logEvent("editCreateEnv");
+            telemetry.logEvent(extension.journey, "editCreateEnv");
             await openSettings("autotools.configurations");
             return;
         } else {
-            telemetry.logEvent("changeEnv", { to: chosen.label });
+            telemetry.logEvent(extension.journey, "changeEnv", { to: chosen.label });
         }
 
         let newName = setCurrentTestEnvironment(chosen.item.name);

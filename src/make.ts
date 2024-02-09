@@ -10,6 +10,7 @@ import * as cpptools from './cpptools';
 import {Extension, extension, telemetry} from './extension';
 import * as tele from './tele';
 import { Attributes, SpanStatusCode } from './tele';
+import { Span } from '@opentelemetry/api';
 import * as fs from 'fs';
 import * as logger from './logger';
 import * as shellParser from './parser/shell';
@@ -180,7 +181,7 @@ export var builtin_targets : Set<string> = new Set();
 // (other than default empty "" or the standard "all"), otherwise it would produce
 // a subset of all the targets involved in the makefile (only the ones triggered
 // by building the current target).
-export async function generateParseContent(recursive: boolean = false): Promise<ConfigureSubphaseStatus> {
+export async function generateParseContent(span: Span): Promise<ConfigureSubphaseStatus> {
     const makefilePath :string | undefined = configuration.getConfigurationMakefile();
     if (!makefilePath) {
         extension.resetCppToolsProvider();
@@ -209,7 +210,7 @@ export async function generateParseContent(recursive: boolean = false): Promise<
     }
 
     let abs_top_builddir = util.resolvePathToRoot(dir || "");
-    let build_tree: Make = new Make(abs_top_builddir, abs_top_builddir);
+    let build_tree: Make = new Make(telemetry.startSpan("Make", span), abs_top_builddir, abs_top_builddir);
 
     // Include all the make arguments defined in autotools.configurations.makeArgs
     makeArgs = makeArgs.concat(c.makeArgs || []);
@@ -424,10 +425,10 @@ export async function generateParseContent(recursive: boolean = false): Promise<
             );
 
             if (result.returnCode == ConfigureBuildReturnCodeTypes.describedError) {
-                telemetry.logEvent("DryRunWarned", {n: completeErr.split('\n').length}, undefined, true);
+                telemetry.logEvent(span, "drWarn", {n: completeErr.split('\n').length}, true);
                 logger.message("Exporting project config succeeded with warnings.");
             } else if (result.returnCode == ConfigureBuildReturnCodeTypes.outOfDate) {
-                telemetry.logEvent("DryRunFailed", {returnCode: result.returnCode}, undefined, true);
+                telemetry.logEvent(span, "drFail", {returnCode: result.returnCode}, true);
                 logger.message("Exporting project config from Makefiles failed.");
             }
 
@@ -440,7 +441,7 @@ export async function generateParseContent(recursive: boolean = false): Promise<
         } else {
             if (parseFailedAt) {
                 /* Partial parse ... something in the make output could not be parsed */
-                telemetry.logEvent("ParseFailed", {proj: extension.pkginfo?.name, line: parseFailedAt}, undefined, true);
+                telemetry.logEvent(span, "paFail", {proj: extension.pkginfo?.name, line: parseFailedAt}, true);
                 var kbUrl : vscode.Uri = await extension.kbUrl();
                 logger.message('KB: ' + kbUrl.toString(true) + '#config-parse-fail', "Normal");
             }
@@ -459,7 +460,7 @@ export async function generateParseContent(recursive: boolean = false): Promise<
             extension.updateTasks(build_tree);
             extension.updateWatchers();
         }
-        telemetry.setAttributes({
+        telemetry.setAttributes(span, {
             stats: [ linenumber,
                 build_tree.stats.programs,
                 build_tree.stats.tests,
@@ -606,7 +607,7 @@ function getRelevantConfigStats(stats: any): ConfigureSubphaseStatusItem[] {
 // There is the downside that any files that are removed from the makefile
 // (thus disappearing from the log with commands) will still have IntelliSense loaded
 // until the next clean configure.
-export async function configure(triggeredBy: TriggeredBy): Promise<number> {
+export async function configure(parentSpan: Span, triggeredBy: TriggeredBy): Promise<number> {
   // Mark that this workspace had at least one attempt at configuring, before any chance of early return,
   // to accurately identify whether this project configured successfully out of the box or not.
   let ranConfigureInCodebaseLifetime: boolean =
@@ -618,7 +619,7 @@ export async function configure(triggeredBy: TriggeredBy): Promise<number> {
     return ConfigureBuildReturnCodeTypes.fullFeatureFalse;
   }
 
-  telemetry.startSpan("configure");
+  let span = telemetry.startSpan("conf", parentSpan);
   // Same start time for configure and an eventual pre-configure.
   let configureStartTime: number = Date.now();
 
@@ -638,7 +639,7 @@ export async function configure(triggeredBy: TriggeredBy): Promise<number> {
   await extension.waitToTouchMakefiles();
   try {
     ui.getUI().setLoading(ui.UIStatus.LOADING);
-    subphaseStats = await doConfigure(readCache, configurationCache);
+    subphaseStats = await doConfigure(readCache, configurationCache, false, span);
     extension.autotoolsDoneNoResult();
 
     ui.getUI().setLoading(ui.UIStatus.OK);
@@ -680,7 +681,7 @@ export async function configure(triggeredBy: TriggeredBy): Promise<number> {
       `Exception thrown during the configure process: ${e.message}`
     );
     telemetry.logException(e);
-    telemetry.endSpanWithStatus(SpanStatusCode.ERROR, e.message);
+    telemetry.endSpanWithStatus(span, SpanStatusCode.ERROR, e.message);
     retc = ConfigureBuildReturnCodeTypes.other;
     return e.errno;
   } finally {
@@ -720,7 +721,7 @@ export async function configure(triggeredBy: TriggeredBy): Promise<number> {
 
     extension.setCompletedConfigureInSession(true);
     
-    telemetry.endSpanWithStatus(SpanStatusCode.OK, undefined, {
+    telemetry.endSpanWithStatus(span, SpanStatusCode.OK, undefined, {
         numFiles: provider.fileIndex.size,
         numConfigs: configuration.getMakefileConfigurations().length,
         firstTime: !ranConfigureInCodebaseLifetime,
@@ -741,9 +742,9 @@ export async function configure(triggeredBy: TriggeredBy): Promise<number> {
  * This function should not be called if there is no cache to load.
  * @param cacheFile - the filename including path of the cache in json format
  */
-async function loadConfigurationFromCache(cacheFile: string): Promise<ConfigureSubphaseStatus> {
+async function loadConfigurationFromCache(cacheFile: string, parentSpan: Span): Promise<ConfigureSubphaseStatus> {
 
-    telemetry.startSpan("loadCache");
+    let span = telemetry.startSpan("lc", parentSpan);
     let startTime: number = Date.now();
     let elapsedTime: number;
 
@@ -784,7 +785,7 @@ async function loadConfigurationFromCache(cacheFile: string): Promise<ConfigureS
                 });
             });
 
-            telemetry.endSpanWithStatus(SpanStatusCode.OK, undefined, {
+            telemetry.endSpanWithStatus(span, SpanStatusCode.OK, undefined, {
                 stats: [
                     configurationCache.customConfigurationProvider.workspaceBrowse.browsePath.length,
                     configurationCache.customConfigurationProvider.fileIndex.length,
@@ -792,7 +793,7 @@ async function loadConfigurationFromCache(cacheFile: string): Promise<ConfigureS
         } catch (e) {
             telemetry.logException(e);
             logger.message("An error occured while parsing the configuration cache.");
-            telemetry.endSpanWithStatus(SpanStatusCode.ERROR, "parsing");
+            telemetry.endSpanWithStatus(span, SpanStatusCode.ERROR, "parsing");
         }
         elapsedTime = util.elapsedTimeSince(startTime);
         logger.message(`Load configuration from cache elapsed time: ${elapsedTime}`, "Verbose");
@@ -805,7 +806,7 @@ async function loadConfigurationFromCache(cacheFile: string): Promise<ConfigureS
             extension.getCppConfigurationProvider().logConfigurationProviderComplete();
         });
     } else {
-        telemetry.endSpanWithStatus(SpanStatusCode.ERROR, "nodata");
+        telemetry.endSpanWithStatus(span, SpanStatusCode.ERROR, "nodata");
         return {
             retc: ConfigureBuildReturnCodeTypes.notFound,
             elapsed: 0
@@ -823,7 +824,7 @@ async function loadConfigurationFromCache(cacheFile: string): Promise<ConfigureS
 // Sometimes the targets do not need an update (for example, when there has been
 // a change in the current build target), as requested through the boolean.
 // This saves unnecessary parsing which may be signifficant for very big code bases.
-export async function doConfigure(readCache: boolean, cacheFile: string, recursiveDoConfigure: boolean = false): Promise<ConfigureSubphasesStatus> {
+export async function doConfigure(readCache: boolean, cacheFile: string, recursiveDoConfigure: boolean = false, span: Span): Promise<ConfigureSubphasesStatus> {
     let subphaseStats: ConfigureSubphasesStatus = {};
 
     // If available, load all the configure constructs via json from the cache file.
@@ -835,7 +836,7 @@ export async function doConfigure(readCache: boolean, cacheFile: string, recursi
     // The loading from cache is cheap, but logging it (for Verbose level) may interfere unnecessarily
     // with the output channel, especially since that logging is not awaited for.
     if (!recursiveDoConfigure && !extension.getCompletedConfigureInSession() && readCache) {
-        subphaseStats.loadFromCache = await loadConfigurationFromCache(cacheFile);
+        subphaseStats.loadFromCache = await loadConfigurationFromCache(cacheFile, span);
     } else {
         logger.message("Loading configurations from cache is not necessary.", "Verbose");
     }
@@ -843,21 +844,20 @@ export async function doConfigure(readCache: boolean, cacheFile: string, recursi
     /* Reset traits collected from parsing the makefile */
     clearTraits();
 
-    let s = telemetry.startSpan("import");
-    telemetry.setAttributes({
-            n: extension.pkginfo?.name,
+    telemetry.setAttributes(span, {
+            n: extension.pkginfo?.name ?? configuration.getFolder(),
             v: extension.pkginfo?.version,
             am: extension.pkginfo?.automake.split("-").slice(-1)[0],
         });
     // This generates the dryrun output (saving it on disk) or reads an alternative build log.
     // Timings for this sub-phase happen inside.
-    subphaseStats.generateParseContent = await generateParseContent(recursiveDoConfigure);
+    subphaseStats.generateParseContent = await generateParseContent(span);
 
     switch (subphaseStats.generateParseContent.retc) {
         case ConfigureBuildReturnCodeTypes.success:
-            telemetry.setSpanStatus(SpanStatusCode.OK); break;
+            telemetry.setSpanStatus(span, SpanStatusCode.OK); break;
         default:
-            telemetry.setSpanStatus(SpanStatusCode.ERROR);
+            telemetry.setSpanStatus(span, SpanStatusCode.ERROR);
     }
 
     // Let the caller collect and log all information regarding the subphases return codes.
