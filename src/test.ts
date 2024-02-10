@@ -160,7 +160,7 @@ export class MyTestController {
     if (!traits.overrides_TESTS_ENVIRONMENT) {
         let envs = configuration.getTestEnvironments();
         let num_applicable_envs = envs.filter((env) => !env.dirs || env.dirs.includes(dir)).length;
-        if (num_applicable_envs)
+        if (num_applicable_envs > 1)
             goal.test!.description = localize("autotools.test.desc", "{0}/{1} environments tested", goal.trs?.results.size ?? 0, num_applicable_envs);
     }
   }
