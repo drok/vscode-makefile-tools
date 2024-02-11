@@ -45,6 +45,10 @@
     "contributes": {
         "commands": [
             {
+                "command": "autotools.closeIrrelevant",
+                "title": "%autotools.closeIrrelevant.title%"
+            },
+            {
                 "command": "autotools.addAutotools",
                 "title": "%autotools.command.addAutotools.title%"
             },
@@ -831,6 +835,10 @@
         "menus": {
             "commandPalette": [
                 {
+                    "command": "autotools.closeIrrelevant",
+                    "when": "never"
+                },
+                {
                     "command": "autotools.addAutotools",
                     "when": "autotools:isAutotoolsProject > 1"
                 },
@@ -915,6 +923,13 @@
                 {
                     "command": "autotools.command.testgrid.top",
                     "group": "navigation@4"
+                }
+            ],
+            "editor/title/context": [
+                {
+                    "command": "autotools.closeIrrelevant",
+                    "when": "autotools:filterByTarget",
+                    "group": "1_close@10"
                 }
             ],
             "view/title": [

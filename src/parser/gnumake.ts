@@ -139,7 +139,7 @@ export class Make implements Parser {
             // only save data for the all-recursive target
             if (!targets.has(this.dir) || true) {
                 targets.set(this.dir, sub.make.goals);
-                this.goals = sub.make.goals;
+                // this.goals = sub.make.goals;
                 this.test_suite = sub.test_suite;
                 sub.variables.some((v) => {
                     if (v.variable)
@@ -292,18 +292,6 @@ export class Database implements Parser {
             if (!sub.goal) { /* End-of-goals, at # files hash-table stats */
                 return undefined;
             } else {
-                /* Don't store automake auxiliary targets, they are thus
-                 * unavailable for target selection
-                 * Also skip noise targets because they are marginally useful, but
-                 * nothing is implemented for them.
-                 * Also skip not-targets (these are source files, not targets)
-                 * Also skip targets without any flags
-                 */
-                if (sub.flags && !(sub.flags & (Goal.Flags.Automake_auxiliary |
-                        Goal.Flags.Not_a_target |
-                        Goal.Flags.Automake_noise
-                        )))
-                    this.make.goals.set(sub.goal, sub);
 
                 if (sub.flags & Goal.Flags.Test_Suite) {
                     this.test_suite = sub;
@@ -416,7 +404,8 @@ const AutomakeNoiseRe = new RegExp('^(' +
     'mostlyclean|maintainer-clean-generic|mostlyclean-generic|clean-cscope|clean|' +
     'dist.*|uninstall-.*|install-.*|maintainer-.*|distclean-.*|installcheck|check-TESTS|' +
     'ps|html|pdf|clean-.*|info|mostlyclean|dvi|' +
-    '.*\\.o|.*\\.h|' +
+    '(?:.*/)(?:\.|_)dirstamp|' +
+//    '.*\\.o|.*\\.h|' +
     'Makefile.in)$');
 const AutomakeTestLogRe = /^.*\.log$/;
 const GoalRecipeRe = /^recipe to execute \((built-in|from '(.*)', line (\d+))\):/;
@@ -442,6 +431,7 @@ export class Goal extends Node implements Parser {
 
 
         /* Flags gathered from automake (recipe hints like $(LINK) */
+        Dependency : 128,
         Linked_binary: 256,
         Test_Suite: 1024,
         Test_Program: 2048,
@@ -511,18 +501,44 @@ export class Goal extends Node implements Parser {
                     this.flags |= Goal.Flags.Automake_primary;
                 else if (AutomakeNoiseRe.test(goal[1]))
                     this.flags |= Goal.Flags.Automake_noise;
+
                 this.goal = goal[1];
+                /* Record this goal on make's goal list */
+                /* Don't store automake auxiliary targets, they are thus
+                 * unavailable for target selection
+                 * Also skip noise targets because they are marginally useful, but
+                 * nothing is implemented for them.
+                 * Also skip not-targets (these are source files, not targets)
+                 * Also skip targets without any flags
+                 */
+                if (!(this.flags & (Goal.Flags.Automake_auxiliary |
+                    Goal.Flags.Not_a_target |
+                    Goal.Flags.Automake_noise
+                    )))
+                    this.make.goals.set(this.goal, this);
+
                 if (goal[2]) {
                     if (this.goal == "test-suite.log") {
                         this.flags |= Goal.Flags.Test_Suite;
                         this.depends = goal[2].split(' ')
                             .filter(s => s)
-                            .map(s => new Goal(this.make, s, Goal.Flags.Test_Log));
+                            .map(s => this.getGoal(s, Goal.Flags.Test_Log));
                     } else if (AutomakeTestLogRe.test(goal[1])) {
                         this.flags |= Goal.Flags.Test_Log;
                         this.depends = goal[2].split(' ')
-                            .map(s => new Goal(this.make, s, Goal.Flags.Test_Program));
+                            .map(s => this.getGoal(s, Goal.Flags.Test_Program));
+                    } else if (!GNUMakeAuxiliaryRe.test(goal[1]) && !AutomakeAuxRe.test(goal[1]) && !AutomakeNoiseRe.test(goal[1])) {
+                        this.flags |= Goal.Flags.Dependency;
+                        this.depends = goal[2].split(' ')
+                            .filter(s => s && 
+                                !AutomakeNoiseRe.test(s) && 
+                                !AutomakeAuxRe.test(s) &&
+                                    (!path.isAbsolute(s) || // This includes builddir files (relative)
+                                        vscode.workspace.getWorkspaceFolder(vscode.Uri.file(s))))
+                            // MUST filter on workspace|builddir files. This list contains /usr/include files
+                            .map(s => this.getGoal(s, Goal.Flags.Dependency));
                     }
+
                 } else if (!this.flags) {
                     // .test.log: (ie, implicit rules)
                     this.flags |= Goal.Flags.Automake_noise;
@@ -531,6 +547,16 @@ export class Goal extends Node implements Parser {
             }
         }
         throw new Error(`Unexpected Goal line ${line}`);
+    }
+    getGoal(s: string, flags: number = Goal.Flags.None) : Goal {
+        let known = this.make.goals.get(s);
+        if (!known) {
+            let newGoal = new Goal(this.make, s, flags);
+            this.make.goals.set(s, newGoal);
+            return newGoal;
+        }
+        known.flags |= flags;
+        return known;
     }
     push(sub: Parser) {
         return undefined; /* The end of the Recipe is the end of the Goal */
@@ -579,13 +605,26 @@ export class Goal extends Node implements Parser {
         return item;
     }
     getURI() : vscode.Uri {
-        return vscode.Uri.from({
-            scheme: (this.flags & Goal.Flags.Test_Suite) ? "check" : "test",
-            authority: _empty,//Extension.whoami,
-            fragment: _empty,
-            path: path.join(configuration.getBuildEnvPath(),this.make.dir,this.goal!),
-            query: (this.flags & Goal.Flags.Test_Log) ? extension._projectTestSuitesProvider.allTests.length.toString() : undefined
-        });
+        if (this.flags & (Goal.Flags.Test_Suite | Goal.Flags.Test_Log))
+            return vscode.Uri.from({
+                scheme: (this.flags & Goal.Flags.Test_Suite) ? "check" : "test",
+                authority: _empty,//Extension.whoami,
+                fragment: _empty,
+                path: path.join(configuration.getBuildEnvPath(),this.make.dir,this.goal!),
+                query: (this.flags & Goal.Flags.Test_Log) ? extension._projectTestSuitesProvider.allTests.length.toString() : undefined
+            });
+        else
+            return vscode.Uri.from({
+                scheme: "file",
+                authority: _empty,//Extension.whoami,
+                fragment: _empty,
+                path: this.getFilePath()
+            });
+    }
+    getFilePath() : string {
+        return path.isAbsolute(this.goal!) ?
+            this.goal! :
+            util.resolvePathToRoot(path.join(configuration.getCurrentMakefileConfiguration().top_builddir, this.make.dir,this.goal!));
     }
 
     logfile(): string | undefined {

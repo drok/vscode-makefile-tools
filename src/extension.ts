@@ -226,8 +226,23 @@ export class Extension {
     public createPanel() : void {
         this._projectOutlineTreeView = vscode.window.createTreeView('autotools.outline', {
             treeDataProvider: this._projectOutlineProvider,
+            canSelectMany: true,
             showCollapseAll: false
 
+        });
+
+        this._projectOutlineTreeView.onDidChangeSelection(e => {
+            let oldGoals = configuration.currentGoals;
+            if (e.selection.length > 0) {
+                let newGoals = e.selection.filter(g => g instanceof Goal) as Goal[];
+                configuration.setCurrentGoals(newGoals.length ? newGoals : undefined);
+            } else {
+                configuration.setCurrentGoals(undefined);
+            }
+            if (oldGoals != configuration.currentGoals) {
+                this.suiteDecorator.updateDecorations(configuration.currentGoals);
+                // vscode.commands.executeCommand('workbench.files.action.refreshFilesExplorer');
+            }
         });
         this._projectTestSuitesView = vscode.window.createTreeView('autotools.tests', {
             treeDataProvider: this._projectTestSuitesProvider,
@@ -1080,6 +1095,19 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         return Promise.resolve(openLog(sub));
     }));
 
+    context.subscriptions.push(vscode.commands.registerCommand('autotools.closeIrrelevant', async (sub: vscode.Uri) => {
+        let relevant = extension.suiteDecorator.getRelevantFiles();
+        let numClosed : number = 0;
+        vscode.window.tabGroups.all.forEach(g => {
+            let irrelevant_tabs = g.tabs.filter(t =>
+                t.input instanceof vscode.TabInputText && !relevant.has(t.input.uri.path) );
+            numClosed += irrelevant_tabs.length;
+            vscode.window.tabGroups.close(irrelevant_tabs);
+        });
+        telemetry.logEvent(extension.journey, "cU", {nt: numClosed});
+        return Promise.resolve();
+    }));
+
     context.subscriptions.push(vscode.commands.registerCommand('autotools.outline.setBuildConfiguration', () => {
         return vscode.commands.executeCommand("autotools.setBuildConfiguration");
     }));
@@ -1140,7 +1168,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         context.subscriptions.push(configureAc.onDidDelete(async (e) => await extension.recheck(true)));
     }
 
-    vscode.window.registerFileDecorationProvider(extension.suiteDecorator);
+    context.subscriptions.push(vscode.window.registerFileDecorationProvider(extension.suiteDecorator));
 
     context.subscriptions.push(vscode.workspace.registerTextDocumentContentProvider(TestGrid.scheme, extension.projectTestGrid));
     context.subscriptions.push(vscode.workspace.onDidCloseTextDocument((doc) => {

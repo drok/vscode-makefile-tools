@@ -30,6 +30,7 @@
 | [Lbrycrd](https://github.com/lbryio/lbrycrd) | autotools | Jan 24 | |
 | [libass](https://github.com/libass/libass) | autotools | Jan 24 | [ms #96](https://github.com/microsoft/vscode-makefile-tools/issues/96) |
 | [libav](https://github.com/libav/libav) | make | Jan 24 | [ms #97](https://github.com/microsoft/vscode-makefile-tools/issues/97) |
+| [libevent](https://github.com/libevent/libevent) | autotools | Feb 24 | |
 | [libsvm](https://github.com/cjlin1/libsvm) | make 4.4k Jan 24 | | | | Yes |
 | [libtommath](https://github.com/libtom/libtommath) | make 622 Jan 24 | | |  | Yes |
 | [libtorrent](https://github.com/rakshasa/libtorrent) | autotools | Jan 24 | |
