@@ -28,7 +28,7 @@
    "autotools.command.configure.help.title": "Autotools: Run `configure --help`",
    "autotools.exportToIntelisense.title": "Autotools: Export configuration to Intellisense",
    "autotools.closeIrrelevant.title": "Close Irrelevant",
-   "autotools.configuration.views.makefile.outline.description": "Binary Goals",
+   "autotools.configuration.views.makefile.outline.description": "Program Goals",
    "autotools.configuration.views.testsuites.description": "Tests",
    "autotools.configuration.makefile.makePath.description": "The path to the make tool",
    "autotools.configuration.telemetry.markdownDescription": "Enable Telemetry.\n\nTelemetry is used to automatically report unexpected errors, and collect a sample of your extension usage, for the purpose of improving future versions.\n\nWe value your privacy, and appreciate the feedback you send automatically via telemetry.\n\nThe data is sent directly to Mergesium, and not shared with any other parties.\n\nAlso see: [How to inspect the data sent by the extension](https://code.visualstudio.com/docs/getstarted/telemetry#_output-channel-for-telemetry-events).",
