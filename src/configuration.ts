@@ -718,11 +718,21 @@ export async function readGlobalTestEnvironment(): Promise<void> {
 }
 
 export let currentGoals : Goal[] | undefined;
-export function setCurrentGoals(goals: Goal[] | undefined) {
-    currentGoals = goals;
+export let currentGoalsBins : Goal[] | undefined;
+export let currentGoalsTests : Goal[] | undefined;
+export function setCurrentGoalBins(goals: Goal[] | undefined) {
+    currentGoalsBins = goals;
+    currentGoals = [...currentGoalsBins??[], ...currentGoalsTests??[]];
     vscode.commands.executeCommand('setContext', "autotools:filterByTarget",
         (currentGoals && (currentGoals.length != 0)));
 }
+export function setCurrentGoalTests(goals: Goal[] | undefined) {
+    currentGoalsTests = goals;
+    currentGoals = [...currentGoalsBins??[], ...currentGoalsTests??[]];
+    vscode.commands.executeCommand('setContext', "autotools:filterByTarget",
+        (currentGoals && (currentGoals.length != 0)));
+}
+
 // The current target is the read from the default built task,
 // or the first Linked_binary target
 export async function getCurrentTarget(): Promise<make.BuildTarget> {

@@ -232,31 +232,41 @@ export class Extension {
         });
 
         this._projectOutlineTreeView.onDidChangeSelection(e => {
-            let oldGoals = configuration.currentGoals;
+            let oldGoals = configuration.currentGoalsBins;
             if (e.selection.length > 0) {
                 let newGoals = e.selection.filter(g => g instanceof Goal) as Goal[];
-                configuration.setCurrentGoals(newGoals.length ? newGoals : undefined);
+                configuration.setCurrentGoalBins(newGoals.length ? newGoals : undefined);
             } else {
-                configuration.setCurrentGoals(undefined);
+                configuration.setCurrentGoalBins(undefined);
             }
-            if (oldGoals != configuration.currentGoals) {
+            if (oldGoals != configuration.currentGoalsBins) {
                 this.suiteDecorator.updateDecorations(configuration.currentGoals);
-                // vscode.commands.executeCommand('workbench.files.action.refreshFilesExplorer');
             }
         });
         this._projectTestSuitesView = vscode.window.createTreeView('autotools.tests', {
             treeDataProvider: this._projectTestSuitesProvider,
+            canSelectMany: true,
             showCollapseAll: false
 
         });
         this._treeDisposables.push(this._projectTestSuitesView.onDidChangeSelection((e) => {
+            let oldGoals = configuration.currentGoalsTests;
+            if (e.selection.length > 0) {
+                let newGoals = e.selection.filter(g => g instanceof Goal) as Goal[];
+                configuration.setCurrentGoalTests(newGoals.length ? newGoals : undefined);
+            } else {
+                configuration.setCurrentGoalTests(undefined);
+            }
+            if (oldGoals != configuration.currentGoalsTests) {
+                this.suiteDecorator.updateDecorations(configuration.currentGoals);
+            }
             if (e.selection.length > 0) {
                 let selected = e.selection[0];
                 if (selected instanceof tree.Node && !(selected instanceof tree.SubNode)) {
                     return openLog(selected);
                 }
             }
-        }));
+    }));
         // this._projectOutlineTreeView.description = "outline description";
         // this._projectTestSuitesView.description = configuration.getCurrentTestEnvironment().name;
         // this._projectOutlineTreeView.message = "outline message";

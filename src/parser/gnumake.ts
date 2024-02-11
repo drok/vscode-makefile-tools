@@ -549,10 +549,11 @@ export class Goal extends Node implements Parser {
         throw new Error(`Unexpected Goal line ${line}`);
     }
     getGoal(s: string, flags: number = Goal.Flags.None) : Goal {
-        let known = this.make.goals.get(s);
+        let norms = path.normalize(s);
+        let known = this.make.goals.get(norms);
         if (!known) {
-            let newGoal = new Goal(this.make, s, flags);
-            this.make.goals.set(s, newGoal);
+            let newGoal = new Goal(this.make, norms, flags);
+            this.make.goals.set(norms, newGoal);
             return newGoal;
         }
         known.flags |= flags;
@@ -624,7 +625,9 @@ export class Goal extends Node implements Parser {
     getFilePath() : string {
         return path.isAbsolute(this.goal!) ?
             this.goal! :
-            util.resolvePathToRoot(path.join(configuration.getCurrentMakefileConfiguration().top_builddir, this.make.dir,this.goal!));
+            // Normalize because goals in the srcdir are refered to as /proj/src/blah/../file.c
+            // when building in src/blah with source ${top_srcdir}/file.c (ie, "../file.c")
+            util.resolvePathToRoot(path.normalize(path.join(configuration.getCurrentMakefileConfiguration().top_builddir, this.make.dir,this.goal!)));
     }
 
     logfile(): string | undefined {

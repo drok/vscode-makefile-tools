@@ -1,4 +1,4 @@
-/* 
+/*
  * Copyright (c) 2023 Radu Hociung
  * All rights reserved.
  */
@@ -57,10 +57,26 @@ export class SuiteDecorations implements vscode.FileDecorationProvider {
     getRelevantFiles() : Set<string> {
         return this.relevantFiles;
     }
-    /* finds which of the goal depends the path */
-    goalOf(path: string, goals : Goal[]) : Goal | undefined {
-        return goals.find(g => path.endsWith(g.goal!) ||
-            (g.depends && g.depends.some(g => g.depends && this.goalOf(path, g.depends))));
+    /* finds which of the goal depends the path
+     * Returns a pair. the first item is the goal being satisfied,
+     * the second is the dependency which is at the path
+     */
+    goalOf(path: string, goals : Goal[]) : [Goal,Goal] | boolean {
+        let leaf : [Goal,Goal] | boolean = false;
+        let relevantDir : boolean = false;
+        let r = goals.find(g => {
+                let goalpath = g.getFilePath();
+                relevantDir = relevantDir || goalpath.startsWith(path);
+                let fin = (path == (goalpath) && (leaf=[g,g])) ||
+            (g.depends && Array.isArray((leaf=this.goalOf(path, g.depends))));
+                relevantDir = relevantDir || (!Array.isArray(leaf) && leaf);
+                return fin;
+        });
+
+        if (r)
+            return [r, Array.isArray(leaf) ? leaf[1] : r]
+        else
+            return relevantDir;
     }
 	onDidChangeFileDecorations: vscode.Event<vscode.Uri | vscode.Uri[]> = this._onDidChangeFileDecorations.event;
 	provideFileDecoration(
@@ -98,13 +114,16 @@ export class SuiteDecorations implements vscode.FileDecorationProvider {
             if (selected != undefined) {
                 try {
                 let goal = this.goalOf(uri.path,selected);
-                if (goal) {
-                    return { tooltip: `used for ${goal.goal}`, badge: '🎯' || '👁️‍🗨️', propagate: true};
-                } else {
+                if (Array.isArray(goal)) {
+                    return { tooltip: `used for ${goal[0].goal}`, badge:
+                        // A goal can be the final target, an intemediate puzzle piece,
+                        // or the origin/bow
+                        goal[0] == goal[1] ?'🎯' :
+                        goal[1].depends?.length ? '🧩' : '🏹', propagate: true}; //  ||  || '👁️‍🗨️', propagate: true};
+                } else if (!goal)
                     return { color: unused };
-                }
-            } catch (e) {
-                uri && console.debug("error at ", uri);
+            } catch(e) {
+                console.debug("err ", e);
             }
             }
         }
