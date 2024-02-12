@@ -210,7 +210,7 @@ export async function generateParseContent(span: Span): Promise<ConfigureSubphas
     }
 
     let abs_top_builddir = util.resolvePathToRoot(dir || "");
-    let build_tree: Make = new Make(telemetry.startSpan("Make", span), abs_top_builddir, abs_top_builddir);
+    let build_tree: Make = new Make('', telemetry.startSpan("Make", span), abs_top_builddir);
 
     // Include all the make arguments defined in autotools.configurations.makeArgs
     makeArgs = makeArgs.concat(c.makeArgs || []);

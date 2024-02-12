@@ -199,7 +199,7 @@ export class Executing implements Parser {
         }
         let entering = EnteringRE.exec(line);
         if (entering)
-            return [ParserDisp.Enter, new Make(this.make.span, entering[1], this.make.root)];
+            return this.make.enter(entering[1]);
         let copyright = CopyrightRE.test(line);
         if (copyright) {
             this.make.finish();

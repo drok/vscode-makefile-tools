@@ -199,7 +199,7 @@ export class ProjectOutlineProvider implements vscode.TreeDataProvider<Node> {
 
     private tree: Make;
     constructor(span: Span, private configuration: string | undefined) {
-        this.tree = new Make(span, '', '')
+        this.tree = new Make('', span, '')
     }
 
     get onDidChangeTreeData(): any {
@@ -246,7 +246,8 @@ export class ProjectOutlineProvider implements vscode.TreeDataProvider<Node> {
     }
 
     clear() : void {
-        this.updateTargets(new Make(extension.journey, '', ''));
+        //if (this.subnodes.size)
+            this.updateTargets(new Make('', extension.journey, ''));
     }
     // Updates the tree when settings.json changes
     updateTargets(build_tree: Make) : void {
@@ -264,7 +265,7 @@ export class ProjectTestsProvider implements vscode.TreeDataProvider<Node> {
 
     private tree: Make;
     constructor(span: Span) {
-        this.tree = new Make(span, '', '')
+        this.tree = new Make('', span, '')
     }
 
     public refresh(): any {
@@ -322,7 +323,7 @@ export class ProjectTestsProvider implements vscode.TreeDataProvider<Node> {
     }
 
     clear() : void {
-        this.updateTargets(new Make(extension.journey, '', ''));
+        this.updateTargets(new Make('', extension.journey, ''));
     }
     // Updates the tree when settings.json changes
     updateTargets(build_tree: Make) : void {

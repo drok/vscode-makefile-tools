@@ -47,9 +47,9 @@ const RecursingRE = /^Making (.*) in (.*)$/;
  * and Make to parse submake output.
  */
 export class Make implements Parser {
-    constructor(public span: Span, dir: string, public root: string)
+    constructor(public dir: string, public span: Span, public root: string)
     {
-        this.dir = path.relative(root, dir);
+        // this.dir = path.relative(root, dir);
         this.section = MakeSection.Starting;
         if (root) {
             let foundGoals = configuration.getAllBuildTargets().get(this.dir);
@@ -113,7 +113,9 @@ export class Make implements Parser {
                 let entering = EnteringRE.exec(line);
                 if (entering) { // This should only happen once at the top of the stack
                     // this.section = MakeSection.Making;
-                    return [ParserDisp.Enter, new Make(this.span, entering[1], this.root)];
+                    // This is not a hack: make in a deeper dir could call a shallow dir.
+                    // That should be a new make, because it's at a different depth/dependency path
+                    return this.enter(entering[1]);
                 }
                 let copyright = CopyrightRE.test(line);
                 if (copyright) {
@@ -192,16 +194,11 @@ export class Make implements Parser {
             return this;
         } else if (sub instanceof Make) {
             if (this == sub)
-                throw new Error(`Unexpected push in Make ${sub}`);
+                return this;
+//                throw new Error(`Unexpected push in Make ${sub}`);
             if (sub.dir == this.dir) {
-                // Submakes in the same directory are removed, but parsed info merged into
-                // this make.
-                // config_header not merged because it's an automake Variable, should be
-                // the same as automake does not do conditional headers.
-
-                this.test_suite = this.test_suite || sub.test_suite;
-
-                this.mergeSubmake(sub);
+                logger.message(`ERROR: Unexpected make @ ${sub.dir} is a dependency of two targets: ${this.file} and ${sub.file} called from different hierarchical depths`);
+                telemetry.logException(new Error(`make-multi-depth ${this.file} and ${sub.file}`), this.span);
             } else
                 this.submake.set(sub.dir, sub);
             return this;
@@ -216,16 +213,9 @@ export class Make implements Parser {
         } else if (sub instanceof EmptyLine) { return undefined; }
         throw new Error(`Unexpected push in Make ${sub}`);
     }
-    // recursively merge a submake into my submake
-    mergeSubmake(other: Make) {
-        other.submake.forEach((submake,dir) => {
-            var mysub = this.submake.get(dir);
-            if (mysub) {
-                mysub.mergeSubmake(submake);
-            } else
-                this.submake.set(dir, submake)
-        })
-        this.test_suite = other.test_suite;
+    enter(dir: string) : [ParserDisp, Parser] {
+        let reldir = path.relative(this.root, dir);
+        return [ParserDisp.Enter, reldir == this.dir ? this : new Make(reldir, this.span, this.root)];
     }
     public getFile(): string | undefined {
         return this.file;
@@ -243,7 +233,6 @@ export class Make implements Parser {
         }
         this.file = rea[4] ?? rea[5];
     }
-    dir: string = 'first';
     section: MakeSection;
     file: string | undefined;
     goals: Map<string,Goal>;
