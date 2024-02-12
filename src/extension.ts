@@ -480,10 +480,6 @@ export class Extension {
                 extension.testController?.debugEnded(e);
             //}
         }));
-
-        vscode.commands.executeCommand("setContext", "autotools:isAutotoolsProject",
-            this.isAutotoolsProject() ? 1 : 2);
-
     }
     tasksBugWorkaround() : void {
         if (this.needTaskFetchBugWorkaround && this.isAutotoolsProject()) {

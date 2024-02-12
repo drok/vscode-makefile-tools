@@ -710,8 +710,7 @@
                 {
                     "id": "autotools.tests",
                     "icon": "res/viewcontainer.svg",
-                    "when": "autotools:isAutotoolsProject",
-
+                    "when": "autotools:haveManifest == 1",
                     "name": "%autotools.configuration.views.testsuites.description%"
                 }
             ]
@@ -840,7 +839,7 @@
                 },
                 {
                     "command": "autotools.addAutotools",
-                    "when": "autotools:isAutotoolsProject > 1"
+                    "when": "autotools:haveManifest > 1"
                 },
                 {
                     "command": "autotools.check",
