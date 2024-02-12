@@ -579,7 +579,8 @@ export class Goal extends Node implements Parser {
                 'nodeType=task,nodeType=test,nodeType=bintest' :
                 'nodeType=task,nodeType=test';
             item.resourceUri = this.getURI();
-            extension._projectTestSuitesProvider.allTests.set(item.resourceUri.path, this);
+            extension._projectTestSuitesProvider.all.set(item.resourceUri.path, this);
+            item.id = item.resourceUri.path;
             // item.id = this.getFilePath();
         } else
         if (this.flags & Goal.Flags.Test_Suite) {
@@ -590,9 +591,13 @@ export class Goal extends Node implements Parser {
             // match in privideFileDecoration.
             // test is at https://github.com/microsoft/vscode/blob/main/src/vs/base/common/uri.ts#L98
             item.resourceUri = this.getURI();
+            item.id = item.resourceUri.path;
         } else
         if (this.flags & Goal.Flags.Linked_binary) {
+            item.resourceUri = this.getURI();
+            extension._projectOutlineProvider.all.set(item.resourceUri.path, this);
             item.contextValue = 'nodeType=task,nodeType=build';
+            item.id = item.resourceUri.path;
             // item.id = this.getFilePath();
         }
         return item;
@@ -603,17 +608,31 @@ export class Goal extends Node implements Parser {
                 scheme: (this.flags & Goal.Flags.Test_Suite) ? Scheme.Check : Scheme.Test,
                 authority: _empty,//Extension.whoami,
                 fragment: _empty,
-                path: path.join(configuration.getBuildEnvPath(),this.make.dir,this.goal!)
+                path: this.getURIPath()
+            });
+        else if (this.flags & (Goal.Flags.Linked_binary))
+            return vscode.Uri.from({
+                scheme: Scheme.Bin,
+                authority: _empty,//Extension.whoami,
+                fragment: _empty,
+                path: this.getURIPath()
             });
         else
             return vscode.Uri.from({
                 scheme: "file",
                 authority: _empty,//Extension.whoami,
                 fragment: _empty,
-                path: this.getFilePath()
+                path: this.getURIPath()
             });
     }
     getFilePath() : string {
+        return path.isAbsolute(this.goal!) ?
+            this.goal! :
+            // Normalize because goals in the srcdir are refered to as /proj/src/blah/../file.c
+            // when building in src/blah with source ${top_srcdir}/file.c (ie, "../file.c")
+            util.resolvePathToRoot(path.normalize(path.join(configuration.getCurrentMakefileConfiguration().top_builddir, this.make.dir,this.goal!)));
+    }
+    getURIPath() : string {
         return path.isAbsolute(this.goal!) ?
             this.goal! :
             (this.flags & (Goal.Flags.Test_Suite | Goal.Flags.Test_Log)) ?

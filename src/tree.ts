@@ -37,7 +37,7 @@ export abstract class Node {
 }
 
 export class SubNode extends Node {
-    constructor(public make: Make, public parent: SubNode | undefined, private tree : Map<Make, SubNode>,  private flags: number) {
+    constructor(public make: Make, public parent: SubNode | undefined | null, private tree : Map<Make, SubNode>,  private flags: number) {
         super();
     }
 
@@ -47,7 +47,7 @@ export class SubNode extends Node {
         if (!(this.flags & Goal.Flags.Test_Suite)) {
             goals.push(...[...this.make.goals.values()]
                 // Bit of a hack to hardcode excluding test_program
-                .filter(goal => (goal.flags & this.flags) && !(goal.flags & Goal.Flags.Test_Program)));
+                .filter(goal => (goal.flags & this.flags)/* && !(goal.flags & Goal.Flags.Test_Program)*/));
         } else if (this.make.test_suite?.depends)
             goals.push(...this.make.test_suite.depends);
         return goals;
@@ -113,43 +113,18 @@ export class ProjectOutlineProvider implements vscode.TreeDataProvider<Node> {
     getChildren(node?: Node): Node[] {
         let goals : Node[];
         if (!node) {
-            goals = [...this.tree.submake.values()]
-                .map(sub => this.subnodes.get(sub)!);
-            goals.push(...[...this.tree.goals.values()]
-                .filter(goal => goal.flags & this.flag));
+            goals = [this.subnodes.get(this.tree)!];
         } else {
             goals = node.getChildren();
         }
         return goals;
     }
-    public getParent(element: Node): Node | undefined {
+    public getParent(element: Node): vscode.ProviderResult<Node> {
         if (element instanceof SubNode)
             return element.parent;
         else
-            return this.subnodes.get(element.make)!.parent;
+            return this.subnodes.get(element.make);
     }
-
-    pathDisplayed(pathInSettings: string | undefined, kind: string, searchInPath: boolean, makeRelative: boolean): string {
-       if (!pathInSettings) {
-         return `${kind}: [Unset]`;
-       }
-       
-       const pathBase: string | undefined = (searchInPath && path.parse(pathInSettings).dir === "") ? path.parse(pathInSettings).base : undefined;
-       const pathInEnv: string | undefined = pathBase ? (path.join(util.toolPathInEnv(pathBase) || "", pathBase)) : undefined;
-       const finalPath: string = pathInEnv || pathInSettings;
-       let checkFileExists: boolean = pathInSettings !== undefined;
-
-       return (!checkFileExists ? `${kind} (not found)` : `${kind}`) + `: [${makeRelative ? util.makeRelPath(finalPath, util.getWorkspaceRoot()) : finalPath}]`;
-    }
-
-//    dependsOn(path: string, goals: Goal[]) : boolean {
-//        return goals.some( g => {
-//            if (g.getFilePath() == path || (g.depends && this.dependsOn(path, goals)))
-//                if (g.flags & Goal.Flags.Linked_binary) {
-//                    goals.push(g);
-//                }
-//        });
-//    }
 
     public selectRdepends(path: string) : Goal[] {
         let targets : Goal[] = [];
@@ -171,8 +146,8 @@ export class ProjectOutlineProvider implements vscode.TreeDataProvider<Node> {
         //}
         configuration.getAllBuildTargets().forEach((v, k) => {
             v.forEach(g => {
-                if ((g.flags & (Goal.Flags.Linked_binary && Goal.Flags.Test_Log)) &&
-                    !(g.flags & Goal.Flags.Test_Program) &&
+                if ((g.flags & (Goal.Flags.Linked_binary | Goal.Flags.Test_Log)) &&
+                    // !(g.flags & Goal.Flags.Test_Program) &&
                     g.depends && dependsOnRecursive(path, g.depends))
                     targets.push(g);
             });
@@ -184,6 +159,7 @@ export class ProjectOutlineProvider implements vscode.TreeDataProvider<Node> {
         return targets;
     }
     // Updates the tree when build configuration changes
+    public all : Map<string,Goal> = new Map();
     async update(configuration: string): Promise<void> {
         this.configuration = configuration;
         this.updateTree();
@@ -206,7 +182,7 @@ export class ProjectOutlineProvider implements vscode.TreeDataProvider<Node> {
     }
 }
 
-function buildParents(tree: Make, parent: SubNode | undefined, parents: Map<Make, SubNode>, flags : number, depth: number = 0) : SubNode {
+function buildParents(tree: Make, parent: SubNode | undefined | null, parents: Map<Make, SubNode>, flags : number, depth: number = 0) : SubNode {
     let myNode = new SubNode(tree, parent, parents, flags);
     if (depth > 10) // Avoid infinite loop. a dependency tree 10-deep should be enough for everyone
         return myNode;
@@ -243,10 +219,7 @@ export class ProjectTestsProvider implements vscode.TreeDataProvider<Node> {
             if (!this.tree.stats.checks)
                 return []; // ie, show the welcome message
 
-            goals = [...this.tree.submake.values()]
-                .map(sub => this.subnodes.get(sub)!);
-            goals.push(...[...this.tree.goals.values()]
-                .filter(goal => goal.flags & this.flag));
+            goals = [this.subnodes.get(this.tree)!];
             if (this.tree.test_suite?.depends)
                 goals
                 .push(...this.tree.test_suite.depends);
@@ -255,17 +228,11 @@ export class ProjectTestsProvider implements vscode.TreeDataProvider<Node> {
         }
         return goals;
     }
-    public getParent(element: Node): Node | undefined {
+    public getParent(element: Node): vscode.ProviderResult<Node> {
         if (element instanceof SubNode)
             return element.parent;
-            //return new Promise((c,e) =>
-            //    c(element.parent));
-        else {
-            let m = this.subnodes.get(element.make)?.parent;
-            return m;
-            // return new Promise((c,e) =>
-            //     c(exp));
-        }
+        else
+            return this.subnodes.get(element.make);
     }
 
     pathDisplayed(pathInSettings: string | undefined, kind: string, searchInPath: boolean, makeRelative: boolean): string {
@@ -283,7 +250,7 @@ export class ProjectTestsProvider implements vscode.TreeDataProvider<Node> {
 
     // Updates the tree when build configuration changes
     // alltests is an array used to find the decoration for each test
-    public allTests : Map<string,Goal> = new Map();
+    public all : Map<string,Goal> = new Map();
     async update(configuration: string): Promise<void> {
         this.updateTree();
     }
@@ -300,7 +267,7 @@ export class ProjectTestsProvider implements vscode.TreeDataProvider<Node> {
     }
 
     updateTree(): void {
-        this.allTests.clear(); // it will be refilled with goals that are currently displayed
+        this.all.clear(); // it will be refilled with goals that are currently displayed
         this._changeEvent.fire(null);
     }
 }

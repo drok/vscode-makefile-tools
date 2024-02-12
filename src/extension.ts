@@ -47,7 +47,6 @@ import * as nls from 'vscode-nls';
 import { assert, log } from 'console';
 import { installAutotools } from './install';
 import { Span } from '@opentelemetry/api';
-import { POINT_CONVERSION_COMPRESSED } from 'constants';
 nls.config({ messageFormat: nls.MessageFormat.bundle, bundleFormat: nls.BundleFormat.standalone })();
 const localize: nls.LocalizeFunc = nls.loadMessageBundle();
 
@@ -61,7 +60,7 @@ const ignoredSaveFiles : Set<string> = new Set(
     "configure.ac", "Makefile.am"]);
 const rdepRevealOption : { select: boolean,
         expand: number,
-        focus: boolean } = {select: false, expand: 3, focus: true};
+        focus: boolean } = {select: false, expand: 3, focus: false};
 export class Extension {
     static readonly whoami: string = "mergesium.autotools";
 
@@ -92,7 +91,6 @@ export class Extension {
     public testController : MyTestController | undefined;
     public pkginfo : make.pkgInfo | undefined;
     private _treeDisposables: vscode.Disposable[] = [];
-    private selectingRdepends : boolean = false;
     public running: WeakMap<vscode.TaskExecution, Span> = new WeakMap();
 
     public constructor(public readonly extensionContext: vscode.ExtensionContext, teleParams: tele.Params) {
@@ -236,8 +234,6 @@ export class Extension {
         });
 
         this._projectOutlineTreeView.onDidChangeSelection(e => {
-            if (this.selectingRdepends)
-                return; // Dont add to selection while the "Find reverse depends is highlighting"
             let oldGoals = configuration.currentGoalsBins;
             if (e.selection.length > 0) {
                 let newGoals = e.selection.filter(g => g instanceof Goal) as Goal[];
@@ -246,7 +242,7 @@ export class Extension {
                 configuration.setCurrentGoalBins(undefined);
             }
             if (oldGoals != configuration.currentGoalsBins) {
-                this.suiteDecorator.updateDecorations(configuration.currentGoals);
+                this.suiteDecorator.highlightRelevant(configuration.currentGoals);
             }
         });
         this._projectTestSuitesView = vscode.window.createTreeView('autotools.tests', {
@@ -256,22 +252,24 @@ export class Extension {
 
         });
         this._treeDisposables.push(vscode.commands.registerCommand('autotools.rdepends', async (sub: vscode.Uri) => {
-            this.selectingRdepends = true;
             configuration.setCurrentGoalBins(undefined);
             configuration.setCurrentGoalTests(undefined);
             // vscode.commands.executeCommand('workbench.action.openView', this._projectTestSuitesView);
+            vscode.commands.executeCommand('autotools.tests.focus');
             let goals = extension._projectOutlineProvider.selectRdepends(sub.path);
             for (const g of goals) {
-                (g.flags & Goal.Flags.Test_Log) ?
-                    await this._projectTestSuitesView?.reveal(g, {select: false, focus: true, expand: 3}) // rdepRevealOption)
+                if (g.flags & Goal.Flags.Test_Log) {
+                    extension._projectTestSuitesProvider.all.set(g.getFilePath(), g); // Fixme - this cn be moved to Test Tree build parents, it seems out of place here. Here it does lazy allocation, in buildParents it would be eager allocation
+                    await this._projectTestSuitesView?.reveal(g, rdepRevealOption) // rdepRevealOption)
                     .then(() => {
-                        extension._projectTestSuitesProvider.allTests.set(g.getFilePath(), g); // Fixme - this cn be moved to Test Tree build parents, it seems out of place here. Here it does lazy allocation, in buildParents it would be eager allocation
                         console.debug('selected', g);
                     },
                     err => {
                         logger.message(`ERROR: Internal error finding goal ${g.goal} in tests tree`,'Normal');
                         telemetry.logException(new Error(`No ${g.goal} in test tree`));
-                    }) :
+                    })
+                } else {
+                    extension._projectOutlineProvider.all.set(g.getFilePath(), g); // Fixme - this cn be moved to Test Tree build parents, it seems out of place here. Here it does lazy allocation, in buildParents it would be eager allocation
                     await this._projectOutlineTreeView?.reveal(g, rdepRevealOption)
                     .then(() => {
                         console.debug('selected', g);
@@ -280,15 +278,13 @@ export class Extension {
                         logger.message(`ERROR: Internal error finding goal ${g.goal} in programs tree`,'Normal');
                         telemetry.logException(new Error(`No ${g.goal} in bin tree`));
                     });
+                }
             }
-            this.selectingRdepends = false;
             this.suiteDecorator.highlightTargets(goals, sub.path);
             return Promise.resolve();
         }));
 
         this._treeDisposables.push(this._projectTestSuitesView.onDidChangeSelection((e) => {
-            if (this.selectingRdepends)
-                return; // Dont add to selection while the "Find reverse depends is highlighting"
             let oldGoals = configuration.currentGoalsTests;
             if (e.selection.length > 0) {
                 let newGoals = e.selection.filter(g => g instanceof Goal) as Goal[];
@@ -297,7 +293,7 @@ export class Extension {
                 configuration.setCurrentGoalTests(undefined);
             }
             if (oldGoals != configuration.currentGoalsTests) {
-                this.suiteDecorator.updateDecorations(configuration.currentGoals);
+                this.suiteDecorator.highlightRelevant(configuration.currentGoals);
             }
             if (e.selection.length > 0) {
                 let selected = e.selection[0];
