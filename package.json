@@ -45,6 +45,10 @@
     "contributes": {
         "commands": [
             {
+                "command": "autotools.rdepends",
+                "title": "%autotools.rdepends.title%"
+            },
+            {
                 "command": "autotools.closeIrrelevant",
                 "title": "%autotools.closeIrrelevant.title%"
             },
@@ -834,6 +838,10 @@
         "menus": {
             "commandPalette": [
                 {
+                    "command": "autotools.rdepends",
+                    "when": "never"
+                },
+                {
                     "command": "autotools.closeIrrelevant",
                     "when": "never"
                 },
@@ -929,6 +937,13 @@
                     "command": "autotools.closeIrrelevant",
                     "when": "autotools:filterByTarget",
                     "group": "1_close@10"
+                }
+            ],
+            "explorer/context" : [
+                {
+                    "command": "autotools.rdepends",
+                    "when": "autotools:hasTargets == 1",
+                    "group": "navigation@30"
                 }
             ],
             "view/title": [

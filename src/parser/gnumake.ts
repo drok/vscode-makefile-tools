@@ -15,11 +15,12 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import {Parser, ParserDisp, EmptyLine } from '../parser';
 import { Executing } from './shell';
-import { Node } from '../tree';
+import { Node, Scheme } from '../tree';
 
 import * as nls from 'vscode-nls';
 import { Extension, extension, telemetry } from '../extension';
 import { Span } from '@opentelemetry/api';
+import { log } from 'console';
 nls.config({ messageFormat: nls.MessageFormat.bundle, bundleFormat: nls.BundleFormat.standalone })();
 const localize: nls.LocalizeFunc = nls.loadMessageBundle();
 
@@ -578,7 +579,8 @@ export class Goal extends Node implements Parser {
                 'nodeType=task,nodeType=test,nodeType=bintest' :
                 'nodeType=task,nodeType=test';
             item.resourceUri = this.getURI();
-            extension._projectTestSuitesProvider.allTests.push(this);
+            extension._projectTestSuitesProvider.allTests.set(item.resourceUri.path, this);
+            // item.id = this.getFilePath();
         } else
         if (this.flags & Goal.Flags.Test_Suite) {
             item.description = this.make.stats.tests ?
@@ -591,17 +593,17 @@ export class Goal extends Node implements Parser {
         } else
         if (this.flags & Goal.Flags.Linked_binary) {
             item.contextValue = 'nodeType=task,nodeType=build';
+            // item.id = this.getFilePath();
         }
         return item;
     }
     getURI() : vscode.Uri {
         if (this.flags & (Goal.Flags.Test_Suite | Goal.Flags.Test_Log))
             return vscode.Uri.from({
-                scheme: (this.flags & Goal.Flags.Test_Suite) ? "check" : "test",
+                scheme: (this.flags & Goal.Flags.Test_Suite) ? Scheme.Check : Scheme.Test,
                 authority: _empty,//Extension.whoami,
                 fragment: _empty,
-                path: path.join(configuration.getBuildEnvPath(),this.make.dir,this.goal!),
-                query: (this.flags & Goal.Flags.Test_Log) ? extension._projectTestSuitesProvider.allTests.length.toString() : undefined
+                path: path.join(configuration.getBuildEnvPath(),this.make.dir,this.goal!)
             });
         else
             return vscode.Uri.from({
@@ -614,6 +616,8 @@ export class Goal extends Node implements Parser {
     getFilePath() : string {
         return path.isAbsolute(this.goal!) ?
             this.goal! :
+            (this.flags & (Goal.Flags.Test_Suite | Goal.Flags.Test_Log)) ?
+            path.join(configuration.getBuildEnvPath(),this.make.dir,this.goal!) :
             // Normalize because goals in the srcdir are refered to as /proj/src/blah/../file.c
             // when building in src/blah with source ${top_srcdir}/file.c (ie, "../file.c")
             util.resolvePathToRoot(path.normalize(path.join(configuration.getCurrentMakefileConfiguration().top_builddir, this.make.dir,this.goal!)));
@@ -623,7 +627,7 @@ export class Goal extends Node implements Parser {
         return this.test?.id;
     }
 
-    constructor(private make: Make, public goal: string | undefined = undefined,
+    constructor(public make: Make, public goal: string | undefined = undefined,
         public flags: number = Goal.Flags.None) {
         super();
         /* TODO: Implement check-local suite (eg, gnumake)

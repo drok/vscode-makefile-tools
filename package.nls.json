@@ -28,6 +28,7 @@
    "autotools.command.configure.help.title": "Autotools: Run `configure --help`",
    "autotools.exportToIntelisense.title": "Autotools: Export configuration to Intellisense",
    "autotools.closeIrrelevant.title": "Close Irrelevant",
+   "autotools.rdepends.title": "Find dependent targets",
    "autotools.configuration.views.makefile.outline.description": "Program Goals",
    "autotools.configuration.views.testsuites.description": "Tests",
    "autotools.configuration.makefile.makePath.description": "The path to the make tool",

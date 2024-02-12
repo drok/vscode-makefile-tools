@@ -359,6 +359,7 @@ export async function analyzeConfigureParams(parentSpan: Span, reload: boolean, 
                         extension.createPanel();
                         await logMakeCmd(relativeMakefile);
                         extension.setConfiguration(currentMakefileConfigurationName);
+                        vscode.commands.executeCommand("setContext", "autotools:hasTargets", 2);
                         extension._projectOutlineProvider?.clear();
                         extension._projectTestSuitesProvider?.clear();
                                         // extension.setConfiguration(currentMakefileConfigurationName);

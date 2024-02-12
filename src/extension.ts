@@ -47,6 +47,7 @@ import * as nls from 'vscode-nls';
 import { assert, log } from 'console';
 import { installAutotools } from './install';
 import { Span } from '@opentelemetry/api';
+import { POINT_CONVERSION_COMPRESSED } from 'constants';
 nls.config({ messageFormat: nls.MessageFormat.bundle, bundleFormat: nls.BundleFormat.standalone })();
 const localize: nls.LocalizeFunc = nls.loadMessageBundle();
 
@@ -58,7 +59,9 @@ export let telemetry: tele.MyTelemetry;
 const ignoredSaveFiles : Set<string> = new Set(
     ["settings.json", "tasks.json", "launch.json",
     "configure.ac", "Makefile.am"]);
-
+const rdepRevealOption : { select: boolean,
+        expand: number,
+        focus: boolean } = {select: false, expand: 3, focus: true};
 export class Extension {
     static readonly whoami: string = "mergesium.autotools";
 
@@ -89,6 +92,7 @@ export class Extension {
     public testController : MyTestController | undefined;
     public pkginfo : make.pkgInfo | undefined;
     private _treeDisposables: vscode.Disposable[] = [];
+    private selectingRdepends : boolean = false;
     public running: WeakMap<vscode.TaskExecution, Span> = new WeakMap();
 
     public constructor(public readonly extensionContext: vscode.ExtensionContext, teleParams: tele.Params) {
@@ -160,8 +164,8 @@ export class Extension {
         extensionContext.subscriptions.push(vscode.commands.registerCommand('autotools.command.testgrid.item', async (sub: tree.SubNode | TestItem) => {
             telemetry.logEvent(this.journey, "itemgrid");
             let dir : string | undefined;
-            if (sub instanceof tree.SubNode && sub.submake.test_suite) {
-                dir = sub.submake.dir;
+            if (sub instanceof tree.SubNode && sub.make.test_suite) {
+                dir = sub.make.dir;
             } else if (instanceOfTestItem(sub)) {
                 dir = sub.parent?.id ?? sub.id;
             }
@@ -232,6 +236,8 @@ export class Extension {
         });
 
         this._projectOutlineTreeView.onDidChangeSelection(e => {
+            if (this.selectingRdepends)
+                return; // Dont add to selection while the "Find reverse depends is highlighting"
             let oldGoals = configuration.currentGoalsBins;
             if (e.selection.length > 0) {
                 let newGoals = e.selection.filter(g => g instanceof Goal) as Goal[];
@@ -249,7 +255,40 @@ export class Extension {
             showCollapseAll: false
 
         });
+        this._treeDisposables.push(vscode.commands.registerCommand('autotools.rdepends', async (sub: vscode.Uri) => {
+            this.selectingRdepends = true;
+            configuration.setCurrentGoalBins(undefined);
+            configuration.setCurrentGoalTests(undefined);
+            // vscode.commands.executeCommand('workbench.action.openView', this._projectTestSuitesView);
+            let goals = extension._projectOutlineProvider.selectRdepends(sub.path);
+            for (const g of goals) {
+                (g.flags & Goal.Flags.Test_Log) ?
+                    await this._projectTestSuitesView?.reveal(g, {select: false, focus: true, expand: 3}) // rdepRevealOption)
+                    .then(() => {
+                        extension._projectTestSuitesProvider.allTests.set(g.getFilePath(), g); // Fixme - this cn be moved to Test Tree build parents, it seems out of place here. Here it does lazy allocation, in buildParents it would be eager allocation
+                        console.debug('selected', g);
+                    },
+                    err => {
+                        logger.message(`ERROR: Internal error finding goal ${g.goal} in tests tree`,'Normal');
+                        telemetry.logException(new Error(`No ${g.goal} in test tree`));
+                    }) :
+                    await this._projectOutlineTreeView?.reveal(g, rdepRevealOption)
+                    .then(() => {
+                        console.debug('selected', g);
+                    },
+                    err => {
+                        logger.message(`ERROR: Internal error finding goal ${g.goal} in programs tree`,'Normal');
+                        telemetry.logException(new Error(`No ${g.goal} in bin tree`));
+                    });
+            }
+            this.selectingRdepends = false;
+            this.suiteDecorator.highlightTargets(goals, sub.path);
+            return Promise.resolve();
+        }));
+
         this._treeDisposables.push(this._projectTestSuitesView.onDidChangeSelection((e) => {
+            if (this.selectingRdepends)
+                return; // Dont add to selection while the "Find reverse depends is highlighting"
             let oldGoals = configuration.currentGoalsTests;
             if (e.selection.length > 0) {
                 let newGoals = e.selection.filter(g => g instanceof Goal) as Goal[];
@@ -571,15 +610,16 @@ export class Extension {
         this.tasks.forEach((provider) => provider.update(this.configDisposables));
         if (this._projectOutlineTreeView) {
             this._projectOutlineProvider.updateTargets(build_tree);
-            this._projectOutlineTreeView.reveal(this._projectOutlineProvider.getChildren(undefined)[0],
-                { select: false, focus: false, expand: true, } );
+            //this._projectOutlineTreeView.reveal(this._projectOutlineProvider.getChildren(undefined)[0],
+            //    { select: false, focus: false, expand: true, } );
         }
         if (this._projectTestSuitesView) {
             this._projectTestSuitesProvider.updateTargets(build_tree);
-            this._projectTestSuitesView.reveal(this._projectTestSuitesProvider.getChildren(undefined)[0],
-                { select: false, focus: false, expand: true, } );
+            //this._projectTestSuitesView.reveal(this._projectTestSuitesProvider.getChildren(undefined)[0],
+            //    { select: false, focus: false, expand: true, } );
             this.updateOutlineBadge();
         }
+        vscode.commands.executeCommand("setContext", "autotools:hasTargets", 1);
         this.updateTestSuite(build_tree, build_tree, true);
         this.testController?.onOpenedDocument();
         this.testController?.restoreLiveCheck();
@@ -984,7 +1024,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     context.subscriptions.push(vscode.commands.registerCommand('autotools.outline.buildAll', async (sub: tree.SubNode) => {
         telemetry.logEvent(extension.journey, "obA");
         if (sub instanceof tree.SubNode)
-            extension.build(new make.BuildTarget(sub.submake.dir, make.t_all.goal));
+            extension.build(new make.BuildTarget(sub.make.dir, make.t_all.goal));
         else
             extension.build(make.t_all);
     }));
@@ -992,7 +1032,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     context.subscriptions.push(vscode.commands.registerCommand('autotools.buildAll', async (sub: tree.SubNode) => {
         telemetry.logEvent(extension.journey, "ba");
         if (sub instanceof tree.SubNode)
-            extension.build(new make.BuildTarget(sub.submake.dir, make.t_all.goal));
+            extension.build(new make.BuildTarget(sub.make.dir, make.t_all.goal));
         else
             extension.build(make.t_all);
     }));
@@ -1033,26 +1073,26 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     context.subscriptions.push(vscode.commands.registerCommand('autotools.livecheck', async (sub: tree.SubNode) => {
         telemetry.logEvent(extension.journey, "lc");
         /* Must be a SubNode */
-        if (!sub.submake.test_suite)
+        if (!sub.make.test_suite)
             throw new Error("Missing test suite on SubNode");
-        if (!sub.submake.test_suite.task)
+        if (!sub.make.test_suite.task)
             throw new Error("Missing check task on SubNode");
-        assert(sub.submake.test_suite.task instanceof Map, "test_suite.task should be a Map", sub.submake.test_suite.task);
-        sub.submake.test_suite.test &&
-            extension.testController?.togglelivecheck(sub.getTreeItem(),sub.submake.test_suite.test);
+        assert(sub.make.test_suite.task instanceof Map, "test_suite.task should be a Map", sub.make.test_suite.task);
+        sub.make.test_suite.test &&
+            extension.testController?.togglelivecheck(sub.getTreeItem(),sub.make.test_suite.test);
             // return await vscode.tasks.executeTask(sub.submake.test_suite.test);
     }));
 
     context.subscriptions.push(vscode.commands.registerCommand('autotools.check', async (sub: tree.SubNode) => {
         telemetry.logEvent(extension.journey, "ck");
         /* Must be a SubNode */
-        if (!sub.submake.test_suite)
+        if (!sub.make.test_suite)
             throw new Error("Missing test suite on SubNode");
-        if (!sub.submake.test_suite.task)
+        if (!sub.make.test_suite.task)
             throw new Error("Missing check task on SubNode");
-        assert(sub.submake.test_suite.task instanceof Map, "test_suite.task should be a Map", sub.submake.test_suite.task);
-        sub.submake.test_suite.test &&
-            extension.testController?.run(sub.submake.test_suite.test, configuration.getCurrentTestEnvironment());
+        assert(sub.make.test_suite.task instanceof Map, "test_suite.task should be a Map", sub.make.test_suite.task);
+        sub.make.test_suite.test &&
+            extension.testController?.run(sub.make.test_suite.test, configuration.getCurrentTestEnvironment());
             // return await vscode.tasks.executeTask(sub.submake.test_suite.test);
     }));
 
