@@ -604,26 +604,6 @@
                 "when": "autotools:haveManifest == 1 && autotools:haveConfigurations > 1"
             }
         ],
-        "languages": [
-            {
-            "filenames": ["Makefile.am", "Makefile.in"],
-            "aliases": ["am"],
-            "icon": {
-                "light": "tools",
-                "dark": "tools"
-            },
-            "id": "automake"
-        },
-        {
-            "filenames": ["configure.ac", "configure.in"],
-            "aliases": ["ac"],
-            "icon": {
-                "light": "tools",
-                "dark": "tools"
-            },
-            "id": "autoconf"
-        }
-        ],
         "debuggers": [
             {
                 "type": "autotools",
