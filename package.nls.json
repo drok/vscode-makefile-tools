@@ -12,6 +12,7 @@
    "autotools.command.configure.title": "Autotools: Configure",
    "autotools.command.openKnowledgeBase.title": "Autotools: Go to Knowledge Base",
    "autotools.command.outline.recheck.title": "Regenerate Makefiles (\"config.status\")",
+
    "autotools.command.build.title": "Build",
    "autotools.command.test.title": "Run test",
    "autotools.command.debug.title": "Debug test",
@@ -22,6 +23,7 @@
    "autotools.command.visit.knowledgeBase.title": "Visit the knowledgebase about editing this project in vscode",
    "autotools.command.visit.packageURL.title": "Visit the package's homepage",
    "autotools.command.visit.packageBugs.title": "Report a bug to the package's maintainer",
+
    "autotools.palette.newConfiguration.title": "Autotools: Create new configuration",
    "autotools.command.editConfigureAc.title": "Edit configure.ac",
    "workbench.action.openWorkspaceSettings.title": "Preferences: Open Workspace Settings",
@@ -33,28 +35,33 @@
    "autotools.configuration.views.testsuites.description": "Tests",
    "autotools.configuration.makefile.makePath.description": "The path to the make tool",
    "autotools.configuration.telemetry.markdownDescription": "Enable Telemetry.\n\nTelemetry is used to automatically report unexpected errors, and collect a sample of your extension usage, for the purpose of improving future versions.\n\nWe value your privacy, and appreciate the feedback you send automatically via telemetry.\n\nThe data is sent directly to Mergesium, and not shared with any other parties.\n\nAlso see: [How to inspect the data sent by the extension](https://code.visualstudio.com/docs/getstarted/telemetry#_output-channel-for-telemetry-events).",
+
    "autotools.debugger.launch.description": "Launch the current build target under cppdbg autotools.debugger.launch.description",
    "autotools.debugger.launch.program.description": "What goes here autotools.debugger.launch.program.description",
    "autotools.debugger.launch.args.description": "Arguments to pass to the program autotools.debugger.launch.args.description",
    "autotools.debugger.launch.cwd.description": "Working directory",
    "autotools.debugger.launch.env.description": "Environment variables",
    "autotools.debugger.launch.stopAtEntry.description": "Stop at entry",
+
    "autotools.configuration.makefile.configurations.description": "Build configurations (eg, Debug, Release, Full, Minimal, etc)",
    "autotools.configuration.makefile.configurations.name.description": "The name of this build configuration. Appears in the 'Build Configurations' dropdown, and on the status bar.",
    "autotools.configurations.title": "The array of build configurations. Each configuration represents a build directory and configure arguments.",
    "autotools.configurations.top_builddir.title": "The build directory where 'configure' will be run",
    "autotools.configurations.top_builddir.markdownDescription": "Object files and build products will be output in this directory.\n\nCan be an absolute directory, relative (to workspace folder), or empty (meaning 'in-tree' or builddir=srcdir, and not recommended because it prevents other configurations being built.\n\nAlso see [GNU autoconf: configurations](https://www.gnu.org/software/autoconf/manual/autoconf-2.69/html_node/Configuration-Actions.html)",
    "autotools.configurations.makeArgs.markdownDescription": "Arguments to pass to make when building and testing. Used to configure how make runs, but not what it does. (eg, `--no-builtin-rules`, `--load-average`, etc, but not `--directory` or `--touch`).\n\nAlso see https://www.gnu.org/software/make/manual/html_node/Options-Summary.html",
+
    "autotools.configurations.configureArgs.markdownDescription": "See `configure --help` pallette command for valid options. These arguments can specify optional features to be enabled/disabled/customized (eg `--enable-bigfiles`), or tools (eg. `CXX=g++-13`).\n\nThese args are used to prepare top_builddir for building the project.\n\n`--enable-option-checking=fatal` is recommended to combat misspelt options.\n\nAlso see [option checking](https://www.gnu.org/software/autoconf/manual/autoconf-2.67/html_node/Option-Checking.html)",
    "autotools.welcome.convert.markdownDescription": "This project does not use the autotools build system.\n[Add autotools](command:autotools.addAutotools)\n\nThis creates a trivial `configure.ac`. A better solution would be to describe the project to a AI chat bot, to generate a set of configure.ac and Makefile.am to your specific needs, as well as iterate using natural language.",
    "autotools.welcome.debug.auto.markdownDescription": "Individual tests in [Automake Test Suites](https://www.gnu.org/software/automake/manual/html_node/Parallel-Test-Harness.html) are debuggable without a launch.json file using settings autodetected by the Autotools integration.\n\nAlso see [debug guide](https://Autotools.Mergesium.com/debug).",
    "autotools.welcome.markdownDescription": "No configurations for this autotools project exist yet.\nThe 'Default' configuration is assumed in [build/Default](command:autotools.gotoBuildDirectory).\n[Create a build configuration](command:autotools.newConfiguration)\nA 'configuration' means a build directory, a name, and optionally a set of arguments for the configure script.\n\nThe project's 'configure' script will be run in the build directory to generate Makefiles, programs can be built using 'Run Task'/build, /check or /test in the build directory.\n\nEx. configurations: 'Debug', 'Release 3', 'Minimal', 'Customer X rel-5', etc.",
    "autotools.welcome.debug.markdownDescription": "Autotools debug features are available, eg, by clicking the 'Debug' button on a failing unit test in the [Autotools Outline](command:autotools.outline.focus).",
    "autotools.welcome.bootstrap.markdownDescription": "This Autotools project needs to be bootstraped.\n\n[Bootstrap](command:autotools.bootstrap)\n\nAlso see [bootstrapping](https://www.gnu.org/software/automake/faq/autotools-faq.html#What-does-_002e_002fbootstrap-or-_002e_002fautogen_002esh-do_003f)",
+
    "autotools.welcome.configure.markdownDescription": "The [build directory](command:autotools.gotoBuildDirectory) is not configured\n\n[Configure](command:autotools.configure)",
    "autotools.welcome.parsing.markdownDescription": "Importing autotools configuration...",
    "autotools.welcome.packageURL.markdownDescription": "Check for [known issues](command:autotools.visit.knowledgeBase) in the knowledge base.\n\nPackage [home page](command:autotools.visit.packageURL)",
    "autotools.welcome.packageBugs.markdownDescription": "Package [bug report](command:autotools.visit.packageBugs)",
+
    "autotools.welcome.tests.none.markdownDescription": "There are no [Parallel Harness](https://www.gnu.org/software/automake/manual/html_node/Parallel-Test-Harness.html) tests.\nThe older (and discouraged) Serial Test Harness is [not yet supported](https://github.com/Mergesium/autotools/issues/5)",
    "autotools.welcome.tests.homegrown-suite.markdownDescription": "A 'check' target exists, possibly implementing a homegrown test suite. Run it with 'Autotools: run all tests (make check)' from palette or panel menu.",
    "autotools.configurations.configureArgs.title": "Arguments for the configure script",
@@ -63,12 +70,14 @@
    "autotools.configuration.makefile.configurationCachePath.description": "The path to a cache file storing the output of the last dry-run make command. When unset, a file named 'configurationCache.log' is stored at the path specified by the 'makefile.extensionOutputFolder' setting.",
    "autotools.configuration.autoreconfTool.markdownDescription": "Name of the `autoreconf` tool. Can be used to select a non-default version (eg. `autoreconf2.53`). It must match the version of the autoconf tool.",
    "autotools.configuration.autoBootstrap.markdownDescription": "Automatically bootstrap project if the `configure` file does not exist. If disabled, you will be prompted when bootstrapping is needed.\n\nThis allows the ability to manually bootstrap project with non-straightforward requirements.\n\nManually bootstrapping can be done from palette: [Autotools: Bootstrap](command:autotools.bootstrap)\n\n Also see [bootstrapping](https://www.gnu.org/software/automake/faq/autotools-faq.html#What-does-_002e_002fbootstrap-or-_002e_002fautogen_002esh-do_003f)",
+
    "autotools.configuration.autoreconfWarnCross.markdownDescription": "When (re-)generating the configure script, whether to warn about issues related to cross-compilation. If you must use constructs that prevent cross compilation, set this to `no-cross` to avoid the warning.\n\nAlso see [Hosts and Cross-Compilation](https://www.gnu.org/software/autoconf/manual/autoconf-2.69/html_node/Hosts-and-Cross_002dCompilation.html)",
    "autotools.configuration.autoreconfWarnPortability.markdownDescription": "When (re-)generating the configure script, whether to warn about issues related to portability (eg, using `bash` language instead of portable macros like AS_ECHO). Maintainers should set this to `portability` generate the most portable configure scripts.\n\n References:\n  * [Common Shell Constructs](https://www.gnu.org/software/autoconf/manual/autoconf-2.68/html_node/Common-Shell-Constructs.html),\n  * [Portable Shell](https://www.gnu.org/software/autoconf/manual/autoconf-2.69/html_node/Portable-Shell.html#Portable-Shell),\n  * [Portable Make](https://www.gnu.org/software/autoconf/manual/autoconf-2.69/html_node/Portable-Make.html#Portable-Make), and\n  * [Portable C/C++](https://www.gnu.org/software/autoconf/manual/autoconf-2.69/html_node/Portable-C-and-C_002b_002b.html#Portable-C-and-C_002b_002b)",
    "autotools.configuration.autoreconfWarnObsolete.markdownDescription": "When (re-)generating the configure script, whether to warn about obsolete macros (eg, using `AC_CHECK_TYPE` and others).\n\nThese warnings indicate the `configure.ac` file is targetting an older autoconf than you are using.\n\nInstead of overriding, consider:\n\n  * using the older autoconf (**autoconf/autoreconf Tool** below), or,\n\n  * updating `configures.ac` to use the newer constructs, as per the autoconf docs\n\nAlso see [Obsolete Macros](https://www.gnu.org/software/autoconf/manual/autoconf-2.69/html_node/Obsolete-Macros.html#Obsolete-Macros)",
    "autotools.configuration.autoreconfWarnOverride.markdownDescription": "When (re-)generating the configure script, whether to warn about user redefinitions of Automake rules or variables.\n\nAlso see [Automake -Woverride](https://www.gnu.org/software/automake/manual/html_node/automake-Invocation.html#index-_002dW)",
    "autotools.configuration.autoreconfWarnGnu.markdownDescription": "When (re-)generating the configure script, whether to warn about minor deviations from the GNU Coding Standards.\n\nAlso see [GNU Coding Standards](https://www.gnu.org/software/make/manual/html_node/Standard-Targets.html)",
    "autotools.configuration.autoreconfWarnUnsupported.markdownDescription": "When (re-)generating the configure script, whether to warn about unsupported or incomplete automake features.\n\nAlso see [Automake -Wunsupported](https://www.gnu.org/software/automake/manual/html_node/automake-Invocation.html#index-_002dW)",
+
    "autotools.configuration.makefile.keepDryRuns.markdownDescription": "Keep the output of the dry-run in `${top_builddir}/.vscode/${currentTarget}.dryrun.log`",
    "autotools.configuration.makefile.keepConfigurationCache.markdownDescription": "Keep the Intellisense configuration parsed from the makefile as `${top_builddir}/.vscode/${currentTarget}.cache`.\n\n If this file exists when starting vscode, it will be loaded before dry-running. This can be used to **speed up** Intellisense initialization in very large projects where dry-running is slow.",
    "autotools.configuration.traceLiveTestRuns.markdownDescription": "While Live Testing, whether to output to the terminal dependency tracing info. This is useful to debug dependencies of tests.\n\nMake will output messages like the following while live testing:\n\n```Makefile:803: update target 'tests.o' due to: /home/radu/myproj/tests/tests.c```",
@@ -76,12 +85,14 @@
    "autotools.configuration.tests_environment.title": "Named set of environment settings, selectable in the testing UI",
    "autotools.configuration.test_environments.description": "Array of tests environments to run the test suites with.\nEach environment has a name and a list of environemnt variable definitions",
    "autotools.configuration.test_environments.name.description": "The name of the test environemnt. Appears in the testing UI to allow selection, and in test grid reports as column names.\nMust be a single word. Valid characters: alphanumeric, dash, underscore",
+
    "autotools.configuration.test_environments.dirs.markdownDescription": "List of test suite directories where this environment is used. If missing, environment exists in all test suites.",
    "autotools.configuration.tests_environment.TESTS_ENVIRONMENT.global.title": "Set of environment variables set on every test suite run.",
    "autotools.configuration.tests_environment.TESTS_ENVIRONMENT.global.markdownDescription": "Set of environment variables set to every `make check` run. This is the global set, applied to every test in every environment. Variables here can be overriden by setting a different value in a test-environment\n\nThis is the only mechanism for passing runtime arguments to automake tests.",
    "autotools.configuration.tests_environment.XFAIL_TESTS.global.markdownDescription": "Global list of tests expected to fail (XFAIL).\nThis list applies to all test environments.\n\nTests marked as `XFAIL` either here or in a test environment can be filtered in the Test Explorer using the `@mergesium.autotools:xfail` filter.\nThis can be seen as a **TODO** list before release.",
    "autotools.configuration.tests_environment.TESTS_ENVIRONMENT.sub.title": "Collection of environment variables to set in the tests environment.\nEach set is concatenated with the global TESTS_ENVIRONMENT set of variables if defined, and used to set the TESTS_ENVIRONMENTS variable on the `make check` command, eg. `make check TESTS_ENVIRONMENT=\"\\\"VAR1=val1\\\" \\\"VAR2=val2\\\"\"`\n\nsee https://www.gnu.org/software/automake/manual/html_node/Parallel-Test-Harness.html",
    "autotools.configuration.tests_environment.XFAIL_TESTS.sub.title": "List of tests expected to fail (XFAIL) in this test environment.\nIt is concatenated with the global XFAIL_TESTS.\n\nThis is useful as temporary failure waivers during development.\n\nTests marked as XFAIL do not cause the Test Explorer to mark the global status as '**Failed**'",
+
    "autotools.taskDefinitions.task.bootstrap.markdownDescription": "Task bootstraps the autotools project (ie, creates the 'configure' file, see [bootstrap](https://www.gnu.org/software/automake/faq/autotools-faq.html#What-does-_002e_002fbootstrap-or-_002e_002fautogen_002esh-do_003f))",
    "autotools.taskDefinitions.task.regen.markdownDescription": "Task updates Makefile (ie, runs the 'AC_OUTPUT'/config.status, see [Autoconf output](https://www.gnu.org/software/autoconf/manual/autoconf-2.69/html_node/Output.html))",
    "autotools.taskDefinitions.task.build.description": "Task builds a make target (program, library, etc)",
@@ -91,6 +102,7 @@
    "autotools.taskDefinitions.task.check.log.markdownDescription": "If given, will add a TEST_SUITE_LOG=... variable to make to output the check run to the specified file.\n\nAlso see [GNU automake parallel test suite](https://www.gnu.org/software/automake/manual/html_node/Parallel-Test-Harness.html)",
    "autotools.taskDefinitions.task.check.builddir.description": "Directory where make will be run. Should be a relative dir from the workspace root, and will be prefixed with the configuration directory for out-of-tree builds, then used as the make cwd. Eg, a builddir of 'src' and a configuration of '/tmp/myapp/Debug' and a goal of 'prog' will run 'make -C /tmp/myapp/Debug/src prog'",
    "autotools.taskDefinitions.target.builddir.description": "Directory where make will be run. Should be a relative dir from the workspace root, and will be prefixed with the configuration directory for out-of-tree builds, then used as the make cwd. Eg, a builddir of 'src' and a configuration of '/tmp/myapp/Debug' and a goal of 'prog' will run 'make -C /tmp/myapp/Debug/src prog'",
+
    "autotools.taskDefinitions.target.goal.description": "Name of the goal as defined in the Makefile (eg, all, check, myprogram.exe, mylib.a, etc)",
    "autotools.taskDefinitions.target.description": "Definition of the target to be built",
    "autotools.taskDefinitions.test.builddir.description": "Directory where the test or suite will be run",
