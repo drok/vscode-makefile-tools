@@ -23,7 +23,7 @@ import * as make from './make';
 import * as logger from './logger';
 import { env } from 'process';
 import * as ui from './ui';
-import { SpanStatusCode } from '@opentelemetry/api';
+import { Span, SpanStatusCode } from '@opentelemetry/api';
 nls.config({ messageFormat: nls.MessageFormat.bundle, bundleFormat: nls.BundleFormat.standalone })();
 const localize: nls.LocalizeFunc = nls.loadMessageBundle();
 
@@ -52,7 +52,7 @@ export class AutoToolsBuildTaskProvider implements MyTaskProvider {
 		return this.myPromise;
 	}
 
-    changeConfiguration(c: configuration.MakefileConfiguration, disposables: vscode.Disposable[]) {
+    changeConfiguration(c: configuration.MakefileConfiguration, disposables: vscode.Disposable[]) : void {
         this.myPromise = Promise.resolve([])
     }
     public update(disposables: vscode.Disposable[]) {
@@ -139,7 +139,7 @@ export class AutoToolsTestTaskProvider implements MyTaskProvider {
 		return this.myPromise;
 	}
 
-    changeConfiguration(c: configuration.MakefileConfiguration, disposables: vscode.Disposable[]) {
+    changeConfiguration(c: configuration.MakefileConfiguration, disposables: vscode.Disposable[]) : void {
         this.myPromise = Promise.resolve([])
     }
     public update(disposables: vscode.Disposable[]) {
@@ -160,6 +160,7 @@ export class AutoToolsTestTaskProvider implements MyTaskProvider {
                     if (g.goal && g.depends) {
                         let p : string = util.resolvePathToRoot(path.join(c.top_builddir, dir));
                         disposables.push(new util.MyFileWatcher(p, (e, f) => {
+                            let cte = configuration.getCurrentTestEnvironment();
                             if (f.endsWith(".trs"))
                                 extension.trsChange(c, cte, vscode.Uri.file(path.join(p,f)));
                         }));
@@ -208,6 +209,7 @@ export class AutoToolsTestTaskProvider implements MyTaskProvider {
                             this.numUnknown += results[TRS.NONE] + results[TRS.ERROR] + (envs.length - d.trs.results.size);
                             this.numSuspect += results[TRS.ERROR] + results[TRS.XFAIL];
                             this.numTests+=envs.length;
+
                             extension.updateTRSInPanel(cte,undefined,d,dir);
                             // tc.addTest(suite, d, trs);
                         });
@@ -248,14 +250,14 @@ export class AutoToolsCheckTaskProvider implements MyTaskProvider {
 		return this.myPromise;
 	}
 
-    changeConfiguration(c: configuration.MakefileConfiguration, disposables: vscode.Disposable[]) {
+    changeConfiguration(c: configuration.MakefileConfiguration, disposables: vscode.Disposable[]) : void {
         this.myPromise = Promise.resolve([])
     }
     public update(disposables: vscode.Disposable[]) {
         let c = configuration.getCurrentMakefileConfiguration();
         var targets : Task[] = [];
         let e = configuration.getTestEnvironments();
-        var cte = configuration.getCurrentTestEnvironment();
+        let traceLiveTestRuns = configuration.gettraceLiveTestRuns();
         configuration.getAllBuildTargets().forEach((goals, dir) => {
             const kind: CheckTask = {
                 type: this.myType,
@@ -265,7 +267,9 @@ export class AutoToolsCheckTaskProvider implements MyTaskProvider {
             for (let g of goals.values()) {
                 if (g.flags & (Goal.Flags.Test_Suite)) {
                 var newMap : Map<TestEnvironment, vscode.Task> = new Map();
+                var newLiveMap : Map<TestEnvironment, vscode.Task> = new Map();
                 g.task = newMap;
+                g.livetask = newLiveMap;
                 let envs = FilterEnvsByDir(e, dir);
                 let ME_KEEP_ENV = KeepList(envs);
 
@@ -287,9 +291,8 @@ export class AutoToolsCheckTaskProvider implements MyTaskProvider {
                     newTask.presentationOptions = defaultCheckPresentation;
                     newMap.set(env, newTask);
                     targets.push(newTask);
-                });
-                let traceLiveTestRuns = configuration.gettraceLiveTestRuns();
-                g.livetask = new Task(kind, TaskScope.Workspace, 'Update test suite ' + (dir ? ('log in ' + dir) : 'log at the top')  + (' @ ' + cte.name),
+
+                    newTask = new Task(kind, TaskScope.Workspace, 'Update test suite ' + (dir ? ('log in ' + dir) : 'log at the top')  + (' @ ' + env.name),
                     "autotools",
                     new ProcessExecution(
                         traceLiveTestRuns ? extension.dryRunner : configuration.getMakePath(),
@@ -301,11 +304,13 @@ export class AutoToolsCheckTaskProvider implements MyTaskProvider {
                             "test-suite.log",
                             `ME_KEEP_ENV=${ME_KEEP_ENV}`
                         ]),
-                        cte.updateExecOptions), "$gcc");
-                g.livetask.group = TaskGroup.Test;
-                g.livetask.presentationOptions = defaultCheckPresentation;
-                g.livetask.detail = localize("automake.livecheck", "$(checklist) $(broadcast) Test Suite Update");
-                targets.push(g.livetask);
+                        env.updateExecOptions), "$gcc");
+                    newTask.group = TaskGroup.Test;
+                    newTask.presentationOptions = defaultCheckPresentation;
+                    newTask.detail = localize("automake.livecheck", "$(checklist) $(broadcast) Test Suite Update");
+                    newLiveMap.set(env, newTask);
+                    targets.push(newTask);
+                });
 
             }}});
         this.checkAllTask = new Task({
@@ -436,7 +441,7 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
             checkFileExistsSync(resolvePathToRoot(path.join(c.top_builddir, "config.status")));
     }
 
-    changeConfiguration(c: configuration.MakefileConfiguration, disposables: vscode.Disposable[])
+    changeConfiguration(c: configuration.MakefileConfiguration, disposables: vscode.Disposable[]) : void
     {
         let b = this.bootstrap_cmd();
         if (b) {
@@ -445,7 +450,7 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
                 action: 'bootstrap'
             };
             this.bootstrapTask = new Task(kind, TaskScope.Workspace,
-                localize("autotools.bootstrap.task", "Bootstrap autotools"),
+                localize("autotools.bootstrap.task", "Bootstrap {0}", extension.getProjectName()),
                 "Autotools task",
                 new ProcessExecution(b[0], b.slice(1)));
             this.bootstrapTask.group = TaskGroup.Build;
@@ -479,19 +484,24 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
                 ]);
         }
         else {
-            telemetry.setSpanStatus(SpanStatusCode.ERROR, "no-bootstrap-task");
+            telemetry.setSpanStatus(extension.journey, SpanStatusCode.ERROR, "no-bootstrap-task");
             this.myPromise = Promise.reject("Runtime error - no bootstrap task")
         }
     }
     update(disposables: vscode.Disposable[]): void {
     }
-    public async bootstrap(): Promise<void> {
+    public async bootstrap(): Promise<vscode.TaskExecution | undefined> {
         if (this.bootstrapTask) {
             await this.waitToTouchMakefiles();
-            vscode.tasks.executeTask(this.bootstrapTask).then(() => {
+            return await vscode.tasks.executeTask(this.bootstrapTask).then((te: vscode.TaskExecution) => {
                 ui.getUI().setLoading(ui.UIStatus.LOADING);
+                return te;
+            },(e) => {
+                ui.getUI().setLoading(ui.UIStatus.ERR);
+                return undefined;
             });
         }
+        return undefined;
     }
     public async regen(): Promise<void> {
         // Use regenWorking to avoid restarting when already running.
@@ -521,7 +531,7 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
             await vscode.tasks.executeTask(this.helpTask);
         }
     }
-    public async configure(): Promise<boolean> {
+    public async configure(span: Span): Promise<boolean> {
         let c = configuration.getCurrentMakefileConfiguration();
         let success = false;
 
@@ -545,7 +555,10 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
             await this.waitToTouchMakefiles();
             vscode.tasks.executeTask(task)
                 .then((e) => {
+                    extension.running.set(e, span);
                     !e.task.execution && this.autotoolsDoneNoResult();
+            }, (err) => {
+                telemetry.setSpanStatus(span, SpanStatusCode.ERROR, err);
             });
 
             success = await new Promise<boolean>(resolve => {

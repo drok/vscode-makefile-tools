@@ -27,6 +27,7 @@ import * as fs from 'fs';
 
 import * as nls from 'vscode-nls';
 import { assert, markTimeline } from 'console';
+import { Span } from '@opentelemetry/api';
 nls.config({ messageFormat: nls.MessageFormat.bundle, bundleFormat: nls.BundleFormat.standalone })();
 const localize: nls.LocalizeFunc = nls.loadMessageBundle();
 
@@ -37,6 +38,7 @@ interface RunDef {
     live: boolean;
     env: configuration.TestEnvironment;
     stats : number[];// { P: number; F: number; XF: number; XP: number; E: number; S: number;}
+    span: Span;
 }
 
 const UpdateRe = /^Makefile:\d+: update target '(.+)' due to: (.+)$/;
@@ -112,13 +114,15 @@ export class MyTestController {
     if (this.busyNonLiveTest)
         for (const d of goal.depends!) {
             let bd : BuildTarget = new BuildTarget(dir, d.goal!);
-            let old = goal.trs;
+            let old = d.trs;
             d.trs = readTRS(bd, c);
             this.updateGoalTRS(this.activeRun!.run, d.test!, d.trs?.global, dir);
             if (updatePanel) {
                 extension.updateTRSInPanel(this.activeRun!.env, old, d, dir);
             }
         }
+    // else
+        //this.activeRun?.run.passed(this.activeGoal!.test!); // FIXME: need actual pass / fail  for the suite
 
     this.isBusy = false;
     this.testCompletedEvent.fire();
@@ -156,7 +160,7 @@ export class MyTestController {
     if (!traits.overrides_TESTS_ENVIRONMENT) {
         let envs = configuration.getTestEnvironments();
         let num_applicable_envs = envs.filter((env) => !env.dirs || env.dirs.includes(dir)).length;
-        if (num_applicable_envs)
+        if (num_applicable_envs > 1)
             goal.test!.description = localize("autotools.test.desc", "{0}/{1} environments tested", goal.trs?.results.size ?? 0, num_applicable_envs);
     }
   }
@@ -401,8 +405,8 @@ export class MyTestController {
         env: configuration.TestEnvironment
     ) {
         let name: string; // FIXME: The name is not shown in vscode 1.77.3 - how about 1.85?
-        telemetry.startSpan('run');
-        telemetry.setAttributes({l: live, n: request.include?.length });
+        let span = telemetry.startSpan(live ? 'liveRun' : 'run', extension.journey);
+        telemetry.setAttributes(span, {l: live, n: request.include?.length });
         if (live) {
             if (request.include?.length == 1) name = `Live check - ${request.include[0].label}`;
             else name = 'Live check @ ${env.name}';
@@ -415,7 +419,7 @@ export class MyTestController {
 
         // Loop through all included tests, or all known tests, and add them to our queue
         let rundef : RunDef = {run: run, cancel: token, tmp_label: request.profile?.label, env: env, live: live,
-            stats: emptyRunStats()};
+            stats: emptyRunStats(), span: span};
         if (request.include) {
             let runnable_in_env : Goal[] = [];
             for (const t of request.include) {
@@ -459,7 +463,7 @@ export class MyTestController {
                     try {
                         await extension.debugGoal(goal, test.parent?.id || "", env);
                     } catch (e) {
-                        console.error("Failed to start debugger", e);
+                        console.error("ERROR: Failed to start debugger", e);
                     }
                 }
             }
@@ -481,6 +485,7 @@ export class MyTestController {
         }
     }
     private isBusy : boolean = false;
+    public get busy() : boolean { return this.isBusy; }
     public get busyNonLiveTest() : boolean { return this.isBusy && !this.activeRun?.live; }
     async advanceQueue() : Promise<void> {
         if (this.activeRun) {
@@ -510,8 +515,8 @@ export class MyTestController {
     }
     endRun() : void {
         this.activeRun!.run.end();
-        telemetry.setAttributes({s: this.activeRun!.stats});
-        telemetry.endSpan();
+        telemetry.setAttributes(this.activeRun!.span, {s: this.activeRun!.stats});
+        this.activeRun!.span.end();
     }
     startNextRun() : void {
         let next = this.runQueue.entries().next();
@@ -526,7 +531,7 @@ export class MyTestController {
 
                 if (this.activeGoal?.task instanceof Map) {
                     this.runningTask = this.activeRun.live ?
-                        this.activeGoal.livetask :
+                        this.activeGoal.livetask?.get(this.activeRun.env) :
                         this.activeGoal.task.get(this.activeRun.env)
                     assert(this.runningTask, "There must be a task for the env");
                     if (this.runningTask && this.activeGoal.test) {
@@ -545,7 +550,7 @@ export class MyTestController {
                         }
                     } else { // `make check` from the top
                         if (this.activeGoal.test) {
-                            telemetry.setSpanStatus(SpanStatusCode.ERROR, "no task for test");
+                            telemetry.setSpanStatus(this.activeRun.span, SpanStatusCode.ERROR, "no task for test");
                             this.activeRun.run.errored(this.activeGoal.test,
                                 new vscode.TestMessage(new vscode.MarkdownString(`${Extension.whoami} BUG: - _no task defined for test_`)));
                         }
@@ -570,6 +575,15 @@ export class MyTestController {
             return true;
         }
         return false;
+    }
+    debugSessions : WeakMap<vscode.DebugSession, Span> = new WeakMap<vscode.DebugSession, Span>();
+    debugStarted(s: vscode.DebugSession, name: string) : void {
+        let span = telemetry.startSpan(name, extension.journey);
+        this.debugSessions.set(s, span);
+    }
+    debugEnded(s: vscode.DebugSession) : void {
+        this.debugSessions.get(s)?.end();
+        this.debugSessions.delete(s);
     }
 }
 

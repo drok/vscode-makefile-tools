@@ -30,6 +30,7 @@
 | [Lbrycrd](https://github.com/lbryio/lbrycrd) | autotools | Jan 24 | |
 | [libass](https://github.com/libass/libass) | autotools | Jan 24 | [ms #96](https://github.com/microsoft/vscode-makefile-tools/issues/96) |
 | [libav](https://github.com/libav/libav) | make | Jan 24 | [ms #97](https://github.com/microsoft/vscode-makefile-tools/issues/97) |
+| [libevent](https://github.com/libevent/libevent) | autotools | Feb 24 | |
 | [libsvm](https://github.com/cjlin1/libsvm) | make 4.4k Jan 24 | | | | Yes |
 | [libtommath](https://github.com/libtom/libtommath) | make 622 Jan 24 | | |  | Yes |
 | [libtorrent](https://github.com/rakshasa/libtorrent) | autotools | Jan 24 | |
@@ -47,6 +48,7 @@
 | [openh264](https://github.com/cisco/openh264) | meson | Jan 24 | |
 | [PCapPlusPlus](https://github.com/seladb/PcapPlusPlus) | CMake | Jan 24 |
 | [PHP](https://github.com/php/php-src) | autoconf | Jan 24 | [#config-fail](v=8.4.0-dev#config-fail) | |
+| [Pincaster](https://github.com/jedisct1/Pincaster) | autotools | Feb 24 | [#bootstrap-fail](v=#bootstrap-fail) [#config-fail](v=0.7#config-fail) | ok, see KB |
 | [ruby](https://github.com/ruby/ruby) | autoconf | Jan 24 | [#dry-run-warnings](v=-version-#dry-run-warnings) | |
 | [PostgreSQL](https://github.com/postgres/postgres) | make,meson | Jan 24 | |
 | [qemu](https://github.com/qemu/qemu)[^non] | | ./configure | | | Yes |
