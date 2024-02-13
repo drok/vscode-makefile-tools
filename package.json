@@ -917,6 +917,11 @@
                     "command": "autotools.closeIrrelevant",
                     "when": "autotools:filterByTarget",
                     "group": "1_close@10"
+                },
+                {
+                    "command": "autotools.rdepends",
+                    "when": "autotools:hasTargets == 1",
+                    "group": "2_files@10"
                 }
             ],
             "explorer/context" : [
