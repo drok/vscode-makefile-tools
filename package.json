@@ -45,6 +45,14 @@
     "contributes": {
         "commands": [
             {
+                "command": "autotools.rdepends",
+                "title": "%autotools.rdepends.title%"
+            },
+            {
+                "command": "autotools.closeIrrelevant",
+                "title": "%autotools.closeIrrelevant.title%"
+            },
+            {
                 "command": "autotools.addAutotools",
                 "title": "%autotools.command.addAutotools.title%"
             },
@@ -179,6 +187,11 @@
                 "icon": "$(arrow-swap)"
             },
             {
+                "command": "autotools.outline.setTestEnvironment",
+                "title": "%autotools.command.setTestEnvironment.title%",
+                "icon": "$(arrow-swap)"
+            },
+            {
                 "command": "autotools.outline.recheck",
                 "title": "%autotools.command.outline.recheck.title%",
                 "icon": "$(refresh)"
@@ -246,25 +259,28 @@
                     "scope": "resource"
                 },
                 "autotools.autoBootstrap": {
+                    "order": 2,
                     "type": "boolean",
                     "markdownDescription": "%autotools.configuration.autoBootstrap.markdownDescription%",
                     "default": true,
                     "scope": "resource"
                 },
                 "autotools.traceLiveTestRuns": {
+                    "order": 3,
                     "scope": "resource",
                     "type": "boolean",
                     "markdownDescription": "%autotools.configuration.traceLiveTestRuns.markdownDescription%",
                     "default": false
                 },
                 "autotools.promptClean": {
+                    "order": 2,
                     "scope": "resource",
                     "type": "boolean",
                     "markdownDescription": "%autotools.configuration.promptClean.description%",
                     "default": true
                 },
                 "autotools.telemetry": {
-                    "order": 2,
+                    "order": 4,
                     "scope": "resource",
                     "type": "boolean",
                     "default": true,
@@ -464,22 +480,11 @@
             "properties": {
                 "autotools.TESTS_ENVIRONMENT" : {
                     "order": 1,
-                    "type": "array",
-                    "default": [],
+                    "type": "object",
+                    "default": {},
                     "title": "%autotools.configuration.tests_environment.TESTS_ENVIRONMENT.global.title%",
                     "markdownDescription": "%autotools.configuration.tests_environment.TESTS_ENVIRONMENT.global.markdownDescription%",
-                    "items": {
-                        "type": "object",
-                        "default": {},
-                        "properties": {
-                            "name": {
-                                "type": "string"
-                            },
-                            "value": {
-                                "type": "string"
-                            }
-                        }
-                    }
+                    "additionalProperties": { "type": "string" }
                 },
                 "autotools.XFAIL_TESTS" : {
                     "order": 2,
@@ -514,21 +519,10 @@
                             "minItems": 1
                           },
                           "TESTS_ENVIRONMENT" : {
-                            "type": "array",
-                            "default": [],
+                            "type": "object",
+                            "default": {},
                             "title": "%autotools.configuration.tests_environment.TESTS_ENVIRONMENT.sub.title%",
-                            "items": {
-                                "type": "object",
-                                "default": {},
-                                "properties": {
-                                    "name": {
-                                        "type": "string"
-                                    },
-                                    "value": {
-                                        "type": "string"
-                                    }
-                                }
-                            }
+                            "additionalProperties": { "type": "string" }
                           },
                           "XFAIL_TESTS" : {
                             "type": "array",
@@ -543,9 +537,10 @@
                         "title": "%autotools.configuration.tests_environment.title%",
                         "default": {
                             "name": "modern",
-                            "TESTS_ENVIRONMENT": [
-                                { "name": "VAR1", "value": "modern-1" }, {"name": "VAR2", "value": "mod2"}
-                            ]
+                            "TESTS_ENVIRONMENT": {
+                                "VAR1": "modern-1",
+                                "VAR2": "mod2"
+                            }
                         }
                     }
                 }
@@ -628,26 +623,6 @@
                 "contents": "%autotools.welcome.debug.markdownDescription%",
                 "when": "autotools:haveManifest == 1 && autotools:haveConfigurations > 1"
             }
-        ],
-        "languages": [
-            {
-            "filenames": ["Makefile.am", "Makefile.in"],
-            "aliases": ["am"],
-            "icon": {
-                "light": "tools",
-                "dark": "tools"
-            },
-            "id": "automake"
-        },
-        {
-            "filenames": ["configure.ac", "configure.in"],
-            "aliases": ["ac"],
-            "icon": {
-                "light": "tools",
-                "dark": "tools"
-            },
-            "id": "autoconf"
-        }
         ],
         "debuggers": [
             {
@@ -739,8 +714,7 @@
                 {
                     "id": "autotools.tests",
                     "icon": "res/viewcontainer.svg",
-                    "when": "autotools:isAutotoolsProject",
-
+                    "when": "autotools:haveManifest == 1",
                     "name": "%autotools.configuration.views.testsuites.description%"
                 }
             ]
@@ -864,8 +838,16 @@
         "menus": {
             "commandPalette": [
                 {
+                    "command": "autotools.rdepends",
+                    "when": "never"
+                },
+                {
+                    "command": "autotools.closeIrrelevant",
+                    "when": "never"
+                },
+                {
                     "command": "autotools.addAutotools",
-                    "when": "autotools:isAutotoolsProject > 1"
+                    "when": "autotools:haveManifest > 1"
                 },
                 {
                     "command": "autotools.check",
@@ -934,6 +916,10 @@
                 {
                     "command": "autotools.outline.setBuildConfiguration",
                     "when": "never"
+                },
+                {
+                    "command": "autotools.outline.setTestEnvironment",
+                    "when": "never"
                 }
             ],
             "testing/item/context": [
@@ -944,6 +930,25 @@
                 {
                     "command": "autotools.command.testgrid.top",
                     "group": "navigation@4"
+                }
+            ],
+            "editor/title/context": [
+                {
+                    "command": "autotools.closeIrrelevant",
+                    "when": "autotools:filterByTarget",
+                    "group": "1_close@10"
+                },
+                {
+                    "command": "autotools.rdepends",
+                    "when": "autotools:hasTargets == 1",
+                    "group": "2_files@10"
+                }
+            ],
+            "explorer/context" : [
+                {
+                    "command": "autotools.rdepends",
+                    "when": "autotools:hasTargets == 1",
+                    "group": "navigation@30"
                 }
             ],
             "view/title": [
@@ -981,6 +986,16 @@
                     "command": "autotools.outline.recheck",
                     "when": "view == autotools.outline",
                     "group": "navigation@2"
+                },
+                {
+                    "command": "autotools.outline.setBuildConfiguration",
+                    "when": "view == autotools.outline",
+                    "group": "navigation@1"
+                },
+                {
+                    "command": "autotools.outline.setTestEnvironment",
+                    "when": "view == autotools.tests",
+                    "group": "navigation@1"
                 }
             ],
             "view/item/context": [
@@ -1043,11 +1058,6 @@
                     "command": "autotools.outline.recheck",
                     "when": "view == autotools.outline && viewItem =~ /nodeType=configuration/",
                     "group": "1_stateActions@1"
-                },
-                {
-                    "command": "autotools.outline.setBuildConfiguration",
-                    "when": "view == autotools.outline && viewItem =~ /nodeType=configuration/",
-                    "group": "inline@10"
                 }
             ]
         }

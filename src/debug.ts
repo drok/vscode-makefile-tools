@@ -57,6 +57,7 @@ class MyConfiguration implements vscode.DebugConfiguration {
     environment: { name: string, value: string }[];
     args: string[];
     stopAtEntry: boolean;
+    goal: Goal | undefined;
     // preLaunchTask: string;
     cwd: string;
     setupCommands: { description: string, text: string, ignoreFailures: boolean }[];
@@ -66,7 +67,7 @@ class MyConfiguration implements vscode.DebugConfiguration {
  * the builddir is pre-populated
  */
 export class DebugNow implements vscode.DebugConfiguration {
-    constructor(c: MakefileConfiguration, built: BuildTarget, buildit: boolean, env?: configuration.TestEnvironment) {
+    constructor(c: MakefileConfiguration, goal: Goal | undefined, built: BuildTarget, buildit: boolean, public env?: configuration.TestEnvironment) {
         this.$comment = [
             "Debug a hardcoded target in any build configuration; customize environment and args as needed",
             "The 'cwd' is set automatically to demonstrate how",
@@ -100,7 +101,9 @@ export class DebugNow implements vscode.DebugConfiguration {
         //    (built.builddir ? (' in ' + built.builddir) : ' at the top') : undefined;
         this.cwd = resolvePathToRoot(path.join(c.top_builddir, built.builddir));
         this.setupCommands = defaultSetupCommands;
+        this.testUri = goal?.test?.uri?.with({scheme: "test"}) ?? vscode.Uri.from({scheme: "debug", path: this.cwd});
     }
+    testUri: vscode.Uri | undefined;
     $comment: string[];
     name: string;
     type: string;
@@ -164,8 +167,9 @@ class MyDebugProvider implements DebugConfigurationProvider {
   resolveDebugConfiguration(folder: WorkspaceFolder | undefined, config: DebugConfiguration): ProviderResult<DebugConfiguration> {
     // If needed, modify the debug configuration before launching the debug session
     if (config.type === undefined) {
-        return getCurrentTarget()
-            .then(goal => new DebugNow(getCurrentMakefileConfiguration(), goal, true));
+        let conf = getCurrentTarget()
+            .then(goal => new DebugNow(getCurrentMakefileConfiguration(), undefined, goal, true, configuration.getCurrentTestEnvironment()));
+        return conf
         //return null;
         // return new MyConfiguration("dir-name", "test-name");
     }
@@ -178,7 +182,8 @@ class MyDebugProvider implements DebugConfigurationProvider {
   resolveDebugConfigurationWithSubstitutedVariables?(folder: WorkspaceFolder | undefined,
         debugConfiguration: DebugConfiguration, token?: vscode.CancellationToken): ProviderResult<DebugConfiguration> {
     // return this.resolveDebugConfiguration(folder, debugConfiguration);
-    //debugConfiguration.type = "cppdbg";
+    if (debugConfiguration.type == "autotools")
+        debugConfiguration.type = "cppdbg";
     return debugConfiguration;
   }
 

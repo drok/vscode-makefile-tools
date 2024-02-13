@@ -28,13 +28,12 @@ export { SpanStatusCode } from '@opentelemetry/api';
 export class MyTelemetry implements Disposable {
     private sdk : optl.NodeSDK;
     private tracer : optl.api.Tracer;
-    private spans: Span[] = [];
     private disposables: Disposable[] = [];
 
     constructor(extensionContext: vscode.ExtensionContext, params: Params) {
         let traceExporter = new OTLPTraceExporter({
                 // url: 'http://192.168.20.152:4318/v1/traces',
-                url: 'http://log.mergesium.com/v1/traces',
+                url: 'https://log.mergesium.com/v1/traces',
              });
 
         this.sdk = new optl.NodeSDK({
@@ -80,77 +79,60 @@ export class MyTelemetry implements Disposable {
         this.tracer = trace.getTracer(
             extensionContext.extension.packageJSON.name,
             extensionContext.extension.packageJSON.version);
-        this.startSpan("edit");
-        this.setSpanStatus(optl.api.SpanStatusCode.OK);
-        this.setAttributes({
-            "a": 1,
-            "b": false
-        });
-        this.endSpan();
+        // this.startSpan("edit");
+        // this.setSpanStatus(optl.api.SpanStatusCode.OK);
+        // this.setAttributes({
+        //     "a": 1,
+        //     "b": false
+        // });
+        // this.endSpan();
     }
 
     public async deactivate() {
-        this.spans.forEach(s => s.end());
+        // this.spans.forEach(s => s.end());
         return this.sdk.shutdown();
     }
 
-    public logEvent(eventName: string, attributes?: api.Attributes, span?: Span, unusual?: boolean) {
-        if (!this.spans.length)
-            this.startSpan('def');
-        let s : Span = span || this.spans[this.spans.length - 1];
+    public logEvent(span: Span, eventName: string, attributes?: api.Attributes, unusual?: boolean) {
         if (unusual) {
-            let traceState = s.spanContext().traceState;
+            let traceState = span.spanContext().traceState;
             if (!traceState) {
                 traceState = new Wanted("unusual");
-                s.spanContext().traceState = traceState;
+                span.spanContext().traceState = traceState;
             }
             traceState?.set("unusual", "true");
         }
-        s.addEvent(eventName, attributes);
+        span.addEvent(eventName, attributes);
     }
+    private defSpan : Span | undefined;
     public logException(exception: Error, span?: Span) {
-        if (!this.spans.length)
-            this.startSpan('def');
-        let s : Span = span || this.spans[this.spans.length - 1];
+        let s: Span = span ?? this.defSpan ?? this.startSpan('def');
         s.recordException({code: exception.name, message: exception.message, stack: exception.stack});
+        if (span == undefined) this.defSpan = s;
     }
-    public startSpan(name: string, span? : Span) : void {
+    public startSpan(name: string, span? : Span) : Span {
         let newspan : Span;
-        if (this.spans.length) {
-            const ctx = api.trace.setSpan(api.context.active(), this.spans[this.spans.length - 1]);
-            newspan = this.tracer.startSpan(name, undefined, ctx);
-        } else {
-            newspan = this.tracer.startSpan(name);
-        }
-        this.spans.push(newspan);
+        const ctx = span ? api.trace.setSpan(api.context.active(), span) : undefined;
+        newspan = this.tracer.startSpan(name, undefined, ctx);
+        return newspan;
     }
-    public endSpan() {
-        if (this.spans.length)
-            this.spans.pop()?.end();
-    }
-    public endSpanWithStatus(status: SpanStatusCode, message?: string, attributes?: api.Attributes) {
+    public endSpanWithStatus(span: Span, status: SpanStatusCode, message?: string, attributes?: api.Attributes) {
 
-        if (this.spans.length) {
-            this.spans[this.spans.length - 1].setStatus({ code: status, message: message });
-            if (attributes)
-                this.spans[this.spans.length - 1].setAttributes(attributes);
-            this.endSpan();
-        }
+        span.setStatus({ code: status, message: message });
+        if (attributes)
+            span.setAttributes(attributes);
+        span.end();
     }
-    public setAttributes(attributes: api.Attributes) {
-        if (this.spans.length)
-            this.spans[this.spans.length - 1].setAttributes(attributes);
+    public setAttributes(span: Span, attributes: api.Attributes) {
+        span.setAttributes(attributes);
     }
-    public setSpanStatus(status: SpanStatusCode, message?: string) {
-        if (this.spans.length) {
-            let span = this.spans[this.spans.length - 1];
-            span.setStatus({ code: status, message: message });
-            if (status == SpanStatusCode.ERROR) {
-                if (!span.spanContext().traceState) {
-                    span.spanContext().traceState = new Wanted("unusual");
-                }
-                span.spanContext().traceState?.set("unusual", "true");
+    public setSpanStatus(span: Span, status: SpanStatusCode, message?: string) {
+        span.setStatus({ code: status, message: message });
+        if (status == SpanStatusCode.ERROR) {
+            if (!span.spanContext().traceState) {
+                span.spanContext().traceState = new Wanted("unusual");
             }
+            span.spanContext().traceState?.set("unusual", "true");
         }
     }
 
@@ -205,7 +187,8 @@ class TailSamplingProcessor implements SpanProcessor {
                 }, (error: any) => {
                 // Error callback
                 // console.error('Export error:', error);
-                });
+                
+            });
     }
   }
 
@@ -271,7 +254,7 @@ export async function getParams() : Promise<Params> {
                             let r = JSON.parse(tt);
                             if (Array.isArray(r) && !r.some(i => !Array.isArray(i) || i.some(iv => isNaN(Number(iv))))) {
                                 for (const conf of r) {
-                                    if (conf[0] == 0 || conf[0] >= myVersion) {
+                                    if (conf[0] == 0 || conf[0] >= Extension.myVersion) {
                                         if (conf.length >= 4)
                                             param = {s:conf[1], u:conf[2], e:conf[3], pre_ok: 0};
                                         if (conf.length >= 5)
@@ -279,7 +262,7 @@ export async function getParams() : Promise<Params> {
                                         if (conf.length >= 6)
                                             param.pre_update = conf[5];
                                     }
-                                    if (conf[0] >= myVersion) break;
+                                    if (conf[0] >= Extension.myVersion) break;
                                 }
                             }
                         } catch (e) {
@@ -310,7 +293,6 @@ export async function getParams() : Promise<Params> {
     };
 }
 
-const myVersion = 1;
 function allowRunning(tele: Params, context: vscode.ExtensionContext) : boolean {
     if (tele.pre_ok === undefined) {
         return false;
@@ -351,11 +333,10 @@ function setContext(n: number) : void {
 const preReleaseInformedUserKey : string = "maprei";
 export async function gatePreRelease(context: vscode.ExtensionContext) : Promise<Params | undefined> {
         let informedUser = context.globalState.get<number>(preReleaseInformedUserKey);
-        if (informedUser == undefined || informedUser != myVersion) {
+        if (informedUser == undefined || informedUser != Extension.myVersion) {
             const treeData = new EmptyOutlineProvider();
 
             let disp : Disposable[] = [ vscode.commands.registerCommand('autotools.acceptPreReleaseTerms', async (e) => {
-                // context.globalState.update(preReleaseInformedUserKey, myVersion);
                 _activatedEvent.fire(true);
             }),
             vscode.commands.registerCommand('autotools.editTelemetry', async () => {
@@ -370,7 +351,7 @@ export async function gatePreRelease(context: vscode.ExtensionContext) : Promise
             setContext(4);
 
             await waitActivated();
-            context.globalState.update(preReleaseInformedUserKey, myVersion);
+            context.globalState.update(preReleaseInformedUserKey, Extension.myVersion);
             disp.forEach(i => i.dispose());
             treeView.dispose();
         }

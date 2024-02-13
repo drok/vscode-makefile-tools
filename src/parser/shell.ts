@@ -199,7 +199,7 @@ export class Executing implements Parser {
         }
         let entering = EnteringRE.exec(line);
         if (entering)
-            return [ParserDisp.Enter, new Make(entering[1], this.make.root)];
+            return this.make.enter(entering[1]);
         let copyright = CopyrightRE.test(line);
         if (copyright) {
             this.make.finish();
@@ -218,8 +218,8 @@ export class Executing implements Parser {
                 this.makes.push(makes);
         } catch (e) {
             if (failureReported < 6) {
-                telemetry.logEvent("ParseFailed", {proj: extension.pkginfo?.name});
-                telemetry.setSpanStatus(SpanStatusCode.ERROR, "ParseFailed");
+                telemetry.logEvent(this.make.span, "tpaFail", {proj: extension.pkginfo?.name});
+                telemetry.setSpanStatus(this.make.span, SpanStatusCode.ERROR, "tpaFAIL");
                 logger.message(`ERROR: Failed to parse recipe for '${this.make.file}'`, "Normal");
                 if (!failureReported) logger.message('KB: ' + extension.kbUrlStatic.toString(true) + '#' + util.slugify(`config-parse-fail-${this.make.file}`), "Normal");
                 this.makes.push(new Making([failToParseTool], this));

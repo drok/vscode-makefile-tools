@@ -15,10 +15,12 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import {Parser, ParserDisp, EmptyLine } from '../parser';
 import { Executing } from './shell';
-import { Node } from '../tree';
+import { Node, Scheme } from '../tree';
 
 import * as nls from 'vscode-nls';
 import { Extension, extension, telemetry } from '../extension';
+import { Span } from '@opentelemetry/api';
+import { log } from 'console';
 nls.config({ messageFormat: nls.MessageFormat.bundle, bundleFormat: nls.BundleFormat.standalone })();
 const localize: nls.LocalizeFunc = nls.loadMessageBundle();
 
@@ -46,9 +48,9 @@ const RecursingRE = /^Making (.*) in (.*)$/;
  * and Make to parse submake output.
  */
 export class Make implements Parser {
-    constructor(dir: string, public root: string)
+    constructor(public dir: string, public span: Span, public root: string)
     {
-        this.dir = path.relative(root, dir);
+        // this.dir = path.relative(root, dir);
         this.section = MakeSection.Starting;
         if (root) {
             let foundGoals = configuration.getAllBuildTargets().get(this.dir);
@@ -112,7 +114,9 @@ export class Make implements Parser {
                 let entering = EnteringRE.exec(line);
                 if (entering) { // This should only happen once at the top of the stack
                     // this.section = MakeSection.Making;
-                    return [ParserDisp.Enter, new Make(entering[1], this.root)];
+                    // This is not a hack: make in a deeper dir could call a shallow dir.
+                    // That should be a new make, because it's at a different depth/dependency path
+                    return this.enter(entering[1]);
                 }
                 let copyright = CopyrightRE.test(line);
                 if (copyright) {
@@ -138,7 +142,7 @@ export class Make implements Parser {
             // only save data for the all-recursive target
             if (!targets.has(this.dir) || true) {
                 targets.set(this.dir, sub.make.goals);
-                this.goals = sub.make.goals;
+                // this.goals = sub.make.goals;
                 this.test_suite = sub.test_suite;
                 sub.variables.some((v) => {
                     if (v.variable)
@@ -159,7 +163,7 @@ export class Make implements Parser {
                                 if (v.variable.value != '$(SHELL) $(top_srcdir)/test-driver' && v.variable.value != '$(SHELL) $(top_srcdir)/build-aux/test-driver') {
                                     /* Customized test driver. */
                                     logger.message(`WARN: ${this.dir} uses ${v.variable.name}=${v.variable.value}; ${Extension.whoami} will override it.`, 'Normal');
-                                    telemetry.logEvent("warn-log-driver", {n: v.variable.name, v: v.variable.value}, undefined, true);
+                                    telemetry.logEvent(this.span, "warn-log-driver", {n: v.variable.name, v: v.variable.value}, true);
                                 }
                                 if (v.variable.name != "LOG_DRIVER") // This is overriden by default
                                     traits.log_drivers.add(v.variable.name);
@@ -191,16 +195,11 @@ export class Make implements Parser {
             return this;
         } else if (sub instanceof Make) {
             if (this == sub)
-                throw new Error(`Unexpected push in Make ${sub}`);
+                return this;
+//                throw new Error(`Unexpected push in Make ${sub}`);
             if (sub.dir == this.dir) {
-                // Submakes in the same directory are removed, but parsed info merged into
-                // this make.
-                // config_header not merged because it's an automake Variable, should be
-                // the same as automake does not do conditional headers.
-
-                this.test_suite = this.test_suite || sub.test_suite;
-
-                this.mergeSubmake(sub);
+                logger.message(`ERROR: Unexpected make @ ${sub.dir} is a dependency of two targets: ${this.file} and ${sub.file} called from different hierarchical depths`);
+                telemetry.logException(new Error(`make-multi-depth ${this.file} and ${sub.file}`), this.span);
             } else
                 this.submake.set(sub.dir, sub);
             return this;
@@ -215,16 +214,9 @@ export class Make implements Parser {
         } else if (sub instanceof EmptyLine) { return undefined; }
         throw new Error(`Unexpected push in Make ${sub}`);
     }
-    // recursively merge a submake into my submake
-    mergeSubmake(other: Make) {
-        other.submake.forEach((submake,dir) => {
-            var mysub = this.submake.get(dir);
-            if (mysub) {
-                mysub.mergeSubmake(submake);
-            } else
-                this.submake.set(dir, submake)
-        })
-        this.test_suite = other.test_suite;
+    enter(dir: string) : [ParserDisp, Parser] {
+        let reldir = path.relative(this.root, dir);
+        return [ParserDisp.Enter, reldir == this.dir ? this : new Make(reldir, this.span, this.root)];
     }
     public getFile(): string | undefined {
         return this.file;
@@ -242,7 +234,6 @@ export class Make implements Parser {
         }
         this.file = rea[4] ?? rea[5];
     }
-    dir: string = 'first';
     section: MakeSection;
     file: string | undefined;
     goals: Map<string,Goal>;
@@ -291,18 +282,6 @@ export class Database implements Parser {
             if (!sub.goal) { /* End-of-goals, at # files hash-table stats */
                 return undefined;
             } else {
-                /* Don't store automake auxiliary targets, they are thus
-                 * unavailable for target selection
-                 * Also skip noise targets because they are marginally useful, but
-                 * nothing is implemented for them.
-                 * Also skip not-targets (these are source files, not targets)
-                 * Also skip targets without any flags
-                 */
-                if (sub.flags && !(sub.flags & (Goal.Flags.Automake_auxiliary |
-                        Goal.Flags.Not_a_target |
-                        Goal.Flags.Automake_noise
-                        )))
-                    this.make.goals.set(sub.goal, sub);
 
                 if (sub.flags & Goal.Flags.Test_Suite) {
                     this.test_suite = sub;
@@ -415,7 +394,8 @@ const AutomakeNoiseRe = new RegExp('^(' +
     'mostlyclean|maintainer-clean-generic|mostlyclean-generic|clean-cscope|clean|' +
     'dist.*|uninstall-.*|install-.*|maintainer-.*|distclean-.*|installcheck|check-TESTS|' +
     'ps|html|pdf|clean-.*|info|mostlyclean|dvi|' +
-    '.*\\.o|.*\\.h|' +
+    '(?:.*/)(?:\.|_)dirstamp|' +
+//    '.*\\.o|.*\\.h|' +
     'Makefile.in)$');
 const AutomakeTestLogRe = /^.*\.log$/;
 const GoalRecipeRe = /^recipe to execute \((built-in|from '(.*)', line (\d+))\):/;
@@ -441,6 +421,7 @@ export class Goal extends Node implements Parser {
 
 
         /* Flags gathered from automake (recipe hints like $(LINK) */
+        Dependency : 128,
         Linked_binary: 256,
         Test_Suite: 1024,
         Test_Program: 2048,
@@ -510,18 +491,44 @@ export class Goal extends Node implements Parser {
                     this.flags |= Goal.Flags.Automake_primary;
                 else if (AutomakeNoiseRe.test(goal[1]))
                     this.flags |= Goal.Flags.Automake_noise;
+
                 this.goal = goal[1];
+                /* Record this goal on make's goal list */
+                /* Don't store automake auxiliary targets, they are thus
+                 * unavailable for target selection
+                 * Also skip noise targets because they are marginally useful, but
+                 * nothing is implemented for them.
+                 * Also skip not-targets (these are source files, not targets)
+                 * Also skip targets without any flags
+                 */
+                if (!(this.flags & (Goal.Flags.Automake_auxiliary |
+                    Goal.Flags.Not_a_target |
+                    Goal.Flags.Automake_noise
+                    )))
+                    this.make.goals.set(this.goal, this);
+
                 if (goal[2]) {
                     if (this.goal == "test-suite.log") {
                         this.flags |= Goal.Flags.Test_Suite;
                         this.depends = goal[2].split(' ')
                             .filter(s => s)
-                            .map(s => new Goal(this.make, s, Goal.Flags.Test_Log));
+                            .map(s => this.getGoal(s, Goal.Flags.Test_Log));
                     } else if (AutomakeTestLogRe.test(goal[1])) {
                         this.flags |= Goal.Flags.Test_Log;
                         this.depends = goal[2].split(' ')
-                            .map(s => new Goal(this.make, s, Goal.Flags.Test_Program));
+                            .map(s => this.getGoal(s, Goal.Flags.Test_Program));
+                    } else if (!GNUMakeAuxiliaryRe.test(goal[1]) && !AutomakeAuxRe.test(goal[1]) && !AutomakeNoiseRe.test(goal[1])) {
+                        this.flags |= Goal.Flags.Dependency;
+                        this.depends = goal[2].split(' ')
+                            .filter(s => s && 
+                                !AutomakeNoiseRe.test(s) && 
+                                !AutomakeAuxRe.test(s) &&
+                                    (!path.isAbsolute(s) || // This includes builddir files (relative)
+                                        vscode.workspace.getWorkspaceFolder(vscode.Uri.file(s))))
+                            // MUST filter on workspace|builddir files. This list contains /usr/include files
+                            .map(s => this.getGoal(s, Goal.Flags.Dependency));
                     }
+
                 } else if (!this.flags) {
                     // .test.log: (ie, implicit rules)
                     this.flags |= Goal.Flags.Automake_noise;
@@ -530,6 +537,17 @@ export class Goal extends Node implements Parser {
             }
         }
         throw new Error(`Unexpected Goal line ${line}`);
+    }
+    getGoal(s: string, flags: number = Goal.Flags.None) : Goal {
+        let norms = path.normalize(s);
+        let known = this.make.goals.get(norms);
+        if (!known) {
+            let newGoal = new Goal(this.make, norms, flags);
+            this.make.goals.set(norms, newGoal);
+            return newGoal;
+        }
+        known.flags |= flags;
+        return known;
     }
     push(sub: Parser) {
         return undefined; /* The end of the Recipe is the end of the Goal */
@@ -541,64 +559,94 @@ export class Goal extends Node implements Parser {
         else
             return [];
     }
-    public treeItem : vscode.TreeItem | undefined;
     getTreeItem(): vscode.TreeItem {
         if (!this.goal)
             throw new Error("Unexpected null goal");
-        if (!this.treeItem) {
-            this.treeItem = new vscode.TreeItem(this.goal);
-            this.treeItem.collapsibleState = vscode.TreeItemCollapsibleState.None;
-            this.treeItem.tooltip = this.goal;
-            this.treeItem.contextValue = ["nodeType=task"]
-                .concat((this.flags & Goal.Flags.Linked_binary) ? ['nodeType=build'] : [])
-                .concat((this.flags & Goal.Flags.Test_Log) ? ['nodeType=test'] : [])
-                .concat((this.flags & Goal.Flags.Test_Log) &&
-                    (this.depends && (this.depends[0].flags & Goal.Flags.Linked_binary)) ? ['nodeType=bintest'] : [])
-                .join(',');
-            if (!this.task)
-                return this.treeItem;
+        let item = new vscode.TreeItem(this.goal);
+        item.collapsibleState = vscode.TreeItemCollapsibleState.None;
+        item.tooltip = this.goal;
+        item.contextValue = ["nodeType=task"]
+            .concat((this.flags & Goal.Flags.Linked_binary) ? ['nodeType=build'] : [])
+            .concat((this.flags & Goal.Flags.Test_Log) ? ['nodeType=test'] : [])
+            .concat((this.flags & Goal.Flags.Test_Log) &&
+                (this.depends && (this.depends[0].flags & Goal.Flags.Linked_binary)) ? ['nodeType=bintest'] : [])
+            .join(',');
+        if (!this.task)
+            return item;
 
-            if (this.flags & Goal.Flags.Test_Log) {
-                this.treeItem.contextValue = (this.depends && (this.depends[0].flags & Goal.Flags.Linked_binary)) ?
-                    'nodeType=task,nodeType=test,nodeType=bintest' :
-                    'nodeType=task,nodeType=test';
-                this.treeItem.resourceUri = vscode.Uri.from({
-                    scheme: "test",
-                    authority: _empty,//Extension.whoami,
-                    fragment: _empty,
-                    path: configuration.getBuildEnvPath(),
-                    query:  extension._projectTestSuitesProvider.allTests.length.toString(),
-                });
-                extension._projectTestSuitesProvider.allTests.push(this);
-            } else
-            if (this.flags & Goal.Flags.Test_Suite) {
-                this.treeItem.description = this.make.stats.tests ?
-                    localize("autotools.subnode.suite", "{0} tests", this.make.stats.tests) : undefined;
-                this.treeItem.tooltip =  this.make.dir;
-                // must satisfy the isURI test otherwise it is reallocated and the refernce won't
-                // match in privideFileDecoration.
-                // test is at https://github.com/microsoft/vscode/blob/main/src/vs/base/common/uri.ts#L98
-                this.treeItem.resourceUri = vscode.Uri.from({
-                    scheme: "check",
-                    authority: _empty,//Extension.whoami,
-                    fragment: _empty,
-                    path: '/' + this.make.dir,
-                    query: 'test-suite.log'
-                });
-                this.treeItem.resourceUri = vscode.Uri.parse(this.treeItem.resourceUri.toString(true));
-            } else
-            if (this.flags & Goal.Flags.Linked_binary) {
-                this.treeItem.contextValue = 'nodeType=task,nodeType=build';
-            }
+        if (this.flags & Goal.Flags.Test_Log) {
+            item.contextValue = (this.depends && (this.depends[0].flags & Goal.Flags.Linked_binary)) ?
+                'nodeType=task,nodeType=test,nodeType=bintest' :
+                'nodeType=task,nodeType=test';
+            item.resourceUri = this.getURI();
+            extension._projectTestSuitesProvider.all.set(item.resourceUri.path, this);
+            item.id = item.resourceUri.path;
+            // item.id = this.getFilePath();
+        } else
+        if (this.flags & Goal.Flags.Test_Suite) {
+            item.description = this.make.stats.tests ?
+                localize("autotools.subnode.suite", "{0} tests", this.make.stats.tests) : undefined;
+            item.tooltip =  this.make.dir;
+            // must satisfy the isURI test otherwise it is reallocated and the refernce won't
+            // match in privideFileDecoration.
+            // test is at https://github.com/microsoft/vscode/blob/main/src/vs/base/common/uri.ts#L98
+            item.resourceUri = this.getURI();
+            item.id = item.resourceUri.path;
+        } else
+        if (this.flags & Goal.Flags.Linked_binary) {
+            item.resourceUri = this.getURI();
+            extension._projectOutlineProvider.all.set(item.resourceUri.path, this);
+            item.contextValue = 'nodeType=task,nodeType=build';
+            item.id = item.resourceUri.path;
+            // item.id = this.getFilePath();
         }
-        return this.treeItem;
+        return item;
+    }
+    getURI() : vscode.Uri {
+        if (this.flags & (Goal.Flags.Test_Suite | Goal.Flags.Test_Log))
+            return vscode.Uri.from({
+                scheme: (this.flags & Goal.Flags.Test_Suite) ? Scheme.Check : Scheme.Test,
+                authority: _empty,//Extension.whoami,
+                fragment: _empty,
+                path: this.getURIPath()
+            });
+        else if (this.flags & (Goal.Flags.Linked_binary))
+            return vscode.Uri.from({
+                scheme: Scheme.Bin,
+                authority: _empty,//Extension.whoami,
+                fragment: _empty,
+                path: this.getURIPath()
+            });
+        else
+            return vscode.Uri.from({
+                scheme: "file",
+                authority: _empty,//Extension.whoami,
+                fragment: _empty,
+                path: this.getURIPath()
+            });
+    }
+    getFilePath() : string {
+        return path.isAbsolute(this.goal!) ?
+            this.goal! :
+            // Normalize because goals in the srcdir are refered to as /proj/src/blah/../file.c
+            // when building in src/blah with source ${top_srcdir}/file.c (ie, "../file.c")
+            util.resolvePathToRoot(path.normalize(path.join(configuration.getCurrentMakefileConfiguration().top_builddir, this.make.dir,this.goal!)));
+    }
+    getURIPath() : string {
+        return path.isAbsolute(this.goal!) ?
+            this.goal! :
+            (this.flags & (Goal.Flags.Test_Suite | Goal.Flags.Test_Log)) ?
+            path.join(configuration.getBuildEnvPath(),this.make.dir,this.goal!) :
+            // Normalize because goals in the srcdir are refered to as /proj/src/blah/../file.c
+            // when building in src/blah with source ${top_srcdir}/file.c (ie, "../file.c")
+            util.resolvePathToRoot(path.normalize(path.join(configuration.getCurrentMakefileConfiguration().top_builddir, this.make.dir,this.goal!)));
     }
 
     logfile(): string | undefined {
         return this.test?.id;
     }
 
-    constructor(private make: Make, public goal: string | undefined = undefined,
+    constructor(public make: Make, public goal: string | undefined = undefined,
         public flags: number = Goal.Flags.None) {
         super();
         /* TODO: Implement check-local suite (eg, gnumake)
@@ -607,7 +655,7 @@ export class Goal extends Node implements Parser {
         */
     }
     depends: Goal[] | undefined = undefined;
-    livetask: vscode.Task | undefined;
+    livetask: Map<TestEnvironment,vscode.Task> | undefined;
     task: vscode.Task | Map<TestEnvironment,vscode.Task> | undefined;
     test: vscode.TestItem | undefined;
 }
