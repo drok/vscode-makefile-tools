@@ -7,15 +7,17 @@ This extension enables VS Code to interact with projects using the GNU Autotools
     * [_Generate a build task_](#generate-build-tasks) for every buildable program or library.
     * Build any single target (program, library), or all with _keybinds_.
     * [_Navigate build errors/warnings_](#navigating-compile-problems) using built-in problem matchers.
+    * Project [_navigation commands_](#navigation-shortcuts) the highlight the relationship between files (sources 🏹, intermediary files 🧩, or build goals 🎯).
+    * [Build diagnostics](#build-diagnostics) enables, **reliable**, **fast** builds.
  * Testing-related functions:
     * [Import test suites](#importing-test-suites) into VS Code's **Testing UI**.
     * _Run_ single tests or full test suites using the Testing UI.
-    * Support all automake test results (PASS ✔️, FAIL ❌, XPASS ☑️, XFAIL 🏳️, SKIP 🔳, ERROR 💣️, and n/a ❔)
-    * Debug individual tests, [_auto-configuring_ the debugger](#debugging-tests).
-    * _Live-testing_ / Test-driven development.
-    * [_Generate a test task_](#generated-test-tasks) for every individual test.
-    * Manage multiple [test environments](#test-environments).
-    * Output _test result grid_ (build configuration vs test vs environment) in markdown format.
+    * Support all automake test results (`PASS` ✔️, `FAIL` ❌, `XPASS` ☑️, `XFAIL` 🏳️, `SKIP` 🔳, `ERROR` 💣️, and `n/a` ❔)
+    * Debug individual tests, [_auto-configuring_ the debugger](#debugging-tests-pro). ![pro](https://img.shields.io/badge/Pro-green?style=plastic&link=https://autotools.mergesium.com)
+    * [_Live-testing_](#live-testing-pro) / Test-driven development. ![pro](https://img.shields.io/badge/Pro-green?style=plastic&link=https://autotools.mergesium.com)
+    * Discover [_Generate a test task_](#generated-test-tasks) for every individual test.
+    * Manage multiple [test environments](#test-environments-pro). ![pro](https://img.shields.io/badge/Pro-green?style=plastic&link=https://autotools.mergesium.com)
+    * Output _test result grid_ (build configuration vs test vs environment) in markdown format. ![pro](https://img.shields.io/badge/Pro-green?style=plastic&link=https://autotools.mergesium.com)
 
 <figure id="figure-1">
     <img src="https://autotools.mergesium.com/s/autotools-intro.png"
@@ -23,9 +25,23 @@ This extension enables VS Code to interact with projects using the GNU Autotools
     <figcaption>Figure 1 - Sample UI in VS Code</figcaption>
 </figure>
 
+## Release plan
+
+The extension contains free and paid (![pro](https://img.shields.io/badge/Pro-green?style=plastic&link=https://autotools.mergesium.com)) features.
+
+Pre-releases are intended for evaluation and expire about 1 month after availability. Their purpose is:
+
+* allow you to test new features before general release, and give bugs/improvement feedback
+* allow Mergesium to collect error / exceptions / usage info via [telemetry](Telemetry and quality)
+* allow free users to evaluate pro features free of charge.
+
+When a pre-release expires, you can update to the current pre-release, or install a non-pre-release version.
+
+Pre-releases allow full use of all features, free and paid. General releases allow access to community features freely. Professional users can unlock the time-saving features by purchasing a subscription at https://autotools.mergesium.com
+
 ## Getting started
 
-An autotools project has the following basic stages: boostrapping, configuration, build, test.
+An autotools project has the following basic stages: boostrapping, configuration, build, test. The extension is aware of the current step, and can run the steps as needed semi-automatically, leaving you to focus on meaningful activities - navigate the source, build it, test it, debug it.
 
 <figure id="figure-2">
     <img src="https://devmanual.gentoo.org/general-concepts/autotools/diagram.png"
@@ -33,9 +49,10 @@ An autotools project has the following basic stages: boostrapping, configuration
     <figcaption>Figure 2 - <a href="https://devmanual.gentoo.org/general-concepts/autotools/index.html">A basic overview of main autotools</a> by <a href="https://www.gentoo.org/inside-gentoo/contact/">Gentoo Authors</a> licensed under <a href="https://creativecommons.org/licenses/by-sa/3.0/">CC BY-SA 3.0</a></figcaption>
 </figure>
 
-Basic familiarity with autotools projects is implied.
+Basic familiarity with autotools projects is implied. Often projects have pre-requisites, like installing dependencies, making configuration choices or running specific bootstrapping commands before the first build. For those cases, the various steps can be run or repeated manually, using palette commands.
 
 The primary pallette commands are:
+
  1. "Autotools: Bootstrap" - this is automatic when needed
  2. "Autotools: Configure" - creates the Default configuration in the subdir `build/Default`
  3. "Autotools: Build All" - runs `make all` in the build directory
@@ -146,7 +163,7 @@ The tests included in `make check` are added to the test suite.
 
 The available tests are displayed in both the Testing panel and the Autotools panel, with slightly different controls and status (eg, XPASS and XFAIL results, Live-testing, link to KB), as the built-in Testing UI is not able to fully support autotools's test features.
 
-### Test Environments
+### Test Environments ![pro](https://img.shields.io/badge/Pro-green?style=plastic&link=https://autotools.mergesium.com)
 
 Autotools supports running the defined test suite with customized environments (ie, the [`TESTS_ENVIRONMENT` variable](https://www.gnu.org/software/automake/manual/html_node/Parallel-Test-Harness.html)). This allows reusing the test suite in more than one scenario, though it is up to the developer to decide what an "environment" means.
 
@@ -159,34 +176,58 @@ Example: given the following settings, each test will find the environment varia
 ```json
 {
     "autotools.TESTS_ENVIRONMENT": [ // global contributions to TEST_ENVIRONMENT
-        "VAR_1_G=value1",
-        "VAR_2_G=value2",
+        "VAR_1_G": "value1",
+        "VAR_2_G": "value2",
     ],
     "autotools.test_environments": [
         {
             "name": "modern",
             "TESTS_ENVIRONMENT": [ // Contribution while running in the 'modern' environment
-                "VAR_1_L=val 3",
-                "VAR_2_L=val 4"
+                "VAR_1_L": "val 3",
+                "VAR_2_L": "val 4",
             ],
         },
         {
             "name": "legacy",
+            "dirs": ["bindings/perl"],
             "TESTS_ENVIRONMENT": [ // Contribution while running in the 'legacy' environment
-                "VAR_1_L=5",
-                "VAR_2_L=6"
+                "VAR_1_L": "val 5",
+                "VAR_2_L": "val 6",
             ],
         }
     ],
 }
 ```
 
+A more compact example:
+
+```
+"autotools.test-environments": [
+    { "name: "Legacy-A", "TESTS_ENVIRONMENT": { "DATADIR": "legacyA", "HASHALGO": "md5" } },
+    { "name: "Legacy-B", "TESTS_ENVIRONMENT": { "DATADIR": "legacyB", "HASHALGO": "sha1" } },
+    { "name: "Modern"  , "TESTS_ENVIRONMENT": { "DATADIR": "modern",  "HASHALGO": "sha256" } },
+    { "name: "NextGen" , "TESTS_ENVIRONMENT": { "DATADIR": "next",    "HASHALGO": "qha" } },
+]
+
+```
+
 The values may include spaces and punctuation as needed, and should be escaped only for json purposes. The extension will correctly escape for shell purposes when passing them to `make check`. The values will not be expanded in the shell. Ie, a value "VAR=$USERNAME" will be passed literally. The test program will find the variable "VAR" with the value "$USERNAME" in its environment.
 
-
-The test environment set in this way must not include "SECRETS", and is thus able to be safely committed in SCMs. Secrets, where needed, must be supplied directly through the environment via `.bashrc` or similar mechanism. The Autotools Integration does not handle secrets.
+The test environment set in this way must not include "SECRETS", and is thus able to be safely committed in SCMs (and should be). Secrets, where needed, must be supplied directly through the environment via `.bashrc` or similar mechanism. The Autotools Integration does not handle secrets.
 
 Note: Test-environments require Makefile.in files generated by automake 1.12 or later, as it makes use of custom test drivers introduced at that version. (`autoreconf -fvi` can be used to update the Makefile.in throughout the project)
+
+### Test grid ![pro](https://img.shields.io/badge/Pro-green?style=plastic&link=https://autotools.mergesium.com)
+
+There is a new Test Explorer context command, "Project Test Summary", which generates a report on the test suite in markdown table format, ready to be cut-pasted into emails, issue reports, etc. The example table below was pasted from a sample project:
+
+|Test|[&lt;null&gt;](#-null--environment)|[modern](#modern-environment)|[legacy](#legacy-environment)|
+|:---|:---:|:---:|:---:|
+|tests.log|✔️|✔️|❌|
+|tests2.log|❔|✔️|✔️|
+
+The generated report includes the build configuration, as well as the definition of the test environments linked in the heading, such that co-workers can duplicate the results easily, in the same build configuration and test environment.
+
 
 ### Multiple Test Suite support
 
@@ -205,34 +246,38 @@ In the following example, the `bindings/python` test suite will be run in _Gener
         {
             "name": "Generic",
             "TESTS_ENVIRONMENT": [
-                { "name": "GENERIC_VAR", "value": "Some Value"}
+                { "GENERIC_VAR": "Some Value"}
             ],
         },
         {
             "name": "perl",
             "dirs": ["bindings/perl"],
             "TESTS_ENVIRONMENT": [
-                { "name": "GREETING", "value": "Hello World"}
+                { "GREETING": "Hello World"}
             ],
         },
         {
             "name": "Python 2",
             "dirs": ["bindings/python"],
             "TESTS_ENVIRONMENT": [
-                { "name": "PYTHON", "value": "python2"}
+                { "PYTHON": "python2"}
             ],
         },
         {
             "name": "Python 3",
             "dirs": ["bindings/python"],
             "TESTS_ENVIRONMENT": [
-                { "name": "PYTHON", "value": "python3"}
+                { "PYTHON": "python3"}
             ],
         }
     ]
 ```
 
 In the example above, all tests suites have a _Generic_ environment, where neither the `GREETING` nor the `PYTHON` variables are set.
+
+When multiple test environments are configured, they appear on the Test Explorer as Run Profiles and Debug Profiles:
+
+![Test Environments in Test Explorer](https://autotools.mergesium.com/photos/mergesium-autotools-multiple-test-environments.png)
 
 
 ### Unexpected test-result waivers (XFAIL_TESTS)
@@ -300,6 +345,47 @@ In very large projects, it may be beneficial to focus on a small part of a proje
 
 Building the project using the auto-generated build tasks allows compilation warnings and errors to be captured, and the offending line of source code to be located and opened with a single click in the "Problems" panel. This powerful built-in feature of vscode would not be available if the project were built by running make in a terminal window.
 
+### Navigation Shortcuts
+
+When a build or test is selected in the Autotools panel, the source files that are in the dependency tree for that target are highlighted in the File explorer and the editor tabs, and a new Context Menu command is available on the editor tabs, "Close Irrelevant Files". This command closes all editor tabs that are not relevant to the selected target. The relevant files are badged as sources 🏹, intermediary files 🧩, or build goals 🎯:
+
+<figure id="figure-7">
+    <img src="https://autotools.mergesium.com/s/autotools-focus-on-the-relevant-files.png"
+         alt="Close Irrelevant Files Context Command">
+    <figcaption>Figure 7 - "Close Irrelevant Files" Context Command</figcaption>
+</figure>
+
+The relevant sources are highlighted in the file explorer, as shown below. The file explorer also gets a new context menu command, "Find dependent targets", which does the reverse, ie, find which targets depend on a selected source file.
+
+<figure id="figure-8">
+    <img src="https://autotools.mergesium.com/s/autotools-explorer-badges.png"
+         alt="Relevant file badges in file explorer and the 'Find dependent targets' command">
+    <figcaption>Figure 8 - Finding reverse dependencies</figcaption>
+</figure>
+
+### Build Diagnostics
+
+Sometimes the build specification (`configure.ac` + `Makefile.am`) itself contains bugs:
+
+  * incomplete dependency specs
+  * Non-portable recipes
+  * 'Customizations' that break automake's built-in functionality
+
+Common symptoms:
+
+  * builds fine on O/S "X" but not on "Y"
+  * parallel builds error out sometimes (`make -j<numcpus>`)
+  * some targets don't rebuild as expected when sources change (`make clean` is required)
+  * builds are slower could be
+
+These are common issues, often with well understood reasons, but the maintainers don't have the autotools expertise to diagnose or fix them. The extension detects many such conditions and provides links to specific documentation that explains and guides to a solution.
+
+Build diagnostics are output in the "Autotools" section of the "OUTPUT" tab, and when a specific problem is identified, a deep link to the [knowledge base](#knowledge-base) is given, eg. https://autotools.mergesium.com/kb/acme-project?v=2.1.0#overrides-check-target - which are human readable, and also takes you to specific info about the error (overriding check target in this case), the project and its version. If no info specific to the given project exist, you'll find relevant, but general info about the error, as well as links to file pre-filled bug reports if appropriate.
+
+The "relevant" badges of the [Navigation Shortcuts](#navigation-shortcuts) will often highlight that some part of the project relies unnecesarily on irrelevant sources or header files, giving you feedback on how includes can be trimmed. Including all headers in all sources is easy, but does come at the cost of slower builds.
+
+At this time, a small list of conditions is detected, but it will grow with future releases.
+
 ## Testing features
 
 The extension implements automake's standard parallel test suite infrastructure interface. If your project follows the automake documentation on writing and running tests, they are seamlessly discovered and used directly from vscode.
@@ -322,11 +408,13 @@ The test tasks allow:
     * One-click access to each test's output file (log file)
 
 
-### Debugging tests
+### Debugging tests ![pro](https://img.shields.io/badge/Pro-green?style=plastic&link=https://autotools.mergesium.com)
 
-Tests that fail can be debugged with a single click. The extension is a [`DebugConfigurationProvider`](https://code.visualstudio.com/api/extension-guides/debugger-extension) which means it can configure the debugger with the same runtime environment that the test normally runs in, without any manual intervention, allowing you to focus on finding the bugs, not on starting the debugger.
+Tests can be debugged with a single click. The extension is a [`DebugConfigurationProvider`](https://code.visualstudio.com/api/extension-guides/debugger-extension) which means it can configure the debugger with the same runtime environment that the test normally runs in, without any manual intervention, allowing you to focus on finding the bugs, not on starting the debugger.
 
-Specifically, tests are supplied with the same environment a automake's [`TESTS_ENVIRONMENT` mechanism](https://www.gnu.org/software/automake/manual/html_node/Serial-Test-Harness.html) as described [below](#test-environments), and the [`srcdir`](https://www.gnu.org/software/automake/manual/html_node/Scripts_002dbased-Testsuites.html) variable which is automatically calculated.
+If multiple environments are set as `Default debug profile` in the Test Explorer, clicking the "Debug" link starts each environment in a side-by-side debug session, allowing straight-forward state comparisons between environments where a test passes with those where it fails.
+
+Debugged tests run in the same environment as automake's [`TESTS_ENVIRONMENT` mechanism](https://www.gnu.org/software/automake/manual/html_node/Serial-Test-Harness.html) as described [below](#test-environments-pro), and the [`srcdir`](https://www.gnu.org/software/automake/manual/html_node/Scripts_002dbased-Testsuites.html) variable which is automatically calculated.
 
 Whether the test runs directly or under the debugger, it is provided the same environment.
 
@@ -334,32 +422,34 @@ Additionally, tests that rely on built shared libraries likely use [libtool](htt
 
 **Note** The extension currently supports only the Parallel Test Harness, but the "older (and discouraged)" harness will be supported in a future version, for compatibility with legacy autotools projects.
 
-### Test Environments
+### Live Testing ![pro](https://img.shields.io/badge/Pro-green?style=plastic&link=https://autotools.mergesium.com)
 
-Autotools provide the ability to run a test suite under any arbitrary test environment, using the `TESTS_ENVIRONMENT` user-variable mechanism. This extension implements this mechanism, and allows you to create any number of environments. You can run individual tests or full test suite under one or more environments.
+You can select one test suite to be the "Live test suite" (⚡). This test suite will be **updated**, rather than run in full, whenever all editor tabs are saved. If you're editing multiple files, the update starts when the last unsaved file is saved, and the results are updated in both the Test Explorer and the Autotools Tests panel.
 
-Example workspace settings:
-```json
-"autotools.test-environments": {
-    "Legacy-A": [ "DATADIR=legacyA", "HASHALGO=md5" ],
-    "Legacy-B": [ "DATADIR=legacyB", "HASHALGO=sha1" ],
-    "Modern":   [ "DATADIR=modern",  "HASHALGO=sha256" ],
-    "NextGen":  [ "DATADIR=next",    "HASHALGO=qha" ],
-}
+The Live Testing suite runs in the currently selected test environment.
 
-```
+This mode is expecially suited for running unit tests suites, which are typically small, targeted at a single function, and are very fast to build and run.
 
-In this example, there are two legacy environments that are tests, one modern, and an avant-garde environment. The environemnt variables that will be set are `DATADIR` and `HASHALGO`. In this envisioned setup, the tests use the `DATADIR` variable in combination with the `srcdir` automatic variable to find a dataset on which to run. They also use the `HASHALGO` variable to configure an arbitrary hashing algorithm to be used with the tests. The fictional `qha` algorithm might mean "quantun hashing algorithm', a future algorithm what the application supports.
+You can continue making changes to the sources even as the tests run.
 
-A typical test environment can contain any number of environment variables. The generated test task passes them to automake via the `TESTS_ENVIRONMENT` variable when running the tests, and passes them to the debugger using the appropriate [`environment` configuration](https://code.visualstudio.com/docs/cpp/launch-json-reference#_environment) when debugging them.
+Here is an example live testing session:
 
-The environment variable `srcdir` is an automatically set environment variable pointing to the directory where the test's data files should be read from.
+<figure id="figure-9">
+    <img src="https://autotools.mergesium.com/s/autotools-live-test.png"
+         alt="Live testing screenshot">
+    <figcaption>Figure 9 - Live Testing in action</figcaption>
+</figure>
 
-### Live Testing
+In this example:
 
-This mode allows test suites to be run when you save edited source files. When a file is saved in the editor, if there are no other modified but not-yet-saved files, a selected test-suite is run under autotools (ie, `make check` in the selected directory, and with a selected list of tests). Autotools first builds any tests that depend on the newly modified sources, and then runs the test suite. The extension watches the filesystem and updates the test results in the Testing UI, live, as they become available.
-
-You choose which tests are selected to run 'live', and when they run (ie, when you 'Save' or 'Save All'). You can continue making changes to the sources even as the tests run. The extension will ensure that the final test results shown in the Testing UI reflect the final saved state of the project.
+  * the test suite named "test" is selected as a live suite (⚡).
+  * The "`modern`" test environment is currently selected.
+  * the `tests.log` test target is selected, which activates relevance badges.
+  * the `tests.c` file is modified and saved.
+  * the `TERMINAL` tab shows that the ouput of the "Update test suite log in tests @ modern" task. (In this example the `autotools.traceLiveTestRuns` setting is `true`, which enables the `Makefile:778: update ... due to: ...` make traces)
+    * the trace output is useful to diagnose Makefiles, to get unit tests buildable as fast as possible.
+  * the `tests.log` log file in the right-side tab is updated with the test's output, if any (both stdout and stderr are captured)
+  * the "debug" icon is available, which will launch this failing test under the debugger, in the `modern` environment. No tinkering with `launch.json` needed.
 
 ### Intellisense data providers
 
@@ -370,6 +460,8 @@ Intellisense allows the data provider to be configured using the `C/C++: Change 
 With your approval, the autotools extension collects anonymous usage data and error traces and sends them to Mergesium servers to help improve our products and services.
 Read our [privacy statement](https://autotools.mergesium.com/privacy.html) to learn more.
 This extension respects the `telemetry.telemetryLevel` setting, which you can learn more about at https://code.visualstudio.com/docs/getstarted/telemetry
+
+Pre-releases require telemetry to be enabled. Telemetry is optional in general releases, but greatly appreciated, as it allows Mergesium to continuously improve quality of the extension and your experience in future versions.
 
 The traces and errors reported by telemetry should not be seen as a substitute for issue reports. They are useful to detect wide-spread bugs or errors, but don't have enough resolution to detect isolated problems. If we knew what code paths are subject to failure, we'd fix them rather than instrument them with telemetry. Your feedback is invaluable in helping us understand bugs. Please do submit bug reports, especially if the knowledge base contains nothing related to your project; in that case you are very likely the first person to encounter the bug you're seeing.
 
@@ -387,12 +479,11 @@ The KB is intended to be the front line of support if a project does not functio
 </figure>
 
 
-## TODO list:
+## TODO list at this pre-release:
 
-* sandbox mode to avoid accidental fork-bombing (https://github.com/microsoft/vscode-makefile-tools/issues/505)
-* libtool compatibility (so libtool projects can be seamlessly debugged in vscode - currently they require much scriptology)
-* ability to configure most freshly cloned well-formed autotools projects. This may require
-  * exposing the configurable options in the gui, and
-  * detecting the right way to bootstrap it (./configure, ./autoreconf -vi, something else?)
-* Do you have suggestions? -> [open an Issue](https://github.com/Mergesium/autotools/issues)
+* libtool support is incomplete
+* compatibility with multi-folder workspaces
+* more translations
+* syntax highlight / completions for `configure.ac` and `Makefile.am` files (other extensions fill this gap for now)
+* `check-local` target not yet handled
 
