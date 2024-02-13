@@ -109,6 +109,7 @@ export class SuiteDecorations implements vscode.FileDecorationProvider {
             return relevantDir;
     }
 	onDidChangeFileDecorations: vscode.Event<vscode.Uri | vscode.Uri[]> = this._onDidChangeFileDecorations.event;
+    private temp : boolean = false;
 	provideFileDecoration(
 		uri: vscode.Uri,
 		_token: vscode.CancellationToken,
@@ -121,8 +122,10 @@ export class SuiteDecorations implements vscode.FileDecorationProvider {
                 ?.get("test-suite.log");
             if (g?.test?.tags?.includes(live)) {
                 return { tooltip: "live run", badge: '⚡'}
-            }
-            return { badge: ' '};
+            } else if (g)
+                return { badge: ' '};
+            else
+                return uri.path.endsWith('o') ? undefined : null;
         } else
         if (uri.scheme == Scheme.Test) {
             let at = extension._projectTestSuitesProvider.all;
@@ -169,12 +172,17 @@ export class SuiteDecorations implements vscode.FileDecorationProvider {
                 this.visibleGoals.add(goal);
                 if (this.rdeps.has(goal)) {
                     return { tooltip: `depends on ${this.dependsOn}`,
-                        badge: '🎯',
+                        badge: `🎯${goal.flags & Goal.Flags.Test_Program ? 'T' : 'P'}`,
                         propagate: true};
+                } else return {
+                    tooltip: `${(goal.flags & Goal.Flags.Test_Program) ? 'Test Program' : 'Program'}`,
+                    badge: `${goal.flags & Goal.Flags.Test_Program ? 'T' : 'P'}`,
                 }
             }
+        } else
+        if (uri.scheme == Scheme.Make) {
         }
 
-        return {}; // This will log an error in ExtensionHost about invalid/empty deco
+        return undefined; // This will log an error in ExtensionHost about invalid/empty deco
 	}
 }

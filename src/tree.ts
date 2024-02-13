@@ -22,10 +22,13 @@ interface NamedItem {
     name: string;
 }
 
+const _empty = '';
+
 export enum Scheme {
     Test = 'test',
     Check = 'check',
     Bin = 'bin',
+    Make = 'make'
 }
 
 export abstract class Node {
@@ -46,8 +49,7 @@ export class SubNode extends Node {
             .map(sub => this.tree.get(sub)!);
         if (!(this.flags & Goal.Flags.Test_Suite)) {
             goals.push(...[...this.make.goals.values()]
-                // Bit of a hack to hardcode excluding test_program
-                .filter(goal => (goal.flags & this.flags)/* && !(goal.flags & Goal.Flags.Test_Program)*/));
+                .filter(goal => (goal.flags & this.flags)));
         } else if (this.make.test_suite?.depends)
             goals.push(...this.make.test_suite.depends);
         return goals;
@@ -66,16 +68,22 @@ export class SubNode extends Node {
                 this.item.description = this.make.stats.tests ? localize("autotools.subnode.suite", "{0} tests",
                     this.make.stats.tests) : undefined;
                 this.item.resourceUri = vscode.Uri.from({
-                        scheme: "check",
-                        authority: Extension.whoami,
+                        scheme: Scheme.Check,
+                        authority: _empty,
                         path: '/' + this.make.dir,
                         query: 'test-suite.log'
                     });
             } else {
+                this.item.resourceUri = vscode.Uri.from({
+                    scheme: Scheme.Make,
+                    authority: _empty,
+                    path: '/' + this.make.dir
+                });
                 this.item.description = this.make.stats.programs ? localize("autotools.subnode.programs", "{0} programs",
                     this.make.stats.programs) : undefined;
             }
             this.item.tooltip =  this.make.dir;
+            this.item.id = this.make.dir;
         }
         return this.item;
     }
@@ -95,7 +103,6 @@ export class SubNode extends Node {
 
 export class ProjectOutlineProvider implements vscode.TreeDataProvider<Node> {
     private readonly _changeEvent = new vscode.EventEmitter<Node | null>();
-    //private readonly _unsetString = localize("Unset", "Unset");
 
     private readonly flag: number = Goal.Flags.Linked_binary;
     private tree: Make;
@@ -133,21 +140,11 @@ export class ProjectOutlineProvider implements vscode.TreeDataProvider<Node> {
             return goals.some( g => {
                 let goalpath = g.getFilePath();
                 return (goalpath == path || (g.depends && dependsOnRecursive(path, g.depends)));
-                    //if (g.flags & Goal.Flags.Linked_binary) {
-                    //    targets.push(g);
-                    //}
-
             });
         }
-        // function dependsOn(path: string, goals: Goal[]) : boolean {
-        //    goals.forEach(g => {
-        //        if (g.)
-        //    });
-        //}
         configuration.getAllBuildTargets().forEach((v, k) => {
             v.forEach(g => {
                 if ((g.flags & (Goal.Flags.Linked_binary | Goal.Flags.Test_Log)) &&
-                    // !(g.flags & Goal.Flags.Test_Program) &&
                     g.depends && dependsOnRecursive(path, g.depends))
                     targets.push(g);
             });
@@ -166,8 +163,7 @@ export class ProjectOutlineProvider implements vscode.TreeDataProvider<Node> {
     }
 
     clear() : void {
-        //if (this.subnodes.size)
-            this.updateTargets(new Make('', extension.journey, ''));
+        this.updateTargets(new Make('', extension.journey, ''));
     }
     // Updates the tree when settings.json changes
     updateTargets(build_tree: Make) : void {

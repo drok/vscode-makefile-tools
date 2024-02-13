@@ -252,6 +252,8 @@ export class Extension {
 
         });
         this._treeDisposables.push(vscode.commands.registerCommand('autotools.rdepends', async (sub: vscode.Uri) => {
+            if (!(sub instanceof vscode.Uri))
+                return Promise.reject("Expected file Uri argument");
             configuration.setCurrentGoalBins(undefined);
             configuration.setCurrentGoalTests(undefined);
             // vscode.commands.executeCommand('workbench.action.openView', this._projectTestSuitesView);
@@ -606,13 +608,9 @@ export class Extension {
         this.tasks.forEach((provider) => provider.update(this.configDisposables));
         if (this._projectOutlineTreeView) {
             this._projectOutlineProvider.updateTargets(build_tree);
-            //this._projectOutlineTreeView.reveal(this._projectOutlineProvider.getChildren(undefined)[0],
-            //    { select: false, focus: false, expand: true, } );
         }
         if (this._projectTestSuitesView) {
             this._projectTestSuitesProvider.updateTargets(build_tree);
-            //this._projectTestSuitesView.reveal(this._projectTestSuitesProvider.getChildren(undefined)[0],
-            //    { select: false, focus: false, expand: true, } );
             this.updateOutlineBadge();
         }
         vscode.commands.executeCommand("setContext", "autotools:hasTargets", 1);
