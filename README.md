@@ -358,7 +358,7 @@ When a build or test is selected in the Autotools panel, the source files that a
 The relevant sources are highlighted in the file explorer, as shown below. The file explorer also gets a new context menu command, "Find dependent targets", which does the reverse, ie, find which targets depend on a selected source file.
 
 <figure id="figure-8">
-    <img src="https://autotools.mergesium.com/s/autotools-explorer-badges.png"
+    <img src="https://autotools.mergesium.com/static/photos/autotools-explorer-badges.png"
          alt="Relevant file badges in file explorer and the 'Find dependent targets' command">
     <figcaption>Figure 8 - Finding reverse dependencies</figcaption>
 </figure>
