@@ -1165,6 +1165,51 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     logger.message(`${getStartTime(validact).toISOString()}: starting ${Extension.whoami} ${context.extension.packageJSON.version}`, 'Normal');
     extension.registerTasks();
 
+    detectWorkspaceMode();
+    if (vscode.workspace.workspaceFolders == undefined) {
+        context.subscriptions.push(vscode.workspace.onDidChangeWorkspaceFolders(async (e) => {
+            detectWorkspaceMode();
+            if(vscode.workspace.workspaceFolders?.length == 1) {
+                let span = telemetry.startSpan("openWS", extension.journey);
+                await startupWithWorkspace(context, span, span);
+                // span.end();
+            }
+        }));
+        telemetry.endSpanWithStatus(act, SpanStatusCode.OK, "noWS");
+        return;
+    } else if (vscode.workspace.workspaceFolders.length != 1) {
+        telemetry.endSpanWithStatus(act, SpanStatusCode.OK, "multiRoot", {n: vscode.workspace.workspaceFolders.length});
+        //telemetry.logEvent(act, "multiRoot", {n: vscode.workspace.workspaceFolders.length});
+        //act.end();
+    } else
+        await startupWithWorkspace(context, validact, act);
+    } catch (e) {
+        /* Can be caused by:
+            extensionHost.js:
+            Exception has occurred: Error: EEXIST: file already exists, open '/home/radu/.vscode-server/data/User/workspaceStorage/ad45d8b1a8e4f48738c477fbc86abc47/vscode.lock'
+
+            Exception has occurred: Error: kill ESRCH
+            t process.kill (node:internal/process/per_thread:220:13)
+            at w (/home/radu/.vscode-server/bin/704ed70d4fd1c6bd6342c436f1ede30d1cff4710/out/vs/workbench/api/node/extensionHostProcess.js:106:4069)
+            at h (/home/radu/.vscode-server/bin/704ed70d4fd1c6bd6342c436f1ede30d1cff4710/out/vs/workbench/api/node/extensionHostProcess.js:106:3576)
+	at async O.g (/home/radu/.vscode-server/bin/704ed70d4fd1c6bd6342c436f1ede30d1cff4710/out/vs/workbench/api/node/extensionHostProcess.js:106:1824)
+	at async O.h (/home/radu/.vscode-server/bin/704ed70d4fd1c6bd6342c436f1ede30d1cff4710/out/vs/workbench/api/node/extensionHostProcess.js:101:131918)
+
+        */
+
+        logger.message(`ERROR: Unexpected activation exception: ${e}`, "Normal");
+        if (act) telemetry.endSpanWithStatus(act, SpanStatusCode.ERROR, e.toString());
+
+    }
+}
+
+function detectWorkspaceMode() {
+    vscode.commands.executeCommand('setContext', "autotools:workspace",
+        (vscode.workspace.workspaceFolders == undefined) ? 2 :
+        (vscode.workspace.workspaceFolders.length == 1) ? 1 :
+        3);
+}
+export async function startupWithWorkspace(context: vscode.ExtensionContext, validact: Span, act: Span) : Promise<void> {
     let configureAc = AutoToolsBootstrapTaskProvider.manifests.find((m) => checkFileExistsSync(resolvePathToRoot(m)));
     configuration.setConfigureAc(configureAc);
 
@@ -1242,24 +1287,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         act.end();
         isActive = true;
         _activatedEvent.fire(isActive);
-    }
-    } catch (e) {
-        /* Can be caused by:
-            extensionHost.js:
-            Exception has occurred: Error: EEXIST: file already exists, open '/home/radu/.vscode-server/data/User/workspaceStorage/ad45d8b1a8e4f48738c477fbc86abc47/vscode.lock'
-
-            Exception has occurred: Error: kill ESRCH
-            t process.kill (node:internal/process/per_thread:220:13)
-            at w (/home/radu/.vscode-server/bin/704ed70d4fd1c6bd6342c436f1ede30d1cff4710/out/vs/workbench/api/node/extensionHostProcess.js:106:4069)
-            at h (/home/radu/.vscode-server/bin/704ed70d4fd1c6bd6342c436f1ede30d1cff4710/out/vs/workbench/api/node/extensionHostProcess.js:106:3576)
-	at async O.g (/home/radu/.vscode-server/bin/704ed70d4fd1c6bd6342c436f1ede30d1cff4710/out/vs/workbench/api/node/extensionHostProcess.js:106:1824)
-	at async O.h (/home/radu/.vscode-server/bin/704ed70d4fd1c6bd6342c436f1ede30d1cff4710/out/vs/workbench/api/node/extensionHostProcess.js:101:131918)
-
-        */
-
-        logger.message(`ERROR: Unexpected activation exception: ${e}`, "Normal");
-        if (act) telemetry.endSpanWithStatus(act, SpanStatusCode.ERROR, e.toString());
-
     }
 }
 
