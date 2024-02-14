@@ -21,6 +21,6 @@
 		".vscode-test"
 	],
 	"include": [
-		"**/*.ts"
+		"src/**/*.ts"
 	]
 }

@@ -6,7 +6,6 @@
 import * as configuration from './configuration';
 import { MakefileConfiguration, TestEnvironment } from './configuration';
 import * as cpptools from './cpptools';
-import * as fs from 'fs';
 import * as logger from './logger';
 import * as util from './util';
 import * as make from './make';
@@ -16,7 +15,6 @@ import * as gnumake from './parser/gnumake';
 import { Goal } from './parser/gnumake';
 import * as path from 'path';
 import * as state from './state';
-// import * as telemetry from './telemetry';
 import { SpanStatusCode, getStartTime } from './tele';
 import {
     ProjectOutlineProvider,

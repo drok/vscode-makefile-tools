@@ -27,21 +27,21 @@ const jsonSchemaFilesPatterns = [
 ];
 
 const languages = [
-    { id: "zh-TW", folderName: "cht", transifexId: "zh-hant" },
-    { id: "zh-CN", folderName: "chs", transifexId: "zh-hans" },
+    // { id: "zh-TW", folderName: "cht", transifexId: "zh-hant" },
+    // { id: "zh-CN", folderName: "chs", transifexId: "zh-hans" },
     { id: "fr", folderName: "fra" },
-    { id: "de", folderName: "deu" },
-    { id: "it", folderName: "ita" },
-    { id: "es", folderName: "esn" },
+    // { id: "de", folderName: "deu" },
+    //{ id: "it", folderName: "ita" },
+    // { id: "es", folderName: "esn" },
     { id: "ja", folderName: "jpn" },
-    { id: "ko", folderName: "kor" },
+    //{ id: "ko", folderName: "kor" },
     { id: "ru", folderName: "rus" },
     //{ id: "bg", folderName: "bul" }, // VS Code supports Bulgarian, but loc team is not currently generating it
     //{ id: "hu", folderName: "hun" }, // VS Code supports Hungarian, but loc team is not currently generating it
-    { id: "pt-br", folderName: "ptb", transifexId: "pt-BR" },
-    { id: "tr", folderName: "trk" },
+    //{ id: "pt-br", folderName: "ptb", transifexId: "pt-BR" },
+    //{ id: "tr", folderName: "trk" },
     { id: "cs", folderName: "csy" },
-    { id: "pl", folderName: "plk" }
+    //{ id: "pl", folderName: "plk" }
 ];
 
 
