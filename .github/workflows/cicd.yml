@@ -76,7 +76,17 @@ jobs:
         run: yarn configure
         if: runner.os != 'Linux'
       - name: Configure externals on Linux
-        run: mkdir -p build/make && cd build/make && [ -f config.status ] || ../../vendor/gnumake/configure --disable-dependency-tracking --with-guile=no --disable-job-server --disable-load 'INSTALL_PROGRAM=install -cs' 'CFLAGS=-g0 -O2' LDFLAGS=-lrt --disable-nls --prefix=$PWD/../..
+        run: mkdir -p build/make && cd build/make && [ -f config.status ] ||
+          ../../vendor/gnumake/configure
+          --disable-dependency-tracking
+          --with-guile=no
+          --disable-job-server
+          --disable-load
+          'INSTALL_PROGRAM=install -cs'
+          'CFLAGS=-g0 -O2 -include $top_srcdir/../gnumake-include.h'
+          LDFLAGS=-lrt
+          --disable-nls
+          --prefix=$PWD/../..
         if: runner.os == 'Linux'
       - name: Build Extension
         run: yarn compile
