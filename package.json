@@ -604,6 +604,11 @@
                 "when": "autotools:expiresSoon == 4"
             },
             {
+                "view": "autotools.outline",
+                "contents": "%autotools.welcome.multiroot.markdownDescription%",
+                "when": "autotools:workspace == 3"
+            },
+            {
                 "view": "autotools.tests",
                 "contents": "%autotools.welcome.tests.none.markdownDescription%",
                 "when": "autotools:haveParallelHarness > 1"
