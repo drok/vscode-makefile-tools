@@ -1169,7 +1169,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         return configuration.setNewEnvironment();
     }));
 
-    logger.message(`${getStartTime(validact).toISOString()}: starting ${Extension.whoami} ${context.extension.packageJSON.version}`, 'Normal');
+    logger.message(`${getStartTime(validact).toISOString()}: starting ${Extension.whoami} ${context.extension.packageJSON.version} - pre-release expires ${Extension.expires}`, 'Normal');
     extension.registerTasks();
 
     let configureAc = AutoToolsBootstrapTaskProvider.manifests.find((m) => checkFileExistsSync(resolvePathToRoot(m)));
@@ -1275,7 +1275,6 @@ export async function outputLogHeader() : Promise<void> {
     var kburl = await extension.kbUrl();
     if (extension.pkginfo/* && !currentMakefileConfiguration*/) {
         let pkg = extension.pkginfo;
-        logger.message(`Autotools Integration ${extension.extensionContext.extension.packageJSON.version} - **pre-release** expires ${Extension.expires}`, "Normal");
         logger.message(localize('autotools.package.coordinates', "Package \"{0}\" version {1} - bug reports: {2}, url: {3}",
         pkg.name || "unknown", pkg.version || "unk", pkg.bugreport || "unknown", pkg.url || "unknown"), "Normal");
         logger.message(localize('autotools.ref.kb', "Knowledge Base: {0}", kburl.toString(true)), "Normal");
