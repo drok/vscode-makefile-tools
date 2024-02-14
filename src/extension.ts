@@ -17,7 +17,7 @@ import { Goal } from './parser/gnumake';
 import * as path from 'path';
 import * as state from './state';
 // import * as telemetry from './telemetry';
-import { SpanStatusCode } from './tele';
+import { SpanStatusCode, getStartTime } from './tele';
 import {
     ProjectOutlineProvider,
     ProjectTestsProvider,
@@ -116,25 +116,29 @@ export class Extension {
         this.rulesPath = path.join(extensionContext.extensionPath, "include")
 
         extensionContext.subscriptions.push(vscode.commands.registerCommand('autotools.bootstrap', async () => {
+            telemetry.logEvent(this.journey, "cBs");
             let te = await this.autotoolsTask.bootstrap();
             te && this.running.set(te, extension.journey);
         }));
         extensionContext.subscriptions.push(vscode.commands.registerCommand('autotools.command.regen', async () => {
+            telemetry.logEvent(this.journey, "cRegen");
             await this.autotoolsTask.regen();
         }));
         extensionContext.subscriptions.push(vscode.commands.registerCommand('autotools.configure.help', async () => {
+            telemetry.logEvent(this.journey, "cHelp");
             await this.autotoolsTask.help();
         }));
         extensionContext.subscriptions.push(vscode.commands.registerCommand('autotools.visit.knowledgeBase', async () => {
+            telemetry.logEvent(this.journey, "gKB");
             await this.gotoKnowledgeBase();
         }));
         extensionContext.subscriptions.push(vscode.commands.registerCommand('autotools.visit.packageURL', async () => {
-            telemetry.logEvent(this.journey, "packageURL");
+            telemetry.logEvent(this.journey, "gpU");
             if (this.pkginfo?.url)
                 vscode.commands.executeCommand('vscode.open', this.pkginfo.url);
         }));
         extensionContext.subscriptions.push(vscode.commands.registerCommand('autotools.gotoBuildDirectory', async (goal: Goal) => {
-            telemetry.logEvent(this.journey, "gotoBuildDir");
+            telemetry.logEvent(this.journey, "gBD");
             vscode.commands.executeCommand('revealInExplorer', vscode.Uri.from({
                 scheme: 'file',
                 path: util.resolvePathToRoot(configuration.getCurrentMakefileConfiguration().top_builddir)
@@ -142,7 +146,7 @@ export class Extension {
         }));
 
         extensionContext.subscriptions.push(vscode.commands.registerCommand('autotools.visit.packageBugs', async () => {
-            telemetry.logEvent(this.journey, "packageBugs");
+            telemetry.logEvent(this.journey, "gpBugs");
             if (this.pkginfo?.bugreport)
                 vscode.commands.executeCommand('vscode.open', this.pkginfo.bugreport);
         }));
@@ -268,7 +272,7 @@ export class Extension {
                     },
                     err => {
                         logger.message(`ERROR: Internal error finding goal ${g.goal} in tests tree`,'Normal');
-                        telemetry.logException(new Error(`No ${g.goal} in test tree`));
+                        telemetry.logException(new Error(`No ${g.goal} in test tree`), extension.journey);
                     })
                 } else {
                     extension._projectOutlineProvider.all.set(g.getFilePath(), g); // Fixme - this cn be moved to Test Tree build parents, it seems out of place here. Here it does lazy allocation, in buildParents it would be eager allocation
@@ -278,11 +282,12 @@ export class Extension {
                     },
                     err => {
                         logger.message(`ERROR: Internal error finding goal ${g.goal} in programs tree`,'Normal');
-                        telemetry.logException(new Error(`No ${g.goal} in bin tree`));
+                        telemetry.logException(new Error(`No ${g.goal} in bin tree`), extension.journey);
                     });
                 }
             }
             this.suiteDecorator.highlightTargets(goals, sub.path);
+            telemetry.logEvent(this.journey, "rdep", {num: goals.length});
             return Promise.resolve();
         }));
 
@@ -931,6 +936,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     act = validact;
 
     context.subscriptions.push(vscode.commands.registerCommand('autotools.setBuildConfiguration', async () => {
+        telemetry.logEvent(extension.journey, "sBC");
         if (!configuration.getCurrentMakefileConfiguration().top_builddir && extension.isConfigured()) {
             const doit: string = localize("autotools.switch.to.out.of.tree", "Browse doc page");
             vscode.window.showErrorMessage(
@@ -953,18 +959,18 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }));
 
     context.subscriptions.push(vscode.commands.registerCommand('autotools.getConfiguration', async () => {
-        telemetry.logEvent(extension.journey, "getConfiguration");
+        telemetry.logEvent(extension.journey, "aGC");
         return configuration.getCurrentMakefileConfiguration();
     }));
 
     context.subscriptions.push(vscode.commands.registerCommand('autotools.goal', async () => {
-        telemetry.logEvent(extension.journey, "goal");
+        telemetry.logEvent(extension.journey, "agoal");
         return (await configuration.getCurrentTarget()).goal;
     }));
 
     /* also need top_builddir */
     context.subscriptions.push(vscode.commands.registerCommand('autotools.builddir', async () => {
-        telemetry.logEvent(extension.journey, "builddir");
+        telemetry.logEvent(extension.journey, "abd");
         return (await configuration.getCurrentTarget()).builddir;
     }));
 
@@ -973,7 +979,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     // Due to bug in cpptools, this temporarily returns an absolute path (always), but
     // this will eventually be fixed. Don't rely on abs paths.
     context.subscriptions.push(vscode.commands.registerCommand('autotools.default_program', async () => {
-        telemetry.logEvent(extension.journey, "default_program");
+        telemetry.logEvent(extension.journey, "adp");
         let built = await configuration.getCurrentTarget();
         // cpptools has a bug where if the "program" member of a launch debug configuration
         // is a relative path, it checks in the wrong directory and fails to find it.
@@ -1144,18 +1150,21 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             numClosed += irrelevant_tabs.length;
             vscode.window.tabGroups.close(irrelevant_tabs);
         });
-        telemetry.logEvent(extension.journey, "cU", {nt: numClosed});
+        telemetry.logEvent(extension.journey, "cIr", {nt: numClosed});
         return Promise.resolve();
     }));
 
     context.subscriptions.push(vscode.commands.registerCommand('autotools.outline.setBuildConfiguration', () => {
+        telemetry.logEvent(extension.journey, "sBCo");
         return vscode.commands.executeCommand("autotools.setBuildConfiguration");
     }));
 
     context.subscriptions.push(vscode.commands.registerCommand('autotools.outline.setTestEnvironment', () => {
+        telemetry.logEvent(extension.journey, "sTE");
         return configuration.setNewEnvironment();
     }));
 
+    logger.message(`${getStartTime(validact).toISOString()}: starting ${Extension.whoami} ${context.extension.packageJSON.version}`, 'Normal');
     extension.registerTasks();
 
     let configureAc = AutoToolsBootstrapTaskProvider.manifests.find((m) => checkFileExistsSync(resolvePathToRoot(m)));

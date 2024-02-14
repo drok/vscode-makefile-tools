@@ -1,0 +1,27 @@
+How to find trace:
+
+Given the message:
+
+2024-02-14T07:31:32.299Z: starting mergesium.autotools 0.1.0
+
+const ts = new Date('2024-02-14T07:31:32.299Z').getTime();
+
+let traceURL : string[] = [
+    'selected=%7B%22operation%22%3A%5B%22conf%22%2C%22an%22%2C%22lc%22%5D%7D',
+    'filterToFetchData=%5B%22duration%22%2C%22status%22%2C%22serviceName%22%2C%22operation%22%5D',
+    'spanAggregateCurrentPage=1',
+    'spanAggregateOrder=',
+    'spanAggregateCurrentPageSize=10',
+    'spanAggregateOrderParam=&',
+    'selectedTags=%5B%5D',
+    'isFilterExclude=%7B%22operation%22%3Atrue%7D&userSelectedFilter=%7B%22serviceName%22%3A%5B%22autotools%22%5D%2C%22status%22%3A%5B%22error%22%2C%22ok%22%5D%2C%22operation%22%3A%5B%22act%22%5D%7D'
+].concat([
+    `startTime=${ts}`,
+    `endTime=${ts}`,
+]);
+
+let url = 'http://64.44.157.130:3301/trace?' + traceURL.join('&');
+
+
+Combine with https://github.com/chibat/chrome-extension-typescript-starter into a chrome extension
+
