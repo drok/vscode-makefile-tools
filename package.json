@@ -581,7 +581,7 @@
             {
                 "view": "autotools.outline",
                 "contents": "%autotools.welcome.convert.markdownDescription%",
-                "when": "autotools:haveManifest > 1"
+                "when": "autotools:haveManifest == 2"
             },
             {
                 "view": "autotools.outline",
