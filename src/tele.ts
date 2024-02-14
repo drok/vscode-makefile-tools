@@ -48,6 +48,9 @@ export class MyTelemetry implements Disposable {
                 [SemanticResourceAttributes.SERVICE_VERSION]: extensionContext.extension.packageJSON.version,
                 [SemanticResourceAttributes.SERVICE_NAMESPACE]:
                     (env.appName == "Visual Studio Code" ? "vscode" : env.appName) + "." + env.appHost + '-' + vscode.version,
+                [SemanticResourceAttributes.OS_TYPE]: process.platform,
+                [SemanticResourceAttributes.HOST_ARCH]: process.arch,
+                [SemanticResourceAttributes.PROCESS_RUNTIME_VERSION]: process.version,
                 [SemanticResourceAttributes.SERVICE_INSTANCE_ID]: env.sessionId,
                 [SemanticResourceAttributes.DEVICE_ID]: env.machineId.slice(0, 8),
                 ['lang']: env.language,
