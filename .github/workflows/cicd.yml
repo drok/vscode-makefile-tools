@@ -89,7 +89,7 @@ jobs:
           --prefix=$PWD/../..
         if: runner.os == 'Linux'
       - name: Build Extension
-        run: yarn compile
+        run: yarn production-compile
       - name: Check make symbols
         run: objdump -T build/make/make
       # - name: Run Unit Tests on Windows or macOS
