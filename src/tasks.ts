@@ -3,12 +3,9 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 import * as path from 'path';
-import * as cp from 'child_process';
 import { Task, TaskDefinition, TaskScope, TaskGroup, TaskProvider,
-    ProcessExecution, ShellExecution,
-    workspace } from 'vscode';
+    ProcessExecution, ShellExecution } from 'vscode';
 import { Goal } from './parser/gnumake';
-import { assert, error } from 'console';
 import * as configuration from './configuration';
 import { TestEnvironment } from './configuration';
 import { BuildTarget, t_all, t_none, readTRS, TRS, isSuspect, emptyRunStats } from './make';
@@ -16,10 +13,8 @@ import { resolvePathToRoot, checkFileExistsSync, createDirectorySync } from './u
 import * as vscode from 'vscode';
 
 import * as nls from 'vscode-nls';
-import { Script } from 'vm';
 import { extension, telemetry } from './extension';
 import * as util from './util';
-import * as make from './make';
 import * as logger from './logger';
 import { env } from 'process';
 import * as ui from './ui';

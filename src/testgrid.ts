@@ -8,7 +8,6 @@ import { TestEnvironment, getAllBuildTargets, getCurrentMakefileConfiguration,
 import { TRS, TRS_Info } from './make';
 import { extension, waitActivated } from './extension';
 import { slugify } from './util';
-import * as path from 'path';
 
 
 export let GridShowOptions : TextDocumentShowOptions = {

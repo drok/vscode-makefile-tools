@@ -109,7 +109,9 @@ jobs:
         uses: HaaLeo/publish-vscode-extension@v1
         with:
           pat: stub
+          preRelease: true
           dryRun: true
+          yarn: true
           target: ${{ matrix.config.name }}-${{ matrix.arch }}
       - name: Upload Extension Package as Artifact
         uses: actions/upload-artifact@v3

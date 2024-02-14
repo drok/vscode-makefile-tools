@@ -4,27 +4,21 @@
 // Configuration support
 
 import { extension, telemetry, statusBar } from './extension';
-import { Attributes, SpanStatusCode } from './tele';
+import { SpanStatusCode } from './tele';
 import * as logger from './logger';
 import * as make from './make';
-import { BuildTarget } from './make';
 import { Goal } from './parser/gnumake';
 import * as ui from './ui';
 import * as util from './util';
 import * as vscode from 'vscode';
 import * as path from 'path';
-import * as multiStep from './multiStepInput';
 import { openSettings } from './extension';
 import { createHash } from 'crypto';
-import * as fs from 'fs';
 
 import * as nls from 'vscode-nls';
-import { dir } from 'console';
-import { Disposable } from 'vscode-jsonrpc';
-import { AutoToolsBuildTaskProvider, BuildTask } from './tasks';
+import { BuildTask } from './tasks';
 import { assert } from 'console';
-import { parse, quote } from '@mergesium/shell-quote';
-import { env } from 'process';
+import { quote } from '@mergesium/shell-quote';
 import { Span } from '@opentelemetry/api';
 
 nls.config({ messageFormat: nls.MessageFormat.bundle, bundleFormat: nls.BundleFormat.standalone })();

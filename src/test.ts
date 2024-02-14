@@ -1,20 +1,15 @@
 import * as path from 'path';
-import { runInNewContext } from 'vm';
 import * as vscode from 'vscode';
-import { Goal, Make } from './parser/gnumake';
+import { Goal } from './parser/gnumake';
 import { BuildTarget, TRS } from './make';
-import { TestController,
+import {
         EventEmitter,
-        TestItemCollection,
-        TestRunRequest,
         TestItem,
         TestRun } from 'vscode';
-import { SSL_OP_DONT_INSERT_EMPTY_FRAGMENTS } from 'constants';
-import { makeFullPath } from './util';
 import { TRS_Info, readTRS, emptyRunStats } from './make';
 import { Extension, extension,
-        telemetry,
-        openEditor } from './extension';
+        telemetry
+        } from './extension';
 import { SpanStatusCode } from './tele';
 import { MakefileConfiguration } from './configuration';
 import { resolvePathToRoot } from './util';
@@ -23,7 +18,6 @@ import * as configuration from "./configuration";
 import { TestEnvironment, traits } from './configuration';
 import { isDebuggable } from './debug';
 import * as logger from './logger';
-import * as fs from 'fs';
 
 import * as nls from 'vscode-nls';
 import { assert, markTimeline } from 'console';

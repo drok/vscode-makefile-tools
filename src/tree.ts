@@ -6,14 +6,11 @@
 import * as configuration from './configuration';
 import * as path from 'path';
 import * as util from './util';
-import { BuildTarget, t_none } from './make';
 import { Make, Goal } from './parser/gnumake';
-import { TestTask } from './tasks';
 import * as vscode from 'vscode';
 
 import * as nls from 'vscode-nls';
-import { Extension, extension, telemetry } from './extension';
-import { assert } from 'console';
+import { extension, telemetry } from './extension';
 import { Span } from '@opentelemetry/api';
 nls.config({ messageFormat: nls.MessageFormat.bundle, bundleFormat: nls.BundleFormat.standalone })();
 const localize: nls.LocalizeFunc = nls.loadMessageBundle();

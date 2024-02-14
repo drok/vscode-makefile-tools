@@ -20,7 +20,6 @@ import { Node, Scheme } from '../tree';
 import * as nls from 'vscode-nls';
 import { Extension, extension, telemetry } from '../extension';
 import { Span } from '@opentelemetry/api';
-import { log } from 'console';
 nls.config({ messageFormat: nls.MessageFormat.bundle, bundleFormat: nls.BundleFormat.standalone })();
 const localize: nls.LocalizeFunc = nls.loadMessageBundle();
 

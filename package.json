@@ -1066,13 +1066,13 @@
         "translations-generate": "gulp translations-generate",
         "translations-import": "gulp translations-import",
 
-        "esbuild-base": "esbuild ./src/extension.ts --bundle --outfile=out/main.js --external:vscode --platform=node",
+        "esbuild-base": "esbuild ./src/extension.ts --bundle --outfile=$npm_package_main --external:vscode --platform=node",
         "esbuild": "npm run esbuild-base -- --sourcemap",
         "test-compile": "tsc -p ./",
 
         "watch": "tsc -watch -p ./",
-        "package": "echo Do something like vsce package --pre-release --target linux-x64 --yarn -o autotools.vsix",
-        "publish": "vsce publish --pre-release --yarn -i autotools.vsix",
+        "package": "[ ! -z $TARGET ] && vsce package --pre-release --target $TARGET --yarn -o autotools.$TARGET.$npm_package_version-pre.vsix",
+        "publish": "echo I WOULD vsce publish --pre-release --yarn -i autotools.vsix",
         "pretest": "yarn compile",
         "test": "yarn run pretest && node ./out/src/test/runTest.js"
     },
