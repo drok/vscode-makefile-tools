@@ -328,7 +328,7 @@ export function accountForTraits(): void {
 // apply to the current makefile configuration.
 export let initialConfigurationAttempted : boolean = false;
 export async function analyzeConfigureParams(parentSpan: Span, reload: boolean, failIfUnconfigured : boolean): Promise<boolean> {
-    let reason : string;
+    let result : string;
     let hasMakefile : boolean = false;
     let span = telemetry.startSpan("an", parentSpan);
 
@@ -363,7 +363,7 @@ export async function analyzeConfigureParams(parentSpan: Span, reload: boolean, 
                         extension._projectOutlineProvider?.clear();
                         extension._projectTestSuitesProvider?.clear();
                                         // extension.setConfiguration(currentMakefileConfigurationName);
-                        reason = "ok";
+                        result = "ok";
                         hasMakefile = true;
                     } else {
                         logger.message('Configuration succeeded but there is no makefile.');
@@ -371,15 +371,15 @@ export async function analyzeConfigureParams(parentSpan: Span, reload: boolean, 
                         /* Override the bootstrapped context so the welcome button "Bootstrap is shown" */
                         vscode.commands.executeCommand("setContext", "autotools:isBootstrapped", 2);
                         telemetry.setSpanStatus(span, SpanStatusCode.ERROR, "no-makefile");
-                        reason = "configured-noMakefile"
+                        result = "configured-noMakefile"
                     }
                 } else
-                    reason = "ok";
+                    result = "oks";
             } else {
-                reason = "configure-failed";
+                result = "configure-failed";
             }
         } else {
-            reason = "Is not Bootstraped";
+            result = "not-bootstraped";
             logger.message('The project is not yet bootstrapped.');
         }
         if (!reload)
@@ -387,10 +387,10 @@ export async function analyzeConfigureParams(parentSpan: Span, reload: boolean, 
                 (hasMakefile ? ui.UIStatus.OK : ui.UIStatus.NO_MAKEFILE) :
                 ui.UIStatus.NON_AUTOTOOLS);
     } else {
-        reason = "n/a";
+        result = "n/a";
     }
 
-    telemetry.logEvent(span, reason, { reason: "init" });
+    telemetry.logEvent(span, "analyze", { result: result });
     span.end();
     getProblemMatchersForConfiguration();
     return Promise.resolve(hasMakefile);
@@ -1034,7 +1034,7 @@ export async function initFromSettings(activation: boolean = false, span: Span):
                     }
 
                 } catch (e) {
-                    telemetry.logException(e);
+                    telemetry.logException(e, span);
                     logger.message(e.message);
                 }
             });

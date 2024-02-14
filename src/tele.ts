@@ -51,9 +51,10 @@ export class MyTelemetry implements Disposable {
                 [SemanticResourceAttributes.SERVICE_NAME]: extensionContext.extension.packageJSON.name,
                 [SemanticResourceAttributes.SERVICE_VERSION]: extensionContext.extension.packageJSON.version,
                 [SemanticResourceAttributes.SERVICE_NAMESPACE]:
-                    (env.appName == "Visual Studio Code" ? "vscode" : env.appName) + "." + env.appHost,
+                    (env.appName == "Visual Studio Code" ? "vscode" : env.appName) + "." + env.appHost + '-' + vscode.version,
                 [SemanticResourceAttributes.SERVICE_INSTANCE_ID]: env.sessionId,
                 [SemanticResourceAttributes.DEVICE_ID]: env.machineId.slice(0, 8),
+                ['lang']: env.language,
             })
         });
         const contextManager = new AsyncHooksContextManager();
@@ -104,11 +105,10 @@ export class MyTelemetry implements Disposable {
         }
         span.addEvent(eventName, attributes);
     }
-    private defSpan : Span | undefined;
-    public logException(exception: Error, span?: Span) {
-        let s: Span = span ?? this.defSpan ?? this.startSpan('def');
-        s.recordException({code: exception.name, message: exception.message, stack: exception.stack});
-        if (span == undefined) this.defSpan = s;
+    public logException(exception: Error, span: Span) {
+        if (exception instanceof Error)
+            span.setStatus({code: SpanStatusCode.ERROR, message: 'ex'});
+        span.recordException({code: exception.name, message: exception.message, stack: exception.stack});
     }
     public startSpan(name: string, span? : Span) : Span {
         let newspan : Span;
@@ -217,6 +217,11 @@ export interface Params {
      */
     pre_ok?: number;
     pre_update?: number;
+}
+
+export function getStartTime(span: Span) : Date {
+    let d : [ number, number ] = (span as any).startTime; //_getTime();//  spanContext();
+    return span ? new Date(d[0]*1000 + (d[1]/1000000)) : new Date(); // in case tele is disabled?
 }
 
 /* Example - conf[] where each conf = Params as array.

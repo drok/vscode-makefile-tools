@@ -362,7 +362,7 @@ export async function generateParseContent(span: Span): Promise<ConfigureSubphas
                 logger.message(`ERROR: Parser error (dryrun line ${linenumber}):` + e);
                 parseFailedAt = linenumber;
                 parserStack = [];
-                telemetry.logException(e);
+                telemetry.logException(e, span);
                 throw new Error("Quit parse" + e);
             }
 
@@ -480,7 +480,7 @@ export async function generateParseContent(span: Span): Promise<ConfigureSubphas
         };
     } catch (error) {
         logger.message("Parsing the configuration failed due to: " + error);
-        telemetry.logException(error);
+        telemetry.logException(error, span);
         ui.getUI().setStatus(ui.UIStatus.RUNTIME);
         return {
             retc: ConfigureBuildReturnCodeTypes.notFound,
@@ -680,7 +680,7 @@ export async function configure(parentSpan: Span, triggeredBy: TriggeredBy): Pro
     logger.message(
       `Exception thrown during the configure process: ${e.message}`
     );
-    telemetry.logException(e);
+    telemetry.logException(e, span);
     telemetry.endSpanWithStatus(span, SpanStatusCode.ERROR, e.message);
     retc = ConfigureBuildReturnCodeTypes.other;
     return e.errno;
@@ -726,7 +726,6 @@ export async function configure(parentSpan: Span, triggeredBy: TriggeredBy): Pro
         numConfigs: configuration.getMakefileConfigurations().length,
         firstTime: !ranConfigureInCodebaseLifetime,
         readCache: readCache,
-        trigBy: triggeredBy,
         ret: retc,
     });
 
@@ -791,7 +790,7 @@ async function loadConfigurationFromCache(cacheFile: string, parentSpan: Span): 
                     configurationCache.customConfigurationProvider.fileIndex.length,
                 ]});
         } catch (e) {
-            telemetry.logException(e);
+            telemetry.logException(e, span);
             logger.message("An error occured while parsing the configuration cache.");
             telemetry.endSpanWithStatus(span, SpanStatusCode.ERROR, "parsing");
         }
