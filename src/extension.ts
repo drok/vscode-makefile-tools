@@ -1227,10 +1227,6 @@ export async function startupWithWorkspace(context: vscode.ExtensionContext, val
     }
 
     extension.tasksBugWorkaround();
-    const openFile = async (fileUri: vscode.Uri) => {
-        await vscode.commands.executeCommand("vscode.open", fileUri);
-        await vscode.commands.executeCommand("workbench.files.action.showActiveFileInExplorer");
-    }
 
     context.subscriptions.push(vscode.workspace.onDidSaveTextDocument(async (f) => {
         if (extension.testController && f.uri.scheme === "file" &&
