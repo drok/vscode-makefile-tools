@@ -83,7 +83,7 @@ jobs:
           --disable-job-server
           --disable-load
           'INSTALL_PROGRAM=install -cs'
-          'CFLAGS=-g0 -O2 -include $top_srcdir/../gnumake-include.h'
+          "CFLAGS=-g0 -O2 -include $PWD/../../vendor/gnumake-include.h"
           LDFLAGS=-lrt
           --disable-nls
           --prefix=$PWD/../..
