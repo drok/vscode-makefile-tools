@@ -1169,7 +1169,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         return configuration.setNewEnvironment();
     }));
 
-    logger.message(`${getStartTime(validact).toISOString()}: starting ${Extension.whoami} ${context.extension.packageJSON.version}`, 'Normal');
+    logger.message(`${getStartTime(validact).toISOString()}: starting ${Extension.whoami} ${context.extension.packageJSON.version}/${buildinfo.platform}-${buildinfo.arch}`, 'Normal');
     extension.registerTasks();
 
     if (buildinfo.arch != process.arch || buildinfo.platform != process.platform) {
