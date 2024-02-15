@@ -1091,7 +1091,7 @@
         "test-compile": "tsc -p ./",
 
         "watch": "tsc -watch -p ./",
-        "package": "[ ! -z $TARGET ] && vsce package --pre-release --target $TARGET --yarn -o autotools.$TARGET.$npm_package_version-pre.vsix",
+        "package": "[ ! -z $TARGET ] && vsce package --pre-release --target $TARGET --yarn -o autotools.$npm_package_version-pre-$TARGET.vsix",
         "publish": "echo I WOULD vsce publish --pre-release --yarn -i autotools.vsix",
         "pretest": "yarn compile",
         "test": "yarn run pretest && node ./out/src/test/runTest.js"
