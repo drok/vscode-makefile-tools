@@ -68,6 +68,8 @@ jobs:
         run: yarn install
       # - name: Run Linter
       #   run: npm run lint
+      - name: Detect Binary Build Info
+        run: node  -e 'let e={arch:process.arch,platform:process.platform};console.log(`export let buildinfo:{arch:string,platform:string}=${JSON.stringify(e)};`);' > buildinfo.ts
       - name: Generate Translations
         run: yarn run translations-generate
       - name: Bootstrap external dependencies

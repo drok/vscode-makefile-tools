@@ -14,6 +14,7 @@ import { getSettingOr } from './util';
 import { Extension, openSettings } from './extension';
 // import * as util from './util'
 import * as vscode from 'vscode'
+import { buildinfo } from '../buildinfo';
 
 import { trace,
     Span, SpanStatusCode, SpanContext, Context, SpanOptions } from '@opentelemetry/api'
@@ -46,6 +47,7 @@ export class MyTelemetry implements Disposable {
             resource: new Resource({
                 [SemanticResourceAttributes.SERVICE_NAME]: extensionContext.extension.packageJSON.name,
                 [SemanticResourceAttributes.SERVICE_VERSION]: extensionContext.extension.packageJSON.version,
+                ['buildinfo']: `${buildinfo.platform}-${buildinfo.arch}`,
                 [SemanticResourceAttributes.SERVICE_NAMESPACE]:
                     (env.appName == "Visual Studio Code" ? "vscode" : env.appName) + "." + env.appHost + '-' + vscode.version,
                 [SemanticResourceAttributes.OS_TYPE]: process.platform,
