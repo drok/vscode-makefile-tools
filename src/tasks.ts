@@ -488,7 +488,7 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
         if (this.bootstrapTask) {
             await this.waitToTouchMakefiles();
             return await vscode.tasks.executeTask(this.bootstrapTask).then((te: vscode.TaskExecution) => {
-                ui.getUI().setLoading(ui.UIStatus.LOADING);
+                ui.getUI().setLoading(ui.UIStatus.REGEN);
                 return te;
             },(e) => {
                 ui.getUI().setLoading(ui.UIStatus.ERR);

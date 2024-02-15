@@ -343,6 +343,7 @@ export async function analyzeConfigureParams(parentSpan: Span, reload: boolean, 
     vscode.commands.executeCommand("setContext", "autotools:isBootstrapped", bootstrapped ? 1 : 2);
 
     if (isAutotools) {
+        statusBar.show();
         if (bootstrapped) {
             if (configured || (!failIfUnconfigured && await extension.configure(span))) {
                 let relativeMakefile = findMakefile();

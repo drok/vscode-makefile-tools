@@ -78,7 +78,7 @@ export class Extension {
     private cppToolsAPI?: cpp.CppToolsApi;
     private cppConfigurationProviderRegister?: Promise<void>;
     private tasks: MyTaskProvider[];
-    private autotoolsTask: AutoToolsBootstrapTaskProvider;
+    public autotoolsTask: AutoToolsBootstrapTaskProvider;
     private buildTasks: AutoToolsBuildTaskProvider;
     private testTasks: AutoToolsTestTaskProvider;
     private checkTasks: AutoToolsCheckTaskProvider;
@@ -495,7 +495,12 @@ export class Extension {
                             (typeof e.exitCode == 'number') ? e.exitCode : (e.exitCode ? 1 : 0));
                     if (!e.exitCode) {
                         if (definition?.action == "bootstrap") {
-                            await configuration.analyzeConfigureParams(span, false, false);
+                            let r = await configuration.analyzeConfigureParams(span, false, false) &&
+                                !await make.configure(span, make.TriggeredBy.configureAfterConfigurationChange);
+                            if (r)
+                                if (this.testController) {
+                                    this.testController.onSavedAll();
+                                };
                         } else if (definition?.action == "regen" || definition?.action == "recheck" || definition?.action == "configure") {
                             let r = await configuration.analyzeConfigureParams(span, false, true) &&
                                 !await make.configure(span, make.TriggeredBy.configureAfterConfigurationChange);
@@ -940,7 +945,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         if (!configuration.getCurrentMakefileConfiguration().top_builddir && extension.isConfigured()) {
             const doit: string = localize("autotools.switch.to.out.of.tree", "Browse doc page");
             vscode.window.showErrorMessage(
-                localize("autotools.want.out-of-tree", "The project needs to be switched to out-of-tree build mode."),
+                localize("autotools.want.out-of-tree", "The project does not support additional build configurations until it is switched to out-of-tree build mode."),
                 doit,
                 localize("autotools.cancel", "Cancel")).then((value) => {
                 if (value === doit) {
@@ -1183,13 +1188,28 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             }
         }));
         telemetry.endSpanWithStatus(act, SpanStatusCode.OK, "noWS");
-        return;
     } else if (vscode.workspace.workspaceFolders.length != 1) {
+        context.subscriptions.push(vscode.workspace.onDidChangeWorkspaceFolders(async (e) => {
+            detectWorkspaceMode();
+            if(vscode.workspace.workspaceFolders?.length == 1) {
+                let span = telemetry.startSpan("openWS", extension.journey);
+                await startupWithWorkspace(context, span, span);
+                // span.end();
+            }
+        }));
         telemetry.endSpanWithStatus(act, SpanStatusCode.OK, "multiRoot", {n: vscode.workspace.workspaceFolders.length});
-        //telemetry.logEvent(act, "multiRoot", {n: vscode.workspace.workspaceFolders.length});
-        //act.end();
-    } else
+    } else {
+        context.subscriptions.push(vscode.workspace.onDidChangeWorkspaceFolders(async (e) => {
+            // ie, if the folder was deleted, the editor will think it exists when it activates.
+            // if the user re-clones, bootstrap and configure it.
+            detectWorkspaceMode();
+            if(vscode.workspace.workspaceFolders?.length == 1) {
+                await extension.autotoolsTask.recheck();
+                // span.end();
+            }
+        }));
         await startupWithWorkspace(context, validact, act);
+    }
     } catch (e) {
         /* Can be caused by:
             extensionHost.js:
@@ -1243,6 +1263,16 @@ export async function startupWithWorkspace(context: vscode.ExtensionContext, val
         }
     }));
 
+    context.subscriptions.push(vscode.workspace.onDidCreateFiles(async (f) => {
+//        if (extension.testController && f.uri.scheme === "file" &&
+//            !ignoredSaveFiles.has(path.basename(f.uri.fsPath))) {
+//            if (!vscode.workspace.textDocuments.some((d) => d.isDirty))
+//                await extension.testController?.onSavedAll();
+//        }
+        logger.message("created files", 'debug');
+    }));
+
+
     // context.subscriptions.push(vscode.window.onDidChangeVisibleTextEditors( (editors) => {
     //     // logger.message(`Opened file ${.uri}`, "Normal");
     context.subscriptions.push(vscode.window.tabGroups.onDidChangeTabs(async (tabs) => {
@@ -1273,7 +1303,8 @@ export async function startupWithWorkspace(context: vscode.ExtensionContext, val
     }))
 
     if (!configuration.getConfigurationMakefile()) {
-        ui.getUI().setLoading(extension.isAutotoolsProject() ? ui.UIStatus.ERR : ui.UIStatus.NON_AUTOTOOLS);
+        if (!extension.autotoolsTask.isWorking) // if bootstrapping was started above, don't flag now. the bootstrap result will tell.
+            ui.getUI().setLoading(extension.isAutotoolsProject() ? ui.UIStatus.ERR : ui.UIStatus.NON_AUTOTOOLS);
         act.end();
         isActive = true;
         _activatedEvent.fire(isActive);
