@@ -16,24 +16,23 @@ on:
 
 jobs:
   build-lint-test:
-    name: Node ${{ matrix.node }} on ${{ matrix.config.os }}-${{ matrix.arch }}
+    name: Node ${{ matrix.node }} on ${{ matrix.config.os }}-${{ matrix.config.name }}
     runs-on: ${{ matrix.config.os }}
     timeout-minutes: 5
     strategy:
       fail-fast: false
       matrix:
         config:
-          - { os: ubuntu-20.04, name: linux }
-          - { os: macos-latest, name: darwin }
+          - { os: ubuntu-20.04, name: linux-x64 }
+          # See https://github.blog/2023-10-02-introducing-the-new-apple-silicon-powered-m1-macos-larger-runner-for-github-actions/
+          - { os: macos-13-large, name: darwin-x64 }
+          - { os: macos-13-xlarge, name: darwin-arm64 }
           # - { os: windows-latest, name: win32 }
-        arch:
-          - x64
-          - arm64
         node:
-          - 16
+          - 18
     outputs:
       vsixPath: ${{ steps.packageExtension.outputs.vsixPath }}
-      target: ${{ matrix.config.name }}-${{ matrix.arch }}
+      target: ${{ matrix.config.name }}
     steps:
       - uses: awalsh128/cache-apt-pkgs-action@latest
         with:
@@ -114,11 +113,11 @@ jobs:
           preRelease: true
           dryRun: true
           yarn: true
-          target: ${{ matrix.config.name }}-${{ matrix.arch }}
+          target: ${{ matrix.config.name }}
       - name: Upload Extension Package as Artifact
         uses: actions/upload-artifact@v3
         with:
-          name: ${{ matrix.config.name }}-${{ matrix.arch }}
+          name: ${{ matrix.config.name }}
           path: ${{ steps.packageExtension.outputs.vsixPath }}
 
   # coverage:
