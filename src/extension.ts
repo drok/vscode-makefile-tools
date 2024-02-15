@@ -63,6 +63,7 @@ const rdepRevealOption : { select: boolean,
         focus: boolean } = {select: false, expand: 3, focus: false};
 export class Extension {
     static readonly whoami: string = "mergesium.autotools";
+    static readonly myVersion = 0;
 
     public readonly journey;
     private mementoState : state.StateManager;

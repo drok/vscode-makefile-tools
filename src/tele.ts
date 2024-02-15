@@ -260,7 +260,7 @@ export async function getParams() : Promise<Params> {
                             let r = JSON.parse(tt);
                             if (Array.isArray(r) && !r.some(i => !Array.isArray(i) || i.some(iv => isNaN(Number(iv))))) {
                                 for (const conf of r) {
-                                    if (conf[0] == 0 || conf[0] >= myVersion) {
+                                    if (conf[0] == 0 || conf[0] >= Extension.myVersion) {
                                         if (conf.length >= 4)
                                             param = {s:conf[1], u:conf[2], e:conf[3], pre_ok: 0};
                                         if (conf.length >= 5)
@@ -268,7 +268,7 @@ export async function getParams() : Promise<Params> {
                                         if (conf.length >= 6)
                                             param.pre_update = conf[5];
                                     }
-                                    if (conf[0] >= myVersion) break;
+                                    if (conf[0] >= Extension.myVersion) break;
                                 }
                             }
                         } catch (e) {
@@ -298,5 +298,3 @@ export async function getParams() : Promise<Params> {
         s: 1, u: 1, e: 1
     };
 }
-
-const myVersion = 1;

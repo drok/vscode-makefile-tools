@@ -204,6 +204,7 @@ export class AutoToolsTestTaskProvider implements MyTaskProvider {
                             this.numUnknown += results[TRS.NONE] + results[TRS.ERROR] + (envs.length - d.trs.results.size);
                             this.numSuspect += results[TRS.ERROR] + results[TRS.XFAIL];
                             this.numTests+=envs.length;
+
                             extension.updateTRSInPanel(cte,undefined,d,dir);
                             // tc.addTest(suite, d, trs);
                         });
