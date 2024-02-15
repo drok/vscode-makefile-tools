@@ -24,7 +24,7 @@ jobs:
       matrix:
         config:
           - { os: ubuntu-20.04, name: linux }
-          - { os: macos-latest, name: darwin }
+          # - { os: macos-latest, name: darwin }
           # - { os: windows-latest, name: win32 }
         arch:
           - x64
