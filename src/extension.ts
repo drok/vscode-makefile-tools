@@ -45,6 +45,8 @@ import * as nls from 'vscode-nls';
 import { assert, log } from 'console';
 import { installAutotools } from './install';
 import { Span } from '@opentelemetry/api';
+import { buildinfo } from '../buildinfo';
+
 nls.config({ messageFormat: nls.MessageFormat.bundle, bundleFormat: nls.BundleFormat.standalone })();
 const localize: nls.LocalizeFunc = nls.loadMessageBundle();
 
@@ -1167,9 +1169,14 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         return configuration.setNewEnvironment();
     }));
 
-    logger.message(`${getStartTime(validact).toISOString()}: starting ${Extension.whoami} ${context.extension.packageJSON.version} - pre-release expires ${Extension.expires}`, 'Normal');
+    logger.message(`${getStartTime(validact).toISOString()}: starting ${Extension.whoami} ${context.extension.packageJSON.version}/${buildinfo.platform}-${buildinfo.arch} - pre-release expires ${Extension.expires}`, 'Normal');
     extension.registerTasks();
 
+    if (buildinfo.arch != process.arch || buildinfo.platform != process.platform) {
+        vscode.commands.executeCommand('setContext', "autotools:binaryIncompatible", true);
+        telemetry.endSpanWithStatus(act, SpanStatusCode.ERROR, "binIncompatible");
+        return;
+    }
     detectWorkspaceMode();
     if (vscode.workspace.workspaceFolders == undefined) {
         context.subscriptions.push(vscode.workspace.onDidChangeWorkspaceFolders(async (e) => {
