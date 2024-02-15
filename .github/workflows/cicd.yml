@@ -108,13 +108,10 @@ jobs:
       #     flag-name: Test on ${{ matrix.config.os }}
       - name: Package Extension
         id: packageExtension
-        uses: HaaLeo/publish-vscode-extension@v1
-        with:
-          pat: stub
-          preRelease: true
-          dryRun: true
-          yarn: true
-          target: ${{ matrix.config.name }}
+        run: |
+          TARGET=${{ matrix.config.name }} npm run package
+          echo "vsixPath=$(echo *-${{ matrix.config.name }}.vsix)" > "$GITHUB_OUTPUT"
+
       - name: Upload Extension Package as Artifact
         uses: actions/upload-artifact@v3
         with:
