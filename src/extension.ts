@@ -567,12 +567,14 @@ export class Extension {
                     localize("autotools.suspect.tests", "{0}/{1} tests are suspect (XPASS/XFAIL/ERROR)",
                         this.testTasks.numSuspect, this.testTasks.numTests),
                 value: this.testTasks.numSuspect};
-        } else if (this.testTasks.numTests && this.testTasks.numUnknown) {
-            this._projectTestSuitesView.badge =
-                {tooltip:
-                    localize("autotools.unknown.tests", "{0}/{1} tests are available/not yet run",
-                        this.testTasks.numUnknown, this.testTasks.numTests),
-                value: this.testTasks.numUnknown};
+// FIXME: this miscounts when TRS file is deleted (3x inotify on test updates). Re-test
+//
+//        } else if (this.testTasks.numTests && this.testTasks.numUnknown) {
+//            this._projectTestSuitesView.badge =
+//                {tooltip:
+//                    localize("autotools.unknown.tests", "{0}/{1} tests are available/not yet run",
+//                        this.testTasks.numUnknown, this.testTasks.numTests),
+//                value: this.testTasks.numUnknown};
         } else {
             this._projectTestSuitesView.badge =
                 {tooltip:
