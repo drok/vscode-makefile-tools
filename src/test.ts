@@ -136,12 +136,15 @@ export class MyTestController {
     cancelToken.dispose();
   }
 
-  public async debug(test: TestItem, env: TestEnvironment) : Promise<void> {
+  public async debug(span: Span, test: TestItem, env: TestEnvironment) : Promise<void> {
     var cancelToken = new vscode.CancellationTokenSource();
     try {
         env.debug?.runHandler(new vscode.TestRunRequest([test], [], env.run), cancelToken.token);
+        telemetry.setSpanStatus(span, SpanStatusCode.OK);
     } catch (e) {
         console.error("Failed to start debugger", test);
+        telemetry.logException(e, span);
+        telemetry.setSpanStatus(span, SpanStatusCode.ERROR);
     }
     cancelToken.dispose();
   }

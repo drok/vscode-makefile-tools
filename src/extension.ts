@@ -1142,17 +1142,14 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }));
 
     context.subscriptions.push(vscode.commands.registerCommand('autotools.debug', async (goal: Goal) => {
-        telemetry.logEvent(extension.journey, "d");
         if (!goal.task)
             throw new Error("Missing test task on TaskNode");
+        let span = telemetry.startSpan("debugCmd", extension.journey);
         if (goal.test && extension.testController)
-            extension.testController.debug(goal.test, configuration.getCurrentTestEnvironment());
-
-//        const definition: TestTask = <any>sub.goal.task.get.definition;
-//            if (definition?.type == 'test' && sub.goal && definition.test)
-//                extension.debugGoal(sub.goal, definition.test.builddir, configuration.getProjectTestEnvironment());
-//        }
-        // return await vscode.tasks.executeTask(sub.goal.task);
+            extension.testController.debug(span, goal.test, configuration.getCurrentTestEnvironment());
+        else
+            telemetry.setSpanStatus(span, SpanStatusCode.ERROR, "noTestOrController");
+        span.end();
     }));
 
     context.subscriptions.push(vscode.commands.registerCommand('autotools.openLog', async (sub: tree.SubNode) => {
