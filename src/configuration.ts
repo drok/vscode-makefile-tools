@@ -1107,7 +1107,7 @@ export async function setNewConfiguration(span: Span): Promise<void> {
 
 export function prepareEnvQuickPick(): PickItem[] {
     const items: PickItem[] = testEnvironments.map<PickItem>((k =>
-        new PickItem(k, k.name, k.dirs ? k.dirs.join(", ") : "all suites", k.testExecOptions?.env?.TESTS_ENVIRONMENT || "no vars")
+        new PickItem(k, k.name, k.dirs ? (k.dirs.length ? "only in: " + k.dirs.join(", ") : "nowhere") : "", k.testExecOptions?.env?.TESTS_ENVIRONMENT || "no vars")
         ));
 
     if (items.length === 0) {
@@ -1146,7 +1146,7 @@ export async function setNewEnvironment(): Promise<void> {
         setBuildEnvPath();
         extension.getState().testEnvironment = newName;
         extension.setTestEnvironmentName(newName);
-        extension._projectTestSuitesProvider.updateTree();
+        extension._projectTestSuitesProvider.updateTree(getCurrentTestEnvironment());
     }
 }
 

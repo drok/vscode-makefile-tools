@@ -100,7 +100,7 @@ export class Extension {
 
         this.mementoState = new state.StateManager(this.extensionContext);
         this._projectOutlineProvider = new ProjectOutlineProvider(this.journey, this.mementoState.buildConfiguration);
-        this._projectTestSuitesProvider = new ProjectTestsProvider(this.journey);
+        this._projectTestSuitesProvider = new ProjectTestsProvider(this.journey); // <null>
 
         this.autotoolsTask = new AutoToolsBootstrapTaskProvider();
         this.buildTasks = new AutoToolsBuildTaskProvider();
