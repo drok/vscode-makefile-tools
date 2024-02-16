@@ -385,7 +385,9 @@ export class Extension {
                 goal.trs = newTRS;
             else
               return; // TRS file moved to .tmp
-            this.updateTRSInPanel(env, old, goal, dir);
+            if (this.updateTRSInPanel(env, old, goal, dir))
+                this.updateOutlineBadge();
+
             let old_global = goal.trs?.global ?? TRS.NONE;
             if ( ((goal.test && goal.trs.global != old_global) || this.testController?.busy) && !(goal.flags & Goal.Flags.Test_Suite))
                 /* If there is an active test run, use it to log the TRS result.
@@ -396,7 +398,8 @@ export class Extension {
         }
     }
     private unsupported_log_count : number = 0;
-    public updateTRSInPanel(env: TestEnvironment, old: make.TestResult | undefined, goal: Goal, dir: string) : void {
+    // return true if the Outline badge should update
+    public updateTRSInPanel(env: TestEnvironment, old: make.TestResult | undefined, goal: Goal, dir: string) : boolean {
         /* The ?? defaults are needed when the test is not using my LOG_DRIVER
          * .. the TRS in the file will not have the hashCode
          *
@@ -417,8 +420,9 @@ export class Extension {
             if (old !== undefined) // Don't update when TRS's are initially read from disk
                 this.failStatUpdate(oldTRS, current ?? TRS.NONE);
             // Don't update the test suites. They are auto summarized
-            this.updateOutlineBadge();
+            return true;
         }
+        return false;
     }
 
     public async bootstrapWithPrompt(span: Span) : Promise<void>  {
@@ -618,7 +622,8 @@ export class Extension {
             this.testController?.deactivate();
             this.testController = undefined;
         }
-        this.tasks.forEach((provider) => provider.update(this.configDisposables));
+        let updateBadge : boolean = false;
+        this.tasks.forEach((provider) => updateBadge = provider.update(this.configDisposables) || updateBadge);
         if (this._projectOutlineTreeView) {
             this._projectOutlineProvider.updateTargets(build_tree);
         }
@@ -963,7 +968,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             // await vscode.commands.executeCommand('extension.open', "ms-vscode-remote.remote-ssh#getting-started");
             // vscode.commands.executeCommand('vscode.open', "https://autotools.mergesium.com/doc/switch-to-out-of-tree-configurations");
         } else {
-            await configuration.setNewConfiguration(extension.journey);
+            try {
+                await configuration.setNewConfiguration(extension.journey);
+            } catch (e) {
+                logger.message(`ERROR: switching configuration failed: ${e}`, 'Normal');
+
+            }
         }
     }));
 

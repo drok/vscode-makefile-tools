@@ -92,7 +92,8 @@ export class MyTestController {
         goal.trs = readTRS(target, configuration.getCurrentMakefileConfiguration());
         this.updateGoalTRS(this.activeRun.run, test, goal.trs?.global, target.builddir);
         if (this.activeRun.env == configuration.getCurrentTestEnvironment())
-            extension.updateTRSInPanel(this.activeRun.env, old, goal, target.builddir);
+            extension.updateTRSInPanel(this.activeRun.env, old, goal, target.builddir) &&
+                extension.updateOutlineBadge();
     }
     this.updateTestDescription(goal, target.builddir);
 
@@ -105,6 +106,7 @@ export class MyTestController {
     // FIXME: also updateTestDescriptions of children
     let c = configuration.getCurrentMakefileConfiguration();
     let updatePanel = (this.activeRun!.env == configuration.getCurrentTestEnvironment());
+    let updateBadge : boolean = false;
     if (this.busyNonLiveTest)
         for (const d of goal.depends!) {
             let bd : BuildTarget = new BuildTarget(dir, d.goal!);
@@ -112,9 +114,10 @@ export class MyTestController {
             d.trs = readTRS(bd, c);
             this.updateGoalTRS(this.activeRun!.run, d.test!, d.trs?.global, dir);
             if (updatePanel) {
-                extension.updateTRSInPanel(this.activeRun!.env, old, d, dir);
+                updateBadge = extension.updateTRSInPanel(this.activeRun!.env, old, d, dir) || updateBadge;
             }
         }
+        if (updateBadge) extension.updateOutlineBadge();
     // else
         //this.activeRun?.run.passed(this.activeGoal!.test!); // FIXME: need actual pass / fail  for the suite
 

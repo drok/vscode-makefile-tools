@@ -50,7 +50,7 @@ export class AutoToolsBuildTaskProvider implements MyTaskProvider {
     changeConfiguration(c: configuration.MakefileConfiguration, disposables: vscode.Disposable[]) : void {
         this.myPromise = Promise.resolve([])
     }
-    public update(disposables: vscode.Disposable[]) {
+    public update(disposables: vscode.Disposable[]) : boolean {
         let c = configuration.getCurrentMakefileConfiguration();
         var targets: Task[] = [];
         configuration.getAllBuildTargets().forEach((goals, dir) => {
@@ -79,6 +79,7 @@ export class AutoToolsBuildTaskProvider implements MyTaskProvider {
             }
         });
         this.myPromise = Promise.resolve(targets);
+        return false;
     }
 
     public build(g : BuildTarget) : void {
@@ -137,7 +138,7 @@ export class AutoToolsTestTaskProvider implements MyTaskProvider {
     changeConfiguration(c: configuration.MakefileConfiguration, disposables: vscode.Disposable[]) : void {
         this.myPromise = Promise.resolve([])
     }
-    public update(disposables: vscode.Disposable[]) {
+    public update(disposables: vscode.Disposable[]) : boolean {
         let c = configuration.getCurrentMakefileConfiguration();
         var targets: Task[] = [];
         this.numFails = 0;
@@ -148,6 +149,7 @@ export class AutoToolsTestTaskProvider implements MyTaskProvider {
         let t = configuration.getAllBuildTargets();
         let cte = configuration.getCurrentTestEnvironment();
         let e = configuration.getTestEnvironments();
+        let updateBadge : boolean = false;
         t.forEach((goals, dir) => {
             for (let g of goals.values()) {
                 if (g.flags & Goal.Flags.Test_Suite) {
@@ -205,13 +207,14 @@ export class AutoToolsTestTaskProvider implements MyTaskProvider {
                             this.numSuspect += results[TRS.ERROR] + results[TRS.XFAIL];
                             this.numTests+=envs.length;
 
-                            extension.updateTRSInPanel(cte,undefined,d,dir);
+                            updateBadge = extension.updateTRSInPanel(cte,undefined,d,dir) || updateBadge;
                             // tc.addTest(suite, d, trs);
                         });
                     }
                 }
             }});
         this.myPromise = Promise.resolve(targets);
+        return updateBadge;
     }
 
 	public resolveTask(_task: Task): Task | undefined {
@@ -248,7 +251,7 @@ export class AutoToolsCheckTaskProvider implements MyTaskProvider {
     changeConfiguration(c: configuration.MakefileConfiguration, disposables: vscode.Disposable[]) : void {
         this.myPromise = Promise.resolve([])
     }
-    public update(disposables: vscode.Disposable[]) {
+    public update(disposables: vscode.Disposable[]) : boolean {
         let c = configuration.getCurrentMakefileConfiguration();
         var targets : Task[] = [];
         let e = configuration.getTestEnvironments();
@@ -329,6 +332,7 @@ export class AutoToolsCheckTaskProvider implements MyTaskProvider {
         targets.push(this.checkAllTask);
 
         this.myPromise = Promise.resolve(targets);
+        return false;
     }
 
 	public resolveTask(_task: Task): Task | undefined {
@@ -367,7 +371,7 @@ export class AutoToolsCheckTaskProvider implements MyTaskProvider {
 
 export interface MyTaskProvider extends TaskProvider {
     readonly myType: string;
-    update(disposables: vscode.Disposable[]): void;
+    update(disposables: vscode.Disposable[]): boolean;
     changeConfiguration(c: configuration.MakefileConfiguration, disposables: vscode.Disposable[]): void;
 }
 
@@ -483,7 +487,8 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
             this.myPromise = Promise.reject("Runtime error - no bootstrap task")
         }
     }
-    update(disposables: vscode.Disposable[]): void {
+    update(disposables: vscode.Disposable[]): boolean {
+        return false;
     }
     public async bootstrap(): Promise<vscode.TaskExecution | undefined> {
         if (this.bootstrapTask) {
