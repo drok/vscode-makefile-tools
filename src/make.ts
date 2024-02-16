@@ -847,8 +847,8 @@ export async function doConfigure(readCache: boolean, cacheFile: string, recursi
     clearTraits();
 
     telemetry.setAttributes(span, {
-            n: extension.pkginfo?.name ?? configuration.getFolder(),
-            v: extension.pkginfo?.version,
+            proj: extension.pkginfo?.name ?? configuration.getFolder(),
+            ver: extension.pkginfo?.version,
             am: extension.pkginfo?.automake.split("-").slice(-1)[0],
         });
     // This generates the dryrun output (saving it on disk) or reads an alternative build log.
