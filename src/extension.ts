@@ -380,11 +380,9 @@ export class Extension {
 
         if (goal) {
             let old = goal.trs;
-            let newTRS = make.readTRS(new make.BuildTarget(dir, log), c);
-            if (newTRS.results.size)
-                goal.trs = newTRS;
-            else
-              return; // TRS file moved to .tmp
+            goal.trs = make.readTRS(new make.BuildTarget(dir, log), c);
+// Avoiding move to .tmp doesn't work. on make clean, the icons should be updated.
+//
             if (this.updateTRSInPanel(env, old, goal, dir))
                 this.updateOutlineBadge();
 
@@ -406,13 +404,14 @@ export class Extension {
          */
         let current : TRS | undefined = goal.trs!.results.get(env.hashCode);
         let oldTRS = old?.results.get(env.hashCode) ?? TRS.NONE;
-        if (current === undefined && old !== undefined) {
+        if (old !== undefined && current == undefined  && goal.trs!.global != TRS.NONE) {
+            /* ie, There *is* a trs file, but lacks envids */
             if (this.unsupported_log_count++ < 4) {
-                logger.message(`ERORR: The test ${dir}/${goal.goal} did not use the ${Extension.whoami} LOG_DRIVER. Per-environment results not available.`);
+                logger.message(`ERROR: The test ${dir}/${goal.goal} did not use the ${Extension.whoami} LOG_DRIVER. Per-environment results not available.`);
                 telemetry.setSpanStatus(this.journey, SpanStatusCode.ERROR, "unknown ?_LOG_DRIVER");
             }
         } else
-        if ((current ?? TRS.NONE) != oldTRS) {
+        if (old === undefined || (current ?? TRS.NONE) != oldTRS) {
             (old != undefined) && this.suiteDecorator.update(goal.getURI());//  vscode.Uri.from(
 //                {authority: Extension.whoami, scheme: 'test', path: '/' + dir, query: goal.goal}));
             //this.suiteDecorator.update(vscode.Uri.from(

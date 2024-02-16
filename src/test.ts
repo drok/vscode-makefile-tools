@@ -424,7 +424,8 @@ export class MyTestController {
             let runnable_in_env : Goal[] = [];
             for (const t of request.include) {
                 // run.enqueued(t);
-                if (!env.dirs || (t.uri && env.dirs.includes(path.basename(t.uri.path)))) {
+                if (!env.dirs || (t.uri &&
+                        ((t.children.size && env.dirs.includes(t.id)) || (!t.children.size && env.dirs.includes(path.dirname(t.id)))))) {
                     let goal = this.testGoals.get(t);
                     if (goal) {
                         this.markSuiteEnqueued(run, goal, env);
