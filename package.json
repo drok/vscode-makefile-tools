@@ -1,7 +1,7 @@
 {
     "name": "autotools",
     "displayName": "Autotools Integration",
-    "description": "Import autotools configuration into C/C++ IntelliSense",
+    "description": "Comprehensive autotools support in Visual Studio Code",
     "version": "0.1.0",
     "publisher": "Mergesium",
     "preview": true,
