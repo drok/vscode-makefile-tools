@@ -115,11 +115,6 @@
                 "title": "%autotools.command.editMakefileAm.title%"
             },
             {
-                "command": "autotools.openLog",
-                "icon": "$(open-preview)",
-                "title": "%autotools.command.openLog.title%"
-            },
-            {
                 "command": "autotools.command.regen",
                 "title": "%autotools.command.regen.title%"
             },
