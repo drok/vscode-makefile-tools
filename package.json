@@ -461,6 +461,7 @@
                 },
                 "autotools.autoreconfTool": {
                     "order": 4,
+                    "scope": "resource",
                     "type": "string",
                     "default": "autoreconf",
                     "markdownDescription": "%autotools.configuration.autoreconfTool.markdownDescription%"
@@ -480,6 +481,7 @@
             "properties": {
                 "autotools.TESTS_ENVIRONMENT" : {
                     "order": 1,
+                    "scope": "resource",
                     "type": "object",
                     "default": {},
                     "title": "%autotools.configuration.tests_environment.TESTS_ENVIRONMENT.global.title%",
@@ -488,6 +490,7 @@
                 },
                 "autotools.XFAIL_TESTS" : {
                     "order": 2,
+                    "scope": "resource",
                     "type": "array",
                     "default": [],
                     "markdownDescription": "%autotools.configuration.tests_environment.XFAIL_TESTS.global.markdownDescription%",

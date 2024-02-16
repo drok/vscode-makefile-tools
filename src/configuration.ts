@@ -459,7 +459,7 @@ export function setMakefileConfigurations(configurations: MakefileConfiguration[
 export async function readMakefileConfigurations(currentConfigurationName : string, span: Span): Promise<void> {
     // We need to read "makefile.configurations" unexpanded first, because we may write back into these settings
     // in case we indentify "name" missing. We'll expand later, see end of function.
-    let workspaceConfiguration: vscode.WorkspaceConfiguration = vscode.workspace.getConfiguration("autotools");
+    let workspaceConfiguration: vscode.WorkspaceConfiguration = vscode.workspace.getConfiguration("autotools", util.getConfigScope());
     makefileConfigurations = workspaceConfiguration.get<MakefileConfiguration[]>("configurations") || [];
     let detectedUnnamedConfigurations: boolean = false;
     let unnamedConfigurationId: number = 0;
@@ -526,7 +526,7 @@ export function getLoadedEnvironments(): TestEnvironment[] { return loadedTestEn
 export async function readTestEnvironments(): Promise<void> {
     // We need to read "makefile.configurations" unexpanded first, because we may write back into these settings
     // in case we indentify "name" missing. We'll expand later, see end of function.
-    let workspaceConfiguration: vscode.WorkspaceConfiguration = vscode.workspace.getConfiguration("autotools");
+    let workspaceConfiguration: vscode.WorkspaceConfiguration = vscode.workspace.getConfiguration("autotools", util.getConfigScope());
     loadedTestEnvironments = [nullTestEnvironment(),...(workspaceConfiguration.get<TestEnvironment[]>("test_environments") || [])];
     let unnamedConfigurationId: number = 0;
 
@@ -699,7 +699,7 @@ let gTestEnvironment : TestEnvironment = {
     hashCode: -1
 };
 export async function readGlobalTestEnvironment(): Promise<void> {
-    let workspaceConfiguration: vscode.WorkspaceConfiguration = vscode.workspace.getConfiguration("autotools");
+    let workspaceConfiguration: vscode.WorkspaceConfiguration = vscode.workspace.getConfiguration("autotools", util.getConfigScope());
     gTestEnvironment.TESTS_ENVIRONMENT = workspaceConfiguration.get<EnvironmentSetting>("TESTS_ENVIRONMENT") ||
         {};
 
@@ -1017,7 +1017,7 @@ export async function initFromSettings(activation: boolean = false, span: Span):
                     // to the telemetry function. Currently, the schema for such a setting
                     // is represented differently than the workspace setting value.
                     let settingObj: any;
-                    let workspaceConfiguration: vscode.WorkspaceConfiguration = vscode.workspace.getConfiguration(keyRoot);
+                    let workspaceConfiguration: vscode.WorkspaceConfiguration = vscode.workspace.getConfiguration(keyRoot, util.getConfigScope());
                     if (subKey.includes(".")) {
                        const subKeys: string[] = subKey.split(".");
                        settingObj = workspaceConfiguration;

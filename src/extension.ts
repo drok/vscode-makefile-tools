@@ -1242,6 +1242,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 }
 
 function detectWorkspaceMode() {
+    util.setConfigScope();
     vscode.commands.executeCommand('setContext', "autotools:workspace",
         (vscode.workspace.workspaceFolders == undefined) ? 2 :
         (vscode.workspace.workspaceFolders.length == 1) ? 1 :
