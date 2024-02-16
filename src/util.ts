@@ -100,6 +100,12 @@ export function tmpDir(): string {
     }
 }
 
+let configScope : vscode.ConfigurationScope | null = null;
+export function setConfigScope() : void {
+    configScope = vscode.workspace.workspaceFolders ? vscode.workspace.workspaceFolders[0] : null;
+}
+export function getConfigScope() : vscode.ConfigurationScope | null { return configScope; }
+
 export function getWorkspaceRoot(): string {
     return vscode.workspace.workspaceFolders ? vscode.workspace.workspaceFolders[0].uri.fsPath : "";
 }
@@ -215,7 +221,7 @@ export function spawnChildProcess(
         // based on where it is running.
         let shellType: string | undefined;
         let shellPlatform: string = (process.platform === "win32") ? "windows" : (process.platform === "linux") ? "linux" : "osx";
-        let workspaceConfiguration: vscode.WorkspaceConfiguration = vscode.workspace.getConfiguration("terminal");
+        let workspaceConfiguration: vscode.WorkspaceConfiguration = vscode.workspace.getConfiguration("terminal", null);
         shellType = workspaceConfiguration.get<string>(`integrated.automationProfile.${shellPlatform}`) || // automationShell is deprecated
                     workspaceConfiguration.get<string>(`integrated.automationShell.${shellPlatform}`); // and replaced with automationProfile
 
@@ -567,11 +573,11 @@ export function userHome(): string {
  }
 
 export function getSetting<T>(settingId: string) : T | undefined {
-    let workspaceConfiguration: vscode.WorkspaceConfiguration = vscode.workspace.getConfiguration("autotools");
+    let workspaceConfiguration: vscode.WorkspaceConfiguration = vscode.workspace.getConfiguration("autotools", configScope);
     return workspaceConfiguration.get<T>(settingId);
 }
 export function getSettingOr<T>(settingId: string, defaultVal: T) : T {
-    let workspaceConfiguration: vscode.WorkspaceConfiguration = vscode.workspace.getConfiguration("autotools");
+    let workspaceConfiguration: vscode.WorkspaceConfiguration = vscode.workspace.getConfiguration("autotools", configScope);
     return workspaceConfiguration.get<T>(settingId, defaultVal);
 }
 // Read setting from workspace settings and expand according to various supported patterns.
@@ -579,7 +585,7 @@ export function getSettingOr<T>(settingId: string, defaultVal: T) : T {
 // is used on such types of settings) and for arrays or objects, expand recursively
 // until we reach the simple types for submembers. This handles any structure.
 export async function getExpandedSetting<T>(settingId: string, propSchema?: any): Promise<T | undefined> {
-    let workspaceConfiguration: vscode.WorkspaceConfiguration = vscode.workspace.getConfiguration("autotools");
+    let workspaceConfiguration: vscode.WorkspaceConfiguration = vscode.workspace.getConfiguration("autotools", configScope);
     let settingVal: any | undefined = workspaceConfiguration.get<T>(settingId);
 
     if (!propSchema) {
@@ -746,7 +752,7 @@ export async function expandVariablesInSetting(settingId: string, settingVal: st
             const regexpCfg: RegExp = /(\w+)\.(.+)/mg;
             const res: RegExpExecArray | null = regexpCfg.exec(result[5]);
             if (res && res[1] && res[2]) {
-                let workspaceCfg: vscode.WorkspaceConfiguration = vscode.workspace.getConfiguration(res[1]);
+                let workspaceCfg: vscode.WorkspaceConfiguration = vscode.workspace.getConfiguration(res[1], configScope);
                 toStr = (workspaceCfg.get(res[2]) as string);
 
                 // The setting is either undefined or maybe we encountered a case with multiple names separated by dot for a property:

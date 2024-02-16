@@ -1,20 +1,15 @@
 import * as path from 'path';
-import { runInNewContext } from 'vm';
 import * as vscode from 'vscode';
-import { Goal, Make } from './parser/gnumake';
+import { Goal } from './parser/gnumake';
 import { BuildTarget, TRS } from './make';
-import { TestController,
+import {
         EventEmitter,
-        TestItemCollection,
-        TestRunRequest,
         TestItem,
         TestRun } from 'vscode';
-import { SSL_OP_DONT_INSERT_EMPTY_FRAGMENTS } from 'constants';
-import { makeFullPath } from './util';
 import { TRS_Info, readTRS, emptyRunStats } from './make';
 import { Extension, extension,
-        telemetry,
-        openEditor } from './extension';
+        telemetry
+        } from './extension';
 import { SpanStatusCode } from './tele';
 import { MakefileConfiguration } from './configuration';
 import { resolvePathToRoot } from './util';
@@ -23,7 +18,6 @@ import * as configuration from "./configuration";
 import { TestEnvironment, traits } from './configuration';
 import { isDebuggable } from './debug';
 import * as logger from './logger';
-import * as fs from 'fs';
 
 import * as nls from 'vscode-nls';
 import { assert, markTimeline } from 'console';
@@ -98,7 +92,8 @@ export class MyTestController {
         goal.trs = readTRS(target, configuration.getCurrentMakefileConfiguration());
         this.updateGoalTRS(this.activeRun.run, test, goal.trs?.global, target.builddir);
         if (this.activeRun.env == configuration.getCurrentTestEnvironment())
-            extension.updateTRSInPanel(this.activeRun.env, old, goal, target.builddir);
+            extension.updateTRSInPanel(this.activeRun.env, old, goal, target.builddir) &&
+                extension.updateOutlineBadge();
     }
     this.updateTestDescription(goal, target.builddir);
 
@@ -111,6 +106,7 @@ export class MyTestController {
     // FIXME: also updateTestDescriptions of children
     let c = configuration.getCurrentMakefileConfiguration();
     let updatePanel = (this.activeRun!.env == configuration.getCurrentTestEnvironment());
+    let updateBadge : boolean = false;
     if (this.busyNonLiveTest)
         for (const d of goal.depends!) {
             let bd : BuildTarget = new BuildTarget(dir, d.goal!);
@@ -118,9 +114,10 @@ export class MyTestController {
             d.trs = readTRS(bd, c);
             this.updateGoalTRS(this.activeRun!.run, d.test!, d.trs?.global, dir);
             if (updatePanel) {
-                extension.updateTRSInPanel(this.activeRun!.env, old, d, dir);
+                updateBadge = extension.updateTRSInPanel(this.activeRun!.env, old, d, dir) || updateBadge;
             }
         }
+        if (updateBadge) extension.updateOutlineBadge();
     // else
         //this.activeRun?.run.passed(this.activeGoal!.test!); // FIXME: need actual pass / fail  for the suite
 
@@ -139,12 +136,15 @@ export class MyTestController {
     cancelToken.dispose();
   }
 
-  public async debug(test: TestItem, env: TestEnvironment) : Promise<void> {
+  public async debug(span: Span, test: TestItem, env: TestEnvironment) : Promise<void> {
     var cancelToken = new vscode.CancellationTokenSource();
     try {
         env.debug?.runHandler(new vscode.TestRunRequest([test], [], env.run), cancelToken.token);
+        telemetry.setSpanStatus(span, SpanStatusCode.OK);
     } catch (e) {
         console.error("Failed to start debugger", test);
+        telemetry.logException(e, span);
+        telemetry.setSpanStatus(span, SpanStatusCode.ERROR);
     }
     cancelToken.dispose();
   }
@@ -424,7 +424,8 @@ export class MyTestController {
             let runnable_in_env : Goal[] = [];
             for (const t of request.include) {
                 // run.enqueued(t);
-                if (!env.dirs || (t.uri && env.dirs.includes(path.basename(t.uri.path)))) {
+                if (!env.dirs || (t.uri &&
+                        ((t.children.size && env.dirs.includes(t.id)) || (!t.children.size && env.dirs.includes(path.dirname(t.id)))))) {
                     let goal = this.testGoals.get(t);
                     if (goal) {
                         this.markSuiteEnqueued(run, goal, env);

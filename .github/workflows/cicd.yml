@@ -16,24 +16,24 @@ on:
 
 jobs:
   build-lint-test:
-    name: Node ${{ matrix.node }} on ${{ matrix.config.os }}-${{ matrix.arch }}
+    name: Node ${{ matrix.node }} on ${{ matrix.config.os }}-${{ matrix.config.name }}
     runs-on: ${{ matrix.config.os }}
     timeout-minutes: 5
     strategy:
       fail-fast: false
       matrix:
         config:
-          - { os: ubuntu-20.04, name: linux }
-          - { os: macos-latest, name: darwin }
+          - { os: ubuntu-20.04, name: linux-x64 }
+          # See https://github.blog/2023-10-02-introducing-the-new-apple-silicon-powered-m1-macos-larger-runner-for-github-actions/
+          - { os: macos-latest, name: darwin-x64 }
+          # - { os: macos-12-large, name: darwin-x64 }
+          # - { os: macos-13-xlarge, name: darwin-arm64 }
           # - { os: windows-latest, name: win32 }
-        arch:
-          - x64
-          - arm64
         node:
-          - 16
+          - 18
     outputs:
       vsixPath: ${{ steps.packageExtension.outputs.vsixPath }}
-      target: ${{ matrix.config.name }}-${{ matrix.arch }}
+      target: ${{ matrix.config.name }}
     steps:
       - uses: awalsh128/cache-apt-pkgs-action@latest
         with:
@@ -68,6 +68,8 @@ jobs:
         run: yarn install
       # - name: Run Linter
       #   run: npm run lint
+      - name: Detect Binary Build Info
+        run: node  -e 'let e={arch:process.arch,platform:process.platform};console.log(`export let buildinfo:{arch:string,platform:string}=${JSON.stringify(e)};`);' > buildinfo.ts
       - name: Generate Translations
         run: yarn run translations-generate
       - name: Bootstrap external dependencies
@@ -77,19 +79,19 @@ jobs:
         if: runner.os != 'Linux'
       - name: Configure externals on Linux
         run: mkdir -p build/make && cd build/make && [ -f config.status ] ||
-          ../../vendor/gnumake/configure
+          ac_cv_func_gettimeofday=no ac_cv_search_clock_gettime=no ../../vendor/gnumake/configure -C
           --disable-dependency-tracking
           --with-guile=no
           --disable-job-server
           --disable-load
           'INSTALL_PROGRAM=install -cs'
-          'CFLAGS=-g0 -O2 -include $top_srcdir/../gnumake-include.h'
+          "CFLAGS=-g0 -O2 -include $PWD/../../vendor/gnumake-include.h"
           LDFLAGS=-lrt
           --disable-nls
           --prefix=$PWD/../..
         if: runner.os == 'Linux'
       - name: Build Extension
-        run: yarn compile
+        run: yarn production-compile
       - name: Check make symbols
         run: objdump -T build/make/make
       # - name: Run Unit Tests on Windows or macOS
@@ -106,15 +108,14 @@ jobs:
       #     flag-name: Test on ${{ matrix.config.os }}
       - name: Package Extension
         id: packageExtension
-        uses: HaaLeo/publish-vscode-extension@v1
-        with:
-          pat: stub
-          dryRun: true
-          target: ${{ matrix.config.name }}-${{ matrix.arch }}
+        run: |
+          TARGET=${{ matrix.config.name }} npm run package
+          echo "vsixPath=$(echo *-${{ matrix.config.name }}.vsix)" > "$GITHUB_OUTPUT"
+
       - name: Upload Extension Package as Artifact
         uses: actions/upload-artifact@v3
         with:
-          name: ${{ matrix.config.name }}-${{ matrix.arch }}
+          name: ${{ matrix.config.name }}
           path: ${{ steps.packageExtension.outputs.vsixPath }}
 
   # coverage:

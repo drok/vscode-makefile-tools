@@ -4,8 +4,8 @@ import * as api from '@opentelemetry/api'
 export { Attributes } from '@opentelemetry/api';
 // import { ConsoleSpanExporter } from '@opentelemetry/sdk-trace-node';
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http'
-import { SemanticAttributes, SemanticResourceAttributes } from '@opentelemetry/semantic-conventions'
-import { AlwaysOnSampler, SpanProcessor, TraceIdRatioBasedSampler, ReadableSpan } from '@opentelemetry/sdk-trace-base';
+import { SemanticResourceAttributes } from '@opentelemetry/semantic-conventions'
+import { SpanProcessor, TraceIdRatioBasedSampler, ReadableSpan } from '@opentelemetry/sdk-trace-base';
 import { AsyncHooksContextManager } from '@opentelemetry/context-async-hooks';
 import { Resource } from '@opentelemetry/resources'
 import { TraceState } from '@opentelemetry/api'
@@ -14,14 +14,11 @@ import { getSettingOr } from './util';
 import { Extension, openSettings } from './extension';
 // import * as util from './util'
 import * as vscode from 'vscode'
+import { buildinfo } from '../buildinfo';
 
 import { trace,
     Span, SpanStatusCode, SpanContext, Context, SpanOptions } from '@opentelemetry/api'
 import { Disposable } from 'vscode-jsonrpc';
-import { log } from 'console';
-import { DH_NOT_SUITABLE_GENERATOR } from 'constants';
-
-// let traceExporter = new OTLPTraceExporter({ url: 'http://192.168.20.152:4318/v1/traces' });
 
 export { SpanStatusCode } from '@opentelemetry/api';
 
@@ -50,8 +47,12 @@ export class MyTelemetry implements Disposable {
             resource: new Resource({
                 [SemanticResourceAttributes.SERVICE_NAME]: extensionContext.extension.packageJSON.name,
                 [SemanticResourceAttributes.SERVICE_VERSION]: extensionContext.extension.packageJSON.version,
+                ['buildinfo']: `${buildinfo.platform}-${buildinfo.arch}`,
                 [SemanticResourceAttributes.SERVICE_NAMESPACE]:
                     (env.appName == "Visual Studio Code" ? "vscode" : env.appName) + "." + env.appHost + '-' + vscode.version,
+                [SemanticResourceAttributes.OS_TYPE]: process.platform,
+                [SemanticResourceAttributes.HOST_ARCH]: process.arch,
+                [SemanticResourceAttributes.PROCESS_RUNTIME_VERSION]: process.version,
                 [SemanticResourceAttributes.SERVICE_INSTANCE_ID]: env.sessionId,
                 [SemanticResourceAttributes.DEVICE_ID]: env.machineId.slice(0, 8),
                 ['lang']: env.language,
@@ -296,88 +297,4 @@ export async function getParams() : Promise<Params> {
          */
         s: 1, u: 1, e: 1
     };
-}
-
-function allowRunning(tele: Params, context: vscode.ExtensionContext) : boolean {
-    if (tele.pre_ok === undefined) {
-        return false;
-    } else if (!tele.pre_ok)
-        return false;
-    return true;
-}
-
-export class EmptyOutlineProvider implements vscode.TreeDataProvider<string> {
-    private readonly _changeEvent = new vscode.EventEmitter<null>();
-
-    get onDidChangeTreeData(): any { return this._changeEvent.event; }
-    getTreeItem(element: string): vscode.TreeItem | Thenable<vscode.TreeItem> {
-        return new vscode.TreeItem('');;
-    }
-    getChildren(node?: string): string[] { return []; }
-}
-
-/* Call getParams every 30 seconds until it returns a tele.newest_pre which is not undefined
- */
-
-let isActive: boolean = false;
-let _activatedEvent: vscode.EventEmitter<boolean> = new vscode.EventEmitter<boolean>();
-async function waitActivated() : Promise<boolean> {
-    if (isActive)
-        return Promise.resolve(isActive);
-    return new Promise<boolean>(resolve => {
-        let a = _activatedEvent.event(e => {
-            a.dispose();
-            return resolve(e);
-        });
-    });
-}
-
-function setContext(n: number) : void {
-    vscode.commands.executeCommand("setContext", "autotools:expiresSoon", n);
-}
-const preReleaseInformedUserKey : string = "maprei";
-export async function gatePreRelease(context: vscode.ExtensionContext) : Promise<Params | undefined> {
-        let informedUser = context.globalState.get<number>(preReleaseInformedUserKey);
-        if (informedUser == undefined || informedUser != Extension.myVersion) {
-            const treeData = new EmptyOutlineProvider();
-
-            let disp : Disposable[] = [ vscode.commands.registerCommand('autotools.acceptPreReleaseTerms', async (e) => {
-                _activatedEvent.fire(true);
-            }),
-            vscode.commands.registerCommand('autotools.editTelemetry', async () => {
-                openSettings("autotools.telemetry");
-            })
-            ];
-            let treeView = vscode.window.createTreeView('autotools.outline', {
-                treeDataProvider: treeData,
-                showCollapseAll: false
-
-            });
-            setContext(4);
-
-            await waitActivated();
-            context.globalState.update(preReleaseInformedUserKey, Extension.myVersion);
-            disp.forEach(i => i.dispose());
-            treeView.dispose();
-        }
-        while (env.isTelemetryEnabled && getSettingOr<boolean>("telemetry", true)) {
-                let tele = await getParams();
-                if (tele.pre_ok !== undefined) {
-                        let allow = allowRunning(tele, context);
-                        /* 1 = allow to run
-                         * 2 = prompt to update when there is no info, but allow
-                         * 3 = Expired = do not run
-                         * 4 = Prompt to accept terms, don't activate until accepted
-                         * 5 = Telemetry disabled = stop running, display "enable tele"
-                         */
-                        setContext((!allow ? 3 : ((tele.pre_update ?? 0) ? 1 : 2)));
-                        if (allow) {
-                            return tele;
-                        }
-                        else return undefined;
-                }
-                await new Promise(resolve => setTimeout(resolve, 30000));
-        }
-        setContext(5);
-        return undefined; // Tele disabled
 }

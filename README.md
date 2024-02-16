@@ -1,7 +1,5 @@
 # VS Code Autotools Integration
 
-**IMPORTANT**: This pre-release expires **`2024-xx-xx`** - update or switch to a non-expiring, general release before then.
-
 This extension enables VS Code to interact with projects using the GNU Autotools build system:
  * Manage multiple [build configurations](#build-configuration) per source-tree (out-of-tree builds)
  * Building-related functions:
@@ -20,6 +18,8 @@ This extension enables VS Code to interact with projects using the GNU Autotools
     * Discover [_Generate a test task_](#generated-test-tasks) for every individual test.
     * Manage multiple [test environments](#test-environments-pro). ![pro](https://img.shields.io/badge/Pro-green?style=plastic&link=https://autotools.mergesium.com)
     * Output _test result grid_ (build configuration vs test vs environment) in markdown format. ![pro](https://img.shields.io/badge/Pro-green?style=plastic&link=https://autotools.mergesium.com)
+
+## First Look - Autotools panel
 
 <figure id="figure-1">
     <img src="https://autotools.mergesium.com/s/autotools-intro.png"

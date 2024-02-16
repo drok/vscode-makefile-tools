@@ -149,7 +149,6 @@ export class SuiteDecorations implements vscode.FileDecorationProvider {
             this.visibleFiles.add(uri.path);
             let selected = configuration.currentGoals;
             if (selected != undefined) {
-                try {
                 let goal = this.goalOf(uri.path,selected);
                 if (Array.isArray(goal)) {
                     return { tooltip: `used for ${goal[0].goal}`, badge:
@@ -159,9 +158,6 @@ export class SuiteDecorations implements vscode.FileDecorationProvider {
                         goal[1].depends?.length ? '🧩' : '🏹', propagate: true}; //  ||  || '👁️‍🗨️', propagate: true};
                 } else if (!goal)
                     return { color: unused };
-                } catch(e) {
-                    console.debug("err ", e);
-                }
             }
         } else
         if (uri.scheme == Scheme.Bin) {
