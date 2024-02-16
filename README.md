@@ -19,6 +19,8 @@ This extension enables VS Code to interact with projects using the GNU Autotools
     * Manage multiple [test environments](#test-environments-pro). ![pro](https://img.shields.io/badge/Pro-green?style=plastic&link=https://autotools.mergesium.com)
     * Output _test result grid_ (build configuration vs test vs environment) in markdown format. ![pro](https://img.shields.io/badge/Pro-green?style=plastic&link=https://autotools.mergesium.com)
 
+## First Look - Autotools panel
+
 <figure id="figure-1">
     <img src="https://autotools.mergesium.com/s/autotools-intro.png"
          alt="Sample extension UI">
