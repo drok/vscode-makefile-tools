@@ -42,7 +42,7 @@ import { SuiteDecorations } from './suite-decorator';
 import { TestGrid, GridShowOptions } from './testgrid';
 import * as tele from './tele';
 import * as nls from 'vscode-nls';
-import { assert, log } from 'console';
+import { assert } from 'console';
 import { installAutotools } from './install';
 import { Span } from '@opentelemetry/api';
 import { buildinfo } from '../buildinfo';
@@ -667,7 +667,7 @@ export class Extension {
                     new DebugNow(c, goal, {goal: goal.depends[0].goal, builddir: builddir},
                             !!(goal.depends[0].flags & Goal.Flags.Linked_binary), env),
                     dopt)
-                .then((z) => console.log(z));
+                .then((z) => {});
             } catch(e) {
                 logger.message(`ERROR: Failed to start debugging: ${e}`);
             }

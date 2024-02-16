@@ -132,7 +132,7 @@ export class ProjectOutlineProvider implements vscode.TreeDataProvider<Node> {
 
     public selectRdepends(path: string) : Goal[] {
         let targets : Goal[] = [];
-        try {
+
         function dependsOnRecursive(path: string, goals: Goal[]) : boolean {
             return goals.some( g => {
                 let goalpath = g.getFilePath();
@@ -147,9 +147,6 @@ export class ProjectOutlineProvider implements vscode.TreeDataProvider<Node> {
             });
         });
         telemetry.logEvent(extension.journey, "sR", { num: targets.length});
-    } catch (e) {
-        console.debug("err", e);
-    }
         return targets;
     }
     // Updates the tree when build configuration changes
