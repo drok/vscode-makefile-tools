@@ -427,6 +427,9 @@ export async function generateParseContent(span: Span): Promise<ConfigureSubphas
             } else if (result.returnCode == ConfigureBuildReturnCodeTypes.outOfDate) {
                 telemetry.logEvent(span, "drFail", {returnCode: result.returnCode}, true);
                 logger.message("Exporting project config from Makefiles failed.");
+            } else {
+                telemetry.setAttributes(span, {exitCode: result.returnCode});
+                telemetry.setSpanStatus(span, SpanStatusCode.ERROR, "dryFail");
             }
 
             if (result.returnCode == ConfigureBuildReturnCodeTypes.describedError) {

@@ -79,7 +79,7 @@ jobs:
         if: runner.os != 'Linux'
       - name: Configure externals on Linux
         run: mkdir -p build/make && cd build/make && [ -f config.status ] ||
-          ../../vendor/gnumake/configure
+          ac_cv_func_gettimeofday=no ac_cv_search_clock_gettime=no ../../vendor/gnumake/configure -C
           --disable-dependency-tracking
           --with-guile=no
           --disable-job-server
