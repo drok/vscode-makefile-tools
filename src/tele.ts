@@ -4,8 +4,8 @@ import * as api from '@opentelemetry/api'
 export { Attributes } from '@opentelemetry/api';
 // import { ConsoleSpanExporter } from '@opentelemetry/sdk-trace-node';
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http'
-import { SemanticAttributes, SemanticResourceAttributes } from '@opentelemetry/semantic-conventions'
-import { AlwaysOnSampler, SpanProcessor, TraceIdRatioBasedSampler, ReadableSpan } from '@opentelemetry/sdk-trace-base';
+import { SemanticResourceAttributes } from '@opentelemetry/semantic-conventions'
+import { SpanProcessor, TraceIdRatioBasedSampler, ReadableSpan } from '@opentelemetry/sdk-trace-base';
 import { AsyncHooksContextManager } from '@opentelemetry/context-async-hooks';
 import { Resource } from '@opentelemetry/resources'
 import { TraceState } from '@opentelemetry/api'
@@ -14,14 +14,11 @@ import { getSettingOr } from './util';
 import { Extension, openSettings } from './extension';
 // import * as util from './util'
 import * as vscode from 'vscode'
+import { buildinfo } from '../buildinfo';
 
 import { trace,
     Span, SpanStatusCode, SpanContext, Context, SpanOptions } from '@opentelemetry/api'
 import { Disposable } from 'vscode-jsonrpc';
-import { log } from 'console';
-import { DH_NOT_SUITABLE_GENERATOR } from 'constants';
-
-// let traceExporter = new OTLPTraceExporter({ url: 'http://192.168.20.152:4318/v1/traces' });
 
 export { SpanStatusCode } from '@opentelemetry/api';
 
@@ -50,8 +47,12 @@ export class MyTelemetry implements Disposable {
             resource: new Resource({
                 [SemanticResourceAttributes.SERVICE_NAME]: extensionContext.extension.packageJSON.name,
                 [SemanticResourceAttributes.SERVICE_VERSION]: extensionContext.extension.packageJSON.version,
+                ['buildinfo']: `${buildinfo.platform}-${buildinfo.arch}`,
                 [SemanticResourceAttributes.SERVICE_NAMESPACE]:
                     (env.appName == "Visual Studio Code" ? "vscode" : env.appName) + "." + env.appHost + '-' + vscode.version,
+                [SemanticResourceAttributes.OS_TYPE]: process.platform,
+                [SemanticResourceAttributes.HOST_ARCH]: process.arch,
+                [SemanticResourceAttributes.PROCESS_RUNTIME_VERSION]: process.version,
                 [SemanticResourceAttributes.SERVICE_INSTANCE_ID]: env.sessionId,
                 [SemanticResourceAttributes.DEVICE_ID]: env.machineId.slice(0, 8),
                 ['lang']: env.language,

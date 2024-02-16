@@ -35,6 +35,7 @@
    "autotools.configuration.views.testsuites.description": "Tests",
    "autotools.configuration.makefile.makePath.description": "The path to the make tool",
    "autotools.configuration.telemetry.markdownDescription": "Enable Telemetry.\n\nTelemetry is used to automatically report unexpected errors, and collect a sample of your extension usage, for the purpose of improving future versions.\n\nWe value your privacy, and appreciate the feedback you send automatically via telemetry.\n\nThe data is sent directly to Mergesium, and not shared with any other parties.\n\nAlso see: [How to inspect the data sent by the extension](https://code.visualstudio.com/docs/getstarted/telemetry#_output-channel-for-telemetry-events).",
+
    "autotools.debugger.launch.description": "Launch the current build target under cppdbg autotools.debugger.launch.description",
    "autotools.debugger.launch.program.description": "What goes here autotools.debugger.launch.program.description",
    "autotools.debugger.launch.args.description": "Arguments to pass to the program autotools.debugger.launch.args.description",
@@ -56,6 +57,8 @@
    "autotools.welcome.debug.markdownDescription": "Autotools debug features are available, eg, by clicking the 'Debug' button on a failing unit test in the [Autotools Outline](command:autotools.outline.focus).",
    "autotools.welcome.bootstrap.markdownDescription": "This Autotools project needs to be bootstraped.\n\n[Bootstrap](command:autotools.bootstrap)\n\nAlso see [bootstrapping](https://www.gnu.org/software/automake/faq/autotools-faq.html#What-does-_002e_002fbootstrap-or-_002e_002fautogen_002esh-do_003f)",
 
+   "autotools.welcome.multiroot.markdownDescription": "Multi-folder Workspaces are not yet supported.",
+   "autotools.welcome.binaryIncompatible.markdownDescription": "This extension package was built for different platform/architecture than the running system.\nIs this a [bug](https://github.com/Mergesium/autotools/issues) or user error?\nPlease let us know if we could have done something to avoid this error.",
    "autotools.welcome.configure.markdownDescription": "The [build directory](command:autotools.gotoBuildDirectory) is not configured\n\n[Configure](command:autotools.configure)",
    "autotools.welcome.parsing.markdownDescription": "Importing autotools configuration...",
    "autotools.welcome.packageURL.markdownDescription": "Check for [known issues](command:autotools.visit.knowledgeBase) in the knowledge base.\n\nPackage [home page](command:autotools.visit.packageURL)",

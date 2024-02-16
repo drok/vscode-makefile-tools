@@ -6,14 +6,11 @@
 import * as configuration from './configuration';
 import * as path from 'path';
 import * as util from './util';
-import { BuildTarget, t_none } from './make';
 import { Make, Goal } from './parser/gnumake';
-import { TestTask } from './tasks';
 import * as vscode from 'vscode';
 
 import * as nls from 'vscode-nls';
-import { Extension, extension, telemetry } from './extension';
-import { assert } from 'console';
+import { extension, telemetry } from './extension';
 import { Span } from '@opentelemetry/api';
 nls.config({ messageFormat: nls.MessageFormat.bundle, bundleFormat: nls.BundleFormat.standalone })();
 const localize: nls.LocalizeFunc = nls.loadMessageBundle();
@@ -43,9 +40,14 @@ export class SubNode extends Node {
     constructor(public make: Make, public parent: SubNode | undefined | null, private tree : Map<Make, SubNode>,  private flags: number) {
         super();
     }
+    private disableSuite : boolean = false;
 
     getChildren(): Node[] {
-        let goals : Node[] = [...this.make.submake.values()]
+        let gg = [...this.make.submake.values()];
+        if (this.flags & Goal.Flags.Test_Suite) {
+            gg = gg.filter(g => g.stats.tests)
+        }
+        let goals : Node[] = gg
             .map(sub => this.tree.get(sub)!);
         if (!(this.flags & Goal.Flags.Test_Suite)) {
             goals.push(...[...this.make.goals.values()]
@@ -54,15 +56,23 @@ export class SubNode extends Node {
             goals.push(...this.make.test_suite.depends);
         return goals;
     }
-
+    // Like getChildren but filtered for dirs of testenvironments
+    getDirChildren() : Node[] {
+        let gg = [...this.make.submake.values()];
+        if (this.flags & Goal.Flags.Test_Suite) {
+            gg = gg.filter(g => g.stats.tests)
+        }
+        let goals : Node[] = gg
+            .map(sub => this.tree.get(sub)!);
+        return goals;
+    }
+    noSuite(en: boolean) : void {
+        this.disableSuite = en;
+    }
     private item : vscode.TreeItem | undefined;
     getTreeItem(): vscode.TreeItem {
         if (!this.item) {
             this.item = new vscode.TreeItem(this.make.dir);
-            this.item.contextValue = ["nodeType=sub"]
-                .concat(((this.flags & Goal.Flags.Test_Suite) && this.make.test_suite) ? ['nodeType=check'] : [])
-                .concat((this.flags & Goal.Flags.Linked_binary) ? ['nodeType=allbuild'] : [])
-                .join(',');
             this.item.collapsibleState = vscode.TreeItemCollapsibleState.Collapsed;
             if (this.flags & Goal.Flags.Test_Suite) {
                 this.item.description = this.make.stats.tests ? localize("autotools.subnode.suite", "{0} tests",
@@ -81,10 +91,19 @@ export class SubNode extends Node {
                 });
                 this.item.description = this.make.stats.programs ? localize("autotools.subnode.programs", "{0} programs",
                     this.make.stats.programs) : undefined;
+                this.item.contextValue = ['nodeType=sub', 'nodeType=allbuild']
+                    .join(',');
             }
             this.item.tooltip =  this.make.dir;
             this.item.id = this.make.dir;
         }
+        if (this.flags & Goal.Flags.Test_Suite) {
+            // recalculate on every refresh because some suites must be disabled if dirs exclude them
+            this.item.contextValue = ["nodeType=sub"]
+            .concat((!this.disableSuite && (this.flags & Goal.Flags.Test_Suite) && this.make.test_suite) ? ['nodeType=check'] : [])
+            .join(',');
+        }
+
         return this.item;
     }
     makefile() : string {
@@ -135,7 +154,7 @@ export class ProjectOutlineProvider implements vscode.TreeDataProvider<Node> {
 
     public selectRdepends(path: string) : Goal[] {
         let targets : Goal[] = [];
-        try {
+
         function dependsOnRecursive(path: string, goals: Goal[]) : boolean {
             return goals.some( g => {
                 let goalpath = g.getFilePath();
@@ -150,9 +169,6 @@ export class ProjectOutlineProvider implements vscode.TreeDataProvider<Node> {
             });
         });
         telemetry.logEvent(extension.journey, "sR", { num: targets.length});
-    } catch (e) {
-        console.debug("err", e);
-    }
         return targets;
     }
     // Updates the tree when build configuration changes
@@ -195,6 +211,7 @@ export class ProjectTestsProvider implements vscode.TreeDataProvider<Node> {
     private readonly flag : number = Goal.Flags.Test_Suite;
     private tree: Make;
     private subnodes : Map<Make, SubNode> = new Map();
+    private env: configuration.TestEnvironment | undefined;
     constructor(span: Span) {
         this.tree = new Make('', span, '')
     }
@@ -216,12 +233,23 @@ export class ProjectTestsProvider implements vscode.TreeDataProvider<Node> {
                 return []; // ie, show the welcome message
 
             goals = [this.subnodes.get(this.tree)!];
-            if (this.tree.test_suite?.depends)
-                goals
-                .push(...this.tree.test_suite.depends);
-        } else {
+            if (!this.env || !this.env?.dirs || this.env.dirs.includes(this.tree.dir))
+                if (this.tree.test_suite?.depends)
+                    goals
+                    .push(...this.tree.test_suite.depends);
+        } else 
+          if (!this.env || !this.env?.dirs || this.env.dirs.includes(node.make.dir))
             goals = node.getChildren();
-        }
+          else if (node instanceof SubNode)
+            goals = node.getDirChildren();
+          else
+            return [];
+        // turn off the suite in all subdirs that are not in the dirs
+        // FIXME: find a better way. This forEach is done for every node.
+        goals.forEach(g => {
+            if (g instanceof SubNode)
+                g.noSuite(!!this.env && !!this.env.dirs && !this.env!.dirs!.includes(g.make.dir));
+        });
         return goals;
     }
     public getParent(element: Node): vscode.ProviderResult<Node> {
@@ -231,24 +259,11 @@ export class ProjectTestsProvider implements vscode.TreeDataProvider<Node> {
             return this.subnodes.get(element.make);
     }
 
-    pathDisplayed(pathInSettings: string | undefined, kind: string, searchInPath: boolean, makeRelative: boolean): string {
-       if (!pathInSettings) {
-         return `${kind}: [Unset]`;
-       }
-
-       const pathBase: string | undefined = (searchInPath && path.parse(pathInSettings).dir === "") ? path.parse(pathInSettings).base : undefined;
-       const pathInEnv: string | undefined = pathBase ? (path.join(util.toolPathInEnv(pathBase) || "", pathBase)) : undefined;
-       const finalPath: string = pathInEnv || pathInSettings;
-       let checkFileExists: boolean = pathInSettings !== undefined;
-
-       return (!checkFileExists ? `${kind} (not found)` : `${kind}`) + `: [${makeRelative ? util.makeRelPath(finalPath, util.getWorkspaceRoot()) : finalPath}]`;
-    }
-
     // Updates the tree when build configuration changes
     // alltests is an array used to find the decoration for each test
     public all : Map<string,Goal> = new Map();
-    async update(configuration: string): Promise<void> {
-        this.updateTree();
+    async update(confname: string): Promise<void> {
+        this.updateTree(configuration.getCurrentTestEnvironment());
     }
 
     clear() : void {
@@ -259,10 +274,11 @@ export class ProjectTestsProvider implements vscode.TreeDataProvider<Node> {
         this.tree = build_tree;
         this.subnodes.clear();
         buildParents(build_tree, undefined, this.subnodes, this.flag);
-        this.updateTree();
+        this.updateTree(configuration.getCurrentTestEnvironment());
     }
 
-    updateTree(): void {
+    updateTree(env: configuration.TestEnvironment): void {
+        this.env = env;
         this.all.clear(); // it will be refilled with goals that are currently displayed
         this._changeEvent.fire(null);
     }

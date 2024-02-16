@@ -1,8 +1,8 @@
 {
     "name": "autotools",
     "displayName": "Autotools Integration",
-    "description": "Import autotools configuration into C/C++ IntelliSense",
-    "version": "0.1.0",
+    "description": "Comprehensive autotools support in Visual Studio Code",
+    "version": "0.0.0",
     "publisher": "Mergesium",
     "preview": true,
     "icon": "res/autotools.png",
@@ -461,6 +461,7 @@
                 },
                 "autotools.autoreconfTool": {
                     "order": 4,
+                    "scope": "resource",
                     "type": "string",
                     "default": "autoreconf",
                     "markdownDescription": "%autotools.configuration.autoreconfTool.markdownDescription%"
@@ -480,6 +481,7 @@
             "properties": {
                 "autotools.TESTS_ENVIRONMENT" : {
                     "order": 1,
+                    "scope": "resource",
                     "type": "object",
                     "default": {},
                     "title": "%autotools.configuration.tests_environment.TESTS_ENVIRONMENT.global.title%",
@@ -488,6 +490,7 @@
                 },
                 "autotools.XFAIL_TESTS" : {
                     "order": 2,
+                    "scope": "resource",
                     "type": "array",
                     "default": [],
                     "markdownDescription": "%autotools.configuration.tests_environment.XFAIL_TESTS.global.markdownDescription%",
@@ -581,7 +584,12 @@
             {
                 "view": "autotools.outline",
                 "contents": "%autotools.welcome.convert.markdownDescription%",
-                "when": "autotools:haveManifest > 1"
+                "when": "autotools:haveManifest == 2"
+            },
+            {
+                "view": "autotools.outline",
+                "contents": "%autotools.welcome.binaryIncompatible.markdownDescription%",
+                "when": "autotools:binaryIncompatible"
             },
             {
                 "view": "autotools.outline",
@@ -1046,7 +1054,7 @@
                 },
                 {
                     "command": "autotools.openLog",
-                    "when": "view == autotools.tests && viewItem =~ /nodeType=check/",
+                    "when": "never && view == autotools.tests && viewItem =~ /nodeType=check/",
                     "group": "inline@2"
                 },
                 {
@@ -1076,13 +1084,13 @@
         "translations-generate": "gulp translations-generate",
         "translations-import": "gulp translations-import",
 
-        "esbuild-base": "esbuild ./src/extension.ts --bundle --outfile=out/main.js --external:vscode --platform=node",
+        "esbuild-base": "esbuild ./src/extension.ts --bundle --outfile=$npm_package_main --external:vscode --platform=node",
         "esbuild": "npm run esbuild-base -- --sourcemap",
         "test-compile": "tsc -p ./",
 
         "watch": "tsc -watch -p ./",
-        "package": "echo Do something like vsce package --pre-release --target linux-x64 --yarn -o autotools.vsix",
-        "publish": "vsce publish --pre-release --yarn -i autotools.vsix",
+        "package": "[ ! -z $TARGET ] && vsce package --pre-release --target $TARGET --yarn -o autotools.$npm_package_version-pre-$TARGET.vsix",
+        "publish": "echo I WOULD vsce publish --pre-release --yarn -i autotools.vsix",
         "pretest": "yarn compile",
         "test": "yarn run pretest && node ./out/src/test/runTest.js"
     },

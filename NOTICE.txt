@@ -2,15 +2,15 @@ NOTICES AND INFORMATION
 Do Not Translate or Localize
 
 This software incorporates material from third parties.
-Microsoft makes certain open source code available at https://3rdpartysource.microsoft.com,
+Mergesium makes certain open source code available at https://github.com/Mergesium,
 or you may send a check or money order for US $5.00, including the product name,
 the open source component name, platform, and version number, to:
 
 Source Code Compliance Team
-Microsoft Corporation
-One Microsoft Way
-Redmond, WA 98052
-USA
+Mergesium Inc
+246 Southwood Dr.
+Kitchener, ON, N2E 2B1
+Canada
 
 Notwithstanding any other terms, you may reverse engineer this software to the extent
 required to debug changes to any libraries licensed under the GNU Lesser General Public License.
@@ -963,3 +963,34 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE
 
 ---------------------------------------------------------
+
+---------------------------------------------------------
+
+opentelemetry - Apache 2.0
+
+https://github.com/open-telemetry/opentelemetry-js/blob/main/api/LICENSE
+
+---------------------------------------------------------
+
+---------------------------------------------------------
+
+GNU Make 4.1 - GPL
+
+                    GNU GENERAL PUBLIC LICENSE
+                       Version 3, 29 June 2007
+
+https://git.savannah.gnu.org/cgit/make.git/tree/COPYING?h=4.1
+
+---------------------------------------------------------
+
+---------------------------------------------------------
+
+GNU Automake 1.16i - GPL
+
+		    GNU GENERAL PUBLIC LICENSE
+		       Version 2, June 1991
+
+https://git.savannah.gnu.org/cgit/automake.git/tree/COPYING?h=v1.16i
+
+---------------------------------------------------------
+

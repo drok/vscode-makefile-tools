@@ -33,4 +33,13 @@ node_modules/
 out/src
 .git
 .gitmodules
-package.nls.*.json
+# package.nls.*.json
+
+# things to be ignored when vsce packages:
+share/
+admin/
+out/admin/
+out/buildinfo.*
+buildinfo.*
+*.code-workspace
+TODO.md

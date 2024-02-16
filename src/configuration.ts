@@ -4,27 +4,21 @@
 // Configuration support
 
 import { extension, telemetry, statusBar } from './extension';
-import { Attributes, SpanStatusCode } from './tele';
+import { SpanStatusCode } from './tele';
 import * as logger from './logger';
 import * as make from './make';
-import { BuildTarget } from './make';
 import { Goal } from './parser/gnumake';
 import * as ui from './ui';
 import * as util from './util';
 import * as vscode from 'vscode';
 import * as path from 'path';
-import * as multiStep from './multiStepInput';
 import { openSettings } from './extension';
 import { createHash } from 'crypto';
-import * as fs from 'fs';
 
 import * as nls from 'vscode-nls';
-import { dir } from 'console';
-import { Disposable } from 'vscode-jsonrpc';
-import { AutoToolsBuildTaskProvider, BuildTask } from './tasks';
+import { BuildTask } from './tasks';
 import { assert } from 'console';
-import { parse, quote } from '@mergesium/shell-quote';
-import { env } from 'process';
+import { quote } from '@mergesium/shell-quote';
 import { Span } from '@opentelemetry/api';
 
 nls.config({ messageFormat: nls.MessageFormat.bundle, bundleFormat: nls.BundleFormat.standalone })();
@@ -349,6 +343,7 @@ export async function analyzeConfigureParams(parentSpan: Span, reload: boolean, 
     vscode.commands.executeCommand("setContext", "autotools:isBootstrapped", bootstrapped ? 1 : 2);
 
     if (isAutotools) {
+        statusBar.show();
         if (bootstrapped) {
             if (configured || (!failIfUnconfigured && await extension.configure(span))) {
                 let relativeMakefile = findMakefile();
@@ -356,12 +351,12 @@ export async function analyzeConfigureParams(parentSpan: Span, reload: boolean, 
                     let kbUrl = await extension.kbUrl();
                     if (relativeMakefile) {
                         extension._projectOutlineProvider.update(currentMakefileConfigurationName);
-                        extension.createPanel();
                         await logMakeCmd(relativeMakefile);
                         extension.setConfiguration(currentMakefileConfigurationName);
                         vscode.commands.executeCommand("setContext", "autotools:hasTargets", 2);
                         extension._projectOutlineProvider?.clear();
                         extension._projectTestSuitesProvider?.clear();
+                        extension.createPanel();
                                         // extension.setConfiguration(currentMakefileConfigurationName);
                         result = "ok";
                         hasMakefile = true;
@@ -464,7 +459,7 @@ export function setMakefileConfigurations(configurations: MakefileConfiguration[
 export async function readMakefileConfigurations(currentConfigurationName : string, span: Span): Promise<void> {
     // We need to read "makefile.configurations" unexpanded first, because we may write back into these settings
     // in case we indentify "name" missing. We'll expand later, see end of function.
-    let workspaceConfiguration: vscode.WorkspaceConfiguration = vscode.workspace.getConfiguration("autotools");
+    let workspaceConfiguration: vscode.WorkspaceConfiguration = vscode.workspace.getConfiguration("autotools", util.getConfigScope());
     makefileConfigurations = workspaceConfiguration.get<MakefileConfiguration[]>("configurations") || [];
     let detectedUnnamedConfigurations: boolean = false;
     let unnamedConfigurationId: number = 0;
@@ -531,7 +526,7 @@ export function getLoadedEnvironments(): TestEnvironment[] { return loadedTestEn
 export async function readTestEnvironments(): Promise<void> {
     // We need to read "makefile.configurations" unexpanded first, because we may write back into these settings
     // in case we indentify "name" missing. We'll expand later, see end of function.
-    let workspaceConfiguration: vscode.WorkspaceConfiguration = vscode.workspace.getConfiguration("autotools");
+    let workspaceConfiguration: vscode.WorkspaceConfiguration = vscode.workspace.getConfiguration("autotools", util.getConfigScope());
     loadedTestEnvironments = [nullTestEnvironment(),...(workspaceConfiguration.get<TestEnvironment[]>("test_environments") || [])];
     let unnamedConfigurationId: number = 0;
 
@@ -704,7 +699,7 @@ let gTestEnvironment : TestEnvironment = {
     hashCode: -1
 };
 export async function readGlobalTestEnvironment(): Promise<void> {
-    let workspaceConfiguration: vscode.WorkspaceConfiguration = vscode.workspace.getConfiguration("autotools");
+    let workspaceConfiguration: vscode.WorkspaceConfiguration = vscode.workspace.getConfiguration("autotools", util.getConfigScope());
     gTestEnvironment.TESTS_ENVIRONMENT = workspaceConfiguration.get<EnvironmentSetting>("TESTS_ENVIRONMENT") ||
         {};
 
@@ -1022,7 +1017,7 @@ export async function initFromSettings(activation: boolean = false, span: Span):
                     // to the telemetry function. Currently, the schema for such a setting
                     // is represented differently than the workspace setting value.
                     let settingObj: any;
-                    let workspaceConfiguration: vscode.WorkspaceConfiguration = vscode.workspace.getConfiguration(keyRoot);
+                    let workspaceConfiguration: vscode.WorkspaceConfiguration = vscode.workspace.getConfiguration(keyRoot, util.getConfigScope());
                     if (subKey.includes(".")) {
                        const subKeys: string[] = subKey.split(".");
                        settingObj = workspaceConfiguration;
@@ -1112,7 +1107,7 @@ export async function setNewConfiguration(span: Span): Promise<void> {
 
 export function prepareEnvQuickPick(): PickItem[] {
     const items: PickItem[] = testEnvironments.map<PickItem>((k =>
-        new PickItem(k, k.name, k.dirs ? k.dirs.join(", ") : "all suites", k.testExecOptions?.env?.TESTS_ENVIRONMENT || "no vars")
+        new PickItem(k, k.name, k.dirs ? (k.dirs.length ? "only in: " + k.dirs.join(", ") : "nowhere") : "", k.testExecOptions?.env?.TESTS_ENVIRONMENT || "no vars")
         ));
 
     if (items.length === 0) {
@@ -1151,7 +1146,7 @@ export async function setNewEnvironment(): Promise<void> {
         setBuildEnvPath();
         extension.getState().testEnvironment = newName;
         extension.setTestEnvironmentName(newName);
-        extension._projectTestSuitesProvider.updateTree();
+        extension._projectTestSuitesProvider.updateTree(getCurrentTestEnvironment());
     }
 }
 
