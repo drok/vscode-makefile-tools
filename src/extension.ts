@@ -266,14 +266,20 @@ export class Extension {
         vscode.commands.executeCommand('vscode.open', kburl.toString(true));
     }
     public createPanel() : void {
+        if (this._projectOutlineTreeView)
+            return; // otherwise "No tree view id 'autotools.outline' registered rejected promise wehn
+            // extensionHost attempts to getChildren()". Looks like createTreeView schedules an async
+            // deferred registration.
+            // Maybe there's a bug in vscode 1.77
+            // Try it again on other versions, uncomment the deletePanel
+            // this.deletePanel();
         this._projectOutlineTreeView = vscode.window.createTreeView('autotools.outline', {
             treeDataProvider: this._projectOutlineProvider,
             canSelectMany: true,
             showCollapseAll: false
 
         });
-
-        this._projectOutlineTreeView.onDidChangeSelection(e => {
+        this._treeDisposables.push(this._projectOutlineTreeView.onDidChangeSelection(e => {
             let oldGoals = configuration.currentGoalsBins;
             if (e.selection.length > 0) {
                 let newGoals = e.selection.filter(g => g instanceof Goal) as Goal[];
@@ -284,7 +290,8 @@ export class Extension {
             if (oldGoals != configuration.currentGoalsBins) {
                 this.suiteDecorator.highlightRelevant(configuration.currentGoals);
             }
-        });
+        }));
+
         this._projectTestSuitesView = vscode.window.createTreeView('autotools.tests', {
             treeDataProvider: this._projectTestSuitesProvider,
             canSelectMany: true,
@@ -308,10 +315,7 @@ export class Extension {
                     return openLog(selected);
                 }
             }
-    }));
-        // this._projectOutlineTreeView.description = "outline description";
-        // this._projectTestSuitesView.description = configuration.getCurrentTestEnvironment().name;
-        // this._projectOutlineTreeView.message = "outline message";
+        }));
     }
     public setConfiguration(name: string) {
         if (this._projectOutlineTreeView) {
@@ -325,15 +329,13 @@ export class Extension {
         }
     }
     public deletePanel() : void {
-        if (this._projectOutlineTreeView) {
-            this._projectOutlineTreeView = undefined;
-            this._treeDisposables.forEach((d) => d.dispose());
-            this._treeDisposables = [];
-
-            this.testController?.deactivate();
-            this.testController = undefined;
-        }
-    }
+        this._treeDisposables.forEach((d) => d.dispose());
+        this._projectOutlineTreeView?.dispose();
+        this._projectTestSuitesView?.dispose();
+        this._projectOutlineTreeView = undefined;
+        this._projectTestSuitesView = undefined;
+        this._treeDisposables = [];
+}
 
     failStatUpdate(oldresult: make.TRS, result: make.TRS) {
         assert(oldresult != result, "in failStatUpdate result should be different", [oldresult, result]);
@@ -733,13 +735,14 @@ export class Extension {
     public getState(): state.StateManager { return this.mementoState; }
 
     public dispose(): void {
-        this._projectOutlineTreeView?.dispose();
-        this._projectTestSuitesView?.dispose();
-        this._treeDisposables.forEach((d) => d.dispose());
+        this.deletePanel();
         this.configDisposables.forEach((d) => d.dispose());
         if (this.cppToolsAPI) {
             this.cppToolsAPI.dispose();
         }
+        this.testController?.deactivate();
+        this.testController = undefined;
+
         this.journey.end();
     }
 

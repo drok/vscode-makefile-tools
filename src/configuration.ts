@@ -351,12 +351,12 @@ export async function analyzeConfigureParams(parentSpan: Span, reload: boolean, 
                     let kbUrl = await extension.kbUrl();
                     if (relativeMakefile) {
                         extension._projectOutlineProvider.update(currentMakefileConfigurationName);
-                        extension.createPanel();
                         await logMakeCmd(relativeMakefile);
                         extension.setConfiguration(currentMakefileConfigurationName);
                         vscode.commands.executeCommand("setContext", "autotools:hasTargets", 2);
                         extension._projectOutlineProvider?.clear();
                         extension._projectTestSuitesProvider?.clear();
+                        extension.createPanel();
                                         // extension.setConfiguration(currentMakefileConfigurationName);
                         result = "ok";
                         hasMakefile = true;
