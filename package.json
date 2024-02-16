@@ -1034,7 +1034,7 @@
                 },
                 {
                     "command": "autotools.openLog",
-                    "when": "view == autotools.tests && viewItem =~ /nodeType=check/",
+                    "when": "never && view == autotools.tests && viewItem =~ /nodeType=check/",
                     "group": "inline@2"
                 },
                 {
