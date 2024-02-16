@@ -1,6 +1,12 @@
 # What's New?
 
-## Autotools Integration 0.1.1
+## Autotools Integration 0.1.2 - hotfix
+
+  - Fix `Mergesium.rules` file not found (https://github.com/Mergesium/autotools/issues/10)
+
+  Errata discovered after release will be posted [here](https://github.com/Mergesium/autotools/releases/tag/0.1.2).
+
+## Autotools Integration 0.1.1 - hotfix
 
   - Fix support for older Ubuntus (16 and before) (https://github.com/Mergesium/autotools/issues/7)
   - Fix initial config extraction after extension is first installed (https://github.com/Mergesium/autotools/issues/8)
