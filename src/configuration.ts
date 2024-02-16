@@ -351,12 +351,12 @@ export async function analyzeConfigureParams(parentSpan: Span, reload: boolean, 
                     let kbUrl = await extension.kbUrl();
                     if (relativeMakefile) {
                         extension._projectOutlineProvider.update(currentMakefileConfigurationName);
-                        extension.createPanel();
                         await logMakeCmd(relativeMakefile);
                         extension.setConfiguration(currentMakefileConfigurationName);
                         vscode.commands.executeCommand("setContext", "autotools:hasTargets", 2);
                         extension._projectOutlineProvider?.clear();
                         extension._projectTestSuitesProvider?.clear();
+                        extension.createPanel();
                                         // extension.setConfiguration(currentMakefileConfigurationName);
                         result = "ok";
                         hasMakefile = true;
@@ -459,7 +459,7 @@ export function setMakefileConfigurations(configurations: MakefileConfiguration[
 export async function readMakefileConfigurations(currentConfigurationName : string, span: Span): Promise<void> {
     // We need to read "makefile.configurations" unexpanded first, because we may write back into these settings
     // in case we indentify "name" missing. We'll expand later, see end of function.
-    let workspaceConfiguration: vscode.WorkspaceConfiguration = vscode.workspace.getConfiguration("autotools");
+    let workspaceConfiguration: vscode.WorkspaceConfiguration = vscode.workspace.getConfiguration("autotools", util.getConfigScope());
     makefileConfigurations = workspaceConfiguration.get<MakefileConfiguration[]>("configurations") || [];
     let detectedUnnamedConfigurations: boolean = false;
     let unnamedConfigurationId: number = 0;
@@ -526,7 +526,7 @@ export function getLoadedEnvironments(): TestEnvironment[] { return loadedTestEn
 export async function readTestEnvironments(): Promise<void> {
     // We need to read "makefile.configurations" unexpanded first, because we may write back into these settings
     // in case we indentify "name" missing. We'll expand later, see end of function.
-    let workspaceConfiguration: vscode.WorkspaceConfiguration = vscode.workspace.getConfiguration("autotools");
+    let workspaceConfiguration: vscode.WorkspaceConfiguration = vscode.workspace.getConfiguration("autotools", util.getConfigScope());
     loadedTestEnvironments = [nullTestEnvironment(),...(workspaceConfiguration.get<TestEnvironment[]>("test_environments") || [])];
     let unnamedConfigurationId: number = 0;
 
@@ -699,7 +699,7 @@ let gTestEnvironment : TestEnvironment = {
     hashCode: -1
 };
 export async function readGlobalTestEnvironment(): Promise<void> {
-    let workspaceConfiguration: vscode.WorkspaceConfiguration = vscode.workspace.getConfiguration("autotools");
+    let workspaceConfiguration: vscode.WorkspaceConfiguration = vscode.workspace.getConfiguration("autotools", util.getConfigScope());
     gTestEnvironment.TESTS_ENVIRONMENT = workspaceConfiguration.get<EnvironmentSetting>("TESTS_ENVIRONMENT") ||
         {};
 
@@ -1017,7 +1017,7 @@ export async function initFromSettings(activation: boolean = false, span: Span):
                     // to the telemetry function. Currently, the schema for such a setting
                     // is represented differently than the workspace setting value.
                     let settingObj: any;
-                    let workspaceConfiguration: vscode.WorkspaceConfiguration = vscode.workspace.getConfiguration(keyRoot);
+                    let workspaceConfiguration: vscode.WorkspaceConfiguration = vscode.workspace.getConfiguration(keyRoot, util.getConfigScope());
                     if (subKey.includes(".")) {
                        const subKeys: string[] = subKey.split(".");
                        settingObj = workspaceConfiguration;
@@ -1107,7 +1107,7 @@ export async function setNewConfiguration(span: Span): Promise<void> {
 
 export function prepareEnvQuickPick(): PickItem[] {
     const items: PickItem[] = testEnvironments.map<PickItem>((k =>
-        new PickItem(k, k.name, k.dirs ? k.dirs.join(", ") : "all suites", k.testExecOptions?.env?.TESTS_ENVIRONMENT || "no vars")
+        new PickItem(k, k.name, k.dirs ? (k.dirs.length ? "only in: " + k.dirs.join(", ") : "nowhere") : "", k.testExecOptions?.env?.TESTS_ENVIRONMENT || "no vars")
         ));
 
     if (items.length === 0) {
@@ -1146,7 +1146,7 @@ export async function setNewEnvironment(): Promise<void> {
         setBuildEnvPath();
         extension.getState().testEnvironment = newName;
         extension.setTestEnvironmentName(newName);
-        extension._projectTestSuitesProvider.updateTree();
+        extension._projectTestSuitesProvider.updateTree(getCurrentTestEnvironment());
     }
 }
 

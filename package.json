@@ -1,8 +1,8 @@
 {
     "name": "autotools",
     "displayName": "Autotools Integration",
-    "description": "Import autotools configuration into C/C++ IntelliSense",
-    "version": "0.1.0",
+    "description": "Comprehensive autotools support in Visual Studio Code",
+    "version": "0.1.1",
     "publisher": "Mergesium",
     "preview": true,
     "icon": "res/autotools.png",
@@ -461,6 +461,7 @@
                 },
                 "autotools.autoreconfTool": {
                     "order": 4,
+                    "scope": "resource",
                     "type": "string",
                     "default": "autoreconf",
                     "markdownDescription": "%autotools.configuration.autoreconfTool.markdownDescription%"
@@ -480,6 +481,7 @@
             "properties": {
                 "autotools.TESTS_ENVIRONMENT" : {
                     "order": 1,
+                    "scope": "resource",
                     "type": "object",
                     "default": {},
                     "title": "%autotools.configuration.tests_environment.TESTS_ENVIRONMENT.global.title%",
@@ -488,6 +490,7 @@
                 },
                 "autotools.XFAIL_TESTS" : {
                     "order": 2,
+                    "scope": "resource",
                     "type": "array",
                     "default": [],
                     "markdownDescription": "%autotools.configuration.tests_environment.XFAIL_TESTS.global.markdownDescription%",
@@ -595,13 +598,8 @@
             },
             {
                 "view": "autotools.outline",
-                "contents": "%autotools.welcome.pre.expired.markdownDescription%",
-                "when": "autotools:expiresSoon == 3"
-            },
-            {
-                "view": "autotools.outline",
-                "contents": "%autotools.welcome.pre.accept.markdownDescription%",
-                "when": "autotools:expiresSoon == 4"
+                "contents": "%autotools.welcome.binaryIncompatible.markdownDescription%",
+                "when": "autotools:binaryIncompatible"
             },
             {
                 "view": "autotools.outline",
@@ -932,16 +930,6 @@
                     "when": "never"
                 }
             ],
-            "testing/item/context": [
-                {
-                    "command": "autotools.command.testgrid.item",
-                    "group": "navigation@3"
-                },
-                {
-                    "command": "autotools.command.testgrid.top",
-                    "group": "navigation@4"
-                }
-            ],
             "editor/title/context": [
                 {
                     "command": "autotools.closeIrrelevant",
@@ -959,6 +947,16 @@
                     "command": "autotools.rdepends",
                     "when": "autotools:hasTargets == 1",
                     "group": "navigation@30"
+                }
+            ],
+            "testing/item/context": [
+                {
+                    "command": "autotools.command.testgrid.item",
+                    "group": "navigation@3"
+                },
+                {
+                    "command": "autotools.command.testgrid.top",
+                    "group": "navigation@4"
                 }
             ],
             "view/title": [
@@ -1056,7 +1054,7 @@
                 },
                 {
                     "command": "autotools.openLog",
-                    "when": "view == autotools.tests && viewItem =~ /nodeType=check/",
+                    "when": "never && view == autotools.tests && viewItem =~ /nodeType=check/",
                     "group": "inline@2"
                 },
                 {
