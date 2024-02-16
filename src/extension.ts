@@ -539,7 +539,8 @@ export class Extension {
             let workaroundTask = new vscode.Task(kind, vscode.TaskScope.Workspace, 'autotools', 'autotools',
             new vscode.ProcessExecution("true", ["this-is-a-workaround-for-fetchTasks-bug-not-parsing-tasks-json"]));
             workaroundTask.presentationOptions = {
-                reveal: vscode.TaskRevealKind.Always,
+                reveal: vscode.TaskRevealKind.Never,
+                focus: false,
                 panel: vscode.TaskPanelKind.Shared,
                 showReuseMessage: false};
             workaroundTask.isBackground = true;
