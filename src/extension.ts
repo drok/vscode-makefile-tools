@@ -180,7 +180,42 @@ export class Extension {
                 });
                 await focusPreviewedDocument(summary);
             }
-    }));
+        }));
+
+        extensionContext.subscriptions.push(vscode.commands.registerCommand('autotools.rdepends', async (sub: vscode.Uri) => {
+            if (!(sub instanceof vscode.Uri))
+                return Promise.reject("Expected file Uri argument");
+            let span = telemetry.startSpan("rdep", extension.journey);
+            configuration.setCurrentGoalBins(undefined);
+            configuration.setCurrentGoalTests(undefined);
+            vscode.commands.executeCommand('autotools.tests.focus');
+            let goals = extension._projectOutlineProvider.selectRdepends(sub.path);
+            let status : boolean = true;
+            for (const g of goals) {
+                if (g.flags & Goal.Flags.Test_Log) {
+                    extension._projectTestSuitesProvider.all.set(g.getFilePath(), g); // Fixme - this cn be moved to Test Tree build parents, it seems out of place here. Here it does lazy allocation, in buildParents it would be eager allocation
+                    await extension._projectTestSuitesView?.reveal(g, rdepRevealOption) // rdepRevealOption)
+                    .then(() => {},
+                    err => {
+                        status = false;
+                        logger.message(`ERROR: Internal error finding goal ${g.goal} in tests tree`,'Normal');
+                        telemetry.logException(new Error(`No ${g.goal} in test tree`), extension.journey);
+                    })
+                } else {
+                    extension._projectOutlineProvider.all.set(g.getFilePath(), g); // Fixme - this cn be moved to Test Tree build parents, it seems out of place here. Here it does lazy allocation, in buildParents it would be eager allocation
+                    await this._projectOutlineTreeView?.reveal(g, rdepRevealOption)
+                    .then(() => {},
+                    err => {
+                        status = false;
+                        logger.message(`ERROR: Internal error finding goal ${g.goal} in programs tree`,'Normal');
+                        telemetry.logException(new Error(`No ${g.goal} in bin tree`), extension.journey);
+                    });
+                }
+            }
+            this.suiteDecorator.highlightTargets(goals, sub.path);
+            telemetry.endSpanWithStatus(span, status ? SpanStatusCode.OK : SpanStatusCode.ERROR, undefined, { numrd: goals.length });
+            return Promise.resolve();
+        }));
 
         debugProvider.activate(extensionContext);
     }
@@ -256,42 +291,6 @@ export class Extension {
             showCollapseAll: false
 
         });
-        this._treeDisposables.push(vscode.commands.registerCommand('autotools.rdepends', async (sub: vscode.Uri) => {
-            if (!(sub instanceof vscode.Uri))
-                return Promise.reject("Expected file Uri argument");
-            configuration.setCurrentGoalBins(undefined);
-            configuration.setCurrentGoalTests(undefined);
-            // vscode.commands.executeCommand('workbench.action.openView', this._projectTestSuitesView);
-            vscode.commands.executeCommand('autotools.tests.focus');
-            let goals = extension._projectOutlineProvider.selectRdepends(sub.path);
-            for (const g of goals) {
-                if (g.flags & Goal.Flags.Test_Log) {
-                    extension._projectTestSuitesProvider.all.set(g.getFilePath(), g); // Fixme - this cn be moved to Test Tree build parents, it seems out of place here. Here it does lazy allocation, in buildParents it would be eager allocation
-                    await this._projectTestSuitesView?.reveal(g, rdepRevealOption) // rdepRevealOption)
-                    .then(() => {
-                        console.debug('selected', g);
-                    },
-                    err => {
-                        logger.message(`ERROR: Internal error finding goal ${g.goal} in tests tree`,'Normal');
-                        telemetry.logException(new Error(`No ${g.goal} in test tree`), extension.journey);
-                    })
-                } else {
-                    extension._projectOutlineProvider.all.set(g.getFilePath(), g); // Fixme - this cn be moved to Test Tree build parents, it seems out of place here. Here it does lazy allocation, in buildParents it would be eager allocation
-                    await this._projectOutlineTreeView?.reveal(g, rdepRevealOption)
-                    .then(() => {
-                        console.debug('selected', g);
-                    },
-                    err => {
-                        logger.message(`ERROR: Internal error finding goal ${g.goal} in programs tree`,'Normal');
-                        telemetry.logException(new Error(`No ${g.goal} in bin tree`), extension.journey);
-                    });
-                }
-            }
-            this.suiteDecorator.highlightTargets(goals, sub.path);
-            telemetry.logEvent(this.journey, "rdep", {num: goals.length});
-            return Promise.resolve();
-        }));
-
         this._treeDisposables.push(this._projectTestSuitesView.onDidChangeSelection((e) => {
             let oldGoals = configuration.currentGoalsTests;
             if (e.selection.length > 0) {
