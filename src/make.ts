@@ -439,12 +439,14 @@ export async function generateParseContent(span: Span): Promise<ConfigureSubphas
             }
             // FIXME: Since dry-running failed, also unlink the configCache file
         } else {
+            telemetry.setAttributes(span, {numLines: linenumber});
             if (parseFailedAt) {
                 /* Partial parse ... something in the make output could not be parsed */
-                telemetry.logEvent(span, "paFail", {proj: extension.pkginfo?.name, line: parseFailedAt}, true);
+                telemetry.setAttributes(span, {failAtLine: parseFailedAt});
                 var kbUrl : vscode.Uri = await extension.kbUrl();
                 logger.message('KB: ' + kbUrl.toString(true) + '#config-parse-fail', "Normal");
-            }
+            } else
+                telemetry.setSpanStatus(span, SpanStatusCode.OK);
         }
         /* Now decide whether to import (partial) data or reset Intellisense */
         if (result.returnCode !== ConfigureBuildReturnCodeTypes.success &&
@@ -481,6 +483,7 @@ export async function generateParseContent(span: Span): Promise<ConfigureSubphas
     } catch (error) {
         logger.message("Parsing the configuration failed due to: " + error);
         telemetry.logException(error, span);
+        telemetry.setSpanStatus(span, SpanStatusCode.ERROR, "exception");
         ui.getUI().setStatus(ui.UIStatus.RUNTIME);
         return {
             retc: ConfigureBuildReturnCodeTypes.notFound,
