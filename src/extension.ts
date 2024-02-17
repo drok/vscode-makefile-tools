@@ -641,8 +641,13 @@ export class Extension {
     updateTestSuite(sub: gnumake.Make, parent: gnumake.Make, top: boolean): void {
         let c = configuration.getCurrentMakefileConfiguration();
         for (let submake of sub.submake.values()) {
-            if (submake.test_suite?.test && parent.test_suite?.test)
-                extension.testController?.addSubTest(parent.test_suite.test, submake.test_suite.test);
+            if (submake.test_suite?.test) {
+                // add it to my parent if I don't have suite
+                // This can happen if 1+ intermediate dir has no TESTS
+                let suiteparent = sub.test_suite?.test ?? parent.test_suite?.test;
+                if (suiteparent)
+                    extension.testController?.addSubTest(suiteparent, submake.test_suite.test);
+            }
             //if (submake.test_suite?.test)
             this.updateTestSuite(submake, sub.test_suite ? sub : parent, top && !sub.test_suite);
         }
