@@ -549,7 +549,8 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
                 localize("autotools.configure.task", "Prepare build directory"),
                 "Autotools task",
                 new ProcessExecution(resolvePathToRoot("configure"), configureArgs,
-                    {cwd : destdir}));
+                    {cwd : destdir}),
+                    ['autotools_configure']);
             task.detail = localize("automake.configure.help", "$(tools) Configure build directory");
 
             await this.waitToTouchMakefiles();

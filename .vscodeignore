@@ -37,7 +37,7 @@ out/src
 
 # things to be ignored when vsce packages:
 share/
-include/
+include/gnumake.h
 admin/
 out/admin/
 out/buildinfo.*

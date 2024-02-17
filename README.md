@@ -463,7 +463,7 @@ With your approval, the autotools extension collects anonymous usage data and er
 Read our [privacy statement](https://autotools.mergesium.com/privacy.html) to learn more.
 This extension respects the `telemetry.telemetryLevel` setting, which you can learn more about at https://code.visualstudio.com/docs/getstarted/telemetry
 
-Pre-releases require telemetry to be enabled. Telemetry is optional in general releases, but greatly appreciated, as it allows Mergesium to continuously improve quality of the extension and your experience in future versions.
+Pre-releases require telemetry to be enabled. Telemetry is optional in general releases, but greatly appreciated, as it allows Mergesium to continuously improve quality of the extension and your experience in future versions. Issues found by in this way are tagged [`tele-found`](https://github.com/Mergesium/autotools/labels/tele-found)
 
 The traces and errors reported by telemetry should not be seen as a substitute for issue reports. They are useful to detect wide-spread bugs or errors, but don't have enough resolution to detect isolated problems. If we knew what code paths are subject to failure, we'd fix them rather than instrument them with telemetry. Your feedback is invaluable in helping us understand bugs. Please do submit bug reports, especially if the knowledge base contains nothing related to your project; in that case you are very likely the first person to encounter the bug you're seeing.
 
