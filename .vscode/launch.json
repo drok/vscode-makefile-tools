@@ -3,6 +3,40 @@
     "version": "0.1.0",
     "configurations": [
         {
+            "name": "Make bitcoin src segv",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "/tmp/make20",
+            "args": [
+                    "-C", "src", "all",
+                    "-j1", "--output-sync=none", "--print-directory",
+                    "--print-data-base",
+                    "V=1",
+                    "--trace",
+                    "--dry-run",
+                    "--keep-going",
+                    "GMOFILES=",
+                    "--always-make",
+            ],
+            "stopAtEntry": false,
+            "cwd": "/tmp/bitcoin/build/Debug",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Set Disassembly Flavor to Intel",
+                    "text": "-gdb-set disassembly-flavor intel",
+                    "ignoreFailures": true
+                }
+            ]
+        },
+        {
             "name": "Make curl dry",
             "type": "cppdbg",
             "request": "launch",
