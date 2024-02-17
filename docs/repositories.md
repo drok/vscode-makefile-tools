@@ -66,6 +66,7 @@
 | [TscanCode](https://github.com/Tencent/TscanCode)| make | Jan 24 | |
 | [Tundra](https://github.com/deplinenoise/tundra)[^non] | |
 | [ucx](https://github.com/openucx/ucx) | CMake | Jan 24 | |
+| [ugrep](https://github.com/Genivia/ugrep) | autotools | Feb 24 | testcase for diagnostics |
 | [UPX](https://github.com/upx/upx)[^non] | CMake | Jan 24 | |
 | [vim](https://github.com/vim/vim)[^non] | make | Jan 24 | |
 | [VLC](https://github.com/videolan/vlc) | autotools, meson | Jan 24 | [ms #99](https://github.com/microsoft/vscode-makefile-tools/issues/99) |
