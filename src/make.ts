@@ -422,15 +422,16 @@ export async function generateParseContent(span: Span): Promise<ConfigureSubphas
             );
 
             if (result.returnCode == ConfigureBuildReturnCodeTypes.describedError) {
-                telemetry.logEvent(span, "drWarn", {n: completeErr.split('\n').length}, true);
-                logger.message("Exporting project config succeeded with warnings.");
+                if (configuration.getAllBuildTargets().size != 0) {
+                    logger.message("Exporting project config was partially successful.");
+                } else {
+                    logger.message("Exporting project config failed.");
+                }
             } else if (result.returnCode == ConfigureBuildReturnCodeTypes.outOfDate) {
-                telemetry.logEvent(span, "drFail", {returnCode: result.returnCode}, true);
                 logger.message("Exporting project config from Makefiles failed.");
-            } else {
-                telemetry.setAttributes(span, {exitCode: result.returnCode});
-                telemetry.setSpanStatus(span, SpanStatusCode.ERROR, "dryFail");
             }
+            telemetry.setAttributes(span, {exitCode: result.returnCode});
+            telemetry.setSpanStatus(span, SpanStatusCode.ERROR, "dryFail");
 
             if (result.returnCode == ConfigureBuildReturnCodeTypes.describedError) {
                 logger.message('KB: ' + kbUrl.toString(true) + '#dry-run-warnings', "Normal");
@@ -445,8 +446,7 @@ export async function generateParseContent(span: Span): Promise<ConfigureSubphas
                 telemetry.setAttributes(span, {failAtLine: parseFailedAt});
                 var kbUrl : vscode.Uri = await extension.kbUrl();
                 logger.message('KB: ' + kbUrl.toString(true) + '#config-parse-fail', "Normal");
-            } else
-                telemetry.setSpanStatus(span, SpanStatusCode.OK);
+            }
         }
         /* Now decide whether to import (partial) data or reset Intellisense */
         if (result.returnCode !== ConfigureBuildReturnCodeTypes.success &&
@@ -456,7 +456,11 @@ export async function generateParseContent(span: Span): Promise<ConfigureSubphas
             extension.resetCppToolsProvider();
         } else {
             // All done, notify that new data is available
-            result.returnCode = extension.updateCppToolsProvider();
+            if (!result.returnCode)
+                result.returnCode = extension.updateCppToolsProvider();
+            else
+                extension.updateCppToolsProvider();
+
             export_stats = build_tree.stats;
             configuration.accountForTraits();
             extension.updateTasks(build_tree);
@@ -724,13 +728,13 @@ export async function configure(parentSpan: Span, triggeredBy: TriggeredBy): Pro
 
     extension.setCompletedConfigureInSession(true);
     
-    telemetry.endSpanWithStatus(span, SpanStatusCode.OK, undefined, {
+    telemetry.setAttributes(span, {
         numFiles: provider.fileIndex.size,
         numConfigs: configuration.getMakefileConfigurations().length,
         firstTime: !ranConfigureInCodebaseLifetime,
         readCache: readCache,
-        ret: retc,
     });
+    span.end();
 
     if (retc !== ConfigureBuildReturnCodeTypes.success) {
       logger.showOutputChannel();
@@ -858,8 +862,8 @@ export async function doConfigure(readCache: boolean, cacheFile: string, recursi
     switch (subphaseStats.generateParseContent.retc) {
         case ConfigureBuildReturnCodeTypes.success:
             telemetry.setSpanStatus(span, SpanStatusCode.OK); break;
-        default:
-            telemetry.setSpanStatus(span, SpanStatusCode.ERROR);
+        default: // Status and explanation should have been set in generateParseContent
+            ;
     }
 
     // Let the caller collect and log all information regarding the subphases return codes.
