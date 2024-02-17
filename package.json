@@ -215,6 +215,23 @@
                 }
             },
             {
+                "name": "autotools_configure",
+                "label": "ccc",
+                "source": "autotools",
+                "owner": "external",
+                "fileLocation":[
+                    "relative",
+                    "${workspaceFolder}"
+                ],
+                "pattern": {
+                    "regexp": "^(configure): (error|WARNING): (.*)$",
+                    "kind": "file",
+                    "file": 1,
+                    "severity": 2,
+                    "message": 3
+                }
+            },
+            {
               "name": "gcc",
               "source": "gcc",
               "owner": "autotools",
