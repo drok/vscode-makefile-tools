@@ -37,7 +37,7 @@ const LeavingRE = /^# make(?:\[\d+\])?: Leaving directory '(.*)'$/;
 const NothingRE = /^make(?:\[\d+\])?: Nothing to be done for '(.*)'\.$/;
 export const ExecutingRE = /^(<builtin>|(.+):(\d+)): (?:update target '(.*)' due to: (?:.*)|target '(.*)' does not exist)$/;
 const UptodateRE = /^make(?:\[\d+\])?: '(.*)' is up to date\.$/;
-export const CopyrightRE = /^# (?:GNU Make|Mergesium Dry Runner)/;
+export const CopyrightRE = /^# (?:GNU Make|Mergesium Dry-Runner)/;
 const RecursingRE = /^Making (.*) in (.*)$/;
 /**
  * Parse the stdout of a GNU make run, and expect a Dumped database,
