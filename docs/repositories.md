@@ -59,12 +59,14 @@
 | [semver.c](https://github.com/h2non/semver.c) | make | Jan 24 | |
 | [SerenityOS](https://github.com/SerenityOS/serenity) | CMake | Jan 24 | |
 | [sled](https://github.com/shinyblink/sled) | gnumake | Jan 24 | |
+| [statoshi](https://github.com/jlopp/statoshi) | autotools | Feb 24 | needs C++20 |
 | [Strace](https://github.com/strace/strace) | autotools | jan 24 | [#config-parse-fail](v=st_esyscmd_s-.-build-aux-git-version-gen-.tarball-version-#config-parse-fail) | |
 | [swig](https://github.com/swig/swig) | autoconf | Jan 24 | [#dry-run](v=4.2.1#dry-run), [ms #98](https://github.com/microsoft/vscode-makefile-tools/issues/98) |
 | [Tinyvm](https://github.com/jakogut/tinyvm)[^non] | | | | | Yes |
 | [TscanCode](https://github.com/Tencent/TscanCode)| make | Jan 24 | |
 | [Tundra](https://github.com/deplinenoise/tundra)[^non] | |
 | [ucx](https://github.com/openucx/ucx) | CMake | Jan 24 | |
+| [ugrep](https://github.com/Genivia/ugrep) | autotools | Feb 24 | testcase for diagnostics |
 | [UPX](https://github.com/upx/upx)[^non] | CMake | Jan 24 | |
 | [vim](https://github.com/vim/vim)[^non] | make | Jan 24 | |
 | [VLC](https://github.com/videolan/vlc) | autotools, meson | Jan 24 | [ms #99](https://github.com/microsoft/vscode-makefile-tools/issues/99) |
