@@ -2,7 +2,7 @@
     "name": "autotools",
     "displayName": "Autotools Integration",
     "description": "Comprehensive autotools support in Visual Studio Code",
-    "version": "0.1.2",
+    "version": "0.1.3",
     "publisher": "Mergesium",
     "preview": true,
     "icon": "res/autotools.png",

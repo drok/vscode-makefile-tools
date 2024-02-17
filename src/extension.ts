@@ -64,7 +64,7 @@ const rdepRevealOption : { select: boolean,
 export class Extension {
     static readonly whoami: string = "mergesium.autotools";
     static readonly expires: string = "2024-03-15";
-    static readonly myVersion = 3;
+    static readonly myVersion = 4;
 
     public readonly journey;
     private mementoState : state.StateManager;
