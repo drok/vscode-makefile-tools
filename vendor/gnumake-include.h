@@ -22,3 +22,6 @@ __asm__(".symver __xstat,__xstat@GLIBC_2.2.5");
 #define stat(f,b) __xstat(1,f,b)
 
 __asm__(".symver __libc_start_main,__libc_start_main@GLIBC_2.2.5");
+
+/* also disable the local glob with make_cv_sys_gnu_glob=yes */
+__asm__(".symver glob,glob@GLIBC_2.2.5");
