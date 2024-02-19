@@ -568,13 +568,13 @@ export class Extension {
                         this.testTasks.numSuspect, this.testTasks.numTests),
                 value: this.testTasks.numSuspect};
 // FIXME: this miscounts when TRS file is deleted (3x inotify on test updates). Re-test
-//
-//        } else if (this.testTasks.numTests && this.testTasks.numUnknown) {
-//            this._projectTestSuitesView.badge =
-//                {tooltip:
-//                    localize("autotools.unknown.tests", "{0}/{1} tests are available/not yet run",
-//                        this.testTasks.numUnknown, this.testTasks.numTests),
-//                value: this.testTasks.numUnknown};
+// not commented out because "No tests available is not a better message than a wrong count"
+        } else if (this.testTasks.numTests && this.testTasks.numUnknown) {
+            this._projectTestSuitesView.badge =
+                {tooltip:
+                    localize("autotools.unknown.tests", "{0}/{1} tests are available/not yet run",
+                        this.testTasks.numUnknown, this.testTasks.numTests),
+                value: this.testTasks.numUnknown};
         } else {
             this._projectTestSuitesView.badge =
                 {tooltip:
