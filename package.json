@@ -386,14 +386,6 @@
                                     "type": "string"
                                 },
                                 "default": []
-                            },
-                            "problemMatchers": {
-                                "type": "array",
-                                "items": {
-                                    "type": "string"
-                                },
-                                "default": ["$gcc", "$msvc"],
-                                "description": "%autotools.configuration.makefile.configurations.problemMatchers.description%"
                             }
                         }
                     }

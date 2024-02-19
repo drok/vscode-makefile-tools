@@ -67,7 +67,6 @@
    "autotools.welcome.tests.none.markdownDescription": "There are no [Parallel Harness](https://www.gnu.org/software/automake/manual/html_node/Parallel-Test-Harness.html) tests.\nThe older (and discouraged) Serial Test Harness is [not yet supported](https://github.com/Mergesium/autotools/issues/5)",
    "autotools.welcome.tests.homegrown-suite.markdownDescription": "A 'check' target exists, possibly implementing a homegrown test suite. Run it with 'Autotools: run all tests (make check)' from palette or panel menu.",
    "autotools.configurations.configureArgs.title": "Arguments for the configure script",
-   "autotools.configuration.makefile.configurations.problemMatchers.description": "Problem matcher names to use when building the current target",
    "autotools.configuration.makefile.loggingLevel.description": "The logging level for the makefile tools extension",
    "autotools.configuration.makefile.configurationCachePath.description": "The path to a cache file storing the output of the last dry-run make command. When unset, a file named 'configurationCache.log' is stored at the path specified by the 'makefile.extensionOutputFolder' setting.",
    "autotools.configuration.autoreconfTool.markdownDescription": "Name of the `autoreconf` tool. Can be used to select a non-default version (eg. `autoreconf2.53`). It must match the version of the autoconf tool.",
