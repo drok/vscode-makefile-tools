@@ -319,37 +319,30 @@
                         "type": "object",
                         "required": ["name", "top_builddir"],
                         "title": "%autotools.configurations.title%",
-                        "default": {
-                            "name": "Debug",
-                            "top_builddir": "build/Debug",
-                            "configureArgs": [
-                                "--enable-option-checking",
-                                "CFLAGS=-ggdb3 -O0",
-                                "CXXFLAGS=-ggdb3 -O0"
-                            ]
-                        },
+                        "default":
+                            {
+                                "name": "Default",
+                                "top_builddir": "build/Default",
+                                "configureArgs": [
+                                    "--enable-option-checking"
+                                ]
+                            },
                         "$comment": "--enable-option-checking is to avoid silent ignoring arg mistakes. See  https://www.gnu.org/software/autoconf/manual/autoconf-2.67/html_node/Option-Checking.html",
                         "examples": [
                             {
                                 "name": "Defaults - in-tree",
-                                "top_builddir": ""
-                            },
-                            {
-                                "name": "Debug w/ Valgrind support",
-                                "top_builddir": "build/Valgrind",
+                                "top_builddir": "",
                                 "configureArgs": [
-                                    "--enable-option-checking",
-                                    "--enable-valgrind"
+                                    "--enable-option-checking"
                                 ]
                             },
                             {
-                                "name": "Lunar Config",
-                                "top_builddir": "build/Lunar",
+                                "name": "Debug",
+                                "top_builddir": "build/Debug",
                                 "configureArgs": [
                                     "--enable-option-checking",
-                                    "--enable-option1",
-                                    "--with-option2=something",
-                                    "CFLAGS=-D_FORTIFY_SOURCE=2"
+                                    "CFLAGS=-ggdb3 -O0",
+                                    "CXXFLAGS=-ggdb3 -O0"
                                 ]
                             },
                             {
@@ -360,15 +353,6 @@
                                     "--enable-option1",
                                     "--with-option2=something",
                                     "CFLAGS=-ggdb3 -O0 -Wall -Werror -pg -fprofile-arcs --coverage -ftest-coverage -fstack-protector-strong"
-                                ]
-                            },
-                            {
-                                "name": "Alpine Config",
-                                "top_builddir": "build/Alpine",
-                                "configureArgs": [
-                                    "--enable-option-checking",
-                                    "--disable-option1",
-                                    "CFLAGS=-flto -g -O2 -fPIC -fstack-protector-strong"
                                 ]
                             }
                         ],
