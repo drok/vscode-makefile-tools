@@ -170,7 +170,7 @@ export class Making implements Parser {
         // Parse the source files
         let file: string = compilerTool.argv[compilerTool.argv.length-1];
         // TODO: the src file could be a built src (ie, in currentDir) #16
-        file = await util.makeFullPath(file, currentPath);
+        file = util.resolvePathToRoot(path.join(caller.make.dir, file)); // ie, in $(srcdir)
 
         // The language represented by this compilation command (-x is for GCC)
         let xlanguage = compilerTool.filterArgs("x");
