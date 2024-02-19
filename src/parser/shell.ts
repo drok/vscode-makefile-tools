@@ -172,7 +172,6 @@ const failToParseTool : Tool = new Tool(
     ["unknown-tool", "unknown-arg"]
 );
 export class Executing implements Parser {
-    // constructor(goal: string) { this.goal = goal; }
     static makeArgs(): string[] { return [
         // Automake uses the V variable to tell whether commands are output as
         // executed. See am__v_CC_ definition in Makefiles.

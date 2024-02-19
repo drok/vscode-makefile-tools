@@ -207,6 +207,7 @@ export async function generateParseContent(span: Span): Promise<ConfigureSubphas
     }
 
     let abs_top_builddir = util.resolvePathToRoot(dir || "");
+    configuration.clearTargets();
     let build_tree: Make = new Make('', telemetry.startSpan("Make", span), abs_top_builddir);
 
     // Include all the make arguments defined in autotools.configurations.makeArgs
@@ -669,11 +670,15 @@ export async function configure(parentSpan: Span, triggeredBy: TriggeredBy): Pro
                 .concat("...")
                 .map(f => path.basename(f));
     // FIXME: not true. it gets here if --dry-run parsing throws
-      logger.message(localize("autotools.log.config.exported",
-        "Exported to Intellisense: build configuration for {0} source files like {1}",
-            fileIndex.size,
-            sample.join(", ")
-            ));
+      if (extension.getCppToolsVersion()) {
+        logger.message(localize("autotools.log.config.exported",
+            "Exported to Intellisense: build configuration for {0} source files like {1}",
+                fileIndex.size, sample.join(", ")));
+      } else {
+        logger.message(localize("autotools.log.config.available",
+            "Intellisense data available, but not used, for {0} source files like {1}",
+                fileIndex.size, sample.join(", ")));
+      }
       logger.message(localize("autotools.log.config.exported2",
             "Generated tasks: {0} build tasks and {1} test tasks in {2} check suites (see Run Task... command)",
             export_stats.programs, export_stats.tests, export_stats.checks));

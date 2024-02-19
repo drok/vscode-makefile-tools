@@ -1165,3 +1165,4 @@ function envHash(e: string) : number {
 // TODO: filter only the relevant targets (binaries, libraries, etc...) from this list.
 let buildTargets: Map<string, Map<string,Goal>> = new Map();
 export function getAllBuildTargets(): Map<string, Map<string,Goal>> { return buildTargets; }
+export function clearTargets(): void { buildTargets = new Map(); }
