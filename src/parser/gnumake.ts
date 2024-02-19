@@ -627,6 +627,8 @@ export class Goal extends Node implements Parser {
     getFilePath() : string {
         return path.isAbsolute(this.goal!) ?
             this.goal! :
+            // Source files have no dependencies. resolve them in the source tree
+            this.depends == undefined ? util.resolvePathToRoot(path.normalize(path.join(this.make.dir,this.goal!))) :
             // Normalize because goals in the srcdir are refered to as /proj/src/blah/../file.c
             // when building in src/blah with source ${top_srcdir}/file.c (ie, "../file.c")
             util.resolvePathToRoot(path.normalize(path.join(configuration.getCurrentMakefileConfiguration().top_builddir, this.make.dir,this.goal!)));
