@@ -37,6 +37,44 @@
             ]
         },
         {
+            "name": "Make debug tesseract continue on errors",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/make/make",
+            "args": [
+                    "-j1", "--output-sync=none", "--print-directory",
+                    "-Res",
+                    "me-check",
+                    "ME_KEEP_ENV=10qqdhdvoqz",
+                    "--eval=include Mergesium.rules",
+                    "--trace",
+                    "TEST_LOGS=bitvector_test.log",
+                    "-db",
+                    "-R"
+            ],
+            "stopAtEntry": false,
+            "cwd": "${env:HOME}/proj/tesseract/build/Default",
+            "environment": [
+                { "name": "MAKEFLAGS",  "value": "-I ${env:HOME}/.vscode-server/extensions/autotools/include" },
+                { "name": "LOG_DRIVER", "value": "${env:HOME}//.vscode-server/extensions/autotools/bin/test-driver"},
+                { "name": "LOG_DRIVER_FLAGS", "value": "--env-name \"<null>\" --env-id \"10qqdhdvoqz\" --env-keep \"$$ME_KEEP_ENV\""},
+            ],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Set Disassembly Flavor to Intel",
+                    "text": "-gdb-set disassembly-flavor intel",
+                    "ignoreFailures": true
+                }
+            ]
+        },
+        {
             "name": "Make curl dry",
             "type": "cppdbg",
             "request": "launch",
@@ -103,7 +141,7 @@
             "args": [
                     "V=1",
                     "-C", "/home/radu/proj/lasso/build/Xenial",
-                    "-Resi",
+                    "-Res",
                     "me-check",
                     "LOG_DRIVER=/home/radu/.vscode-server/extensions/autotools/bin/test-driver",
                     "LOG_DRIVER_FLAGS=--env-name legacy",
@@ -270,6 +308,21 @@
             "outFiles": [
                 "${workspaceFolder}/out/**/*.js"
             ]
+        },
+        {
+            "name": "Debug on Tesseract",
+            "type": "extensionHost",
+            "request": "launch",
+            "runtimeExecutable": "${execPath}",
+            "args": [
+                "--extensionDevelopmentPath=${workspaceFolder}",
+                "/home/radu/proj/tesseract"
+            ],
+            "sourceMaps": true,
+            "outFiles": [
+                "${workspaceFolder}/out/**/*.js"
+            ],
+            "preLaunchTask": "compile",
         },
         {
             "name": "Launch Extension (disable others)",
