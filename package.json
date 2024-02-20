@@ -224,7 +224,7 @@
                     "${workspaceFolder}"
                 ],
                 "pattern": {
-                    "regexp": "^(configure): (error|WARNING): (.*)$",
+                    "regexp": "(configure): (error|WARNING): (.*)$",
                     "kind": "file",
                     "file": 1,
                     "severity": 2,
