@@ -62,6 +62,7 @@
 | [statoshi](https://github.com/jlopp/statoshi) | autotools | Feb 24 | needs C++20 |
 | [Strace](https://github.com/strace/strace) | autotools | jan 24 | [#config-parse-fail](v=st_esyscmd_s-.-build-aux-git-version-gen-.tarball-version-#config-parse-fail) | |
 | [swig](https://github.com/swig/swig) | autoconf | Jan 24 | [#dry-run](v=4.2.1#dry-run), [ms #98](https://github.com/microsoft/vscode-makefile-tools/issues/98) |
+| [Tesseract OCR](https://github.com/tesseract-ocr/tesseract) | autotools | Feb 24 | needs libtool debug |
 | [Tinyvm](https://github.com/jakogut/tinyvm)[^non] | | | | | Yes |
 | [TscanCode](https://github.com/Tencent/TscanCode)| make | Jan 24 | |
 | [Tundra](https://github.com/deplinenoise/tundra)[^non] | |
