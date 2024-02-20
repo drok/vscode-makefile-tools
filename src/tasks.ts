@@ -184,7 +184,7 @@ export class AutoToolsTestTaskProvider implements MyTaskProvider {
                                     (c.top_builddir ? ['-C', c.top_builddir] : [])
                                     .concat(dir ? ['-C', dir] : [])
                                     .concat(c.makeArgs || [])
-                                    .concat(["-Resi",
+                                    .concat(["-Res",
                                         "me-check",
                                         `ME_KEEP_ENV=${ME_KEEP_ENV}`,
                                         "--eval=include Mergesium.rules",
@@ -279,7 +279,7 @@ export class AutoToolsCheckTaskProvider implements MyTaskProvider {
                         (c.top_builddir ? ['-C', c.top_builddir] : [])
                         .concat(dir ? ['-C', dir] : [])
                         .concat(c.makeArgs || [])
-                        .concat(["-Resi",
+                        .concat(["-Res",
                             "me-check",
                             `ME_KEEP_ENV=${ME_KEEP_ENV}`,
                             "--eval=include Mergesium.rules"]),
@@ -298,7 +298,7 @@ export class AutoToolsCheckTaskProvider implements MyTaskProvider {
                         .concat(dir ? ['-C', dir] : [])
                         .concat(c.makeArgs || [])
                         .concat(traceLiveTestRuns ? ["--trace", "--silent"] : [])
-                        .concat(["-Resi",
+                        .concat(["-Res",
                             "test-suite.log",
                             `ME_KEEP_ENV=${ME_KEEP_ENV}`
                         ]),
@@ -319,7 +319,7 @@ export class AutoToolsCheckTaskProvider implements MyTaskProvider {
                 configuration.getMakePath(),
                 (c.top_builddir ? ['-C', c.top_builddir] : [])
                 .concat(c.makeArgs || [])
-                .concat(["-Resi",
+                .concat(["-Res",
                     "check"]),
                 {
                     env: {
