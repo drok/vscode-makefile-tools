@@ -598,12 +598,18 @@ export class Extension {
     }
 
     public updateWatchers() {
-        this.configDisposables.concat([...Array.from(configuration.getAllBuildTargets().keys())
+        let c = configuration.getCurrentMakefileConfiguration();
+        this.configDisposables.forEach((d) => d.dispose());
+        this.configDisposables = Array.from(configuration.getAllBuildTargets().keys())
             .map( (p) => new util.MyFileWatcher(resolvePathToRoot(p), (e, f) => {
-                if (f == 'Makefile.am' || (f.endsWith('.in') && f != 'Makefile.in'))
+                if (f == 'Makefile.am' || (f.endsWith('.in') && f != 'Makefile.in')) {
                     /* Regen if config*.in files change, other than Makefile.in which is updated due to Makefile.am */
-                    make.configure(extension.journey, make.TriggeredBy.amUpdate);
-            }))]);
+                    extension.reautomake(telemetry.startSpan("upAM", this.journey));
+                }
+                if (f.endsWith(".trs"))
+                    extension.trsChange(c, configuration.getCurrentTestEnvironment(), vscode.Uri.file(path.join(p,f)));
+                    // make.configure(extension.journey, make.TriggeredBy.amUpdate);
+            }));
     }
     private configDisposables : vscode.Disposable[] = [];
     private buildTree: gnumake.Make | undefined;
@@ -632,7 +638,7 @@ export class Extension {
             this.testController = undefined;
         }
         let updateBadge : boolean = false;
-        this.tasks.forEach((provider) => updateBadge = provider.update(this.configDisposables) || updateBadge);
+        this.tasks.forEach((provider) => updateBadge = provider.update() || updateBadge);
         if (this._projectOutlineTreeView) {
             this._projectOutlineProvider.updateTargets(build_tree);
         }
@@ -690,7 +696,7 @@ export class Extension {
     }
 
     public onConfigurationSelect(c: configuration.MakefileConfiguration) : void {
-        this.tasks.forEach((provider) => provider.changeConfiguration(c, this.configDisposables));
+        this.tasks.forEach((provider) => provider.changeConfiguration(c));
         this.configDisposables.forEach((d) => d.dispose());
         this.configDisposables = [];
     }

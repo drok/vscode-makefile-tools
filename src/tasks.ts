@@ -48,10 +48,10 @@ export class AutoToolsBuildTaskProvider implements MyTaskProvider {
 		return this.myPromise;
 	}
 
-    changeConfiguration(c: configuration.MakefileConfiguration, disposables: vscode.Disposable[]) : void {
+    changeConfiguration(c: configuration.MakefileConfiguration) : void {
         this.myPromise = Promise.resolve([])
     }
-    public update(disposables: vscode.Disposable[]) : boolean {
+    public update() : boolean {
         let c = configuration.getCurrentMakefileConfiguration();
         var targets: Task[] = [];
         configuration.getAllBuildTargets().forEach((goals, dir) => {
@@ -136,10 +136,10 @@ export class AutoToolsTestTaskProvider implements MyTaskProvider {
 		return this.myPromise;
 	}
 
-    changeConfiguration(c: configuration.MakefileConfiguration, disposables: vscode.Disposable[]) : void {
+    changeConfiguration(c: configuration.MakefileConfiguration) : void {
         this.myPromise = Promise.resolve([])
     }
-    public update(disposables: vscode.Disposable[]) : boolean {
+    public update() : boolean {
         let c = configuration.getCurrentMakefileConfiguration();
         var targets: Task[] = [];
         this.numFails = 0;
@@ -157,11 +157,6 @@ export class AutoToolsTestTaskProvider implements MyTaskProvider {
                     g.test || tc?.addSuite(c, dir, g);
                     if (g.goal && g.depends) {
                         let p : string = util.resolvePathToRoot(path.join(c.top_builddir, dir));
-                        disposables.push(new util.MyFileWatcher(p, (e, f) => {
-                            let cte = configuration.getCurrentTestEnvironment();
-                            if (f.endsWith(".trs"))
-                                extension.trsChange(c, cte, vscode.Uri.file(path.join(p,f)));
-                        }));
                         let envs = FilterEnvsByDir(e, dir);
                         let ME_KEEP_ENV = KeepList(envs);
                         g.depends.forEach((d) => {
@@ -249,10 +244,10 @@ export class AutoToolsCheckTaskProvider implements MyTaskProvider {
 		return this.myPromise;
 	}
 
-    changeConfiguration(c: configuration.MakefileConfiguration, disposables: vscode.Disposable[]) : void {
+    changeConfiguration(c: configuration.MakefileConfiguration) : void {
         this.myPromise = Promise.resolve([])
     }
-    public update(disposables: vscode.Disposable[]) : boolean {
+    public update() : boolean {
         let c = configuration.getCurrentMakefileConfiguration();
         var targets : Task[] = [];
         let e = configuration.getTestEnvironments();
@@ -372,8 +367,8 @@ export class AutoToolsCheckTaskProvider implements MyTaskProvider {
 
 export interface MyTaskProvider extends TaskProvider {
     readonly myType: string;
-    update(disposables: vscode.Disposable[]): boolean;
-    changeConfiguration(c: configuration.MakefileConfiguration, disposables: vscode.Disposable[]): void;
+    update(): boolean;
+    changeConfiguration(c: configuration.MakefileConfiguration): void;
 }
 
 export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
@@ -447,7 +442,7 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
             checkFileExistsSync(resolvePathToRoot(path.join(c.top_builddir, "config.status")));
     }
 
-    changeConfiguration(c: configuration.MakefileConfiguration, disposables: vscode.Disposable[]) : void
+    changeConfiguration(c: configuration.MakefileConfiguration) : void
     {
         let b = this.bootstrap_cmd();
         if (b) {
@@ -481,7 +476,7 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
                 localize("autotools.update.task", "Configuration output"),
                 new ShellExecution(
                     c.top_builddir ? `${autoreconf} -v && CDPATH= cd ${c.top_builddir} && ./config.status` :
-                        `${autoreconf} -v && ./config.status`));
+                        `${autoreconf} -v && ./config.status`), "autotools_configure");
             this.regenTask.group = TaskGroup.Build;
             this.regenTask.detail = localize("autotools.update", "$(sync) Regenerate Makefiles and headers. See [Autoconf output](https://www.gnu.org/software/autoconf/manual/autoconf-2.69/html_node/Output.html)");
 
@@ -490,7 +485,7 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
                 localize("autotools.recheck.task", "Configuration update"),
                 new ShellExecution(
                     c.top_builddir ? `${autoreconf} && CDPATH= cd ${c.top_builddir} && ./config.status --recheck && ./config.status` :
-                        `${autoreconf} && ./config.status --recheck && ./config.status`));
+                        `${autoreconf} && ./config.status --recheck && ./config.status`), "autotools_configure");
             this.recheckTask.group = TaskGroup.Build;
             this.recheckTask.presentationOptions = presentSilent;
             this.recheckTask.detail = localize("autotools.recheck", "$(sync) Update configuration. See [config.status invocation - --recheck](https://www.gnu.org/software/autoconf/manual/autoconf-2.69/html_node/config_002estatus-Invocation.html)");
@@ -506,7 +501,7 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
             this.myPromise = Promise.reject("Runtime error - no bootstrap task")
         }
     }
-    update(disposables: vscode.Disposable[]): boolean {
+    update(): boolean {
         return false;
     }
     public async bootstrap(): Promise<vscode.TaskExecution | undefined> {
@@ -526,7 +521,7 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
      * This is quicker than bootstrapping + configure
      */
     public async reautomake(span: Span): Promise<void> {
-        if (this.reautomakeTask) {
+        if (this.reautomakeTask && !this.isWorking) {
             await this.waitToTouchMakefiles();
             vscode.tasks.executeTask(this.reautomakeTask).then((e) => {
                 ui.getUI().setLoading(ui.UIStatus.REGEN);

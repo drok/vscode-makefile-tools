@@ -690,9 +690,9 @@ export async function configure(parentSpan: Span, triggeredBy: TriggeredBy): Pro
             logger.message('Exporting can be re-attempted with "Autotools: Export Configuration to Intellisense"', "Normal");
             logger.message('KB: ' + kbUrl.toString(true) + '#intellisense-export-fail', "Normal");
         } else if (retc == 2) { /* Makefile is broken */
-            if (triggeredBy != TriggeredBy.configureAfterConfigurationChange) {
-                logger.message('Trying to recover by re-generating the Makefile.inS', "Normal");
-                await extension.reautomake(telemetry.startSpan("recover", span));
+            if (triggeredBy != TriggeredBy.configureAfterConfigurationChange && triggeredBy != TriggeredBy.amUpdate) {
+                logger.message('Trying to recover by re-checking the configuration (config.status)', "Normal");
+                await extension.recheck(telemetry.startSpan("recover", span));
             }
         }
     }
