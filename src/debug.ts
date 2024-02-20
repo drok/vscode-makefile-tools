@@ -86,6 +86,16 @@ export class DebugNow implements vscode.DebugConfiguration {
             name: "srcdir",
             value: resolvePathToRoot(built.builddir)
         }]
+        if (goal?.depends?.length) {
+            let bingoal = goal.depends[0];
+            if (bingoal.flags & Goal.Flags.Libtool_Linked) {
+                let libtool = resolvePathToRoot(path.join(c.top_builddir, 'libtool'))
+                this.miDebuggerPath = extension.ltLauncher;
+                this.miDebuggerArgs = `gdb ${libtool} ${this.program}`;
+                this.MIMode = 'gdb';
+                this.externalConsole = false;
+            }
+        }
         if (env) {
             if (env.testDebugEnv)
                 Object.entries(env.testDebugEnv).forEach(([k,v]) => {
@@ -115,6 +125,13 @@ export class DebugNow implements vscode.DebugConfiguration {
     //preLaunchTask: string | undefined;
     cwd: string;
     setupCommands: { description: string, text: string, ignoreFailures: boolean }[];
+
+    /* mi params used for debugging Libtool bins */
+    miDebuggerPath?: string;
+    miDebuggerArgs?: string;
+    MIMode?: string;
+    additionalSOLibSearchPath?: string;
+    externalConsole?: boolean;
 }
 
 class MyDebugProvider implements DebugConfigurationProvider {

@@ -87,6 +87,7 @@ export class Extension {
     private compilerFullPath ?: string;
     public readonly dryRunner : string;
     public readonly testRunner : string;
+    public readonly ltLauncher : string;
     public readonly rulesPath : string;
     public readonly userEnvName : string = "<none>";
     public testController : MyTestController | undefined;
@@ -114,6 +115,7 @@ export class Extension {
         ];
         this.dryRunner = path.join(extensionContext.extensionPath, "bin/make" + (process.platform === 'win32' ? ".exe" : ""));
         this.testRunner = path.join(extensionContext.extensionPath, "bin/test-driver");
+        this.ltLauncher = path.join(extensionContext.extensionPath, "bin/lt-debug.sh");
         this.rulesPath = path.join(extensionContext.extensionPath, "include")
 
         extensionContext.subscriptions.push(vscode.commands.registerCommand('autotools.bootstrap', async () => {

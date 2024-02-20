@@ -20,6 +20,7 @@ import { Parser, ParserDisp, EmptyLine } from '../parser';
 import { Executing } from './shell';
 import { telemetry } from '../extension';
 import { SpanStatusCode } from '@opentelemetry/api';
+import { Goal } from './gnumake';
 
 // List of compiler tools plus the most common aliases cc and c++
 // ++ needs to be escaped for the regular expression in parseLineAsTool.
@@ -98,6 +99,10 @@ export class Making implements Parser {
                 //throw new Error("compilerTool.fullPath is not a string (eg, subshell)");
                 /* FIXME: this isCompiler() functionality is a placeholder */
                 if (tool.ltmode === 'link') {
+                    let goal = caller.make.goals.get(caller.currentTarget);
+                    if (goal) {
+                        goal.flags |= Goal.Flags.Libtool_Linked;
+                    }
                     this.handleLinkerCommand(tool, caller);
                 } else {
                     if(ObjectFileRE.test(caller.currentTarget)) {

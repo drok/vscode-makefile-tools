@@ -142,7 +142,6 @@ export class Make implements Parser {
             if (!targets.has(this.dir) || true) {
                 targets.set(this.dir, sub.make.goals);
                 // this.goals = sub.make.goals;
-                this.test_suite = sub.test_suite;
                 sub.variables.some((v) => {
                     if (v.variable)
                     switch (v.variable.name) {
@@ -159,7 +158,8 @@ export class Make implements Parser {
                             break;
                         default:
                             if (v.variable.name.endsWith("LOG_DRIVER")) {
-                                if (v.variable.value != '$(SHELL) $(top_srcdir)/test-driver' && v.variable.value != '$(SHELL) $(top_srcdir)/build-aux/test-driver') {
+                                /* Needs to be a RE because AC_CONFIG_AUX_DIR([config]) could put automake's script anywhere */
+                                if (!LogDriverRe.test(v.variable.value)) {
                                     /* Customized test driver. */
                                     logger.message(`WARN: ${this.dir} uses ${v.variable.name}=${v.variable.value}; ${Extension.whoami} will override it.`, 'Normal');
                                     telemetry.logEvent(this.span, "warn-log-driver", {n: v.variable.name, v: v.variable.value}, true);
@@ -282,13 +282,10 @@ export class Database implements Parser {
                 return undefined;
             } else {
 
-                if (sub.flags & Goal.Flags.Test_Suite) {
-                    this.test_suite = sub;
-                }
                 // binaries that follow a test suite are always test programs
                 // TODO: check automake source code. is this guaranteed?
-                if (this.test_suite && (sub.flags & Goal.Flags.Linked_binary))
-                    sub.flags |= Goal.Flags.Test_Program;
+//                if (this.test_suite && (sub.flags & Goal.Flags.Linked_binary))
+//                    sub.flags |= Goal.Flags.Test_Program;
                 return new Goal(this.make); /* look for more Goals */
             }
         } else if (sub instanceof Variable) {
@@ -303,7 +300,6 @@ export class Database implements Parser {
         throw new Error(`Unexpected push in ${sub}`);
     }
     variables : Variable[] = [];
-    test_suite : Goal | undefined;
 }
 
 // Lines which have variable content, but I don't need them
@@ -422,6 +418,7 @@ export class Goal extends Node implements Parser {
         /* Flags gathered from automake (recipe hints like $(LINK) */
         Dependency : 128,
         Linked_binary: 256,
+        Libtool_Linked: 512,
         Test_Suite: 1024,
         Test_Program: 2048,
         Test_Log: 4096,
@@ -468,9 +465,11 @@ export class Goal extends Node implements Parser {
 
                             let recipe = GoalRecipeRe.exec(info[1]);
                             if (recipe) {
-                                if (this.goal)
-                                    return [ParserDisp.Enter, new Recipe(this)];
-                                else
+                                if (this.goal) {
+                                    /* If a goal obj exists for this target, use it instead of this.
+                                     */
+                                    return [ParserDisp.Enter, new Recipe(this.make.goals.get(this.goal) ?? this)];
+                                } else
                                     throw new Error(`Unexpected Recipe in ${recipe[2]}:${recipe[3]} before goal name`);
                             }
                             throw new Error(`Unexpected Goal Info ${info[1]}`);
@@ -500,37 +499,48 @@ export class Goal extends Node implements Parser {
                  * Also skip not-targets (these are source files, not targets)
                  * Also skip targets without any flags
                  */
+                let thiso : Goal;
                 if (!(this.flags & (Goal.Flags.Automake_auxiliary |
                     Goal.Flags.Not_a_target |
                     Goal.Flags.Automake_noise
-                    )))
-                    this.make.goals.set(this.goal, this);
-
-                if (goal[2]) {
-                    if (this.goal == "test-suite.log") {
-                        this.flags |= Goal.Flags.Test_Suite;
-                        this.depends = goal[2].split(' ')
-                            .filter(s => s)
-                            .map(s => this.getGoal(s, Goal.Flags.Test_Log));
-                    } else if (AutomakeTestLogRe.test(goal[1])) {
-                        this.flags |= Goal.Flags.Test_Log;
-                        this.depends = goal[2].split(' ')
-                            .map(s => this.getGoal(s, Goal.Flags.Test_Program));
-                    } else if (!GNUMakeAuxiliaryRe.test(goal[1]) && !AutomakeAuxRe.test(goal[1]) && !AutomakeNoiseRe.test(goal[1])) {
-                        this.flags |= Goal.Flags.Dependency;
-                        this.depends = goal[2].split(' ')
-                            .filter(s => s && 
-                                !AutomakeNoiseRe.test(s) && 
-                                !AutomakeAuxRe.test(s) &&
-                                    (!path.isAbsolute(s) || // This includes builddir files (relative)
-                                        vscode.workspace.getWorkspaceFolder(vscode.Uri.file(s))))
-                            // MUST filter on workspace|builddir files. This list contains /usr/include files
-                            .map(s => this.getGoal(s, Goal.Flags.Dependency));
+                    ))) {
+                    /* If a goal obj exists for this target, use it instead of this.
+                     * If not, add it to the make's goal list
+                     */
+                    let go = this.make.goals.get(this.goal);
+                    thiso = go ?? this;
+                    if (!go) {
+                        this.make.goals.set(this.goal, this);
                     }
+                
 
-                } else if (!this.flags) {
-                    // .test.log: (ie, implicit rules)
-                    this.flags |= Goal.Flags.Automake_noise;
+                    if (goal[2]) {
+                        if (thiso.goal == "test-suite.log") {
+                            thiso.flags |= Goal.Flags.Test_Suite;
+                            this.make.test_suite = thiso;
+                            thiso.depends = goal[2].split(' ')
+                                .filter(s => s)
+                                .map(s => this.getGoal(s, Goal.Flags.Test_Log));
+                        } else if (AutomakeTestLogRe.test(goal[1])) {
+                            thiso.flags |= Goal.Flags.Test_Log;
+                            thiso.depends = goal[2].split(' ')
+                                .map(s => this.getGoal(s, Goal.Flags.Test_Program));
+                        } else if (!GNUMakeAuxiliaryRe.test(goal[1]) && !AutomakeAuxRe.test(goal[1]) && !AutomakeNoiseRe.test(goal[1])) {
+                            thiso.flags |= Goal.Flags.Dependency;
+                            thiso.depends = goal[2].split(' ')
+                                .filter(s => s && 
+                                    !AutomakeNoiseRe.test(s) && 
+                                    !AutomakeAuxRe.test(s) &&
+                                        (!path.isAbsolute(s) || // This includes builddir files (relative)
+                                            vscode.workspace.getWorkspaceFolder(vscode.Uri.file(s))))
+                                // MUST filter on workspace|builddir files. This list contains /usr/include files
+                                .map(s => this.getGoal(s, Goal.Flags.Dependency));
+                        }
+
+                    } else if (!thiso.flags) {
+                        // .test.log: (ie, implicit rules)
+                        thiso.flags |= Goal.Flags.Automake_noise;
+                    }
                 }
                 return [ParserDisp.Continue, this];
             }
@@ -664,6 +674,7 @@ export class Goal extends Node implements Parser {
 const LinkerRe = /\$\(\w*LINK\)\s/;
 const RanlibRe = /\$\(RANLIB\)\s/;
 const TestRe = /\$\(AM_TESTS_FD_REDIRECT\)\s/;
+const LogDriverRe = /\$\(SHELL\) \$\(top_srcdir\)\/(?:.*)?test-driver/;
 /**
  * Parse an unexpanded build recipe for a target.
  * Currently no information is captured, but it could be used to learn
