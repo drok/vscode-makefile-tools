@@ -19,6 +19,7 @@ import * as logger from './logger';
 import { env } from 'process';
 import * as ui from './ui';
 import { Span, SpanStatusCode } from '@opentelemetry/api';
+import { getStartTime } from './tele';
 nls.config({ messageFormat: nls.MessageFormat.bundle, bundleFormat: nls.BundleFormat.standalone })();
 const localize: nls.LocalizeFunc = nls.loadMessageBundle();
 
@@ -380,6 +381,8 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
 	private myPromise: Thenable<Task[]> | undefined = undefined;
     public bootstrapTask?: vscode.Task;
     public regenTask?: vscode.Task;
+    public reautomakeTask?: vscode.Task;
+    // public autoreconfTask?: vscode.Task;
     public recheckTask?: vscode.Task;
     public helpTask?: vscode.Task;
     private the_bootstrap_cmd : string[] | undefined;
@@ -411,8 +414,12 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
         const definition: AutotoolsTask = <any>_task.definition;
         if (definition.action === 'bootstrap')
             return this.bootstrapTask;
+//        if (definition.action === 'autoreconf')
+//            return this.autoreconfTask;
         if (definition.action === 'regen')
             return this.regenTask;
+        if (definition.action === 'reautomake')
+            return this.reautomakeTask;
         if (definition.action === 'help')
             return this.helpTask;
 	}
@@ -454,6 +461,18 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
                 new ProcessExecution(b[0], b.slice(1)));
             this.bootstrapTask.group = TaskGroup.Build;
             this.bootstrapTask.detail = localize("autotools.bootstrap", "$(tools) Bootstrap project using '{0}'", b.join(' '));
+
+            /* This is not used yet. Instead, make.configure will automatically update Makefile.inS */
+            const automake_kind: AutotoolsTask = {
+                type: this.myType,
+                action: 'reautomake'
+            };
+            this.reautomakeTask = new Task(automake_kind, TaskScope.Workspace,
+                localize("autotools.reautomakecmd.task", "Update Makefile.in and config headers"),
+                "Autotools task",
+                new ProcessExecution('automake', ['--no-force']));
+            this.reautomakeTask.group = TaskGroup.Build;
+            this.reautomakeTask.detail = localize("autotools.makefilein.update", "$(sync) Regenerate Makefile.in templates. See [Updating Makefile.inS](https://www.gnu.org/software/automake/manual/html_node/automake-Invocation.html#index-_002d_002dno_002dforce)");
 
             var autoreconf : string = configuration.autoreconfCmd().join(' ');
 
@@ -503,26 +522,40 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
         }
         return undefined;
     }
+    /* runs automake --no-force, then recheck.
+     * This is quicker than bootstrapping + configure
+     */
+    public async reautomake(span: Span): Promise<void> {
+        if (this.reautomakeTask) {
+            await this.waitToTouchMakefiles();
+            vscode.tasks.executeTask(this.reautomakeTask).then((e) => {
+                ui.getUI().setLoading(ui.UIStatus.REGEN);
+                extension.running.set(e, span);
+            });
+        }
+    }
     public async regen(): Promise<void> {
         // Use regenWorking to avoid restarting when already running.
         // Eg, Makefile.in is updated in the workspace, which triggers
         // a separate, unnecesary update.
-        if (this.regenTask) {
+        if (this.regenTask && !this.isWorking) {
             await this.waitToTouchMakefiles();
-            vscode.tasks.executeTask(this.regenTask).then(() => {
+            vscode.tasks.executeTask(this.regenTask).then((e) => {
                 ui.getUI().setLoading(ui.UIStatus.REGEN);
+                extension.running.set(e, telemetry.startSpan("regen", extension.journey));
             });
         }
     }
-    public async recheck(): Promise<void> {
+    public async recheck(span: Span): Promise<void> {
         // Use regenWorking to avoid restarting when already running.
         // Eg, Makefile.in is updated in the workspace, which triggers
         // a separate, unnecesary update.
         if (this.recheckTask) {
             await this.waitToTouchMakefiles();
             await extension.readPkgInfo();
-            vscode.tasks.executeTask(this.recheckTask).then(() => {
+            vscode.tasks.executeTask(this.recheckTask).then((e) => {
                 ui.getUI().setLoading(ui.UIStatus.REGEN);
+                extension.running.set(e, span);
             });
         }
     }
@@ -593,24 +626,27 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
     public get isWorking() : boolean {
         return this.working;
     }
-    public async autotoolsDone(task: ProcessExecution | ShellExecution | vscode.CustomExecution | undefined, exitCode: number): Promise<void> {
+    public async autotoolsDone(span: Span, task: ProcessExecution | ShellExecution | vscode.CustomExecution | undefined, exitCode: number): Promise<void> {
         if (exitCode != 0) {
             var kbUrl : vscode.Uri = await extension.kbUrl();
             if (task == this.bootstrapTask?.execution) {
-                logger.message('Bootstrap failed. Review the Terminal tab for cause.', "Normal");
+                logger.message(localize('autotools.regen.failed', '{0}: ERROR: Bootstrap failed. Review the Terminal tab for cause.',
+                    getStartTime(span).toISOString()), "Normal");
                 logger.message('Bootstrapping can be re-attempted with "Autotools: Bootstrap"', "Normal");
                 logger.message('KB: ' + kbUrl.toString(true) + '#bootstrap-fail', "Normal");
-                logger.showOutputChannel();
+                // logger.showOutputChannel();
             }
             else if (task == this.regenTask?.execution) {
-                logger.message('Regen failed. Review the Terminal tab for cause.', "Normal");
+                logger.message(localize('autotools.regen.failed', '{0}: ERROR: Regen failed. Review the Terminal tab for cause.',
+                    getStartTime(span).toISOString()), "Normal");
                 logger.message('KB: ' + kbUrl.toString(true) + '#regen-fail', "Normal");
-                logger.showOutputChannel();
+                // logger.showOutputChannel();
             }
             else if (task == this.recheckTask?.execution) {
-                logger.message('Recheck failed. Review the Terminal tab for cause.', "Normal");
+                logger.message(localize('autotools.recheck.failed', '{0}: ERROR: Recheck failed. Review the Terminal tab for cause.',
+                    getStartTime(span).toISOString()), "Normal");
                 logger.message('KB: ' + kbUrl.toString(true) + '#recheck-fail', "Normal");
-                logger.showOutputChannel();
+                // logger.showOutputChannel();
             }
         }
         if (this.working)

@@ -68,6 +68,7 @@ export enum Operations {
 }
 
 export enum TriggeredBy {
+    amUpdate = "Makefile.am updated",
     buildAll = "command pallette (buildAll)",
     configure = "command pallette (configure)",
     cleanConfigure = "command pallette (clean configure)",
@@ -654,12 +655,12 @@ export async function configure(parentSpan: Span, triggeredBy: TriggeredBy): Pro
     subphaseStats = await doConfigure(readCache, configurationCache, false, span);
     extension.autotoolsDoneNoResult();
 
-    ui.getUI().setLoading(ui.UIStatus.OK);
     // If not cancelled already, analyze all doConfigure subphases
     // to decide how we should look at the final configure outcome.
     // retc is set to cancel in onCancellationRequested
     // and we don't need to look which subphase cancelled.
     retc = analyzeConfigureSubphases(subphaseStats);
+    ui.getUI().setLoading(!retc ? ui.UIStatus.OK : ui.UIStatus.ERR);
 
     extension.getState().configureDirty = !(retc === ConfigureBuildReturnCodeTypes.success);
 
@@ -688,6 +689,11 @@ export async function configure(parentSpan: Span, triggeredBy: TriggeredBy): Pro
             logger.message('Export to Intellisense failed. Review the OUTPUT tab of C++ for cause.', "Normal");
             logger.message('Exporting can be re-attempted with "Autotools: Export Configuration to Intellisense"', "Normal");
             logger.message('KB: ' + kbUrl.toString(true) + '#intellisense-export-fail', "Normal");
+        } else if (retc == 2) { /* Makefile is broken */
+            if (triggeredBy != TriggeredBy.configureAfterConfigurationChange) {
+                logger.message('Trying to recover by re-generating the Makefile.inS', "Normal");
+                await extension.reautomake(telemetry.startSpan("recover", span));
+            }
         }
     }
 

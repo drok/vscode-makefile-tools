@@ -453,7 +453,7 @@ export class Extension {
         // Monitoring exit codes is blind to the user manually doing "make clean" or "make check"
         this.extensionContext.subscriptions.push(vscode.tasks.onDidEndTask((e) =>{
             let task = e.execution.task;
-            let span = this.running.get(e.execution);
+            // let span = this.running.get(e.execution);
             if (task) {
                 const definition: TestTask = <any>task.definition;
                 if (definition.type == "test" && definition.test) {
@@ -481,8 +481,7 @@ export class Extension {
                     this.autotoolsDoneNoResult();
                 }
             }
-            span?.end();
-
+            this.running.delete(e.execution);
         }));
         this.extensionContext.subscriptions.push(vscode.tasks.onDidEndTaskProcess(async (e) => {
             let task = e.execution.task;
@@ -496,7 +495,7 @@ export class Extension {
                     const definition: AutotoolsTask = <any>task.definition;
                     ui.getUI().setStatus(e.exitCode ? ui.UIStatus.ERR : ui.UIStatus.OK);
                     //if (definition?.action == "regen" || definition?.action == "recheck")
-                    await this.autotoolsTask.autotoolsDone(task.execution,
+                    await this.autotoolsTask.autotoolsDone(span, task.execution,
                             (typeof e.exitCode == 'number') ? e.exitCode : (e.exitCode ? 1 : 0));
                     if (!e.exitCode) {
                         if (definition?.action == "bootstrap") {
@@ -506,9 +505,17 @@ export class Extension {
                                 if (this.testController) {
                                     this.testController.onSavedAll();
                                 };
-                        } else if (definition?.action == "regen" || definition?.action == "recheck" || definition?.action == "configure") {
+                        } else if (definition?.action == "reautomake") {
+                            if (!e.exitCode) {
+                                this.recheck(telemetry.startSpan('recheck', tspan));
+                            }
+                        } else if (definition?.action == "regen") {
+                            if (!e.exitCode) {
+                                this.configure(telemetry.startSpan('config+', span));
+                            }
+                        } else if (definition?.action == "recheck" || definition?.action == "configure") {
                             let r = await configuration.analyzeConfigureParams(span, false, true) &&
-                                !await make.configure(span, make.TriggeredBy.configureAfterConfigurationChange);
+                                !await make.configure(telemetry.startSpan('conf+', span), make.TriggeredBy.configureAfterConfigurationChange);
                             if (r)
                                 if (this.testController) {
                                     this.testController.onSavedAll();
@@ -520,6 +527,7 @@ export class Extension {
                         tspan && telemetry.setSpanStatus(tspan, SpanStatusCode.ERROR, `status ${e.exitCode}`);
                     }
                 }
+                tspan?.end();
             }
         }));
         this.extensionContext.subscriptions.push(vscode.debug.onDidStartDebugSession(e => {
@@ -594,7 +602,7 @@ export class Extension {
             .map( (p) => new util.MyFileWatcher(resolvePathToRoot(p), (e, f) => {
                 if (f == 'Makefile.am' || (f.endsWith('.in') && f != 'Makefile.in'))
                     /* Regen if config*.in files change, other than Makefile.in which is updated due to Makefile.am */
-                    extension.regen();
+                    make.configure(extension.journey, make.TriggeredBy.amUpdate);
             }))]);
     }
     private configDisposables : vscode.Disposable[] = [];
@@ -689,33 +697,14 @@ export class Extension {
     public bootstrap(span: Span): void {
         this.autotoolsTask.bootstrap();
     }
+    public async reautomake(span: Span): Promise<void> {
+        await this.autotoolsTask.reautomake(span);
+    }
     // config.status (just re-output)
     public async regen(): Promise<void> { await this.autotoolsTask.regen(); }
     // config.status --recheck
-    public async recheck(changed: boolean): Promise<void> {
-        if (changed) {
-            if (!this.isBootstrapped()) {
-                await this.bootstrapWithPrompt(extension.journey);
-                return Promise.resolve();
-            } else if (this.isAutotoolsProject()) {
-                let span = telemetry.startSpan("recheck", extension.journey);
-                // newly installed
-                statusBar.show();
-                configuration.initFromState();
-                await configuration.initFromSettings(true, span);
-                await configuration.analyzeConfigureParams(span, false, false);
-                await outputLogHeader();
-                await extension.configure(span);
-                span.end();
-                return Promise.resolve();
-            } else if (this.isAutotoolsProject() && !this.autotoolsTask.bootstrap_cmd()) {
-                // Disable extension, configure.ac deleted
-                return Promise.resolve();
-            }
-        }
-        await this.autotoolsTask.recheck();
-        if (changed && vscode.workspace.textDocuments.find((d) => d.isDirty))
-            this.testController?.onSavedAll();
+    public async recheck(span: Span): Promise<void> {
+        await this.autotoolsTask.recheck(span);
         return Promise.resolve();
     }
     public autotoolsDoneNoResult(): void { this.autotoolsTask.autotoolsDoneNoResult(); }
@@ -1079,7 +1068,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
     context.subscriptions.push(vscode.commands.registerCommand('autotools.outline.recheck', () => {
         telemetry.logEvent(extension.journey, "orc");
-        extension.recheck(false);
+        extension.recheck(telemetry.startSpan('recheck', extension.journey));
     }));
 
     context.subscriptions.push(vscode.commands.registerCommand('autotools.configure', async () => {
@@ -1221,7 +1210,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             // if the user re-clones, bootstrap and configure it.
             detectWorkspaceMode();
             if(vscode.workspace.workspaceFolders?.length == 1) {
-                await extension.autotoolsTask.recheck();
+                await extension.autotoolsTask.recheck(telemetry.startSpan("recheckW", extension.journey));
                 // span.end();
             }
         }));
@@ -1306,9 +1295,9 @@ export async function startupWithWorkspace(context: vscode.ExtensionContext, val
     if (vscode.workspace.workspaceFolders) {
         let configureAc = vscode.workspace.createFileSystemWatcher(
             new vscode.RelativePattern(vscode.workspace.workspaceFolders[0], (configuration.getConfigureAc() || "configure.ac")));
-        context.subscriptions.push(configureAc.onDidChange(async (e) => await extension.recheck(true)));
-        context.subscriptions.push(configureAc.onDidCreate(async (e) => await extension.recheck(true)));
-        context.subscriptions.push(configureAc.onDidDelete(async (e) => await extension.recheck(true)));
+        context.subscriptions.push(configureAc.onDidChange(async (e) => await extension.regen()));
+        context.subscriptions.push(configureAc.onDidCreate(async (e) => await extension.regen()));
+        context.subscriptions.push(configureAc.onDidDelete(async (e) => await extension.regen()));
     }
 
     context.subscriptions.push(vscode.window.registerFileDecorationProvider(extension.suiteDecorator));
