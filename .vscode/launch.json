@@ -75,6 +75,41 @@
             ]
         },
         {
+            "name": "Make debug | tmp in deps @L900",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/make/make",
+            "args": [
+                    "-j1", "--output-sync=none", "--print-directory",
+                    "all", "check",
+                    "--print-data-base",
+                    "V=1",
+                    "--trace",
+                    "--dry-run",
+                    "--assume-old=\\$(top_srcdir)/configure",
+                    "--assume-old=\\$(top_builddir)/config.status",
+                    "--keep-going",
+                    "GMOFILES=",
+                    "--always-make"
+            ],
+            "stopAtEntry": false,
+            "cwd": "${env:HOME}/proj/tesseract/build/Default",
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Set Disassembly Flavor to Intel",
+                    "text": "-gdb-set disassembly-flavor intel",
+                    "ignoreFailures": true
+                }
+            ]
+        },
+        {
             "name": "Make curl dry",
             "type": "cppdbg",
             "request": "launch",
