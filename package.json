@@ -46,10 +46,12 @@
         "commands": [
             {
                 "command": "autotools.rdepends",
+                "icon": "$(type-hierarchy)",
                 "title": "%autotools.rdepends.title%"
             },
             {
                 "command": "autotools.closeIrrelevant",
+                "icon": "$(filter)",
                 "title": "%autotools.closeIrrelevant.title%"
             },
             {
@@ -931,6 +933,18 @@
                     "command": "autotools.rdepends",
                     "when": "autotools:hasTargets == 1",
                     "group": "2_files@10"
+                }
+            ],
+            "editor/title": [
+                {
+                    "command": "autotools.closeIrrelevant",
+                    "when": "autotools:filterByTarget",
+                    "group": "navigation@1"
+                },
+                {
+                    "command": "autotools.rdepends",
+                    "when": "autotools:hasTargets == 1",
+                    "group": "navigation@1"
                 }
             ],
             "explorer/context" : [
