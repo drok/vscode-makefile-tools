@@ -233,10 +233,6 @@ export class ProjectTestsProvider implements vscode.TreeDataProvider<Node> {
                 return []; // ie, show the welcome message
 
             goals = [this.subnodes.get(this.tree)!];
-            if (!this.env || !this.env?.dirs || this.env.dirs.includes(this.tree.dir))
-                if (this.tree.test_suite?.depends)
-                    goals
-                    .push(...this.tree.test_suite.depends);
         } else 
           if (!this.env || !this.env?.dirs || this.env.dirs.includes(node.make.dir))
             goals = node.getChildren();
