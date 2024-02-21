@@ -20,6 +20,7 @@ import { Node, Scheme } from '../tree';
 import * as nls from 'vscode-nls';
 import { Extension, extension, telemetry } from '../extension';
 import { Span } from '@opentelemetry/api';
+import { fstat } from 'fs';
 nls.config({ messageFormat: nls.MessageFormat.bundle, bundleFormat: nls.BundleFormat.standalone })();
 const localize: nls.LocalizeFunc = nls.loadMessageBundle();
 
@@ -47,19 +48,19 @@ const RecursingRE = /^Making (.*) in (.*)$/;
  * and Make to parse submake output.
  */
 export class Make implements Parser {
-    constructor(public dir: string, public span: Span, public root: string)
+    constructor(public dir: string, public span: Span, public root: string, parent: Make | undefined)
     {
         // this.dir = path.relative(root, dir);
+        // The top make contains a map of all makes
+        if (parent == undefined) {
+            this.allmakes = new Map();
+        } else {
+            this.allmakes = parent.allmakes;
+            this.allmakes.set(dir, this);
+        }
         this.section = MakeSection.Starting;
-        if (root) {
-            let foundGoals = configuration.getAllBuildTargets().get(this.dir);
-            if (foundGoals) {
-                this.goals = foundGoals;
-            } else {
-                this.goals = new Map<string, Goal>();
-                configuration.getAllBuildTargets().set(this.dir, this.goals);
-            }
-        } else this.goals = new Map<string, Goal>();
+        this.goals = new Map<string, Goal>();
+        if (root) configuration.getAllBuildTargets().set(this.dir, this.goals);
     }
     static makeArgs(): string[] { return [
         // take precedence over other parallel executions
@@ -215,7 +216,11 @@ export class Make implements Parser {
     }
     enter(dir: string) : [ParserDisp, Parser] {
         let reldir = path.relative(this.root, dir);
-        return [ParserDisp.Enter, reldir == this.dir ? this : new Make(reldir, this.span, this.root)];
+        return [ParserDisp.Enter, this.getMake(reldir)];
+    }
+    getMake(reldir: string) : Make {
+        if (reldir == this.dir) return this;
+        return this.allmakes.get(reldir) ?? new Make(reldir, this.span, this.root, this);
     }
     public getFile(): string | undefined {
         return this.file;
@@ -238,6 +243,7 @@ export class Make implements Parser {
     goals: Map<string,Goal>;
     config_header: Set<string> | undefined;
     submake: Map<string, Make> = new Map();
+    allmakes: Map<string, Make>; // All directories in this tree. Used to deduplicate make runs
     /* builtins set prevents the same builtin warning to be printed multiple times */
     test_suite: Goal | undefined;
     hasStats?: boolean;
@@ -374,6 +380,7 @@ const GoalInfoRe = /^#  (.*)$/;
 // Lines which have variable content, but I don't need them
 const GoalAckInfoRe = /^(?:Implicit\/static pattern stem:|Last modified)/;
 const GoalVarsRe = /^# (?:automatic|. :=|variable set hash-table stats:|Load=)/;
+const AlsoMakesRe = /^Also makes: (.*)/;
 const GoalFlagsRe = /^# (.*):$/;
 const GoalRe = /^(.*): ?(.*)$/;
 const AutomakePrimaryRe = /^(?:all|check|distcheck|install)$/;
@@ -472,6 +479,21 @@ export class Goal extends Node implements Parser {
                                 } else
                                     throw new Error(`Unexpected Recipe in ${recipe[2]}:${recipe[3]} before goal name`);
                             }
+                            let alsoTargets = AlsoMakesRe.exec(info[1]);
+                            if (alsoTargets) {
+                                let go = this.make.goals.get(this.goal) ?? this;
+                                //assert(go.depends, "Also-makes targets should have a depends list");
+                                if (!go.siblings) {
+                                    go.siblings = [];
+                                    alsoTargets[1].split(' ')
+                                        .forEach(t => {
+                                            let g = this.getGoal(t, go.flags);
+                                            go.siblings!.push(g);
+                                            g.depends = go.depends;
+                                        });
+                                }
+                                return [ParserDisp.Continue, this];
+                            }
                             throw new Error(`Unexpected Goal Info ${info[1]}`);
                         }
                 } else {
@@ -491,6 +513,7 @@ export class Goal extends Node implements Parser {
                     this.flags |= Goal.Flags.Automake_noise;
 
                 this.goal = goal[1];
+
                 /* Record this goal on make's goal list */
                 /* Don't store automake auxiliary targets, they are thus
                  * unavailable for target selection
@@ -503,7 +526,11 @@ export class Goal extends Node implements Parser {
                 if (!(this.flags & (Goal.Flags.Automake_auxiliary |
                     Goal.Flags.Not_a_target |
                     Goal.Flags.Automake_noise
-                    ))) {
+                    ))
+                    &&
+                    /* Only worry about files inside the workspace */
+                    (!path.isAbsolute(this.goal) || vscode.workspace.getWorkspaceFolder(vscode.Uri.file(this.goal)))
+                    ) {
                     /* If a goal obj exists for this target, use it instead of this.
                      * If not, add it to the make's goal list
                      */
@@ -670,6 +697,7 @@ export class Goal extends Node implements Parser {
     livetask: Map<TestEnvironment,vscode.Task> | undefined;
     task: vscode.Task | Map<TestEnvironment,vscode.Task> | undefined;
     test: vscode.TestItem | undefined;
+    siblings?: Goal[]; // "Also makes" products of the same recipe.
 }
 
 const LinkerRe = /\$\(\w*LINK\)\s/;
@@ -691,9 +719,11 @@ export class Recipe implements Parser {
             return [ParserDisp.Leave, this];
         if (LinkerRe.test(line)) {
             this.goal.flags |= Goal.Flags.Linked_binary;
+            // Also apply to goal.siblings ?
         }
         if (TestRe.test(line))
             this.goal.flags |= Goal.Flags.Test_Log;
+            // Also apply to goal.siblings ?
         return [ParserDisp.Continue, this];
     }
     push(sub: Parser) { return undefined;}
