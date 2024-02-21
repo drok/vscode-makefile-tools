@@ -216,7 +216,7 @@
             },
             {
                 "name": "autotools_configure",
-                "label": "ccc",
+                "label": "configure script errors",
                 "source": "autotools",
                 "owner": "external",
                 "fileLocation":[
@@ -229,6 +229,24 @@
                     "file": 1,
                     "severity": 2,
                     "message": 3
+                }
+            },
+            {
+                "name": "autotools_configureac",
+                "label": "configure.ac errors",
+                "source": "autotools",
+                "owner": "external",
+                "fileLocation":[
+                    "relative",
+                    "${workspaceFolder}"
+                ],
+                "pattern": {
+                    "regexp": "(configure\\.ac):(\\d+): (error|WARNING): (.*)$",
+                    "kind": "line",
+                    "file": 1,
+                    "line": 2,
+                    "severity": 3,
+                    "message": 4
                 }
             },
             {

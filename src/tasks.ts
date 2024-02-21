@@ -453,7 +453,8 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
             this.bootstrapTask = new Task(kind, TaskScope.Workspace,
                 localize("autotools.bootstrap.task", "Bootstrap {0}", extension.getProjectName()),
                 "Autotools task",
-                new ProcessExecution(b[0], b.slice(1)));
+                new ProcessExecution(b[0], b.slice(1), { env: { ACLOCAL_PATH: extension.m4Path }}),
+                ["autotools_configureac", "autotools_configure"]);
             this.bootstrapTask.group = TaskGroup.Build;
             this.bootstrapTask.detail = localize("autotools.bootstrap", "$(tools) Bootstrap project using '{0}'", b.join(' '));
 
@@ -475,17 +476,20 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
                     TaskScope.Workspace, "Update Makefiles and config headers",
                 localize("autotools.update.task", "Configuration output"),
                 new ShellExecution(
-                    c.top_builddir ? `${autoreconf} -v && CDPATH= cd ${c.top_builddir} && ./config.status` :
-                        `${autoreconf} -v && ./config.status`), "autotools_configure");
+                    (c.top_builddir ? `${autoreconf} -v && CDPATH= cd ${c.top_builddir} && ./config.status` :
+                        `${autoreconf} -v && ./config.status`), { env: { ACLOCAL_PATH: extension.m4Path }}),
+                            ["autotools_configureac", "autotools_configure"]);
             this.regenTask.group = TaskGroup.Build;
             this.regenTask.detail = localize("autotools.update", "$(sync) Regenerate Makefiles and headers. See [Autoconf output](https://www.gnu.org/software/autoconf/manual/autoconf-2.69/html_node/Output.html)");
 
             this.recheckTask = new Task({type: this.myType, action: 'recheck'},
                 TaskScope.Workspace, "Re-check configuration",
                 localize("autotools.recheck.task", "Configuration update"),
-                new ShellExecution(
-                    c.top_builddir ? `${autoreconf} && CDPATH= cd ${c.top_builddir} && ./config.status --recheck && ./config.status` :
-                        `${autoreconf} && ./config.status --recheck && ./config.status`), "autotools_configure");
+                new ShellExecution('./config.status --recheck && ./config.status', {
+                            env: { ACLOCAL_PATH: extension.m4Path },
+                            cwd: resolvePathToRoot(c.top_builddir)
+                        }),
+                        ["autotools_configureac", "autotools_configure"]);
             this.recheckTask.group = TaskGroup.Build;
             this.recheckTask.presentationOptions = presentSilent;
             this.recheckTask.detail = localize("autotools.recheck", "$(sync) Update configuration. See [config.status invocation - --recheck](https://www.gnu.org/software/autoconf/manual/autoconf-2.69/html_node/config_002estatus-Invocation.html)");
@@ -578,7 +582,7 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
                 "Autotools task",
                 new ProcessExecution(resolvePathToRoot("configure"), configureArgs,
                     {cwd : destdir}),
-                    ['autotools_configure']);
+                    ['autotools_configureac', 'autotools_configure']);
             task.detail = localize("automake.configure.help", "$(tools) Configure build directory");
 
             await this.waitToTouchMakefiles();

@@ -89,6 +89,7 @@ export class Extension {
     public readonly testRunner : string;
     public readonly ltLauncher : string;
     public readonly rulesPath : string;
+    public readonly m4Path : string;
     public readonly userEnvName : string = "<none>";
     public testController : MyTestController | undefined;
     public pkginfo : make.pkgInfo | undefined;
@@ -117,6 +118,7 @@ export class Extension {
         this.testRunner = path.join(extensionContext.extensionPath, "bin/test-driver");
         this.ltLauncher = path.join(extensionContext.extensionPath, "bin/lt-debug.sh");
         this.rulesPath = path.join(extensionContext.extensionPath, "include")
+        this.m4Path = path.join(extensionContext.extensionPath, "m4")
 
         extensionContext.subscriptions.push(vscode.commands.registerCommand('autotools.bootstrap', async () => {
             telemetry.logEvent(this.journey, "cBs");
