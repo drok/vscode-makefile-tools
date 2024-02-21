@@ -519,16 +519,17 @@ export class Goal extends Node implements Parser {
                             thiso.flags |= Goal.Flags.Test_Suite;
                             this.make.test_suite = thiso;
                             thiso.depends = goal[2].split(' ')
-                                .filter(s => s)
+                                .filter(s => s && s != '|')
                                 .map(s => this.getGoal(s, Goal.Flags.Test_Log));
                         } else if (AutomakeTestLogRe.test(goal[1])) {
                             thiso.flags |= Goal.Flags.Test_Log;
                             thiso.depends = goal[2].split(' ')
+                                .filter(s => s != '|') // remove the marker symbol for order-only deps
                                 .map(s => this.getGoal(s, Goal.Flags.Test_Program));
                         } else if (!GNUMakeAuxiliaryRe.test(goal[1]) && !AutomakeAuxRe.test(goal[1]) && !AutomakeNoiseRe.test(goal[1])) {
                             thiso.flags |= Goal.Flags.Dependency;
                             thiso.depends = goal[2].split(' ')
-                                .filter(s => s && 
+                                .filter(s => s && s != '|' && // remove the marker symbol for order-only deps
                                     !AutomakeNoiseRe.test(s) && 
                                     !AutomakeAuxRe.test(s) &&
                                         (!path.isAbsolute(s) || // This includes builddir files (relative)
