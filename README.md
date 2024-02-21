@@ -424,6 +424,21 @@ Additionally, tests that rely on built shared libraries likely use [libtool](htt
 
 **Note** The extension currently supports only the Parallel Test Harness, but the "older (and discouraged)" harness will be supported in a future version, for compatibility with legacy autotools projects.
 
+### Test Framework debugging support
+
+The following test-framework-specific support is implemented, to make debugging more fluent:
+
+#### [Google Test](https://google.github.io/googletest/advanced.html)
+
+  * `GTEST_BREAK_ON_FAILURE=1`
+  * `GTEST_CATCH_EXCEPTIONS=0`
+
+#### [Check](https://libcheck.github.io/check/doc/check_html/check_7.html#Environment-Variable-Reference)
+
+  * `CK_FORK=no`
+
+Additional test suite support can be added by opening an issue.
+
 ### Live Testing ![pro](https://img.shields.io/badge/Pro-green?style=plastic&link=https://autotools.mergesium.com)
 
 You can select one test suite to be the "Live test suite" (⚡). This test suite will be **updated**, rather than run in full, whenever all editor tabs are saved. If you're editing multiple files, the update starts when the last unsaved file is saved, and the results are updated in both the Test Explorer and the Autotools Tests panel.

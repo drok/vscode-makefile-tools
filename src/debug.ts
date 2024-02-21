@@ -5,7 +5,7 @@ import { getCurrentTarget,
         MakefileConfiguration } from './configuration';
 import { BuildTarget } from './make';
 import { DebugConfigurationProvider, WorkspaceFolder, DebugConfiguration, ProviderResult } from 'vscode';
-import { resolvePathToRoot } from './util';
+import { resolvePathToRoot, getSettingOr } from './util';
 import * as configuration from './configuration';
 import { Goal } from './parser/gnumake';
 import { extension } from './extension';
@@ -21,6 +21,20 @@ let defaultSetupCommands = [{
     "ignoreFailures": true
 }
 ];
+
+const frameworks_support : { [key: string]: string } =
+{
+    /* Google Test
+     * https://google.github.io/googletest/advanced.html#turning-assertion-failures-into-break-points
+     */
+    GTEST_BREAK_ON_FAILURE: "1",
+    GTEST_CATCH_EXCEPTIONS: "0",
+
+    /* Check
+     * https://libcheck.github.io/check/doc/check_html/check_7.html#Environment-Variable-Reference
+     */
+    CK_FORK: "no",
+}
 
 export function isDebuggable(goal: Goal) : boolean {
     return !!(goal.flags & Goal.Flags.Linked_binary);
@@ -105,8 +119,14 @@ export class DebugNow implements vscode.DebugConfiguration {
                     });
                 });
         }
+        Object.entries(frameworks_support).forEach(([k,v]) => {
+            this.environment.push({
+                name: k,
+                value: v
+            });
+        });
         this.args = [];
-        this.stopAtEntry = true;
+        this.stopAtEntry = getSettingOr<boolean>("stopAtEntry", false);
         //this.preLaunchTask = buildit ? "autotools: build " + built.goal +
         //    (built.builddir ? (' in ' + built.builddir) : ' at the top') : undefined;
         this.cwd = resolvePathToRoot(path.join(c.top_builddir, built.builddir));

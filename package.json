@@ -309,6 +309,13 @@
                     "markdownDescription": "%autotools.configuration.traceLiveTestRuns.markdownDescription%",
                     "default": false
                 },
+                "autotools.stopAtEntry": {
+                    "order": 2,
+                    "type": "boolean",
+                    "scope": "resource",
+                    "markdownDescription": "%autotools.configuration.stopAtEntry.markdownDescription%",
+                    "default": true
+                },
                 "autotools.promptClean": {
                     "order": 2,
                     "scope": "resource",
