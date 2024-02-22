@@ -46,6 +46,7 @@ import { assert } from 'console';
 import { installAutotools } from './install';
 import { Span } from '@opentelemetry/api';
 import { buildinfo } from '../buildinfo';
+import * as diag from './diag';
 
 nls.config({ messageFormat: nls.MessageFormat.bundle, bundleFormat: nls.BundleFormat.standalone })();
 const localize: nls.LocalizeFunc = nls.loadMessageBundle();
@@ -953,6 +954,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     extension = new Extension(context, teleParams);
     let validact = telemetry.startSpan('act', extension.journey);
     act = validact;
+
+//    diag.testDiag();
 
     context.subscriptions.push(vscode.commands.registerCommand('autotools.setBuildConfiguration', async () => {
         telemetry.logEvent(extension.journey, "sBC");

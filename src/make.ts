@@ -24,6 +24,7 @@ import * as ui from './ui';
 import { quote } from '@mergesium/shell-quote';
 
 import * as nls from 'vscode-nls';
+import { log } from 'console';
 nls.config({ messageFormat: nls.MessageFormat.bundle, bundleFormat: nls.BundleFormat.standalone })();
 const localize: nls.LocalizeFunc = nls.loadMessageBundle();
 const recursiveString = localize("recursive", "(recursive)");
@@ -368,11 +369,29 @@ export async function generateParseContent(span: Span): Promise<ConfigureSubphas
             heartBeat = Date.now();
         };
 
+        var kbUrl : vscode.Uri = await extension.kbUrl();
         let stderr: any = (result: string): void => {
             // Sometimes there is useful information coming via the stderr
             // (one example is even a bug of the make tool, because it reports
             // "Entering directory" on stderr instead of stdout causing various issues).
             completeErr += result;
+
+
+            if (keepDryRuns) {
+                logger.message(`ERROR in ${dryrunFile}:${linenumber}:`, 'Normal');
+            }
+            let mi = util.findLastIndex(parserStack, p => p instanceof Make);
+            if (mi >= 0) {
+                let m = parserStack[mi] as Make;
+                logger.message(`In ${path.join(m.dir,'Makefile')} > ${m.file}`, 'Normal');
+            }
+
+            let msg = result
+                .replace(/^/, "    ")
+                .replace(/^\s*(.* No rule to make target.*)$/gm, "WARNING: $&\nWARNING: This leads to debugging out-of-date programs.")
+                .replace(/^\s*(.* overriding recipe for target*)$/gm, `WARNING: $&\nWARNING: Discovered test tasks will not run as the maintainers expect.\nKB: ${kbUrl.toString(true)}#overrides-check-target`);
+            logger.message(msg, 'Normal');
+
         };
 
         const heartBeatTimeout: number = 300; // half minute. TODO: make this a setting
@@ -416,13 +435,6 @@ export async function generateParseContent(span: Span): Promise<ConfigureSubphas
         // because it "can't fail". It represents only display of database and no targets are actually run.
         // try syntax error
         if (result.returnCode !== ConfigureBuildReturnCodeTypes.success) {
-            var kbUrl : vscode.Uri = await extension.kbUrl();
-            logger.message(completeErr
-                .replace(/^(.* No rule to make target.*)$/gm, "WARNING: $&\nWARNING: This leads to debugging out-of-date programs.")
-                .replace(/^(.* overriding recipe for target*)$/gm, `WARNING: $&\nWARNING: Discovered test tasks will not run as the maintainers expect.\nKB: ${kbUrl.toString(true)}#overrides-check-target`)
-
-            );
-
             if (result.returnCode == ConfigureBuildReturnCodeTypes.describedError) {
                 if (configuration.getAllBuildTargets().size != 0) {
                     logger.message("Exporting project config was partially successful.");
@@ -742,7 +754,7 @@ export async function configure(parentSpan: Span, triggeredBy: TriggeredBy): Pro
     logger.message(`Configure elapsed time: ${configureElapsedTime}`, "Verbose");
 
     extension.setCompletedConfigureInSession(true);
-    
+
     telemetry.setAttributes(span, {
         numFiles: provider.fileIndex.size,
         numConfigs: configuration.getMakefileConfigurations().length,
