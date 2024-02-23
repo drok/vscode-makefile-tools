@@ -217,10 +217,10 @@ export class Executing implements Parser {
                 this.makes.push(makes);
         } catch (e) {
             if (failureReported < 6) {
-                telemetry.logEvent(this.make.span, "tpaFail", {proj: extension.pkginfo?.name});
-                telemetry.setSpanStatus(this.make.span, SpanStatusCode.ERROR, "tpaFAIL");
+                telemetry.logEvent(this.make.ctx.span, "tpaFail", {proj: this.make.ctx.fc.pkginfo?.name});
+                telemetry.setSpanStatus(this.make.ctx.span, SpanStatusCode.ERROR, "tpaFAIL");
                 logger.message(`ERROR: Failed to parse recipe for '${this.make.file}'`, "Normal");
-                if (!failureReported) logger.message('KB: ' + extension.kbUrlStatic.toString(true) + '#' + util.slugify(`config-parse-fail-${this.make.file}`), "Normal");
+                if (!failureReported) logger.message('KB: ' + this.make.ctx.fc._kbUrlStatic.toString(true) + '#' + util.slugify(`config-parse-fail-${this.make.file}`), "Normal");
                 this.makes.push(new Making([failToParseTool], this));
                 failureReported++;
             }

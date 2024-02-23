@@ -360,6 +360,36 @@
             "preLaunchTask": "compile",
         },
         {
+            "name": "Debug on amhello",
+            "type": "extensionHost",
+            "request": "launch",
+            "runtimeExecutable": "${execPath}",
+            "args": [
+                "--extensionDevelopmentPath=${workspaceFolder}",
+                "/home/radu/proj/amhello"
+            ],
+            "sourceMaps": true,
+            "outFiles": [
+                "${workspaceFolder}/out/**/*.js"
+            ],
+            "preLaunchTask": "compile",
+        },
+        {
+            "name": "Debug on me-auth-backend",
+            "type": "extensionHost",
+            "request": "launch",
+            "runtimeExecutable": "${execPath}",
+            "args": [
+                "--extensionDevelopmentPath=${workspaceFolder}",
+                "/home/radu/proj/me-auth-backend"
+            ],
+            "sourceMaps": true,
+            "outFiles": [
+                "${workspaceFolder}/out/**/*.js"
+            ],
+            "preLaunchTask": "compile",
+        },
+        {
             "name": "Launch Extension (disable others)",
             "type": "extensionHost",
             "request": "launch",

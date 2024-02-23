@@ -1,6 +1,7 @@
 {
    "autotools.command.addAutotools.title": "Autotools: Add autotools to project",
    "autotools.command.bootstrap.title": "Autotools: Bootstrap",
+   "autotools.command.outline.bootstrap.title": "Bootstrap",
    "autotools.command.regen.title": "Autotools: Update Makefiles and Headers",
    "autotools.command.makefile.buildAll.title": "Autotools: Build 'all'",
    "autotools.outline.checkAll.title": "Run all tests (make check)",
@@ -10,6 +11,7 @@
    "autotools.command.setBuildConfiguration.title": "Set the current build configuration",
    "autotools.command.setTestEnvironment.title": "Select the primary test environment",
    "autotools.command.configure.title": "Autotools: Configure",
+   "autotools.command.outline.configure.title": "Configure",
    "autotools.command.openKnowledgeBase.title": "Autotools: Go to Knowledge Base",
    "autotools.command.outline.recheck.title": "Regenerate Makefiles (\"config.status\")",
 
@@ -20,15 +22,16 @@
    "autotools.command.livecheck.title": "Live test this suite",
    "autotools.command.openLog.title": "View Test Suite Log",
    "autotools.command.editMakefileAm.title": "Edit Makefile.am",
+   "autotools.command.gotoBuildDirectory.title": "Reveal build directory in explorer",
    "autotools.command.visit.knowledgeBase.title": "Visit the knowledgebase about editing this project in vscode",
    "autotools.command.visit.packageURL.title": "Visit the package's homepage",
    "autotools.command.visit.packageBugs.title": "Report a bug to the package's maintainer",
 
-   "autotools.palette.newConfiguration.title": "Autotools: Create new configuration",
+   "autotools.palette.newConfiguration.title": "Create new build configuration",
    "autotools.command.editConfigureAc.title": "Edit configure.ac",
    "workbench.action.openWorkspaceSettings.title": "Preferences: Open Workspace Settings",
-   "autotools.command.configure.help.title": "Autotools: Run `configure --help`",
-   "autotools.exportToIntelisense.title": "Autotools: Export configuration to Intellisense",
+   "autotools.command.configure.help.title": "Run `configure --help`",
+   "autotools.exportToIntelisense.title": "Export configuration to Intellisense",
    "autotools.closeIrrelevant.title": "Close Irrelevant Files",
    "autotools.rdepends.title": "Find dependent targets",
    "autotools.configuration.views.makefile.outline.description": "Program Goals",
@@ -57,7 +60,6 @@
    "autotools.welcome.debug.markdownDescription": "Autotools debug features are available, eg, by clicking the 'Debug' button on a failing unit test in the [Autotools Outline](command:autotools.outline.focus).",
    "autotools.welcome.bootstrap.markdownDescription": "This Autotools project needs to be bootstraped.\n\n[Bootstrap](command:autotools.bootstrap)\n\nAlso see [bootstrapping](https://www.gnu.org/software/automake/faq/autotools-faq.html#What-does-_002e_002fbootstrap-or-_002e_002fautogen_002esh-do_003f)",
 
-   "autotools.welcome.multiroot.markdownDescription": "Multi-folder Workspaces are not yet supported.",
    "autotools.welcome.binaryIncompatible.markdownDescription": "This extension package was built for different platform/architecture than the running system.\nIs this a [bug](https://github.com/Mergesium/autotools/issues) or user error?\nPlease let us know if we could have done something to avoid this error.",
    "autotools.welcome.configure.markdownDescription": "The [build directory](command:autotools.gotoBuildDirectory) is not configured\n\n[Configure](command:autotools.configure)",
    "autotools.welcome.parsing.markdownDescription": "Importing autotools configuration...",

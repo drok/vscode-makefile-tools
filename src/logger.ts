@@ -19,7 +19,7 @@ function getOutputChannel(): vscode.OutputChannel {
 
 // TODO: process verbosities with enums instead of strings.
 // This is a temporary hack.
-function loggingLevelApplies(messageVerbosity: string | undefined): boolean {
+export function loggingLevelApplies(messageVerbosity: string | undefined): boolean {
     let projectVerbosity: string | undefined = configuration.getLoggingLevel();
 
     if (messageVerbosity === "Debug") {

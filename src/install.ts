@@ -1,10 +1,12 @@
 import * as vscode from 'vscode';
 import * as util from './util';
+import * as path from 'path';
+import { FolderConfig } from './configuration';
 
-export async function installAutotools() : Promise<void> {
+export async function installAutotools(fc: FolderConfig) : Promise<void> {
     const uri = vscode.Uri.from({
       scheme: 'untitled',
-      path: util.resolvePathToRoot('configure.ac')
+      path: path.join(fc.folder.uri.path, 'configure.ac')
     });
     const document = await vscode.workspace.openTextDocument(uri);
     const editor = await vscode.window.showTextDocument(document);

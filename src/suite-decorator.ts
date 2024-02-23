@@ -17,6 +17,8 @@ import { assert } from 'console';
 nls.config({ messageFormat: nls.MessageFormat.bundle, bundleFormat: nls.BundleFormat.standalone })();
 const localize: nls.LocalizeFunc = nls.loadMessageBundle();
 
+export const URIFolderIndexRe = /\/(\d+)\/(.*)/;
+
 const unused : vscode.ThemeColor = new vscode.ThemeColor(
     // 'list.warningForeground' ||
     // 'list.errorForeground' ||
@@ -116,23 +118,28 @@ export class SuiteDecorations implements vscode.FileDecorationProvider {
 	): vscode.ProviderResult<vscode.FileDecoration> {
 		// const query = fromFileChangeNodeUri(uri);
         if (uri.scheme == Scheme.Check) {
-            let goals = configuration.getAllBuildTargets();
-            let g = goals
-                .get(uri.path.substring(1))
-                ?.get("test-suite.log");
-            if (g?.test?.tags?.includes(live)) {
-                return { tooltip: "live run", badge: '⚡'}
-            } else if (g)
-                return { badge: ' '};
-            else
-                return uri.path.endsWith('o') ? undefined : null;
+            let coords = URIFolderIndexRe.exec(uri.path);
+            if (coords) {
+                let fc = configuration.findFolderConfigByIndex(Number(coords[1]));
+                if (fc) {
+                    let g = fc.buildTargets
+                        .get(coords[1])
+                        ?.get("test-suite.log");
+                    if (g) {
+                        if (g.test?.tags?.includes(live)) {
+                            return { tooltip: "live run", badge: '⚡'}
+                        }
+                        return { badge: ' '};
+                    }
+                }
+            }
         } else
         if (uri.scheme == Scheme.Test) {
             let at = extension._projectTestSuitesProvider.all;
             let goal = at.get(uri.path);
             if (goal) {
                 this.visibleGoals.add(goal);
-                let testresult = TRS_Info[goal.trs?.results.get(configuration.getCurrentTestEnvironment().hashCode) ?? TRS.NONE];
+                let testresult = TRS_Info[goal.trs?.results.get(goal.make.ctx.fc.currentTestEnvironment.hashCode) ?? TRS.NONE];
                 if (this.rdeps.has(goal)) {
                         let highlighting : vscode.FileDecoration = {
                         badge: `🎯${testresult.badge}`,

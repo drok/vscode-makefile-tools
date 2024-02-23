@@ -7,11 +7,12 @@
 // or dependencies on a real build)
 
 import * as configuration from '../configuration';
-import { TestEnvironment, traits } from '../configuration';
+import { FolderConfig, TestEnvironment } from '../configuration';
 import * as logger from '../logger';
 import * as make from '../make';
 import * as util from '../util';
 import * as vscode from 'vscode';
+import { WorkspaceFolder, DiagnosticCollection } from 'vscode';
 import * as path from 'path';
 import {Parser, ParserDisp, EmptyLine } from '../parser';
 import { Executing } from './shell';
@@ -47,20 +48,20 @@ const RecursingRE = /^Making (.*) in (.*)$/;
  * Calls Database, Executing parser to extract info about the current makefile,
  * and Make to parse submake output.
  */
+export interface MakeContext {
+    allmakes: Map<string, Make>; // All directories in this tree. Used to deduplicate make runs
+    fc: FolderConfig;
+    diags: DiagnosticCollection;
+    root: string;
+    span: Span;
+}
+
 export class Make implements Parser {
-    constructor(public dir: string, public span: Span, public root: string, parent: Make | undefined)
+    constructor(public dir: string, public ctx: MakeContext)
     {
-        // this.dir = path.relative(root, dir);
-        // The top make contains a map of all makes
-        if (parent == undefined) {
-            this.allmakes = new Map();
-        } else {
-            this.allmakes = parent.allmakes;
-            this.allmakes.set(dir, this);
-        }
         this.section = MakeSection.Starting;
         this.goals = new Map<string, Goal>();
-        if (root) configuration.getAllBuildTargets().set(this.dir, this.goals);
+        if (ctx.root) ctx.fc.buildTargets.set(this.dir, this.goals);
     }
     static makeArgs(): string[] { return [
         // take precedence over other parallel executions
@@ -136,7 +137,7 @@ export class Make implements Parser {
     }
     push(sub: Parser) : Parser | undefined {
         if (sub instanceof Database) {
-            let targets = configuration.getAllBuildTargets();
+            let targets = this.ctx.fc.buildTargets;
             // FIXME: GNU make enters several times the same directory during --dry-run
             // Can the work of parsing additional enterings be avoided?
             // only save data for the all-recursive target
@@ -154,7 +155,7 @@ export class Make implements Parser {
                             this.config_header = new Set(v.variable.value.split(' '));
                             return true;
                         case "TESTS_ENVIRONMENT":
-                            traits.overrides_TESTS_ENVIRONMENT = true;
+                            this.ctx.fc.traits.overrides_TESTS_ENVIRONMENT = true;
                             logger.message(`WARN: ${this.dir} Makefile overrides ${v.variable.name} with '${v.variable.value}'`, 'Normal');
                             break;
                         default:
@@ -163,10 +164,10 @@ export class Make implements Parser {
                                 if (!LogDriverRe.test(v.variable.value)) {
                                     /* Customized test driver. */
                                     logger.message(`WARN: ${this.dir} uses ${v.variable.name}=${v.variable.value}; ${Extension.whoami} will override it.`, 'Normal');
-                                    telemetry.logEvent(this.span, "warn-log-driver", {n: v.variable.name, v: v.variable.value}, true);
+                                    telemetry.logEvent(this.ctx.span, "warn-log-driver", {n: v.variable.name, v: v.variable.value}, true);
                                 }
                                 if (v.variable.name != "LOG_DRIVER") // This is overriden by default
-                                    traits.log_drivers.add(v.variable.name);
+                                    this.ctx.fc.traits.log_drivers.add(v.variable.name);
                             }
                     }
                     return false;
@@ -199,7 +200,7 @@ export class Make implements Parser {
 //                throw new Error(`Unexpected push in Make ${sub}`);
             if (sub.dir == this.dir) {
                 logger.message(`ERROR: Unexpected make @ ${sub.dir} is a dependency of two targets: ${this.file} and ${sub.file} called from different hierarchical depths`);
-                telemetry.logException(new Error(`make-multi-depth ${this.file} and ${sub.file}`), this.span);
+                telemetry.logException(new Error(`make-multi-depth ${this.file} and ${sub.file}`), this.ctx.span);
             } else
                 this.submake.set(sub.dir, sub);
             return this;
@@ -215,18 +216,18 @@ export class Make implements Parser {
         throw new Error(`Unexpected push in Make ${sub}`);
     }
     enter(dir: string) : [ParserDisp, Parser] {
-        let reldir = path.relative(this.root, dir);
+        let reldir = path.relative(this.ctx.root, dir);
         return [ParserDisp.Enter, this.getMake(reldir)];
     }
     getMake(reldir: string) : Make {
         if (reldir == this.dir) return this;
-        return this.allmakes.get(reldir) ?? new Make(reldir, this.span, this.root, this);
+        return this.ctx.allmakes.get(reldir) ?? new Make(reldir, this.ctx);
     }
     public getFile(): string | undefined {
         return this.file;
     }
     public getDir(): string {
-        return path.join(this.root, this.dir);
+        return path.join(this.ctx.root, this.dir);
     }
     public finish(): void { this.section = MakeSection.Copyright; }
     public startExecuting(rea: RegExpExecArray) {
@@ -243,7 +244,6 @@ export class Make implements Parser {
     goals: Map<string,Goal>;
     config_header: Set<string> | undefined;
     submake: Map<string, Make> = new Map();
-    allmakes: Map<string, Make>; // All directories in this tree. Used to deduplicate make runs
     /* builtins set prevents the same builtin warning to be printed multiple times */
     test_suite: Goal | undefined;
     hasStats?: boolean;
@@ -602,12 +602,12 @@ export class Goal extends Node implements Parser {
         let item = new vscode.TreeItem(this.goal);
         item.collapsibleState = vscode.TreeItemCollapsibleState.None;
         item.tooltip = this.goal;
-        item.contextValue = ["nodeType=task"]
-            .concat((this.flags & Goal.Flags.Linked_binary) ? ['nodeType=build'] : [])
-            .concat((this.flags & Goal.Flags.Test_Log) ? ['nodeType=test'] : [])
-            .concat((this.flags & Goal.Flags.Test_Log) &&
-                (this.depends && (this.depends[0].flags & Goal.Flags.Linked_binary)) ? ['nodeType=bintest'] : [])
-            .join(',');
+//        item.contextValue = ["nodeType=task"]
+//            .concat((this.flags & Goal.Flags.Linked_binary) ? ['nodeType=build'] : [])
+//            .concat((this.flags & Goal.Flags.Test_Log) ? ['nodeType=test'] : [])
+//            .concat((this.flags & Goal.Flags.Test_Log) &&
+//                (this.depends && (this.depends[0].flags & Goal.Flags.Linked_binary)) ? ['nodeType=bintest'] : [])
+//            .join(',');
         if (!this.task)
             return item;
 
@@ -617,7 +617,6 @@ export class Goal extends Node implements Parser {
                 'nodeType=task,nodeType=test';
             item.resourceUri = this.getURI();
             extension._projectTestSuitesProvider.all.set(item.resourceUri.path, this);
-            item.id = item.resourceUri.path;
             // item.id = this.getFilePath();
         } else
         if (this.flags & Goal.Flags.Test_Suite) {
@@ -628,15 +627,14 @@ export class Goal extends Node implements Parser {
             // match in privideFileDecoration.
             // test is at https://github.com/microsoft/vscode/blob/main/src/vs/base/common/uri.ts#L98
             item.resourceUri = this.getURI();
-            item.id = item.resourceUri.path;
         } else
         if (this.flags & Goal.Flags.Linked_binary) {
             item.resourceUri = this.getURI();
             extension._projectOutlineProvider.all.set(item.resourceUri.path, this);
             item.contextValue = 'nodeType=task,nodeType=build';
-            item.id = item.resourceUri.path;
             // item.id = this.getFilePath();
         }
+        item.id = item.resourceUri?.path || this.getFilePath();
         return item;
     }
     getURI() : vscode.Uri {
@@ -666,19 +664,19 @@ export class Goal extends Node implements Parser {
         return path.isAbsolute(this.goal!) ?
             this.goal! :
             // Source files have no dependencies. resolve them in the source tree
-            this.depends == undefined ? util.resolvePathToRoot(path.normalize(path.join(this.make.dir,this.goal!))) :
+            this.depends == undefined ? path.join(this.make.ctx.fc.folder.uri.path, path.normalize(path.join(this.make.dir,this.goal!))) :
             // Normalize because goals in the srcdir are refered to as /proj/src/blah/../file.c
             // when building in src/blah with source ${top_srcdir}/file.c (ie, "../file.c")
-            util.resolvePathToRoot(path.normalize(path.join(configuration.getCurrentMakefileConfiguration().top_builddir, this.make.dir,this.goal!)));
+            path.normalize(path.join(this.make.ctx.root, this.make.dir,this.goal!));
     }
     getURIPath() : string {
         return path.isAbsolute(this.goal!) ?
             this.goal! :
             (this.flags & (Goal.Flags.Test_Suite | Goal.Flags.Test_Log)) ?
-            path.join(configuration.getBuildEnvPath(),this.make.dir,this.goal!) :
+            path.join(this.make.ctx.fc.buildEnvPath,this.make.dir,this.goal!) :
             // Normalize because goals in the srcdir are refered to as /proj/src/blah/../file.c
             // when building in src/blah with source ${top_srcdir}/file.c (ie, "../file.c")
-            util.resolvePathToRoot(path.normalize(path.join(configuration.getCurrentMakefileConfiguration().top_builddir, this.make.dir,this.goal!)));
+            path.normalize(path.join(this.make.ctx.root, this.make.dir,this.goal!));
     }
 
     logfile(): string | undefined {
@@ -729,3 +727,28 @@ export class Recipe implements Parser {
     push(sub: Parser) { return undefined;}
     goal: Goal;
 }
+
+export function countStats(sub: Make): number[] {
+    sub.stats.subdirs = sub.submake.size;
+    for (let submake of sub.submake.values()) {
+        let [t, n, s, c] = countStats(submake);
+        sub.stats.programs += t;
+        sub.stats.tests += n;
+        sub.stats.subdirs += s;
+        sub.stats.checks += c;
+    }
+    for (let [goal, g] of sub.goals)
+        sub.stats.programs += ((g.flags & Goal.Flags.Linked_binary)
+            && !(g.flags & Goal.Flags.Test_Program)) ? 1 : 0;
+
+    let numTestsHere = (sub.goals.get("test-suite.log")?.depends?.length ?? 0);
+    sub.stats.tests += numTestsHere;
+    sub.stats.checks += (numTestsHere ? 1 : 0);
+    return [
+        sub.stats.programs,
+        sub.stats.tests,
+        sub.submake.size,
+        sub.stats.checks
+    ];
+}
+

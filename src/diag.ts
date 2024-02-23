@@ -1,12 +1,10 @@
 import * as vscode from "vscode";
-import { resolvePathToRoot } from "./util";
-import { diag } from "@opentelemetry/api";
 
 let diags : vscode.DiagnosticCollection = vscode.languages.createDiagnosticCollection("Autotools Diagnostics");
 
 
 export function testDiag() {
-    let loc = vscode.Uri.file(resolvePathToRoot("configure.ac"));
+    let loc = vscode.Uri.file("configure.ac");
     let r : vscode.Range =
         new vscode.Range(new vscode.Position(10,1), new vscode.Position(10,30));
 

@@ -175,7 +175,7 @@ export class Making implements Parser {
         // Parse the source files
         let file: string = compilerTool.argv[compilerTool.argv.length-1];
         // TODO: the src file could be a built src (ie, in currentDir) #16
-        file = util.resolvePathToRoot(path.join(caller.make.dir, file)); // ie, in $(srcdir)
+        file = path.resolve(caller.make.getDir(), file); // ie, in $(srcdir)
 
         // The language represented by this compilation command (-x is for GCC)
         let xlanguage = compilerTool.filterArgs("x");
@@ -212,7 +212,7 @@ export class Making implements Parser {
                 // More standard validation and defaults, in the context of the whole command.
             let standard: util.StandardVersion | undefined = parseStandard(ext.extension.getCppToolsVersion(), standardStr, language);
 
-            ext.extension.buildCustomConfigurationProvider(
+            caller.make.ctx.fc.buildCustomConfigurationProvider(
                 { defines, includes, forcedIncludes, standard,
                     intelliSenseMode, compilerFullPath, compilerArgs, files: [file], windowsSDKVersion, currentPath,
                     line: compilerTool.argv.join(" ") });
@@ -348,9 +348,9 @@ export class Making implements Parser {
         // We need to ignore the $ anywhere else in the linker command line so that we don't lose
         // valid target binaries.
         if (!targetBinary) {
-            telemetry.setSpanStatus(c.make.span, SpanStatusCode.ERROR, "linker target not ID");
+            telemetry.setSpanStatus(c.make.ctx.span, SpanStatusCode.ERROR, "linker target not ID");
         } else if (targetBinary.includes("$")) {
-            telemetry.setSpanStatus(c.make.span, SpanStatusCode.ERROR, "linker target has $");
+            telemetry.setSpanStatus(c.make.ctx.span, SpanStatusCode.ERROR, "linker target has $");
             throw new Error("targets should never have dollar signs");
         } else
             this.targetBinaries.push(targetBinary);

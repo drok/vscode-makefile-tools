@@ -62,7 +62,7 @@ export class MyTelemetry implements Disposable {
         contextManager.enable();
         api.context.setGlobalContextManager(contextManager);
 
-        if (env.isTelemetryEnabled && getSettingOr<boolean>("telemetry", true)) {
+        if (env.isTelemetryEnabled && getSettingOr<boolean>(null, "telemetry", true)) {
             this.sdk.start();
         }
         this.disposables.push(env.onDidChangeTelemetryEnabled((e) => {

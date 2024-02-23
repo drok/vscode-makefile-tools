@@ -12,10 +12,9 @@ import { Extension, extension,
         } from './extension';
 import { SpanStatusCode } from './tele';
 import { MakefileConfiguration } from './configuration';
-import { resolvePathToRoot } from './util';
 import * as util from './util';
 import * as configuration from "./configuration";
-import { TestEnvironment, traits } from './configuration';
+import { FolderConfig, TestEnvironment } from './configuration';
 import { isDebuggable } from './debug';
 import * as logger from './logger';
 
@@ -89,11 +88,11 @@ export class MyTestController {
     let test : TestItem = goal.test!;
     if (this.activeRun) {
         let old = goal.trs;
-        goal.trs = readTRS(target, configuration.getCurrentMakefileConfiguration());
+        goal.trs = readTRS(target, goal.make.ctx.fc);
         this.updateGoalTRS(this.activeRun.run, test, goal.trs?.global, target.builddir);
-        if (this.activeRun.env == configuration.getCurrentTestEnvironment())
-            extension.updateTRSInPanel(this.activeRun.env, old, goal, target.builddir) &&
-                extension.updateOutlineBadge();
+        if (this.activeRun.env == goal.make.ctx.fc.currentTestEnvironment)
+            goal.make.ctx.fc.updateTRSInPanel(old, goal, target.builddir) &&
+                goal.make.ctx.fc.updateOutlineBadge();
     }
     this.updateTestDescription(goal, target.builddir);
 
@@ -104,20 +103,20 @@ export class MyTestController {
   public suiteCompleted(task: vscode.TaskExecution, goal: Goal, dir: string) : void {
     // extension.autotoolsDoneNoResult();
     // FIXME: also updateTestDescriptions of children
-    let c = configuration.getCurrentMakefileConfiguration();
-    let updatePanel = (this.activeRun!.env == configuration.getCurrentTestEnvironment());
+    let fc = goal.make.ctx.fc;
+    let updatePanel = (this.activeRun!.env == fc.currentTestEnvironment);
     let updateBadge : boolean = false;
     if (this.busyNonLiveTest)
         for (const d of goal.depends!) {
             let bd : BuildTarget = new BuildTarget(dir, d.goal!);
             let old = d.trs;
-            d.trs = readTRS(bd, c);
+            d.trs = readTRS(bd, fc);
             this.updateGoalTRS(this.activeRun!.run, d.test!, d.trs?.global, dir);
             if (updatePanel) {
-                updateBadge = extension.updateTRSInPanel(this.activeRun!.env, old, d, dir) || updateBadge;
+                updateBadge = fc.updateTRSInPanel(old, d, dir) || updateBadge;
             }
         }
-        if (updateBadge) extension.updateOutlineBadge();
+        if (updateBadge) fc.updateOutlineBadge();
     // else
         //this.activeRun?.run.passed(this.activeGoal!.test!); // FIXME: need actual pass / fail  for the suite
 
@@ -150,15 +149,15 @@ export class MyTestController {
   }
   public addSuite(c: MakefileConfiguration, dir: string, sub: Goal) : void {
     sub.test =  this.controller.createTestItem(
-            dir || '/', dir || "Top Test Suite",
-            vscode.Uri.file(resolvePathToRoot(path.join(c.top_builddir, dir, sub.goal || ""))
-            ));
+            path.resolve('/', sub.make.ctx.fc.folder.index.toString(), dir), dir || sub.make.ctx.fc.folder.name,
+            vscode.Uri.file(path.join(sub.make.ctx.root, dir, sub.goal || ""))
+            );
     this.testGoals.set(sub.test, sub);
     sub.test.tags = tags_none;
   }
   updateTestDescription(goal: Goal, dir: string) : void {
-    if (!traits.overrides_TESTS_ENVIRONMENT) {
-        let envs = configuration.getTestEnvironments();
+    if (!goal.make.ctx.fc.traits.overrides_TESTS_ENVIRONMENT) {
+        let envs = goal.make.ctx.fc.testEnvironments;
         let num_applicable_envs = envs.filter((env) => !env.dirs || env.dirs.includes(dir)).length;
         if (num_applicable_envs > 1)
             goal.test!.description = localize("autotools.test.desc", "{0}/{1} environments tested", goal.trs?.results.size ?? 0, num_applicable_envs);
@@ -170,7 +169,7 @@ export class MyTestController {
     goal.test = this.controller.createTestItem(
             path.join(logpath, goal.goal ||""),
             goal.goal || "",
-            vscode.Uri.file(resolvePathToRoot(path.join(c.top_builddir, logpath, goal.goal || ""))));
+            vscode.Uri.file(path.join(goal.make.ctx.root, logpath, goal.goal || "")));
     this.testGoals.set(goal.test, goal);
     if (goal.depends?.length && isDebuggable(goal.depends[0]))
         goal.test.tags = tags_debuggable;
@@ -184,7 +183,7 @@ export class MyTestController {
   }
 
   public clear() : void {
-    configuration.getAllBuildTargets().forEach(d => {
+    this.fc.buildTargets.forEach(d => {
         d.forEach(g => {
             g.test = undefined;
         })
@@ -194,7 +193,7 @@ export class MyTestController {
   }
   public update(suite: TestItem) : void { // FIXME: call with suite[], and createTestRun once for all suites.
       this.controller.items.add(suite);
-      var env = configuration.getCurrentTestEnvironment();
+      var env = this.fc.currentTestEnvironment;
       const run = this.controller.createTestRun(
                 new vscode.TestRunRequest(undefined, [], env.run),
                 "Autotools TRS on " + env.run?.label,
@@ -207,7 +206,7 @@ export class MyTestController {
   public trsChange(test: TestItem, dir: string) : void {
     if (!this.activeRun) {
         // do nothing if a run is waiting for this
-        var env = configuration.getCurrentTestEnvironment();
+        var env = this.fc.currentTestEnvironment;
         let run = this.controller.createTestRun(
                 new vscode.TestRunRequest([test], [], env.run),
                 "Manual run",
@@ -239,7 +238,7 @@ export class MyTestController {
     }
   }
 
-  constructor(public id: string, public label: string, public livecheckid: string | undefined) {
+  constructor(private fc: FolderConfig, public id: string, public label: string, public livecheckid: string | undefined) {
     this.controller = vscode.tests.createTestController(id, label);
     this.activate();
   }
@@ -253,7 +252,7 @@ export class MyTestController {
     if (this.livecheckid) {
         var test = this.controller.items.get(this.livecheckid);
         if (test) {
-            await this.liverun(test, configuration.getCurrentTestEnvironment());
+            await this.liverun(test, this.fc.currentTestEnvironment);
         }
     }
   }
@@ -265,7 +264,7 @@ export class MyTestController {
     if (!this.controller.items.size) return Promise.reject();
 
     return new Promise<void>(async (resolve, reject) => {
-        var targets = configuration.getAllBuildTargets();
+        var targets = this.fc.buildTargets;
         var runs : Map<string,string[]> = new Map();
         var applicable_tests : Set<vscode.TestItem>= new Set();
         vscode.window.tabGroups.all.forEach(group => {
@@ -292,7 +291,7 @@ export class MyTestController {
                 extension.dryRunner,
                     ["-r", "--output-sync=none", "--trace", "--dry-run", "--silent", "-C", dir, "test-suite.log"]
                     .concat([...sources.map(x => `--assume-new=${x}`)]),
-                resolvePathToRoot(configuration.getCurrentMakefileConfiguration().top_builddir),
+                this.fc.abs_top_builddir,
                 true, true,
                 undefined,
                 (x) => {
@@ -331,14 +330,14 @@ export class MyTestController {
     });
   }
 
-  private livecheck : vscode.Uri | undefined;
+  // private livecheck : vscode.Uri | undefined;
   public togglelivecheck(treeItem: vscode.TreeItem, test : vscode.TestItem) : void {
     var remove = test.tags.includes(live);
     var newtags = remove ? delTag(live, test) : addTag(live, test);
     if (newtags !== undefined) {
-        this.livecheck = !remove ? test.uri : undefined;
+        // this.livecheck = !remove ? test.uri : undefined;
         this.livecheckid = !remove ? test.id : undefined;
-        extension.getState().liveCheckId = this.livecheckid;
+        this.fc.state.liveCheckId = this.livecheckid;
 
 
         test.tags = newtags;
@@ -369,9 +368,9 @@ export class MyTestController {
     this.activate();
   }
   activate(): void {
-      configuration.getTestEnvironments().map(env => {
+      this.fc.testEnvironments.map(env => {
         env.debug = this.controller.createRunProfile(
-            localize('autotools.test.debug.profile.name', '{0}: Debug "{1}" environment', extension.pkginfo?.name || "Autotools", env.name),
+            localize('autotools.test.debug.profile.name', '{0}: Debug "{1}" environment', this.fc.pkginfo?.name || "Autotools", env.name),
             vscode.TestRunProfileKind.Debug,
             async(request, token) => {
               this.debugHandler(false, request, token, env);
@@ -379,7 +378,7 @@ export class MyTestController {
           );
 
           env.run = this.controller.createRunProfile(
-            localize('autotools.test.run.profile.name', '{0}: Test "{1}" environment', extension.pkginfo?.name || "Autotools", env.name),
+            localize('autotools.test.run.profile.name', '{0}: Test "{1}" environment', this.fc.pkginfo?.name || "Autotools", env.name),
             vscode.TestRunProfileKind.Run,
             async (request, token) => {
                 this.runHandler(false, request, token, env);
@@ -436,7 +435,7 @@ export class MyTestController {
             this.runQueue.set(rundef, runnable_in_env);
         } else {
             let runnable : Goal[] = [];
-            let rr = configuration.getAllBuildTargets().forEach((v,dir) => {
+            let rr = this.fc.buildTargets.forEach((v,dir) => {
                 if (!env.dirs || env.dirs.includes(dir))
                     v.forEach((goal,name) => {
                         if (goal.depends && (goal.flags & Goal.Flags.Test_Suite)) {
@@ -462,7 +461,7 @@ export class MyTestController {
                 let goal = this.testGoals.get(test);
                 if (goal) {
                     try {
-                        await extension.debugGoal(goal, test.parent?.id || "", env);
+                        await extension.debugGoal(goal, env);
                     } catch (e) {
                         console.error("ERROR: Failed to start debugger", e);
                     }
@@ -537,7 +536,7 @@ export class MyTestController {
                     assert(this.runningTask, "There must be a task for the env");
                     if (this.runningTask && this.activeGoal.test) {
                         this.activeRun.run.started(this.activeGoal.test)
-                        await extension.waitToTouchMakefiles();
+                        await this.fc.autotoolsTask.waitToTouchMakefiles();
                         let reason = await vscode.tasks.executeTask(this.runningTask)
                             .then(e =>
                                 (this.isBusy = true) && "ok",
@@ -547,7 +546,7 @@ export class MyTestController {
                             logger.message(`ERROR: Failed to start task ${this.runningTask.name}`, 'Normal');
                             this.activeRun.run.errored(this.activeGoal.test,
                                     new vscode.TestMessage(new vscode.MarkdownString(`Failed to start task '**${this.runningTask.name}**' - _${reason}_`)));
-                                    extension.autotoolsDoneNoResult();
+                                    this.fc.autotoolsTask.autotoolsDoneNoResult();
                         }
                     } else { // `make check` from the top
                         if (this.activeGoal.test) {

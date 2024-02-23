@@ -10,8 +10,10 @@ import * as toolParser from './parser/tool';
 import * as path from 'path';
 import * as util from './util';
 import * as vscode from 'vscode';
+import { WorkspaceFolder } from 'vscode';
 import * as cpp from 'vscode-cpptools';
 import { Extension } from './extension';
+import { config } from 'vscode-nls';
 
 export interface SourceFileConfigurationItem extends cpp.SourceFileConfigurationItem {
     readonly compileCommand: toolParser.CompileCommand;
@@ -37,26 +39,32 @@ export interface CustomConfigProviderItem {
 }
 
 export class CppConfigurationProvider implements cpp.CustomConfigurationProvider {
-    public readonly name = 'Autotools Integration';
+    public readonly name;//  = 'Autotools Integration';
     public readonly extensionId = Extension.whoami;
 
+    constructor(folder: WorkspaceFolder) {
+        this.name = `Autotools Integration - ${folder.name}`
+    }
     private workspaceBrowseConfiguration: cpp.WorkspaceBrowseConfiguration = { browsePath: [] };
-
     private getConfiguration(uri: vscode.Uri): SourceFileConfigurationItem | undefined {
         let norm_path: string = path.normalize(uri.fsPath);
         if (process.platform === "win32") {
            norm_path = norm_path.toUpperCase();
         }
 
-        return this.fileIndex.get(norm_path);
+        let info = this.fileIndex.get(norm_path);
+        return info;
     }
 
     public async canProvideConfiguration(uri: vscode.Uri): Promise<boolean> {
-        return !!this.getConfiguration(uri);
+        let can = !!this.getConfiguration(uri);
+        return can;
     }
 
     public async provideConfigurations(uris: vscode.Uri[]): Promise<cpp.SourceFileConfigurationItem[]> {
-        return util.dropNulls(uris.map(u => this.getConfiguration(u)));
+        let configs: SourceFileConfigurationItem[] = util.dropNulls(uris
+            .map(u => this.getConfiguration(u)));
+        return configs;
     }
 
     // Used when saving all the computed configurations into a cache.
@@ -80,19 +88,19 @@ export class CppConfigurationProvider implements cpp.CustomConfigurationProvider
     }
 
     public async canProvideBrowseConfigurationsPerFolder(): Promise<boolean> {
-        return false;
+        return true;
     }
 
     public async provideFolderBrowseConfiguration(_uri: vscode.Uri): Promise<cpp.WorkspaceBrowseConfiguration> {
-        if (_uri.fsPath !== util.getWorkspaceRoot()) {
-            logger.message("Makefile Tools supports single root for now.");
-        }
-
         return this.workspaceBrowseConfiguration;
     }
 
-    public async provideBrowseConfiguration(): Promise<cpp.WorkspaceBrowseConfiguration> { return this.workspaceBrowseConfiguration; }
-    public setBrowseConfiguration(browseConfiguration: cpp.WorkspaceBrowseConfiguration): void { this.workspaceBrowseConfiguration =  browseConfiguration; }
+    public async provideBrowseConfiguration(): Promise<cpp.WorkspaceBrowseConfiguration> {
+        return this.workspaceBrowseConfiguration;
+    }
+    public setBrowseConfiguration(browseConfiguration: cpp.WorkspaceBrowseConfiguration): void {
+        this.workspaceBrowseConfiguration =  browseConfiguration;
+    }
 
     public dispose(): void { }
 
