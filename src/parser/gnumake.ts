@@ -596,11 +596,11 @@ export class Goal extends Node implements Parser {
         else
             return [];
     }
-    getTreeItem(): vscode.TreeItem {
+    getTreeItem(state: vscode.TreeItemCollapsibleState): vscode.TreeItem {
         if (!this.goal)
             throw new Error("Unexpected null goal");
         let item = new vscode.TreeItem(this.goal);
-        item.collapsibleState = vscode.TreeItemCollapsibleState.None;
+        item.collapsibleState = state;
         item.tooltip = this.goal;
 //        item.contextValue = ["nodeType=task"]
 //            .concat((this.flags & Goal.Flags.Linked_binary) ? ['nodeType=build'] : [])

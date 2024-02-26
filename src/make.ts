@@ -185,7 +185,7 @@ export async function generateParseContent(span: Span, fc: FolderConfig): Promis
         makeArgs.push(...["-f", topMakefile]);
     }
 
-    fc.clearBuildTargets();
+    fc.clearBuildTargets(span);
     let build_tree = fc.build_tree;
 
     // Include all the make arguments defined in autotools.configurations.makeArgs
@@ -452,7 +452,6 @@ export async function generateParseContent(span: Span, fc: FolderConfig): Promis
 
             fc.accountForTraits();
             fc.updateBuildTree();
-            fc.updateTasks(true);
             fc.updateWatchers();
         }
         telemetry.setAttributes(span, {

@@ -17,6 +17,7 @@ import { SpanStatusCode, getStartTime } from './tele';
 import {
     ProjectOutlineProvider,
     ProjectTestsProvider,
+    subHash,
     } from './tree';
 import * as tree from './tree';
 import * as ui from './ui';
@@ -61,7 +62,9 @@ export class Extension {
     public readonly _projectOutlineProvider;
     public readonly _projectTestSuitesProvider;
     public _projectOutlineTreeView : vscode.TreeView<tree.Node> | undefined;
+    private _expandedMakes: Map<number,Set<number>> = new Map();
     public _projectTestSuitesView : vscode.TreeView<tree.Node> | undefined;
+    private _expandedChecks: Map<number,Set<number>> = new Map();
     public readonly suiteDecorator = new SuiteDecorations();
 
     public cppToolsAPI?: cpp.CppToolsApi;
@@ -238,15 +241,9 @@ export class Extension {
 
         debugProvider.activate(extensionContext);
     }
-
     public createPanel() : void {
         if (this._projectOutlineTreeView)
             return; // otherwise "No tree view id 'autotools.outline' registered rejected promise wehn
-            // extensionHost attempts to getChildren()". Looks like createTreeView schedules an async
-            // deferred registration.
-            // Maybe there's a bug in vscode 1.77
-            // Try it again on other versions, uncomment the deletePanel
-            // this.deletePanel();
         this._projectOutlineTreeView = vscode.window.createTreeView('autotools.outline', {
             treeDataProvider: this._projectOutlineProvider,
             canSelectMany: true,
@@ -265,12 +262,29 @@ export class Extension {
                 this.suiteDecorator.highlightRelevant(configuration.currentGoals);
             }
         }));
+        this._treeDisposables.push(this._projectOutlineTreeView.onDidCollapseElement((e: vscode.TreeViewExpansionEvent<tree.Node>) => {
+            let s = this._expandedMakes.get(e.element.make.ctx.fc.folder.index);
+            if (!s) {
+                s = new Set(e.element.make.ctx.fc.state.expandedMakes);
+                this._expandedMakes.set(e.element.make.ctx.fc.folder.index,s);
+            }
+            s.delete(subHash(e.element as tree.SubNode));
+            e.element.make.ctx.fc.state.expandedMakes = Array.from(s);
+        }));
+        this._treeDisposables.push(this._projectOutlineTreeView.onDidExpandElement((e: vscode.TreeViewExpansionEvent<tree.Node>) => {
+            let s = this._expandedMakes.get(e.element.make.ctx.fc.folder.index);
+            if (!s) {
+                s = new Set(e.element.make.ctx.fc.state.expandedMakes);
+                this._expandedMakes.set(e.element.make.ctx.fc.folder.index,s);
+            }
+            s.add(subHash(e.element as tree.SubNode));
+            e.element.make.ctx.fc.state.expandedMakes = Array.from(s);
+        }));
 
         this._projectTestSuitesView = vscode.window.createTreeView('autotools.tests', {
             treeDataProvider: this._projectTestSuitesProvider,
             canSelectMany: true,
             showCollapseAll: false
-
         });
         this._treeDisposables.push(this._projectTestSuitesView.onDidChangeSelection((e) => {
             let oldGoals = configuration.currentGoalsTests;
@@ -289,6 +303,24 @@ export class Extension {
                     return openLog(selected);
                 }
             }
+        }));
+        this._treeDisposables.push(this._projectTestSuitesView.onDidCollapseElement((e: vscode.TreeViewExpansionEvent<tree.Node>) => {
+            let s = this._expandedChecks.get(e.element.make.ctx.fc.folder.index);
+            if (!s) {
+                s = new Set(e.element.make.ctx.fc.state.expandedChecks);
+                this._expandedChecks.set(e.element.make.ctx.fc.folder.index,s);
+            }
+            s.delete(subHash(e.element as tree.SubNode));
+            e.element.make.ctx.fc.state.expandedChecks = Array.from(s);
+        }));
+        this._treeDisposables.push(this._projectTestSuitesView.onDidExpandElement((e: vscode.TreeViewExpansionEvent<tree.Node>) => {
+            let s = this._expandedChecks.get(e.element.make.ctx.fc.folder.index);
+            if (!s) {
+                s = new Set(e.element.make.ctx.fc.state.expandedChecks);
+                this._expandedChecks.set(e.element.make.ctx.fc.folder.index,s);
+            }
+            s.add(subHash(e.element as tree.SubNode));
+            e.element.make.ctx.fc.state.expandedChecks = Array.from(s);
         }));
     }
     public deletePanel() : void {
@@ -436,10 +468,6 @@ export class Extension {
         this.projectTestGrid.updateAll();
     }
 
-    public updateTreeMenus(fc: FolderConfig) : void {
-        this._projectOutlineProvider.updateMenu(fc);
-        this._projectTestSuitesProvider.updateMenu(fc);
-    }
     // goal is the *.log goal. The executable will be read from .depends[0]
     async debugGoal(goal: Goal, env: configuration.TestEnvironment) : Promise<void> {
         if (goal?.depends?.length && goal.depends[0].goal) {
@@ -671,7 +699,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             throw new Error("Missing check task on SubNode");
         assert(sub.make.test_suite.task instanceof Map, "test_suite.task should be a Map", sub.make.test_suite.task);
         sub.make.test_suite.test &&
-            sub.make.ctx.fc.testController?.togglelivecheck(sub.getTreeItem(),sub.make.test_suite.test);
+            sub.make.ctx.fc.testController?.togglelivecheck(sub.getTreeItem(vscode.TreeItemCollapsibleState.Expanded),sub.make.test_suite.test);
             // return await vscode.tasks.executeTask(sub.submake.test_suite.test);
     }));
 

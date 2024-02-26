@@ -120,11 +120,14 @@ class State {
     constructor(folder: WorkspaceFolder) {
         this.state = extension.extensionContext.workspaceState;
         this.te = `${folder.name}.te`;
-        this.bc = `${folder.name}.bc`
-        this.bt = `${folder.name}.bt`
-        this.dirty = `${folder.name}.dirty`
-        this.live = `${folder.name}.live`
-        this.first = `${folder.name}.first`
+        this.bc = `${folder.name}.bc`;
+        this.bt = `${folder.name}.bt`;
+        this.dirty = `${folder.name}.di`;
+        this.live = `${folder.name}.li`;
+        this.first = `${folder.name}.fi`;
+        /* Expanded outline,test tree nodes */
+        this.makes = `${folder.name}.${this.buildConfiguration}.mk`;
+        this.checks = `${folder.name}.${this.buildConfiguration}.ck`;
     }
     private state : vscode.Memento;
 
@@ -134,6 +137,8 @@ class State {
     private dirty: string;
     private live: string;
     private first: string;
+    private makes: string;
+    private checks: string;
 
     public set testEnvironment(v : string) { this.state.update(this.te, v);}
     public get testEnvironment() : string { return this.state.get(this.te, defaultTestEnvName);}
@@ -153,6 +158,12 @@ class State {
     public set ranConfigureInCodebaseLifetime(v : boolean) { this.state.update(this.first, v);}
     public get ranConfigureInCodebaseLifetime() : boolean { return this.state.get(this.first, false);}
 
+    public set expandedMakes(v : number[]) { this.state.update(this.makes, v);}
+    public get expandedMakes() : number[] { return this.state.get(this.makes, []);}
+
+    public set expandedChecks(v : number[]) { this.state.update(this.checks, v);}
+    public get expandedChecks() : number[] { return this.state.get(this.checks, []);}
+
   // Reset all the variables saved in the workspace state.
   reset(reloadWindow: boolean = true): void {
     this.state.update(this.te, undefined)
@@ -161,6 +172,8 @@ class State {
     this.state.update(this.dirty, undefined)
     this.state.update(this.live, undefined)
     this.state.update(this.first, undefined)
+    this.state.update(this.makes, undefined)
+    this.state.update(this.checks, undefined)
 
     if (reloadWindow) {
         vscode.commands.executeCommand('workbench.action.reloadWindow');
@@ -479,13 +492,7 @@ export class FolderConfig implements vscode.Disposable {
                     if (!reload) {
                         let kbUrl = await this.kbUrl();
                         if (this.topMakefile) {
-                            extension._projectOutlineProvider.update(this);
                             this.logMakeCmd();
-                            //extension.setConfiguration(currentMakefileConfigurationName);
-                            // vscode.commands.executeCommand("setContext", "autotools:hasTargets", 2);
-//                            extension._projectOutlineProvider?.clear(this);
-//                            extension._projectTestSuitesProvider?.clear(this);
-                                            // extension.setConfiguration(currentMakefileConfigurationName);
                             result = "ok";
                             hasMakefile = true;
                         } else {
@@ -511,7 +518,6 @@ export class FolderConfig implements vscode.Disposable {
         } else {
             result = "n/a";
         }
-        extension.updateTreeMenus(this);
         telemetry.logEvent(span, "analyze", { result: result });
         span.end();
         return Promise.resolve(hasMakefile);
@@ -539,12 +545,14 @@ export class FolderConfig implements vscode.Disposable {
         this.testTasks,
         this.checkTasks
     ];
+    private isTreeUpdate: boolean = false;
     public updateTasks(newTree: boolean): void {
         let updateBadge : boolean = false;
         this.tasks.forEach((provider) => updateBadge = provider.update() || updateBadge);
 
-        extension._projectOutlineProvider.updateTargets(this);
-        extension._projectTestSuitesProvider.updateTargets(this);
+        extension._projectOutlineProvider.updateTargets(this, this.isTreeUpdate);
+        extension._projectTestSuitesProvider.updateTargets(this, this.isTreeUpdate);
+        this.isTreeUpdate = true;
         this.updateOutlineBadge();
 
         this.updateTestSuite(this.build_tree, this._build_tree, true);
@@ -716,11 +724,11 @@ export class FolderConfig implements vscode.Disposable {
     /* Build Tree */
     readonly _build_tree : Make;
     public updateBuildTree (): void {
-        this.updateTasks(true);
         if (!this.build_tree.hasStats) {
             countStats(this._build_tree);
             this.build_tree.hasStats = true;
         }
+        this.updateTasks(true);
 
         this.updateCppToolsProvider();
         if (this.build_tree.stats.checks) {
@@ -735,15 +743,6 @@ export class FolderConfig implements vscode.Disposable {
             this.testController?.deactivate();
             this.testController = undefined;
         }
-    }
-    public clearBuildTree(span: Span): void {
-        this._build_tree.ctx.span = span;
-        this._build_tree.goals.clear();
-        this._build_tree.submake.clear();
-        this._build_tree.test_suite = undefined;
-        this._build_tree.stats = {programs: 0, tests: 0, checks: 0, subdirs: 0};
-        this._build_tree.hasStats = false;
-
     }
     public get build_tree() : Make { return this._build_tree; }
     public resyncTasks() : void { this.updateTasks(false);}
@@ -791,8 +790,8 @@ export class FolderConfig implements vscode.Disposable {
     }
     public async start(span: Span) : Promise<void> {
         if (this.isAutotoolsProject) {
-            extension._projectOutlineProvider.updateTargets(this);
-            extension._projectTestSuitesProvider.updateTargets(this);
+            extension._projectOutlineProvider.updateTargets(this, false);
+            extension._projectTestSuitesProvider.updateTargets(this, false);
             await this.analyzeConfigureParams(span, false, false);
             this.outputLogHeader();
             this.bootstrapWithPrompt(span);
@@ -861,8 +860,14 @@ export class FolderConfig implements vscode.Disposable {
         return Promise.reject("Testing - no current build target");
     }
 
-    public clearBuildTargets() {
+    public clearBuildTargets(span: Span) {
         this.clearTraits();
+        this._build_tree.ctx.span = span;
+        this._build_tree.goals.clear();
+        this._build_tree.submake.clear();
+        this._build_tree.test_suite = undefined;
+        this._build_tree.stats = {programs: 0, tests: 0, checks: 0, subdirs: 0};
+        this._build_tree.hasStats = false;
         this.targetDisposables.forEach(d => d.dispose());
         this.buildTargets.clear();
     }
@@ -1033,7 +1038,7 @@ let configs : Map<WorkspaceFolder, FolderConfig> = new Map();
 let intels : Map<WorkspaceFolder, CppConfigurationProvider> = new Map();
 
 export function loadAllFolders() : void {
-    vscode.workspace.workspaceFolders?.map((f,i) => configs.set(f,new FolderConfig(f)));
+    vscode.workspace.workspaceFolders?.map((f,i) => configs.set(f,new FolderConfig(f, )));
 }
 
 export function onWorkspaceChange(e: vscode.WorkspaceFoldersChangeEvent) {
@@ -1739,8 +1744,8 @@ export async function setNewEnvironment(fc: FolderConfig): Promise<void> {
             telemetry.logEvent(extension.journey, "changeEnv", { to: chosen.label });
         }
 
-        let newName = fc.currentTestEnvironmentName = chosen.item.name;
-        extension._projectTestSuitesProvider.updateTree(fc);
+        fc.currentTestEnvironmentName = chosen.item.name;
+        extension._projectTestSuitesProvider.updateTargets(fc, true);
     }
 }
 
@@ -1749,7 +1754,7 @@ function buildDirHash(c: MakefileConfiguration) : number {
         (c.configureArgs?.join(',') ?? '')+`buildDir=${c.top_builddir}`
     ).digest('hex').slice(0,13), 16);
 }
-function envHash(e: string) : number {
+export function envHash(e: string) : number {
     return parseInt(createHash('md5').update(e).digest('hex').slice(0,13), 16);
 }
 // List of targets defined in the makefile project.
