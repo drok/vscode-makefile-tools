@@ -204,14 +204,14 @@ export class FolderConfig implements vscode.Disposable {
         if (!path.isAbsolute(this.abs_top_builddir)) {
             this.abs_top_builddir = path.join(this.folder.uri.fsPath, this.abs_top_builddir);
         }
-        this.gTestEnvironment = {
+        this._gTestEnvironment = {
             TESTS_ENVIRONMENT: c.get<EnvironmentSetting>("TESTS_ENVIRONMENT"),
             XFAIL_TESTS: c.get<string[]>("XFAIL_TESTS"),
             name: 'g',
             hashCode: 0,
         }
 
-        this.loadedTestEnvironments = c.get<TestEnvironment[]>("test_environments") ?? [];
+        this.loadedTestEnvironments = c.get<TestEnvironment[]>("test_environments", []);
         cleanupLoadedTestEnvironments(this.loadedTestEnvironments, this._testEnvironments);
         if (this.loadedTestEnvironments.length && loggingLevelApplies('Verbose')) {
             let tenames = this.loadedTestEnvironments
@@ -236,7 +236,7 @@ export class FolderConfig implements vscode.Disposable {
             }
         this.tasks.forEach((provider) => provider.changeConfiguration());
         this.disposables.push(vscode.workspace.onDidChangeConfiguration(async e => {
-            console.log("config changed", e);
+            // console.log("config changed", e);
         }));
 
         this.tasks.forEach((provider) => this.disposables.push(vscode.tasks.registerTaskProvider(provider.myType, provider)));
@@ -246,10 +246,7 @@ export class FolderConfig implements vscode.Disposable {
         this.disposables.push(configureAc.onDidChange(async (e) => await this.regen()));
         this.disposables.push(configureAc.onDidCreate(async (e) => await this.regen()));
         this.disposables.push(configureAc.onDidDelete(async (e) => await this.regen()));
-
-        this._cppConfigurationProvider = intels.get(folder) ?? new CppConfigurationProvider(folder);
-        intels.set(folder, this._cppConfigurationProvider);
-        this.registerCppToolsProvider();
+        this._cppConfigurationProvider = new CppConfigurationProvider();
     }
     readonly state: State;
     readonly abs_top_builddir: string;
@@ -293,8 +290,8 @@ export class FolderConfig implements vscode.Disposable {
     public get topMakefile() : string | undefined { return this._topMakefile; }
 
     /* Test Environments */
-    readonly gTestEnvironment : TestEnvironment;
-    readonly loadedTestEnvironments: TestEnvironment[];
+    private _gTestEnvironment : TestEnvironment;
+    public loadedTestEnvironments: TestEnvironment[];
     private _testEnvironments: TestEnvironment[] = [];
     private _currentTestEnvironment : TestEnvironment = nullTestEnvironment();
     public set currentTestEnvironmentName(name: string) {
@@ -305,6 +302,7 @@ export class FolderConfig implements vscode.Disposable {
         this.state.testEnvironment = name;
         this.setBuildEnvPath();
     }
+    public get gTestEnvironment() : TestEnvironment { return this._gTestEnvironment; }
     public get currentTestEnvironment() : TestEnvironment { return this._currentTestEnvironment; }
     public get testEnvironments() : TestEnvironment[] { return this._testEnvironments; }
     public getTestEnvironment(name: string) : TestEnvironment {
@@ -320,8 +318,8 @@ export class FolderConfig implements vscode.Disposable {
                 } };
         }
         var vars : string[] = [];
-        if (this.gTestEnvironment.TESTS_ENVIRONMENT)
-            Object.entries(this.gTestEnvironment.TESTS_ENVIRONMENT).forEach(([name,value]) => {
+        if (this._gTestEnvironment.TESTS_ENVIRONMENT)
+            Object.entries(this._gTestEnvironment.TESTS_ENVIRONMENT).forEach(([name,value]) => {
                 name &&
                     vars.push(`${name}=` + quote([`${value}`]));
             });
@@ -341,8 +339,8 @@ export class FolderConfig implements vscode.Disposable {
         var vars : EnvironmentSetting = {};
         if (this.traits.overrides_TESTS_ENVIRONMENT)
             return vars;
-        if (this.gTestEnvironment.TESTS_ENVIRONMENT)
-            Object.entries(this.gTestEnvironment.TESTS_ENVIRONMENT).forEach(([name,value]) => {
+        if (this._gTestEnvironment.TESTS_ENVIRONMENT)
+            Object.entries(this._gTestEnvironment.TESTS_ENVIRONMENT).forEach(([name,value]) => {
             name &&
                 (vars[name] = value);
         });
@@ -353,7 +351,19 @@ export class FolderConfig implements vscode.Disposable {
         });
         return vars;
     }
-
+    reloadTestEnvironments(c: vscode.WorkspaceConfiguration) {
+        this._gTestEnvironment = {
+            TESTS_ENVIRONMENT: c.get<EnvironmentSetting>("TESTS_ENVIRONMENT"),
+            XFAIL_TESTS: c.get<string[]>("XFAIL_TESTS"),
+            name: 'g',
+            hashCode: 0,
+        }
+        this.loadedTestEnvironments = c.get<TestEnvironment[]>("test_environments", []);
+        cleanupLoadedTestEnvironments(this.loadedTestEnvironments, this._testEnvironments);
+        this.accountForTraits();
+        this.currentTestEnvironmentName = this.currentTestEnvironment.name;
+        this.resyncTasks();
+    }
     /* build+environment path used to uniquely id tests,build,env tuples */
     _buildEnvPath : string = '';
     setBuildEnvPath() : void {
@@ -373,10 +383,10 @@ export class FolderConfig implements vscode.Disposable {
             e.checkExecOptions =  this.processExecutionOptions(e);
             e.updateExecOptions = this.processExecutionOptions(e);
             e.testDebugEnv = this.processDebugEnvironment(e);
-            e.XFAIL_TESTS = this.gTestEnvironment.XFAIL_TESTS??[];
+            e.XFAIL_TESTS = this._gTestEnvironment.XFAIL_TESTS??[];
             this._testEnvironments = [e];
         } else {
-            var global_XFAIL_TESTS = this.gTestEnvironment.XFAIL_TESTS??[];
+            var global_XFAIL_TESTS = this._gTestEnvironment.XFAIL_TESTS??[];
             this._testEnvironments = [];
             [nullTestEnvironment(),...this.loadedTestEnvironments].forEach(element => {
                 let e: TestEnvironment = {
@@ -556,7 +566,9 @@ export class FolderConfig implements vscode.Disposable {
         this.updateOutlineBadge();
 
         this.updateTestSuite(this.build_tree, this._build_tree, true);
-        this.testController?.onOpenedDocument();
+        this.testController?.onOpenedDocument().then(
+            ok => {},
+            notok => {});
         this.testController?.restoreLiveCheck();
     }
 
@@ -728,13 +740,12 @@ export class FolderConfig implements vscode.Disposable {
             countStats(this._build_tree);
             this.build_tree.hasStats = true;
         }
-        this.updateTasks(true);
 
-        this.updateCppToolsProvider();
+        extension.updateCppToolsProvider();
         if (this.build_tree.stats.checks) {
             if (!this.testController) {
                 this.testController = new MyTestController(this,
-                    Extension.whoami, `Autotools tests - ${this.folder.name}`, this.state.liveCheckId);
+                    `${Extension.whoami}.${this.folder.index}`, `Autotools tests - ${this.folder.name}`, this.state.liveCheckId);
             } else {
                 this.testController?.deactivate();
                 this.testController?.restart();
@@ -743,6 +754,7 @@ export class FolderConfig implements vscode.Disposable {
             this.testController?.deactivate();
             this.testController = undefined;
         }
+        this.updateTasks(true);
     }
     public get build_tree() : Make { return this._build_tree; }
     public resyncTasks() : void { this.updateTasks(false);}
@@ -785,8 +797,8 @@ export class FolderConfig implements vscode.Disposable {
         } else {
             logger.message(localize('autotools.folder.coordinates', "Folder \"{0}\"", this.folder.name));
         }
-        if (this.gTestEnvironment.XFAIL_TESTS?.length)
-            logger.message("Defined autotools.XFAIL_TESTS: " + this.gTestEnvironment.XFAIL_TESTS.join(";"), "Verbose");
+        if (this._gTestEnvironment.XFAIL_TESTS?.length)
+            logger.message("Defined autotools.XFAIL_TESTS: " + this._gTestEnvironment.XFAIL_TESTS.join(";"), "Verbose");
     }
     public async start(span: Span) : Promise<void> {
         if (this.isAutotoolsProject) {
@@ -927,29 +939,8 @@ export class FolderConfig implements vscode.Disposable {
         // workspaceBrowseConfiguration
         // this.updateCppToolsProvider();
     }
-    // Request a custom config provider update.
-    public updateCppToolsProvider(): void {
-        if (extension.cppToolsAPI) {
-            this._cppConfigurationProvider.logConfigurationProviderBrowse();
-            extension.cppToolsAPI.didChangeCustomConfiguration(this._cppConfigurationProvider);
-        }
-    }
 
 
-    // Register this folder as a new provider or request an update
-    registerCppToolsProvider() {
-
-        // Call notifyReady earlier than when the provider is updated,
-        // as soon as we know that we are going to actually parse for IntelliSense.
-        // This allows CppTools to ask earlier about source files in use
-        // and Makefile Tools may return a targeted source file configuration
-        // if it was already computed in our internal arrays (make.ts: customConfigProviderItems).
-        // If the requested file isn't yet processed, it will get updated when configure is finished.
-        // TODO: remember all requests that are coming and send an update as soon as we detect
-        // any of them being pushed into make.customConfigProviderItems.
-        extension.cppToolsAPI?.registerCustomConfigurationProvider(this._cppConfigurationProvider);
-        extension.cppToolsAPI?.notifyReady(this._cppConfigurationProvider);
-    }
     public buildCustomConfigurationProvider(item: toolParser.CustomConfigProviderItem): void {
         let provider: cpptools.CustomConfigurationProvider = this._cppConfigurationProvider.getCustomConfigurationProvider();
 
@@ -1031,18 +1022,12 @@ export class FolderConfig implements vscode.Disposable {
 }
 
 let configs : Map<WorkspaceFolder, FolderConfig> = new Map();
-/* cpptools API is not able to unregister providers.
- * maintain a map of providers indefinitely so new providers are not
- * allocated every time the FolderConfig is replaced
- */
-let intels : Map<WorkspaceFolder, CppConfigurationProvider> = new Map();
 
 export function loadAllFolders() : void {
     vscode.workspace.workspaceFolders?.map((f,i) => configs.set(f,new FolderConfig(f, )));
 }
 
-export function onWorkspaceChange(e: vscode.WorkspaceFoldersChangeEvent) {
-    e.added.forEach(f => configs.set(f, new FolderConfig(f)));
+export async function onWorkspaceChange(e: vscode.WorkspaceFoldersChangeEvent, span: Span) : Promise<void> {
     e.removed.forEach(f => {
         let fc = configs.get(f);
         if (fc) {
@@ -1060,8 +1045,11 @@ export function onWorkspaceChange(e: vscode.WorkspaceFoldersChangeEvent) {
 // }
 
 export async function startAllFolders(span: Span) : Promise<void> {
+    return startFolders(span, Array.from(configs.values()));
+}
+export async function startFolders(span: Span, configs: FolderConfig[]) : Promise<void> {
     extension.createPanel();
-    for (const [k,v] of configs) {
+    for (const v of configs) {
         if (v.isAutotoolsProject)
             statusBar.show();
         await v.start(span);
@@ -1181,6 +1169,17 @@ export function findFolderConfigByIndex(folderIndex: number) : FolderConfig {
     throw e;
 }
 
+export function findFolderConfigByTarget(uri: vscode.Uri) : FolderConfig | undefined{
+    for (const [folder,fc] of configs) {
+        let fileIndex = fc.cppConfigurationProvider.getCustomConfigurationProvider().fileIndex;
+        if (fileIndex.has(uri.path))
+            return fc;
+    }
+    let e = new Error("Non-existent folder for target");
+    telemetry.logException(e, extension.journey);
+    return undefined;
+}
+
 // The default make tool is "make"
 let makePath: string = "make";
 export function getMakePath(): string { return makePath; }
@@ -1203,6 +1202,11 @@ export function readLoggingLevel(): void {
     logger.message(`Logging level: ${loggingLevel}`, "Verbose");
 }
 
+export let cppProvider : string;
+export function readCppProvider() : void {
+    let c = vscode.workspace.getConfiguration("C_Cpp.default", null);
+    cppProvider = c?.get<string>("configurationProvider", '');
+}
 // prompt to clean when the active configuration changes?
 //   true : prompt, clean if user confirms
 //   false: no prompting, no cleaning
@@ -1385,6 +1389,8 @@ export async function initFromSettings(activation: boolean = false, span: Span):
     readautoreconfWarnGnu();
     readautoreconfWarnUnsupported();
     await readAutoreconfTool();
+    readCppProvider();
+
     // await setCurrentMakefileConfiguration(currentMakefileConfigurationName);
 
     // FIXME: seems wrong to do || make.t_all; this fn should probably be called
@@ -1394,24 +1400,35 @@ export async function initFromSettings(activation: boolean = false, span: Span):
     // Watch for Makefile Tools setting updates that can change the IntelliSense config provider dirty state.
     // More than one setting may be updated on one settings.json save,
     // so make sure to OR the dirty state when it's calculated by a formula (not a simple TRUE value).
-    vscode.workspace.onDidChangeConfiguration(async (e : vscode.ConfigurationChangeEvent) => {
-        if (vscode.workspace.workspaceFolders && e.affectsConfiguration('autotools')) {
-            console.debug("onDidChangeConfiguration", e);
-            /*
+    extension.extensionContext.subscriptions.push(vscode.workspace.onDidChangeConfiguration(async (e : vscode.ConfigurationChangeEvent) => {
+        if (!vscode.workspace.workspaceFolders)
+            return;
+        const keyRoot: string = "autotools";
+        let span = telemetry.startSpan("uS", extension.journey);
+        let updatedSettingsSubkeys: string[] = [];
+        for (const folder of vscode.workspace.workspaceFolders) {
+            if (!e.affectsConfiguration(keyRoot, folder))
+                continue;
+            let fc = configs.get(folder);
+            if (!fc) {
+                fc = new FolderConfig(folder);
+                configs.set(folder, fc);
+                await startFolders(span, [fc]);
+                continue;
+            }
+            let c = vscode.workspace.getConfiguration(keyRoot, folder);
             // We are interested in updating only some relevant properties.
             // A subset of these should also trigger an IntelliSense config provider update.
             // Avoid unnecessary updates (for example, when settings are modified via the extension quickPick).
             let updatedTestEnvironments : boolean = false;
-            let updatedSettingsSubkeys: string[] = [];
-            const keyRoot: string = "autotools";
             let subKey: string;
 
-            let span = telemetry.startSpan("uS", extension.journey);
+/*
             subKey = "loggingLevel";
             let updatedLoggingLevel : string | undefined = await util.getExpandedSetting<string>(subKey);
             if (updatedLoggingLevel !== loggingLevel) {
                 readLoggingLevel();
-                updatedSettingsSubkeys.push(subKey);
+                updatedSettingsSubkeys.push(`${folder.index}.${subKey}`);
             }
 
             subKey = "makePath";
@@ -1422,59 +1439,58 @@ export async function initFromSettings(activation: boolean = false, span: Span):
                 // so trigger an update (unless we read from a build log).
                 extension.getState().configureDirty = true;
                 await readMakePath();
-                updatedSettingsSubkeys.push(subKey);
+                updatedSettingsSubkeys.push(`${folder.index}.${subKey}`);
             }
-
+*/
             // Base tests environment XFAIL_TESTS is handled inside readGlobalTestEnvironment()
             subKey = "TESTS_ENVIRONMENT";
-            let oldProjectTestEnvironment = gTestEnvironment;
-            await readGlobalTestEnvironment();
-            if (!util.areEqual(oldProjectTestEnvironment, gTestEnvironment)) {
-                updatedSettingsSubkeys.push(subKey);
+            let oldProjectTestEnvironment = fc.gTestEnvironment;
+            let newC = c.get<EnvironmentSetting>(subKey);
+            if (!util.areEqual(oldProjectTestEnvironment.TESTS_ENVIRONMENT, newC)) {
+                updatedSettingsSubkeys.push(`${folder.index}.${subKey}`);
                 updatedTestEnvironments = true;
             }
+            subKey = "XFAIL_TESTS";
+            newC = c.get<EnvironmentSetting>(subKey);
+            if (!util.areEqual(oldProjectTestEnvironment.XFAIL_TESTS, newC)) {
+                updatedSettingsSubkeys.push(`${folder.index}.${subKey}`);
+                updatedTestEnvironments = true;
+            }
+
 
             // Read and update test environments
             subKey = "test_environments";
             if (!updatedTestEnvironments) {
-                let updatedEnvironments = await util.getExpandedSetting<TestEnvironment[]>(subKey);
-                updatedEnvironments && cleanupLoadedTestEnvironments(updatedEnvironments);
-                updatedTestEnvironments = !util.areEqual(updatedEnvironments, getLoadedEnvironments())
+                let updatedEnvironments = await c.get<TestEnvironment[]>(subKey, []);
+                updatedEnvironments && cleanupLoadedTestEnvironments(updatedEnvironments, fc.testEnvironments);
+                updatedTestEnvironments = !util.areEqual(updatedEnvironments, fc.loadedTestEnvironments)
+                if (updatedTestEnvironments)
+                    updatedSettingsSubkeys.push(`${folder.index}.${subKey}`);
             }
-            if (updatedTestEnvironments) {
-                await readTestEnvironments();
-                updatedSettingsSubkeys.push(subKey);
+            if (updatedTestEnvironments) {// Update the tasks with new environments
+                fc.reloadTestEnvironments(c);
             }
 
             subKey = "configurations";
-            let updatedMakefileConfigurations : MakefileConfiguration[] | undefined = await util.getExpandedSetting<MakefileConfiguration[]>(subKey);
+            let updatedMakefileConfigurations : MakefileConfiguration[] | undefined = c.get<MakefileConfiguration[]>(subKey);
             let updatedConfiguration: MakefileConfiguration | undefined = updatedMakefileConfigurations?.find(k => {
-                if (k.name === currentMakefileConfiguration.name) {
+                if (k.name === fc!.config.name) {
                     return k;
                 }
             });
-            if (!util.areEqual(updatedMakefileConfigurations, makefileConfigurations)) {
-                await readMakefileConfigurations(currentMakefileConfigurationName, span);
-            }
+            var needConfigure : boolean = !util.areEqual(updatedConfiguration?.configureArgs, fc.config.configureArgs);
             // TODO: should call an onConfigurationUpdate(updatedConfiguration);
             // so that not only build log, but other updated members can be handled
-            var needConfigure : boolean = false;
-            var updatedMakeArgs : boolean = false;
-            if (updatedConfiguration) {
-                var oldConfig = currentMakefileConfiguration;
-                if (!util.areEqual(updatedConfiguration, oldConfig)) {
-                    needConfigure = !util.areEqual(
-                            updatedConfiguration?.configureArgs,
-                            oldConfig.configureArgs);
-                    updatedMakeArgs = !util.areEqual(updatedConfiguration?.makeArgs, oldConfig.makeArgs);
-                    extension.getState().configureDirty = needConfigure;
-
-                    await setCurrentMakefileConfiguration(currentMakefileConfigurationName, span);
-                    var configuring : Promise<boolean> | undefined;
-                    if (needConfigure) {
-                        configuring = extension.configure(span);
-                    }
-
+            var updatedMakeArgs : boolean = !util.areEqual(updatedConfiguration?.makeArgs, fc.config.makeArgs);
+            if (updatedMakeArgs) {
+                fc.config.makeArgs = updatedConfiguration?.makeArgs;
+                updatedSettingsSubkeys.push(`${folder.index}.${subKey}.makeArgs`);
+            }
+            if (needConfigure) {
+                    fc.state.configureDirty = needConfigure;
+                    fc.config.configureArgs = updatedConfiguration?.configureArgs;
+                    updatedSettingsSubkeys.push(`${folder.index}.${subKey}.configureArgs`);
+                    var configuring : Promise<boolean> = fc.configure(span);
                     if (promptClean) {
                         const cleanit: string = localize("autotools.cleanit", "Clean");
                         const setit: string = localize("autotools.edit.setting", "Setting...");
@@ -1486,24 +1502,21 @@ export async function initFromSettings(activation: boolean = false, span: Span):
                             if (value === cleanit) {
                                 if (configuring)
                                     configuring.then<boolean>(() => true);
-                                extension.build(make.t_clean);
+                                fc!.buildTasks.build(make.t_clean);
                             } else if (value === setit) {
-                                openSettings("autotools.promptClean");
+                                openSettings("autotools.promptClean", folder, false);
                             }
                         });
                     }
                     if (configuring)
                         configuring.finally();
-                }
-            } else if (updatedTestEnvironments) // Update the tasks with new environments
-                extension.onConfigurationSelect(currentMakefileConfiguration);
-
-
+            }
+/*
             subKey = "keepDryRuns";
             let updatedkeepDryRuns : boolean = util.getSettingOr<boolean>(subKey, false);
             if (updatedkeepDryRuns !== keepDryRuns) {
                 readkeepDryRuns();
-                updatedSettingsSubkeys.push(subKey);
+                updatedSettingsSubkeys.push(`${folder.index}.${subKey}`);
             }
 
             subKey = "traceLiveTestRuns";
@@ -1511,7 +1524,7 @@ export async function initFromSettings(activation: boolean = false, span: Span):
             let updatedTestTasks : boolean = (updatedtraceLiveTestRuns !== traceLiveTestRuns);
             if (updatedtraceLiveTestRuns !== traceLiveTestRuns) {
                 readtraceLiveTestRuns();
-                updatedSettingsSubkeys.push(subKey);
+                updatedSettingsSubkeys.push(${folder.index}.${subKey});
             }
 
 
@@ -1519,56 +1532,56 @@ export async function initFromSettings(activation: boolean = false, span: Span):
             let updatedkeepConfigurationCache : boolean = util.getSettingOr<boolean>(subKey, false);
             if (updatedkeepConfigurationCache !== keepConfigurationCache) {
                 readkeepConfigurationCache();
-                updatedSettingsSubkeys.push(subKey);
+                updatedSettingsSubkeys.push(${folder.index}.${subKey});
             }
 
             subKey = "autoreconfWarnCross";
             let updatedautoreconfWarnCross : boolean = util.getSettingOr<boolean>(subKey, false);
             if (updatedautoreconfWarnCross !== autoreconfWarnCross) {
                 readautoreconfWarnCross();
-                updatedSettingsSubkeys.push(subKey);
+                updatedSettingsSubkeys.push(${folder.index}.${subKey});
             }
 
             subKey = "autoreconfWarnPortability";
             let updatedautoreconfWarnPortability : boolean = util.getSettingOr<boolean>(subKey, false);
             if (updatedautoreconfWarnPortability !== autoreconfWarnPortability) {
                 readautoreconfWarnPortability();
-                updatedSettingsSubkeys.push(subKey);
+                updatedSettingsSubkeys.push(${folder.index}.${subKey});
             }
 
             subKey = "autoreconfWarnObsolete";
             let updatedautoreconfWarnObsolete : boolean = util.getSettingOr<boolean>(subKey, false);
             if (updatedautoreconfWarnObsolete !== autoreconfWarnObsolete) {
                 readautoreconfWarnObsolete();
-                updatedSettingsSubkeys.push(subKey);
+                updatedSettingsSubkeys.push(${folder.index}.${subKey});
             }
 
             subKey = "autoreconfWarnOverride";
             let updatedautoreconfWarnOverride : boolean = util.getSettingOr<boolean>(subKey, false);
             if (updatedautoreconfWarnOverride !== autoreconfWarnOverride) {
                 readautoreconfWarnOverride();
-                updatedSettingsSubkeys.push(subKey);
+                updatedSettingsSubkeys.push(${folder.index}.${subKey});
             }
 
             subKey = "autoreconfWarnGnu";
             let updatedautoreconfWarnGnu : boolean = util.getSettingOr<boolean>(subKey, false);
             if (updatedautoreconfWarnGnu !== autoreconfWarnGnu) {
                 readautoreconfWarnGnu();
-                updatedSettingsSubkeys.push(subKey);
+                updatedSettingsSubkeys.push(${folder.index}.${subKey});
             }
 
             subKey = "autoreconfWarnUnsupported";
             let updatedautoreconfWarnUnsupported : boolean = util.getSettingOr<boolean>(subKey, true);
             if (updatedautoreconfWarnUnsupported !== autoreconfWarnUnsupported) {
                 readautoreconfWarnUnsupported();
-                updatedSettingsSubkeys.push(subKey);
+                updatedSettingsSubkeys.push(${folder.index}.${subKey});
             }
 
             subKey = "autoreconfTool";
             let updatedautoreconfTool : string | undefined = await util.getExpandedSetting<string>(subKey);
             if (updatedautoreconfTool !== autoreconfTool) {
                 await readAutoreconfTool();
-                updatedSettingsSubkeys.push(subKey);
+                updatedSettingsSubkeys.push(${folder.index}.${subKey});
             }
 
             // Final updates in some constructs that depend on more than one of the above settings.
@@ -1615,15 +1628,16 @@ export async function initFromSettings(activation: boolean = false, span: Span):
                 }
             });
 
-            if (extension.getState().configureDirty) {
-                await make.configure(span, make.TriggeredBy.configureAfterConfigurationChange, work);
-            }
-            telemetry.endSpanWithStatus(span, SpanStatusCode.OK, undefined, {
-                changed: updatedSettingsSubkeys.join(",")
-            });
 */
+            if (fc.state.configureDirty) {
+                await make.configure(span, make.TriggeredBy.configureAfterConfigurationChange, fc);
+            }
         }
-    });
+        telemetry.endSpanWithStatus(span, SpanStatusCode.OK, undefined, {
+            changed: updatedSettingsSubkeys.join(",")
+        });
+
+    }));
 }
 
 export async function selectFolderConfig() : Promise<FolderConfig> {
@@ -1727,7 +1741,7 @@ export async function setNewEnvironment(fc: FolderConfig): Promise<void> {
     const items: PickItem[] = prepareEnvQuickPick(fc);
 
     let options: vscode.QuickPickOptions = {
-        placeHolder: localize("autotools.selectTestEnvironment", "Select a test environment"),
+        placeHolder: localize("autotools.selectTestEnvironment", "Select a test environment for {0}", fc.getProjectName()),
         title: localize("autotools.selectEnvironment", "Test Environment selection"),
         matchOnDescription: false,
         matchOnDetail: true

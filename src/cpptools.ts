@@ -42,22 +42,31 @@ export class CppConfigurationProvider implements cpp.CustomConfigurationProvider
     public readonly name;//  = 'Autotools Integration';
     public readonly extensionId = Extension.whoami;
 
-    constructor(folder: WorkspaceFolder) {
-        this.name = `Autotools Integration - ${folder.name}`
+    constructor() {
+        this.name = 'Autotools Integration';
+
     }
     private workspaceBrowseConfiguration: cpp.WorkspaceBrowseConfiguration = { browsePath: [] };
     private getConfiguration(uri: vscode.Uri): SourceFileConfigurationItem | undefined {
-        let norm_path: string = path.normalize(uri.fsPath);
-        if (process.platform === "win32") {
-           norm_path = norm_path.toUpperCase();
+        let folder = vscode.workspace.getWorkspaceFolder(uri);
+        if (folder) {
+            let fc = configuration.getFolderConfig(folder);
+            if (fc) {
+                let norm_path: string = path.normalize(uri.fsPath);
+                if (process.platform === "win32") {
+                   norm_path = norm_path.toUpperCase();
+                }
+                return fc.cppConfigurationProvider.fileIndex.get(norm_path);
+            }
         }
-
-        let info = this.fileIndex.get(norm_path);
-        return info;
+        return undefined;
     }
 
     public async canProvideConfiguration(uri: vscode.Uri): Promise<boolean> {
-        let can = !!this.getConfiguration(uri);
+        let can = !!vscode.workspace.getWorkspaceFolder(uri);
+        if (!can) {
+            can = !!configuration.findFolderConfigByTarget(uri);
+        }
         return can;
     }
 

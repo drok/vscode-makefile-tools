@@ -72,12 +72,16 @@ export class SubNode extends Node {
     resetItem() : void { this.item = undefined; }
     getTreeItem(state: vscode.TreeItemCollapsibleState): vscode.TreeItem {
         if (!this.item) {
-            let id = this.make.dir ? this.make.dir : `${this.make.ctx.fc.folder.name}`
-            this.item = new vscode.TreeItem(id);
+            let isTestSuite = !!(this.flags & Goal.Flags.Test_Suite);
+            let label = this.make.dir ? this.make.dir : (
+                isTestSuite ? `${this.make.ctx.fc.folder.name}` :
+                this.make.ctx.fc.getProjectName()
+            );
+            this.item = new vscode.TreeItem(label);
             this.item.collapsibleState = state; // vscode.TreeItemCollapsibleState.Collapsed;
-            if (this.flags & Goal.Flags.Test_Suite) {
-                this.item.description = this.make.stats.tests ? localize("autotools.subnode.suite", "{0} tests",
-                    this.make.stats.tests) : undefined;
+            if (isTestSuite) {
+                this.item.description = this.make.dir ? (this.make.stats.tests ? localize("autotools.subnode.suite", "{0} tests",
+                    this.make.stats.tests) : undefined) : this.make.ctx.fc.currentTestEnvironment.name;
                 this.item.resourceUri = vscode.Uri.from({
                         scheme: Scheme.Check,
                         authority: _empty,
@@ -92,14 +96,10 @@ export class SubNode extends Node {
                 });
                 // FIXME: This GetItem is called before parse, to set commands.
                 // The description needs to be updated after parse
-                this.item.description = this.make.stats.programs ? localize("autotools.subnode.programs", "{0} programs",
-                    this.make.stats.programs) : undefined;
+                this.item.description = this.make.dir ? (this.make.stats.programs ? localize("autotools.subnode.programs", "{0} programs",
+                    this.make.stats.programs) : undefined) : this.make.ctx.fc.buildConfig.name;
             }
-            this.item.tooltip =  this.make.dir;
-            // this.item.id = `${this.make.ctx.fc.folder.name}:${this.make.dir}`;
-            if (!this.make.dir) {
-                this.item.label = this.make.ctx.fc.folder.name;
-            }
+            this.item.tooltip =  this.make.dir || this.make.ctx.root;
             this.item.id = this.make.getDir();
         }
         let context : string[] = ["nodeType=sub"];
@@ -202,18 +202,20 @@ export class ProjectOutlineProvider implements vscode.TreeDataProvider<Node> {
     removeFolder(fc: FolderConfig) : void {
         this.trees.delete(fc);
         this.subnodes.delete(fc);
+        this._changeEvent.fire(null);
     }
     // Updates the tree when settings.json changes
     updateTargets(fc: FolderConfig, update: boolean) : void {
+        let firstPaint = !this.trees.size;
         this.trees.set(fc, fc.build_tree);
         let oldtop = this.subnodes.get(fc)?.get(fc.build_tree);
         let nodeMap = new Map();
         this.subnodes.set(fc, nodeMap);
         let newtop = buildParents(fc.build_tree, undefined, oldtop, nodeMap, this.flag);
-        update && this.updateTree(oldtop ?? newtop);
+        (update || !firstPaint) && this.updateTree(!firstPaint ? null : oldtop ?? newtop);
     }
 
-    updateTree(top: SubNode): void {
+    updateTree(top: SubNode | null): void {
         this._changeEvent.fire(top);
     }
 }
@@ -244,10 +246,6 @@ export class ProjectTestsProvider implements vscode.TreeDataProvider<Node> {
         this.trees = new Map();
     }
 
-    public refresh(): any {
-        this._changeEvent.fire(null);
-    }
-
     get onDidChangeTreeData(): any {
         return this._changeEvent.event;
     }
@@ -267,7 +265,7 @@ export class ProjectTestsProvider implements vscode.TreeDataProvider<Node> {
                 .sort((a,b) => a[0].folder.index - b[0].folder.index)
                 .filter(([k,v]) => v.stats.checks)
                 .map(([fc,m]) => this.subnodes.get(fc)!.get(m)!);
-        } else 
+        } else
           if (!this.env || !this.env?.dirs || this.env.dirs.includes(node.make.dir))
             goals = node.getChildren();
           else if (node instanceof SubNode)
@@ -300,18 +298,20 @@ export class ProjectTestsProvider implements vscode.TreeDataProvider<Node> {
     removeFolder(fc: FolderConfig) : void {
         this.trees.delete(fc);
         this.subnodes.delete(fc);
+        this._changeEvent.fire(null);
     }
     // Updates the tree when settings.json changes
     updateTargets(fc: FolderConfig, update: boolean) : void {
+        let firstPaint = !this.trees.size;
         this.trees.set(fc, fc.build_tree);
         let oldtop = this.subnodes.get(fc)?.get(fc.build_tree);
         let nodeMap = new Map();
         this.subnodes.set(fc, nodeMap);
         let newtop = buildParents(fc.build_tree, undefined, oldtop, nodeMap, this.flag);
-        update && this.updateTree(oldtop ?? newtop);
+        (update || !firstPaint) && this.updateTree(!firstPaint ? null : oldtop ?? newtop);
     }
 
-    updateTree(top: SubNode): void {
+    updateTree(top: SubNode | null): void {
         this._changeEvent.fire(top);
     }
     // updateTreeItems(fc: FolderConfig): void {

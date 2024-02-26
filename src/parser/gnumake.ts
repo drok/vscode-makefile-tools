@@ -680,7 +680,7 @@ export class Goal extends Node implements Parser {
     }
 
     logfile(): string | undefined {
-        return this.test?.id;
+        return path.join(this.make.dir, this.goal!);
     }
 
     constructor(public make: Make, public goal: string | undefined = undefined,

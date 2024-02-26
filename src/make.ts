@@ -372,9 +372,8 @@ export async function generateParseContent(span: Span, fc: FolderConfig): Promis
         let timeout: NodeJS.Timeout = setInterval(function (): void {
             let elapsedHeartBit: number = util.elapsedTimeSince(heartBeat);
             if (elapsedHeartBit > heartBeatTimeout) {
-                vscode.window.showWarningMessage("Dryrun timeout. See Makefile Tools Output Channel for details.");
-                logger.message("Dryrun timeout. Verify that the make command works properly " +
-                "in your development terminal (it could wait for stdin).");
+                vscode.window.showWarningMessage("Dryrun timeout. See Autotools Output Channel for details.");
+                logger.message(`Dryrun timeout. See ${kbUrl.toString(true)}#dry-run-timeout`, "Normal");
                 if (dryRunPath) {
                     logger.message(`Double check the dryrun output log: ${dryrunFile}`);
                 }
@@ -447,9 +446,6 @@ export async function generateParseContent(span: Span, fc: FolderConfig): Promis
             /* Reset, to make it obvious that something very wrong happened */
             fc.resetCppToolsProvider();
         } else {
-            // All done, notify that new data is available
-            fc.updateCppToolsProvider();
-
             fc.accountForTraits();
             fc.updateBuildTree();
             fc.updateWatchers();
@@ -784,7 +780,7 @@ async function loadConfigurationFromCache(fc: FolderConfig, cacheFile: string, p
         elapsedTime = util.elapsedTimeSince(startTime);
         logger.message(`Load configuration from cache elapsed time: ${elapsedTime}`, "Verbose");
 
-        fc.updateCppToolsProvider();
+        extension.updateCppToolsProvider();
 
         // Log all the files read from cache after elapsed time is calculated.
         // IntelliSense should be available by now for all files.

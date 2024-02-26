@@ -24,13 +24,16 @@ import * as ui from './ui';
 import * as vscode from 'vscode';
 import { TestItem } from 'vscode';
 import * as cpp from 'vscode-cpptools';
+import { CppConfigurationProvider } from './cpptools';
 import * as debugProvider from './debug';
 import { DebugNow } from './debug';
 import {
         AutotoolsTask,
         TestTask,
         BuildTask,
-        MyTaskProvider } from './tasks';
+        CheckTask,
+        MyTaskProvider,
+        AutoToolsCheckTaskProvider} from './tasks';
 import { SuiteDecorations, URIFolderIndexRe } from './suite-decorator';
 import { TestGrid, GridShowOptions } from './testgrid';
 import * as tele from './tele';
@@ -78,6 +81,11 @@ export class Extension {
     public readonly userEnvName : string = "<none>";
     private _treeDisposables: vscode.Disposable[] = [];
     public running: WeakMap<vscode.TaskExecution, Span> = new WeakMap();
+
+    /* Intellisense Data */
+    private readonly _cppConfigurationProvider : CppConfigurationProvider = new CppConfigurationProvider();
+    public get cppConfigurationProvider() : CppConfigurationProvider { return this._cppConfigurationProvider; }
+
 
     public constructor(public readonly extensionContext: vscode.ExtensionContext, teleParams: tele.Params) {
         telemetry = new tele.MyTelemetry(extensionContext, teleParams);
@@ -397,11 +405,12 @@ export class Extension {
                     fc.autotoolsTask.autotoolsDoneNoResult();
                     extension.updateAllGrids();
                 } else if (definition.type == 'check') {
+                    const def: CheckTask = task.definition as CheckTask;
                     let suite = fc.buildTargets
-                        .get(definition.builddir)
+                        .get(def.builddir)
                         ?.get('test-suite.log');
                     if (suite && suite.test) {
-                        fc.testController?.suiteCompleted(e.execution, suite, definition.builddir);
+                        fc.testController?.suiteCompleted(e.execution, suite, def.builddir);
                     }
                     fc.autotoolsTask.autotoolsDoneNoResult();
                     extension.updateAllGrids();
@@ -538,6 +547,27 @@ export class Extension {
 
     public async registerCppTools(): Promise<void> {
         this.cppToolsAPI = await cpp.getCppToolsApi(cpp.Version.v6);
+    // Register this folder as a new provider or request an update
+        if (this.cppToolsAPI) {
+
+            // Call notifyReady earlier than when the provider is updated,
+            // as soon as we know that we are going to actually parse for IntelliSense.
+            // This allows CppTools to ask earlier about source files in use
+            // and Makefile Tools may return a targeted source file configuration
+            // if it was already computed in our internal arrays (make.ts: customConfigProviderItems).
+            // If the requested file isn't yet processed, it will get updated when configure is finished.
+            // TODO: remember all requests that are coming and send an update as soon as we detect
+            // any of them being pushed into make.customConfigProviderItems.
+            extension.cppToolsAPI?.registerCustomConfigurationProvider(this._cppConfigurationProvider);
+            extension.cppToolsAPI?.notifyReady(this._cppConfigurationProvider);
+        }
+    }
+    // Request a custom config provider update.
+    public updateCppToolsProvider(): void {
+        if (extension.cppToolsAPI) {
+            this._cppConfigurationProvider.logConfigurationProviderBrowse();
+            extension.cppToolsAPI.didChangeCustomConfiguration(this._cppConfigurationProvider);
+        }
     }
 
 
@@ -598,35 +628,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     let validact = telemetry.startSpan('act', extension.journey);
     act = validact;
 
-    context.subscriptions.push(vscode.commands.registerCommand('autotools.setBuildConfiguration', async () => {
-        telemetry.logEvent(extension.journey, "sBC");
-        await configuration.selectFolderConfig().then( async fc => {
-
-        if (!fc.buildConfig.top_builddir && fc.isConfigured) {
-            const doit: string = localize("autotools.switch.to.out.of.tree", "Browse doc page");
-            vscode.window.showErrorMessage(
-                localize("autotools.want.out-of-tree", "The project does not support additional build configurations until it is switched to out-of-tree build mode."),
-                doit,
-                localize("autotools.cancel", "Cancel")).then((value) => {
-                if (value === doit) {
-                    // this.autotoolsTask.bootstrap();
-                    vscode.commands.executeCommand('vscode.open', "https://autotools.mergesium.com/kb/docs/#switch-to-out-of-tree-configuration");
-                }
-            });
-        // https://github.com/microsoft/vscode/blob/0bb69da87ca19412a768d5966fcb0e7b36b2dd3f/src/vs/workbench/contrib/extensions/browser/extensions.contribution.ts#L277
-            // await vscode.commands.executeCommand('extension.open', context.extension.id, 'readme', true);
-            // await vscode.commands.executeCommand('extension.open', "ms-vscode-remote.remote-ssh");
-            // await vscode.commands.executeCommand('extension.open', "ms-vscode-remote.remote-ssh#getting-started");
-            // vscode.commands.executeCommand('vscode.open', "https://autotools.mergesium.com/doc/switch-to-out-of-tree-configurations");
-        } else {
-            try {
-                await configuration.setNewConfiguration(extension.journey, fc);
-            } catch (e) {
-                logger.message(`ERROR: switching configuration failed: ${e}`, 'Normal');
-            }
-        }
-    })}));
-
     /** End of commands that shouldn't be exposed in package.json, they are used for command substitution in launch.json and tasks.json. */
 
     context.subscriptions.push(vscode.commands.registerCommand('autotools.addAutotools', async (sub: tree.SubNode) => {
@@ -654,8 +655,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
     context.subscriptions.push(vscode.commands.registerCommand('autotools.checkAll', async (sub: tree.SubNode) => {
         telemetry.logEvent(extension.journey, "ckA");
+        // if (goal.test && goal.make.ctx.fc.testController)
+
         if (sub instanceof tree.SubNode)
-            await sub.make.ctx.fc.checkTasks.checkAll();
+            return sub.make.ctx.fc.testController?.runAll(sub.make.ctx.fc.currentTestEnvironment);
+            // await sub.make.ctx.fc.checkTasks.checkAll();
     }));
 
     context.subscriptions.push(vscode.commands.registerCommand('autotools.exportToIntelisense', async (sub: tree.SubNode) => {
@@ -777,16 +781,32 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         return Promise.resolve();
     }));
 
-    context.subscriptions.push(vscode.commands.registerCommand('autotools.outline.setBuildConfiguration', () => {
-        telemetry.logEvent(extension.journey, "sBCo");
-        return vscode.commands.executeCommand("autotools.setBuildConfiguration");
+    context.subscriptions.push(vscode.commands.registerCommand('autotools.outline.setBuildConfiguration', async (sub: tree.SubNode) => {
+        telemetry.logEvent(extension.journey, "sBC");
+
+        if (!sub.make.ctx.fc.buildConfig.top_builddir && sub.make.ctx.fc.isConfigured) {
+            const doit: string = localize("autotools.switch.to.out.of.tree", "Browse doc page");
+            vscode.window.showErrorMessage(
+                localize("autotools.want.out-of-tree", "The project does not support additional build configurations until it is switched to out-of-tree build mode."),
+                doit,
+                localize("autotools.cancel", "Cancel")).then((value) => {
+                if (value === doit) {
+                    // this.autotoolsTask.bootstrap();
+                    vscode.commands.executeCommand('vscode.open', "https://autotools.mergesium.com/kb/docs/#switch-to-out-of-tree-configuration");
+                }
+            });
+        } else {
+            try {
+                await configuration.setNewConfiguration(extension.journey, sub.make.ctx.fc);
+            } catch (e) {
+                logger.message(`ERROR: switching configuration failed: ${e}`, 'Normal');
+            }
+        }
     }));
 
-    context.subscriptions.push(vscode.commands.registerCommand('autotools.outline.setTestEnvironment', async (e) => {
+    context.subscriptions.push(vscode.commands.registerCommand('autotools.outline.setTestEnvironment', async (sub: tree.SubNode) => {
         telemetry.logEvent(extension.journey, "sTE");
-        await configuration.selectFolderConfig().then(
-            async fc => await configuration.setNewEnvironment(fc)
-        )
+        await configuration.setNewEnvironment(sub.make.ctx.fc);
     }));
 
     logger.message(`${getStartTime(validact).toISOString()}: starting ${Extension.whoami} ${context.extension.packageJSON.version}/${buildinfo.platform}-${buildinfo.arch}`, 'Normal');
@@ -800,7 +820,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
     context.subscriptions.push(vscode.workspace.onDidChangeWorkspaceFolders(async (e) => {
         let span = telemetry.startSpan("openWS", extension.journey);
-        configuration.onWorkspaceChange(e);
+        await configuration.onWorkspaceChange(e, span);
         span.end();
     }));
 
@@ -849,6 +869,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }))
 
     await configuration.initFromSettings(true, act);
+
+    if (configuration.cppProvider != Extension.whoami) {
+        telemetry.setAttributes(act, {cppProvider: configuration.cppProvider});
+    }
 
     util.scheduleAsyncTask<void>(async () => {
         await extension.registerCppTools();

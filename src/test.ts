@@ -129,6 +129,11 @@ export class MyTestController {
     env.run?.runHandler(new vscode.TestRunRequest([test], [], env.run), cancelToken.token);
     cancelToken.dispose();
   }
+  public runAll(env: TestEnvironment) : void {
+    var cancelToken = new vscode.CancellationTokenSource();
+    env.run?.runHandler(new vscode.TestRunRequest(undefined, [], env.run), cancelToken.token);
+    cancelToken.dispose();
+  }
   public async liverun(test: TestItem, env: TestEnvironment) : Promise<void> {
     var cancelToken = new vscode.CancellationTokenSource();
     this.runHandler(true, new vscode.TestRunRequest([test], [], env.run), cancelToken.token, env);

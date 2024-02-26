@@ -320,9 +320,12 @@ export class AutoToolsCheckTaskProvider implements MyTaskProvider {
                 });
 
             }}});
-        this.checkAllTask = new Task({
-                type: this.myType,
-                builddir: ''}, TaskScope.Workspace, 'Run user test suite (make check)',
+        let checkAllTaskDef : CheckTask = {
+            type: this.myType,
+            folderIndex: this.fc.folder.index,
+            builddir: ''
+        };
+        this.checkAllTask = new Task(checkAllTaskDef, TaskScope.Workspace, 'Run user test suite (make check)',
             "autotools",
             new ProcessExecution(
                 configuration.getMakePath(),
@@ -352,13 +355,13 @@ export class AutoToolsCheckTaskProvider implements MyTaskProvider {
         // resolveTask requires that the same definition object be used.
         const definition: TestTask = <any>_task.definition;
         let fc = configuration.findFolderConfigByIndex(definition.folderIndex);
-        if (fc) return new Task(definition, _task.scope ?? TaskScope.Workspace, "check",
+        if (fc && definition.test) return new Task(definition, _task.scope ?? TaskScope.Workspace, "check",
             this.myType,
             new ProcessExecution(
                 configuration.getMakePath(),
                 (check.builddir ? ['-C', check.builddir] : [])
                 .concat(fc.buildConfig.makeArgs || [])
-                .concat(definition.target.goal)
+                .concat(definition.test?.goal)
                 .concat(check.TESTS ? 'TESTS=' +  check.TESTS.join(' ') : [])
                 .concat(check.TEST_SUITE_LOG ? 'TEST_SUITE_LOG=' +  check.TEST_SUITE_LOG : []),
                 fc.currentTestEnvironment.checkExecOptions));
@@ -485,7 +488,7 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
 
             var autoreconf : string = configuration.autoreconfCmd().join(' ');
 
-            this.regenTask = new Task({type: this.myType, action: 'regen'},
+            this.regenTask = new Task({type: this.myType, action: 'regen', folderIndex: this.fc.folder.index},
                     TaskScope.Workspace, "Update Makefiles and config headers",
                 localize("autotools.update.task", "Configuration output"),
                 new ShellExecution(
@@ -495,7 +498,7 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
             this.regenTask.group = TaskGroup.Build;
             this.regenTask.detail = localize("autotools.update", "$(sync) Regenerate Makefiles and headers. See [Autoconf output](https://www.gnu.org/software/autoconf/manual/autoconf-2.69/html_node/Output.html)");
 
-            this.recheckTask = new Task({type: this.myType, action: 'recheck'},
+            this.recheckTask = new Task({type: this.myType, action: 'recheck', folderIndex: this.fc.folder.index},
                 TaskScope.Workspace, "Re-check configuration",
                 localize("autotools.recheck.task", "Configuration update"),
                 new ShellExecution('./config.status --recheck && ./config.status', {
@@ -677,29 +680,33 @@ function FilterEnvsByDir(e: TestEnvironment[], dir: string) : TestEnvironment[] 
 function KeepList(e: TestEnvironment[]) : string {
     return e.map(i => i.hashCode.toString(36)).join(',');
 }
-export interface BuildTask extends TaskDefinition {
+export interface BuildTask {
     /*
      * The makefile goal that this task operates on
      */
+    readonly type: string;
     target?: BuildTarget;
     
     folderIndex: number;
 };
 
-export interface TestTask extends TaskDefinition {
+export interface TestTask {
     /*
      * The test output log this task creates.
      */
+    readonly type: string;
     test?: BuildTarget;
     folderIndex: number;
 };
 
-interface CheckTask extends TaskDefinition {
+export interface CheckTask {
     /*
      * Test suite arguments (default: none, ie, run 'make check' )
      */
+    readonly type: string;
     check?: CheckTarget;
     folderIndex: number;
+    builddir: string;
 };
 
 export class CheckTarget {
@@ -707,7 +714,8 @@ export class CheckTarget {
     TEST_SUITE_LOG?: string;
 }
 
-export interface AutotoolsTask extends TaskDefinition {
+export interface AutotoolsTask {
+    readonly type: string;
     action: string;
     folderIndex: number;
 };
