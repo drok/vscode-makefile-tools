@@ -294,7 +294,7 @@ export class MyTestController {
             var dirtargets = targets.get(dir) || new Map<string,Goal>();
             if ((await util.spawnChildProcess(
                 extension.dryRunner,
-                    ["-r", "--output-sync=none", "--trace", "--dry-run", "--silent", "-C", dir, "test-suite.log"]
+                    ["-r", "--output-sync=none", "--trace", "--dry-run", "--silent", "-C", dir || '.', "test-suite.log"]
                     .concat([...sources.map(x => `--assume-new=${x}`)]),
                 this.fc.abs_top_builddir,
                 true, true,
