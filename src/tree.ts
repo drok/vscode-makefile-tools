@@ -113,21 +113,12 @@ export class SubNode extends Node {
             if (!path.isAbsolute(fc.buildConfig.top_builddir)) context.push('relBuildDir');
             if (fc.gTestEnvironment.XFAIL_TESTS?.length) context.push('haveGlobalWaivers');
         }
-        //if ((this.flags & Goal.Flags.Test_Suite) || !this.make.dir) {
-            // recalculate on every refresh because some suites must be disabled if dirs exclude them
-            this.item.contextValue = context
-                .concat((!this.disableSuite && (this.flags & Goal.Flags.Test_Suite) && this.make.test_suite) ? ['nodeType=check'] : [])
-                .join(',');
-        //}
+        this.item.contextValue = context
+            .concat((!this.disableSuite && (this.flags & Goal.Flags.Test_Suite) && this.make.test_suite) ? ['nodeType=check'] : [])
+            .join(',');
 
         return this.item;
     }
-//    makefile() : string {
-//        if (this.make.dir)
-//            // If a relative directory, make it absolute wrt. root of workspace
-//            path.join('', path.join(this.make.dir, 'Makefile.am'));
-//        return path.join(this.make.dir, 'Makefile.am');
-//    }
     logfile() : string | undefined {
         if ((this.flags & Goal.Flags.Test_Log) && this.make.dir) {
             return path.join(this.make.dir, 'test-suite.log');
