@@ -700,14 +700,14 @@
         "viewsContainers": {
             "activitybar": [
                 {
-                    "id": "autotools__viewContainer",
+                    "id": "autotools",
                     "title": "Autotools",
                     "icon": "res/viewcontainer.svg"
                 }
             ]
         },
         "views": {
-            "autotools__viewContainer": [
+            "autotools": [
                 {
                     "id": "autotools.outline",
                     "icon": "res/viewcontainer.svg",
