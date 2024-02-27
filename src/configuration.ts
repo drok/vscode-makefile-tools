@@ -221,11 +221,13 @@ export class FolderConfig implements vscode.Disposable {
         logger.message(`Selected build for ${this.folder.name} is "${this.buildConfig.name}" in ${this.config.top_builddir}`, 'Verbose');
 
         this._build_tree = new Make('', {
-            diags: vscode.languages.createDiagnosticCollection(`${this.folder.name} @ ${this.buildConfig.name} config parse`),
+            diags: vscode.languages.createDiagnosticCollection(`${this.folder.name} @ ${this.buildConfig.name} build rules`),
+            diag: new Map(),
             fc: this,
             root: this.abs_top_builddir,
             span: extension.journey,
             allmakes: new Map(),
+            makefiles: new Map()
         });
         statusBar.setConfiguration(this);
         //extension.onConfigurationSelect(this.config);
@@ -259,6 +261,7 @@ export class FolderConfig implements vscode.Disposable {
         this.targetDisposables.forEach((d) => d.dispose());
         this.testController?.deactivate();
         this.testController = undefined;
+        this._build_tree.ctx.diags?.dispose();
         extension._projectOutlineProvider.removeFolder(this);
         extension._projectTestSuitesProvider.removeFolder(this);
 
@@ -875,8 +878,12 @@ export class FolderConfig implements vscode.Disposable {
     public clearBuildTargets(span: Span) {
         this.clearTraits();
         this._build_tree.ctx.span = span;
+        this._build_tree.ctx.diags.clear();// set(undefined);
+        this._build_tree.ctx.diag.clear();
+        this._build_tree.ctx.allmakes.set(this._build_tree.dir, this._build_tree);
         this._build_tree.goals.clear();
         this._build_tree.submake.clear();
+        this._build_tree.ctx.allmakes.clear();
         this._build_tree.test_suite = undefined;
         this._build_tree.stats = {programs: 0, sharedlibs: 0, tests: 0, testbins:0, checks: 0, subdirs: 0};
         this._build_tree.hasStats = false;

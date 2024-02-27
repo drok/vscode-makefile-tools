@@ -26,6 +26,9 @@ import { isContext } from 'vm';
 nls.config({ messageFormat: nls.MessageFormat.bundle, bundleFormat: nls.BundleFormat.standalone })();
 const localize: nls.LocalizeFunc = nls.loadMessageBundle();
 
+/* https://stackoverflow.com/questions/72119570/why-doesnt-vs-code-typescript-recognize-the-indices-property-on-the-result-of-r */
+export type RegExpMatchArrayWithIndices = RegExpMatchArray & { indices: Array<[number, number]> };
+
 const chunkSize: number = 100;
 
 enum MakeSection {
@@ -52,7 +55,13 @@ const RecursingRE = /^Making (.*) in (.*)$/;
 export interface MakeContext {
     allmakes: Map<string, Make>; // All directories in this tree. Used to deduplicate make runs
     fc: FolderConfig;
+    diag: Map<string, vscode.Diagnostic[]>;
     diags: DiagnosticCollection;
+    /* Maps the URI for all makefiles (think blah.mak includes) where rules are read from
+     * In simple cases without include, this will be a map of all 'Makefile' files.
+     * Used so each Goal can store a shared reference, instead of a separate URI object
+     */
+    makefiles: Map<string, vscode.Uri>;
     root: string;
     span: Span;
 }
@@ -97,7 +106,7 @@ export class Make implements Parser {
                 if (leaving) {
                     return [ParserDisp.Leave, this];
                 }
-                let executing = ExecutingRE.exec(line);
+                let executing = ExecutingRE.exec(line) as RegExpMatchArrayWithIndices;
                 if (executing) {
 //                    if (this.file == "config.status" && false) { // FIXME: implement recursive detection. a single refresh is ok if configure.ac is newer
 //                        // For some reason, reconfig was triggerred, meaning
@@ -222,7 +231,12 @@ export class Make implements Parser {
     }
     getMake(reldir: string) : Make {
         if (reldir == this.dir) return this;
-        return this.ctx.allmakes.get(reldir) ?? new Make(reldir, this.ctx);
+        let m = this.ctx.allmakes.get(reldir);
+        if (!m) {
+            m = new Make(reldir, this.ctx);
+            this.ctx.allmakes.set(reldir, m);
+        }
+        return m;
     }
     public getFile(): string | undefined {
         return this.file;
@@ -231,15 +245,43 @@ export class Make implements Parser {
         return path.join(this.ctx.root, this.dir);
     }
     public finish(): void { this.section = MakeSection.Copyright; }
-    public startExecuting(rea: RegExpExecArray) {
+    public startExecuting(rea: RegExpMatchArrayWithIndices) {
         if (rea[1] === "<builtin>" && !make.builtin_targets.has(this.dir + "/" + rea[4])) {
-            logger.message(localize("gnumake.warn.builtin.rule",
-                "WARN: Built-in rules used for {0} in {1}, potentially with unexpected/incomplete FLAGS. see https://autotools.mergesium.com/doc/builtin-rules",
-                rea[4], this.dir));
+            /* Find the targets which depend on this builtin target, and apply
+             * MissingRule flag to all.
+             */
+            for (const [name,g] of this.goals) {
+                if (g.depends?.find(i => i.goal == rea[4])) {
+                    g.flags |= Goal.Flags.MissingRule;
+                    if (!g.ruleMakefile || !g.ruleLine)
+                        continue;
+                    if (g.flags & Goal.Flags.MissingRule) {
+                        let diag = new vscode.Diagnostic(
+                            new vscode.Range(g.ruleLine-2, 0, g.ruleLine-2, 100),
+                            localize("gnumake.warn.builtin.rule", `'{0}' in '{1}' relies on built-in rule to build '{2}'`,
+                                g.goal, g.make.dir, rea[4]), vscode.DiagnosticSeverity.Warning);
+                        this.addDiag(path.resolve(this.getDir(), g.ruleMakefile.path),
+                            diag, 'implicit-rule-use');
+                    }
+                }
+            }
             make.builtin_targets.add(this.dir + "/" + rea[4]);
         }
         this.file = rea[4] ?? rea[5];
     }
+    public addDiag(file: string, d: vscode.Diagnostic, code: string): void {
+        let diagsForFile = this.ctx.diag.get(file);
+        if (!diagsForFile) {
+            diagsForFile = [];
+            this.ctx.diag.set(file, diagsForFile);
+        }
+        d.code =  { value: code, target: this.ctx.fc._kbUrlStatic.with({fragment: code})};
+        diagsForFile.push(d);
+        let u = vscode.Uri.file(file);
+        this.ctx.diags.set(u, diagsForFile);
+    }
+
+    diags?: DiagnosticCollection;
     section: MakeSection;
     file: string | undefined;
     goals: Map<string,Goal>;
@@ -417,8 +459,10 @@ const _empty = '';
 export class Goal extends Node implements Parser {
     public static readonly Flags = {
         None: 0,
+        FullyParsed: 1,
 
         /* Flags gathered from Make (phony, etc) */
+        BuiltIn: 4,
         Not_a_target: 8,
 
         /* Well-known automake targets */
@@ -435,6 +479,7 @@ export class Goal extends Node implements Parser {
         Test_Program: 2048,
         Test_Log: 4096,
         SharedLib: 8192,
+        MissingRule: 16384,
     };
     public trs?: make.TestResult;
 
@@ -452,6 +497,7 @@ export class Goal extends Node implements Parser {
         if (line == "") {
             if (!this.goal)
                 throw new Error("Unexpected end of goal");
+            this.flags |= Goal.Flags.FullyParsed;
             return [ParserDisp.Leave, this];
         } else {
             if (!this.goal) {
@@ -468,6 +514,8 @@ export class Goal extends Node implements Parser {
                         }
                 }
             } else {
+                if (this.flags & Goal.Flags.FullyParsed)
+                    return [ParserDisp.Continue, this];
                 let info = GoalInfoRe.exec(line);
                 if (info) {
                     switch (info[1]) {
@@ -488,7 +536,18 @@ export class Goal extends Node implements Parser {
                                 if (this.goal) {
                                     /* If a goal obj exists for this target, use it instead of this.
                                      */
-                                    return [ParserDisp.Enter, new Recipe(this.make.goals.get(this.goal) ?? this)];
+                                    let g = this.make.goals.get(this.goal) ?? this;
+                                    if (recipe[1] == 'built-in')
+                                        g.flags |= Goal.Flags.BuiltIn;
+                                    else {
+                                        let makefile = path.resolve(this.make.getDir(), recipe[2]);
+                                        this.ruleMakefile = this.make.ctx.makefiles.get(makefile);
+                                        if (!this.ruleMakefile)
+                                            this.make.ctx.makefiles.set(makefile, vscode.Uri.file(makefile));
+                                        // FIXME: This is done more than once (repeated rules)
+                                        this.ruleLine = Number(recipe[3]);
+                                    }
+                                    return [ParserDisp.Enter, new Recipe(g)];
                                 } else
                                     throw new Error(`Unexpected Recipe in ${recipe[2]}:${recipe[3]} before goal name`);
                             }
@@ -505,7 +564,7 @@ export class Goal extends Node implements Parser {
                                             g.depends = go.depends;
                                         });
                                 }
-                                return [ParserDisp.Continue, this];
+                                return [ParserDisp.Continue, go];
                             }
                             throw new Error(`Unexpected Goal Info ${info[1]}`);
                         }
@@ -535,7 +594,14 @@ export class Goal extends Node implements Parser {
                  * Also skip not-targets (these are source files, not targets)
                  * Also skip targets without any flags
                  */
-                let thiso : Goal;
+                /* If a goal obj exists for this target, use it instead of this.
+                    * If not, add it to the make's goal list
+                    */
+                let go = this.make.goals.get(this.goal);
+                if (!go) {
+                    this.make.goals.set(this.goal, this);
+                } else return [ParserDisp.Continue, go];;// FIXME: Can return early if go already exists. avoid re-parsing depends
+                let thiso = go ?? this;
                 if (!(this.flags & (Goal.Flags.Automake_auxiliary |
                     Goal.Flags.Not_a_target |
                     Goal.Flags.Automake_noise
@@ -544,14 +610,6 @@ export class Goal extends Node implements Parser {
                     /* Only worry about files inside the workspace */
                     (!path.isAbsolute(this.goal) || vscode.workspace.getWorkspaceFolder(vscode.Uri.file(this.goal)))
                     ) {
-                    /* If a goal obj exists for this target, use it instead of this.
-                     * If not, add it to the make's goal list
-                     */
-                    let go = this.make.goals.get(this.goal);
-                    thiso = go ?? this;
-                    if (!go) {
-                        this.make.goals.set(this.goal, this);
-                    }
                 
 
                     if (goal[2]) {
@@ -583,7 +641,7 @@ export class Goal extends Node implements Parser {
                         thiso.flags |= Goal.Flags.Automake_noise;
                     }
                 }
-                return [ParserDisp.Continue, this];
+                return [ParserDisp.Continue, thiso]; // FIXME: should ret thiso
             }
         }
         throw new Error(`Unexpected Goal line ${line}`);
@@ -712,6 +770,8 @@ export class Goal extends Node implements Parser {
     task: vscode.Task | Map<TestEnvironment,vscode.Task> | undefined;
     test: vscode.TestItem | undefined;
     siblings?: Goal[]; // "Also makes" products of the same recipe.
+    ruleMakefile?: vscode.Uri;
+    ruleLine?: number;
 }
 
 const LinkerRe = /\$\(\w*LINK\)\s/;
@@ -725,13 +785,15 @@ const SharedLibRe = /\.(?:|la|so|dll)$/;
  * what kind of target it is (eg, if `@ref $(LINK)` or `$(COMPILE)` is referenced
  */
 export class Recipe implements Parser {
-    constructor(goal: Goal) { this.goal = goal; }
+    constructor(private goal: Goal) { }
     static makeArgs(): string[] { return [
         // Nothing. The goals are output when the Database is output
     ];};
     ingest (line: string) : [ParserDisp, Parser] {
-        if (line == "")
+        if (line == "") {
+            this.goal.flags |= Goal.Flags.FullyParsed;
             return [ParserDisp.Leave, this];
+        }
         if (LinkerRe.test(line)) {
             this.goal.flags |= Goal.Flags.Linked_binary;
             if (SharedLibRe.test(this.goal.goal||''))
@@ -744,7 +806,6 @@ export class Recipe implements Parser {
         return [ParserDisp.Continue, this];
     }
     push(sub: Parser) { return undefined;}
-    goal: Goal;
 }
 
 export function countStats(sub: Make): number[] {

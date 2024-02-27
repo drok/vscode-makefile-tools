@@ -17,7 +17,7 @@ import { parse, quote } from '@mergesium/shell-quote';
 // import  from '../extension';
 import { extension, telemetry } from '../extension';
 import { Making } from './tool';
-import { Make, EnteringRE, CopyrightRE, ExecutingRE } from './gnumake';
+import { RegExpMatchArrayWithIndices, Make, EnteringRE, CopyrightRE, ExecutingRE } from './gnumake';
 import { SpanStatusCode } from '@opentelemetry/api';
 
 export interface PreprocessDryRunOutputReturnType {
@@ -205,7 +205,7 @@ export class Executing implements Parser {
             return [ParserDisp.Leave, this];
         }
 
-        let executing = ExecutingRE.exec(line);
+        let executing = ExecutingRE.exec(line) as RegExpMatchArrayWithIndices;
         if (executing) {
             this.make.startExecuting(executing);
             return [ParserDisp.Leave, this];
