@@ -878,7 +878,7 @@ export class FolderConfig implements vscode.Disposable {
         this._build_tree.goals.clear();
         this._build_tree.submake.clear();
         this._build_tree.test_suite = undefined;
-        this._build_tree.stats = {programs: 0, tests: 0, checks: 0, subdirs: 0};
+        this._build_tree.stats = {programs: 0, sharedlibs: 0, tests: 0, testbins:0, checks: 0, subdirs: 0};
         this._build_tree.hasStats = false;
         this.targetDisposables.forEach(d => d.dispose());
         this.buildTargets.clear();

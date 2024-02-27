@@ -80,6 +80,7 @@ export class SubNode extends Node {
             this.item = new vscode.TreeItem(label);
             this.item.collapsibleState = state; // vscode.TreeItemCollapsibleState.Collapsed;
             if (isTestSuite) {
+                if (this.make.test_suite) this.item.iconPath = Goal.CheckIcon;
                 this.item.description = this.make.dir ? (this.make.stats.tests ? localize("autotools.subnode.suite", "{0} tests",
                     this.make.stats.tests) : undefined) : this.make.ctx.fc.currentTestEnvironment.name;
                 this.item.resourceUri = vscode.Uri.from({
@@ -88,6 +89,7 @@ export class SubNode extends Node {
                         path: '/' + this.make.dir,
                         query: 'test-suite.log'
                     });
+                this.item.tooltip = this.make.dir || this.make.ctx.root;
             } else {
                 this.item.resourceUri = vscode.Uri.from({
                     scheme: Scheme.Make,
@@ -98,8 +100,18 @@ export class SubNode extends Node {
                 // The description needs to be updated after parse
                 this.item.description = this.make.dir ? (this.make.stats.programs ? localize("autotools.subnode.programs", "{0} programs",
                     this.make.stats.programs) : undefined) : this.make.ctx.fc.buildConfig.name;
+                this.item.tooltip =
+                    (this.make.stats.sharedlibs && this.make.stats.testbins) ?
+                    localize("autotools.subnode.programs.tooltip.ST", "{0}: {1} shared libs, {2} test programs",
+                        this.make.dir || this.make.ctx.root, this.make.stats.sharedlibs, this.make.stats.testbins) :
+                    (this.make.stats.sharedlibs) ?
+                    localize("autotools.subnode.programs.tooltip.S", "{0}: {1} shared libs",
+                        this.make.dir || this.make.ctx.root, this.make.stats.sharedlibs) :
+                    (this.make.stats.testbins) ?
+                    localize("autotools.subnode.programs.tooltip.S", "{0}: {1} test programs",
+                        this.make.dir || this.make.ctx.root, this.make.stats.testbins) :
+                    this.make.dir || this.make.ctx.root;
             }
-            this.item.tooltip =  this.make.dir || this.make.ctx.root;
             this.item.id = this.make.getDir();
         }
         let context : string[] = ["nodeType=sub"];

@@ -175,13 +175,11 @@ export class SuiteDecorations implements vscode.FileDecorationProvider {
                 this.visibleGoals.add(goal);
                 if (this.rdeps.has(goal)) {
                     return { tooltip: `depends on ${this.dependsOn}`,
-                        badge: `🎯${goal.flags & Goal.Flags.Test_Program ? 'T' : 'P'}`,
+                        badge: '🎯',
                         propagate: true};
                 } else return {
                     tooltip: `${(goal.flags & Goal.Flags.Test_Program) ? 'Test Program' :
                     (goal.flags & Goal.Flags.SharedLib) ? 'Shared Lib' : 'Program'}`,
-                    badge: `${goal.flags & Goal.Flags.Test_Program ? 'T' :
-                    (goal.flags & Goal.Flags.SharedLib) ? 'S' : 'P'}`,
                 }
             }
         } else

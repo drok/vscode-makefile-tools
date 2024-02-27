@@ -22,6 +22,7 @@ import * as nls from 'vscode-nls';
 import { Extension, extension, telemetry } from '../extension';
 import { Span } from '@opentelemetry/api';
 import { fstat } from 'fs';
+import { isContext } from 'vm';
 nls.config({ messageFormat: nls.MessageFormat.bundle, bundleFormat: nls.BundleFormat.standalone })();
 const localize: nls.LocalizeFunc = nls.loadMessageBundle();
 
@@ -250,11 +251,15 @@ export class Make implements Parser {
     stats: {
         tests: number;
         programs: number;
+        sharedlibs: number;
+        testbins: number;
         subdirs: number;
         checks: number;
     } = {
         tests: 0,
         programs: 0,
+        sharedlibs: 0,
+        testbins: 0,
         subdirs: 0,
         checks: 0
     };
@@ -432,6 +437,13 @@ export class Goal extends Node implements Parser {
         SharedLib: 8192,
     };
     public trs?: make.TestResult;
+
+    private static readonly iconColor = new vscode.ThemeColor('minimap.selectionHighlight');
+    private static readonly LinkedProgramIcon = new vscode.ThemeIcon('file-binary', this.iconColor);
+    private static readonly LinkedLibraryIcon = new vscode.ThemeIcon('library', this.iconColor);
+    private static readonly LinkedTestIcon = new vscode.ThemeIcon('beaker', this.iconColor);
+    static readonly CheckIcon = new vscode.ThemeIcon('check-all', this.iconColor);
+
 
     static makeArgs(): string[] { return [
         // Nothing. The goals are output when the Database is output
@@ -618,6 +630,7 @@ export class Goal extends Node implements Parser {
                 'nodeType=task,nodeType=test';
             item.resourceUri = this.getURI();
             extension._projectTestSuitesProvider.all.set(item.resourceUri.path, this);
+            item.iconPath = Goal.LinkedTestIcon;
             // item.id = this.getFilePath();
         } else
         if (this.flags & Goal.Flags.Test_Suite) {
@@ -630,6 +643,8 @@ export class Goal extends Node implements Parser {
             item.resourceUri = this.getURI();
         } else
         if (this.flags & Goal.Flags.Linked_binary) {
+            item.iconPath = (this.flags & Goal.Flags.SharedLib) ? Goal.LinkedLibraryIcon :
+            (this.flags & Goal.Flags.Test_Program) ? Goal.LinkedTestIcon : Goal.LinkedProgramIcon;
             item.resourceUri = this.getURI();
             extension._projectOutlineProvider.all.set(item.resourceUri.path, this);
             item.contextValue = 'nodeType=task,nodeType=build';
@@ -735,22 +750,29 @@ export class Recipe implements Parser {
 export function countStats(sub: Make): number[] {
     sub.stats.subdirs = sub.submake.size;
     for (let submake of sub.submake.values()) {
-        let [t, n, s, c] = countStats(submake);
+        let [t, sl, n, tp, s, c] = countStats(submake);
         sub.stats.programs += t;
+        sub.stats.sharedlibs += sl;
         sub.stats.tests += n;
+        sub.stats.testbins += tp;
         sub.stats.subdirs += s;
         sub.stats.checks += c;
     }
-    for (let [goal, g] of sub.goals)
+    for (let [goal, g] of sub.goals) {
         sub.stats.programs += ((g.flags & Goal.Flags.Linked_binary)
-            && !(g.flags & Goal.Flags.Test_Program)) ? 1 : 0;
+            && !(g.flags & (Goal.Flags.Test_Program | Goal.Flags.SharedLib))) ? 1 : 0;
+        sub.stats.sharedlibs += (g.flags & Goal.Flags.SharedLib) ? 1 : 0;
+        sub.stats.testbins += (g.flags & (Goal.Flags.Test_Program | Goal.Flags.Linked_binary)) == (Goal.Flags.Test_Program | Goal.Flags.Linked_binary) ? 1 : 0;
+    }
 
     let numTestsHere = (sub.goals.get("test-suite.log")?.depends?.length ?? 0);
     sub.stats.tests += numTestsHere;
     sub.stats.checks += (numTestsHere ? 1 : 0);
     return [
         sub.stats.programs,
+        sub.stats.sharedlibs,
         sub.stats.tests,
+        sub.stats.testbins,
         sub.submake.size,
         sub.stats.checks
     ];

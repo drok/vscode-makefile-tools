@@ -209,6 +209,37 @@
                 "icon": "$(refresh)"
             }
         ],
+        "languages": [
+            {
+                "id": "m4",
+                "aliases": [
+                    "Autoconf M4", "m4"
+                ],
+                "extensions": [
+                    ".ac"
+                ],
+                "filenames": [
+                    "configure.ac", "configure.in"
+                ],
+                "icon": {
+                    "dark": "res/icon/A-dark.svg",
+                    "light": "res/icon/A-light.svg"
+                }
+            },
+            {
+                "id": "automake",
+                "aliases": [
+                    "Automake"
+                ],
+                "filenames": [
+                    "Makefile.am"
+                ],
+                "icon": {
+                    "dark": "res/icon/AM-dark.svg",
+                    "light": "res/icon/AM-light.svg"
+                }
+            }
+        ],
         "problemMatchers": [
             {
                 "name": "configureAc",

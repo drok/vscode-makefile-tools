@@ -453,7 +453,9 @@ export async function generateParseContent(span: Span, fc: FolderConfig): Promis
         telemetry.setAttributes(span, {
             stats: [ linenumber,
                 build_tree.stats.programs,
+                build_tree.stats.sharedlibs,
                 build_tree.stats.tests,
+                build_tree.stats.testbins,
                 build_tree.stats.checks ]
         });
         ui.getUI().setStatus(result.returnCode !== ConfigureBuildReturnCodeTypes.success ? ui.UIStatus.ERR : ui.UIStatus.OK, build_tree.ctx.fc);
