@@ -211,6 +211,33 @@
         ],
         "languages": [
             {
+                "id": "tarball",
+                "aliases": [
+                    "Source Tarball"
+                ],
+                "filenames": [
+                    "aclocal.m4",
+                    "compile",
+                    "ar-lib",
+                    "configure",
+                    "depcomp",
+                    "install-sh",
+                    "missing",
+                    "test-driver",
+                    "config.h.in",
+                    "config.sub",
+                    "config.guess",
+                    "config.cache",
+                    "ltmain.sh",
+                    "Makefile",
+                    "Makefile.in"
+                ],
+                "icon": {
+                    "dark": "res/icon/archive-dark.svg",
+                    "light": "res/icon/archive-light.svg"
+                }
+            },
+            {
                 "id": "m4",
                 "aliases": [
                     "Autoconf M4", "m4"
