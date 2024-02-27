@@ -429,6 +429,7 @@ export class Goal extends Node implements Parser {
         Test_Suite: 1024,
         Test_Program: 2048,
         Test_Log: 4096,
+        SharedLib: 8192,
     };
     public trs?: make.TestResult;
 
@@ -702,6 +703,7 @@ const LinkerRe = /\$\(\w*LINK\)\s/;
 const RanlibRe = /\$\(RANLIB\)\s/;
 const TestRe = /\$\(AM_TESTS_FD_REDIRECT\)\s/;
 const LogDriverRe = /\$\(SHELL\) \$\(top_srcdir\)\/(?:.*)?test-driver/;
+const SharedLibRe = /\.(?:|la|so|dll)$/;
 /**
  * Parse an unexpanded build recipe for a target.
  * Currently no information is captured, but it could be used to learn
@@ -717,6 +719,8 @@ export class Recipe implements Parser {
             return [ParserDisp.Leave, this];
         if (LinkerRe.test(line)) {
             this.goal.flags |= Goal.Flags.Linked_binary;
+            if (SharedLibRe.test(this.goal.goal||''))
+                this.goal.flags |= Goal.Flags.SharedLib;
             // Also apply to goal.siblings ?
         }
         if (TestRe.test(line))

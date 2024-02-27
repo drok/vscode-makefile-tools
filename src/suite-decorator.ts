@@ -178,8 +178,10 @@ export class SuiteDecorations implements vscode.FileDecorationProvider {
                         badge: `🎯${goal.flags & Goal.Flags.Test_Program ? 'T' : 'P'}`,
                         propagate: true};
                 } else return {
-                    tooltip: `${(goal.flags & Goal.Flags.Test_Program) ? 'Test Program' : 'Program'}`,
-                    badge: `${goal.flags & Goal.Flags.Test_Program ? 'T' : 'P'}`,
+                    tooltip: `${(goal.flags & Goal.Flags.Test_Program) ? 'Test Program' :
+                    (goal.flags & Goal.Flags.SharedLib) ? 'Shared Lib' : 'Program'}`,
+                    badge: `${goal.flags & Goal.Flags.Test_Program ? 'T' :
+                    (goal.flags & Goal.Flags.SharedLib) ? 'S' : 'P'}`,
                 }
             }
         } else
