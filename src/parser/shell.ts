@@ -212,7 +212,7 @@ export class Executing implements Parser {
         }
         // FIXME: line could be emitted by a script snippet, and it could throw the parser. try Catch here.
         try {
-            let makes = new Making(parseToolCmd(line), this);
+            let makes = new Making(parseToolCmd(line, path.resolve(this.make.ctx.fc.folder.uri.path,this.make.dir)), this);
             if (makes.done())
                 this.makes.push(makes);
         } catch (e) {
@@ -250,8 +250,13 @@ const LibtoolRE = /^[^\s]+ [^\s]+\/libtool .* (?:--mode=(\w+)) (.*)\s*$/;
 const TickRe = /`[^`]*`/g;
 // Parse a command line, removing comments, compound statements (||, &&)
 // redirections, and unescaping shell escape sequences
-function parseToolCmd(line: string) : Tool[] {
-    line = line.replace(TickRe,'');
+function parseToolCmd(line: string, abs_srcdir: string) : Tool[] {
+    // BAD: replaces rpath with dir
+    // /bin/bash ../libtool  --tag=CC   --mode=link gcc  -g -O2 -rpath `cd ../lasso/.libs/; pwd` -static  -o tests tests.o login_tests.o basic_tests.o non_regression_tests.o random_tests.o metadata_tests.o login_tests_saml2.o assertion_query_saml2.o ../lasso/liblasso.la -L/usr/local/lib -lz  -lgobject-2.0 -lglib-2.0 -lxmlsec1-openssl -lxmlsec1 -lssl -lcrypto -lxmlsec1-openssl -lxmlsec1 -lssl -lcrypto -lxslt -lxml2 -lssl -lcrypto -lcheck_pic -pthread -lrt -lm -lsubunit
+    // Also BAD:
+    // resolve uses PWD
+    line = line.replace(TickRe, abs_srcdir + '/');
+
     let libtool_cmd = LibtoolRE.exec(line);
     let ltmode : string | undefined;
     if (libtool_cmd) {
