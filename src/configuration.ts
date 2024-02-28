@@ -1121,10 +1121,8 @@ function updateWelcomeContexts() : void {
         vscode.commands.executeCommand("setContext", "autotools:isConfigured",
             at.isConfigured ? 1 : 2);
     }
-//    vscode.commands.executeCommand("setContext", "autotools:isConfigured",
-//        allConfigured ? 1 : 2);
 
-    updateOutlineStats(numTests, numFails, numSuspect, numUnknown);
+    updateOutlineStats(numFails, numSuspect, numTests, numUnknown);
 }
 
 function updateOutlineStats(
