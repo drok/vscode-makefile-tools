@@ -432,10 +432,6 @@ export class FolderConfig implements vscode.Disposable {
         // extension.setTestEnvironmentName(newName);
     }
     public accountForTraits(): void {
-        if (this.traits.overrides_TESTS_ENVIRONMENT) {
-            logger.message(`WARNING: The ${this.pkginfo?.name} package overrides test environment settings. Disabling environments.`, 'Normal');
-            logger.message(`KB: ${this._kbUrlStatic.toString(true)}#overrides-test-environments`, 'Normal');
-        }
         this.updateEnvironmentsForTraits();
     }
     clearTraits() {
