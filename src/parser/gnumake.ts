@@ -67,7 +67,7 @@ export interface MakeContext {
 }
 
 export class Make implements Parser {
-    constructor(public dir: string, public ctx: MakeContext)
+    constructor(public dir: string, public ctx: MakeContext, public parent: Make | undefined)
     {
         if (ctx.root) ctx.fc.buildTargets.set(this.dir, this.goals);
     }
@@ -218,7 +218,7 @@ export class Make implements Parser {
         if (reldir == this.dir) return this;
         let m = this.ctx.allmakes.get(reldir);
         if (!m) {
-            m = new Make(reldir, this.ctx);
+            m = new Make(reldir, this.ctx, this);
             this.ctx.allmakes.set(reldir, m);
         }
         return m;
@@ -687,6 +687,39 @@ export class Goal extends Node implements Parser {
                         localize("gnumake.warn.missing.rule",
                             `No rule to make '{0}', needed by '{1}'`,
                             this.goal, name), vscode.DiagnosticSeverity.Error);
+                    /* The make dir where the dependency with missing rule is made */
+                    let libMake = this.make.ctx.allmakes.get(path.normalize(path.join(this.make.dir, path.dirname(this.goal!))));
+                    diag.relatedInformation = [];
+                    if (libMake) {
+                        diag.relatedInformation.push(new vscode.DiagnosticRelatedInformation(
+                            new vscode.Location(vscode.Uri.file(path.resolve(this.make.ctx.fc.folder.uri.path, g.make.dir, 'Makefile.am')),
+                            new vscode.Position(0,0)),
+                            localize("gnumake.warn.missing.rule.hint.refactor",
+                                `Refactor '{0}' to include '{1}' so the '{2}' rule is available where '{3}' is made.`,
+                                path.join(g.make.dir, 'Makefile.am'), path.join(libMake.dir, 'Makefile.am'),
+                                this.goal, g.goal)
+                        ));
+                        if (libMake.goals.get(path.basename(this.goal!))) {
+                            diag.relatedInformation.push(new vscode.DiagnosticRelatedInformation(
+                                new vscode.Location(vscode.Uri.file(path.resolve(this.make.ctx.fc.folder.uri.path, this.make.dir, 'Makefile.am')),
+                                new vscode.Position(0,0)),
+                                localize("gnumake.warn.missing.rule.hint.include",
+                                    `Include '$(top_srcdir)/{0}' at the top of '{1}'.`,
+                                    path.join(libMake.dir, 'Makefile.am'), path.join(this.make.dir, 'Makefile.am'))
+                            ));
+                        }
+                        if (this.make.parent) {
+                            diag.relatedInformation.push(new vscode.DiagnosticRelatedInformation(
+                                new vscode.Location(vscode.Uri.file(path.resolve(this.make.ctx.fc.folder.uri.path, this.make.parent.dir, 'Makefile.am')),
+                                new vscode.Position(0,0)),
+                                localize("gnumake.warn.missing.rule.hint.rmsubdir",
+                                    `Remove '{0}' from SUBDIRS in '{1}'.`,
+                                    path.relative(this.make.parent.dir, libMake.dir),
+                                    path.join(this.make.ctx.fc.folder.uri.path, this.make.parent.dir, 'Makefile.am'))
+                            ));
+                        }
+                    }
+
                     this.make.addDiag(g.ruleMakefile!.path, diag, code);
                 }
             }

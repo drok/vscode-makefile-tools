@@ -228,7 +228,7 @@ export class FolderConfig implements vscode.Disposable {
             span: extension.journey,
             allmakes: new Map(),
             makefiles: new Map()
-        });
+        }, undefined);
         statusBar.setConfiguration(this);
         //extension.onConfigurationSelect(this.config);
         for (const ac of AutoToolsBootstrapTaskProvider.manifests)
@@ -881,6 +881,7 @@ export class FolderConfig implements vscode.Disposable {
         this._build_tree.seenVars.clear();
         this._build_tree.submake.clear();
         this._build_tree.ctx.allmakes.clear();
+        this._build_tree.ctx.allmakes.set('', this._build_tree);
         this._build_tree.test_suite = undefined;
         this._build_tree.stats = {programs: 0, sharedlibs: 0, tests: 0, testbins:0, checks: 0, subdirs: 0};
         this._build_tree.hasStats = false;
