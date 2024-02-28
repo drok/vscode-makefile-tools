@@ -450,6 +450,7 @@ export class MyTestController {
                 if (!env.dirs || env.dirs.includes(dir))
                     v.forEach((goal,name) => {
                         if (goal.depends && (goal.flags & Goal.Flags.Test_Suite)) {
+                            this.markSuiteEnqueued(run, goal, env);
                             runnable.push(goal);
                         }
                 })
