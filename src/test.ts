@@ -2,6 +2,7 @@ import * as path from 'path';
 import * as vscode from 'vscode';
 import { Goal } from './parser/gnumake';
 import { BuildTarget, TRS } from './make';
+import { TestTask } from './tasks';
 import {
         EventEmitter,
         TestItem,
@@ -21,6 +22,7 @@ import * as logger from './logger';
 import * as nls from 'vscode-nls';
 import { assert, markTimeline } from 'console';
 import { Span } from '@opentelemetry/api';
+import { Disposable } from 'vscode-jsonrpc';
 nls.config({ messageFormat: nls.MessageFormat.bundle, bundleFormat: nls.BundleFormat.standalone })();
 const localize: nls.LocalizeFunc = nls.loadMessageBundle();
 
@@ -87,14 +89,19 @@ export class MyTestController {
   public testCompleted(task: vscode.TaskExecution, goal: Goal, target: BuildTarget) : void {
     let test : TestItem = goal.test!;
     if (this.activeRun) {
-        let old = goal.trs;
-        goal.trs = readTRS(target, goal.make.ctx.fc);
-        this.updateGoalTRS(this.activeRun.run, test, goal.trs?.global, target.builddir);
-        if (this.activeRun.env == goal.make.ctx.fc.currentTestEnvironment)
-            goal.make.ctx.fc.updateTRSInPanel(old, goal, target.builddir) &&
-                goal.make.ctx.fc.updateOutlineBadge();
+        if ((task.task.definition as TestTask).exitCode != undefined) {
+            let old = goal.trs;
+            // Test cancelled
+            goal.trs = readTRS(target, goal.make.ctx.fc);
+            this.updateGoalTRS(this.activeRun.run, test, goal.trs?.global, target.builddir);
+            if (this.activeRun.env == goal.make.ctx.fc.currentTestEnvironment)
+                goal.make.ctx.fc.updateTRSInPanel(old, goal, target.builddir) &&
+                    goal.make.ctx.fc.updateOutlineBadge();
+            this.updateTestDescription(goal, target.builddir);
+        }
+        this.cancelDisposable.forEach(d => d.dispose);
+        this.cancelDisposable = [];
     }
-    this.updateTestDescription(goal, target.builddir);
 
     this.isBusy = false;
     // extension.autotoolsDoneNoResult();
@@ -419,7 +426,6 @@ export class MyTestController {
         else name = `Test all @ ${env.name}`;
 
         const run = this.controller.createTestRun(request, name, false);
-        const queue: vscode.TestItem[] = [];
 
         // Loop through all included tests, or all known tests, and add them to our queue
         let rundef : RunDef = {run: run, cancel: token, tmp_label: request.profile?.label, env: env, live: live,
@@ -528,6 +534,8 @@ export class MyTestController {
         if (!next.done)
             [this.activeRun, this.activeQueue] = next.value;
     }
+    cancelDisposable : Disposable[] = [];
+    activeExecution : vscode.TaskExecution | undefined;
     async startNextTest() : Promise<void> {
         if (this.activeRun) {
             this.activeGoal = this.activeQueue.pop();
@@ -543,8 +551,17 @@ export class MyTestController {
                         this.activeRun.run.started(this.activeGoal.test)
                         await this.fc.autotoolsTask.waitToTouchMakefiles();
                         let reason = await vscode.tasks.executeTask(this.runningTask)
-                            .then(e =>
-                                (this.isBusy = true) && "ok",
+                            .then(e => {
+
+                                this.cancelDisposable.push(
+                                    this.activeRun!.cancel.onCancellationRequested(c => {
+                                        e.terminate();
+                                        this.cancelDisposable.forEach(d => d.dispose());
+                                        this.cancelDisposable = [];
+                                    }));
+
+                                this.activeExecution = e;
+                                (this.isBusy = true) && "ok"},
                             (r) =>
                             r.message);
                         if (!this.isBusy) {

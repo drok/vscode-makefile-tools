@@ -697,6 +697,7 @@ export interface TestTask {
     readonly type: string;
     test?: BuildTarget;
     folderIndex: number;
+    exitCode?: number | undefined;
 };
 
 export interface CheckTask {
@@ -707,6 +708,7 @@ export interface CheckTask {
     check?: CheckTarget;
     folderIndex: number;
     builddir: string;
+    exitCode?: number | undefined;
 };
 
 export class CheckTarget {

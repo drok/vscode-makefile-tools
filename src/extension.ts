@@ -426,7 +426,9 @@ export class Extension {
                 let span = tspan ?? extension.journey;
                 const definition: TestTask = <any>task.definition;
                 if (definition.type == "test" && definition.test) {
+                    definition.exitCode = e.exitCode;
                 } else if (definition.type == 'check') {
+                    definition.exitCode = e.exitCode;
                 } else if (definition.type == "autotools") {
                     const definition: AutotoolsTask = <any>task.definition;
 
