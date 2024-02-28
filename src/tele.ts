@@ -15,17 +15,76 @@ import { Extension, openSettings } from './extension';
 // import * as util from './util'
 import * as vscode from 'vscode'
 import { buildinfo } from '../buildinfo';
+import { pseudoRandomBytes } from 'crypto';
 
 import { trace,
-    Span, SpanStatusCode, SpanContext, Context, SpanOptions } from '@opentelemetry/api'
+    isSpanContextValid,
+    isValidSpanId,
+    isValidTraceId,
+    TextMapGetter,
+    TextMapPropagator,
+    TextMapSetter,
+    TraceFlags,
+    Span, SpanStatusCode, SpanContext, Context, SpanOptions} from '@opentelemetry/api'
+import { isTracingSuppressed } from '@opentelemetry/core';
 import { Disposable } from 'vscode-jsonrpc';
+import { setSpanContext } from '@opentelemetry/api/build/src/trace/context-utils';
 
 export { SpanStatusCode } from '@opentelemetry/api';
+// Example header, the content format can be `<trace-id>:<span-id>`
+const MyHeader = 'my-header';
+
+// See https://github.com/open-telemetry/opentelemetry-js/blob/main/doc/propagation.md
+class MyPropagator implements TextMapPropagator {
+    constructor(private defaultTraceId : string) {}
+    // Inject the header to the outgoing request.
+    inject(context: Context, carrier: unknown, setter: TextMapSetter): void {
+      const spanContext = trace.getSpanContext(context);
+      // Skip if the current span context is not valid or suppressed.
+      if (
+        !spanContext ||
+        !isSpanContextValid(spanContext) ||
+        isTracingSuppressed(context)
+      ) {
+        return;
+      }
+
+      const value = `${spanContext.traceId}:${spanContext.spanId}`;
+      setter.set(carrier, MyHeader, value);
+      // You can set more header fields as you need.
+    }
+
+    // Extract the header from the incoming request.
+    extract(context: Context, carrier: unknown, getter: TextMapGetter): Context {
+      const headers = getter.get(carrier, MyHeader);
+      const header = Array.isArray(headers) ? headers[0] : headers;
+      if (typeof header !== 'string') return context;
+
+      const [traceId, spanId] = header.split(':');
+
+      // Skip if the traceId or spanId is invalid.
+      if (!isValidTraceId(traceId) || !isValidSpanId(spanId)) return context;
+
+      return trace.setSpanContext(context, {
+        traceId,
+        spanId,
+        isRemote: true,
+        traceFlags: TraceFlags.SAMPLED,
+      });
+    }
+
+    fields(): string[] {
+      return [MyHeader];
+    }
+  }
 
 export class MyTelemetry implements Disposable {
     private sdk : optl.NodeSDK;
     private tracer : optl.api.Tracer;
+    private myContext : SpanContext;
     private disposables: Disposable[] = [];
+    public rootSpan: Span | undefined;
+    static teleContextKey: string = 'tc';
 
     constructor(extensionContext: vscode.ExtensionContext, params: Params) {
         let traceExporter = new OTLPTraceExporter({
@@ -33,8 +92,12 @@ export class MyTelemetry implements Disposable {
                 url: 'https://log.mergesium.com/v1/traces',
              });
 
+
+//        let propagator = new MyPropagator(tele_traceId);
+//        api.propagation.setGlobalPropagator(propagator);
         this.sdk = new optl.NodeSDK({
             traceExporter,
+//            textMapPropagator: propagator,
 
             spanProcessor: new TailSamplingProcessor(
                     new optl.node.TraceIdRatioBasedSampler(params.s),
@@ -62,6 +125,10 @@ export class MyTelemetry implements Disposable {
         contextManager.enable();
         api.context.setGlobalContextManager(contextManager);
 
+
+//        propagator.inject(api.context.active(), "zzz-carrier", )
+        //setSpanContext(api.context.active(), newContext);
+
         if (env.isTelemetryEnabled && getSettingOr<boolean>(null, "telemetry", true)) {
             this.sdk.start();
         }
@@ -78,9 +145,46 @@ export class MyTelemetry implements Disposable {
             .catch((error) => console.log('Error terminating tracing', error))
             .finally(() => process.exit(0));
           });
+        // this.myContext = api.trace.setSpanContext(api.context.active(), newSpanContext);
+        let c = api.context.active()
         this.tracer = trace.getTracer(
             extensionContext.extension.packageJSON.name,
             extensionContext.extension.packageJSON.version);
+
+        let tele_context = extensionContext.globalState.get<string>(MyTelemetry.teleContextKey);
+        //let tele_traceId = '2c2c2c1806c32e34f85f09e53e082581:909090e310d836bb'; // 'dev-tele';
+//        let tele_spanId = 'dev-span';
+        const isRemote : boolean = !!tele_context;
+        if (!tele_context) {
+            // tele_context = pseudoRandomBytes(16).toString('hex');
+            // tele_context = tele
+            // extensionContext.globalState.update(MyTelemetry.teleContextKey, tele_context);
+            this.rootSpan = this.tracer.startSpan('install', undefined, undefined);
+            this.myContext = this.rootSpan.spanContext();
+            extensionContext.globalState.update(MyTelemetry.teleContextKey, `${this.myContext.traceId}:${this.myContext.spanId}`);
+            this.rootSpan.end();
+        } else {
+            const [traceId, spanId] = tele_context.split(':');
+            this.myContext = {
+                    // spanId: tele_spanId,
+                    spanId: spanId,
+                    traceId: traceId, // tele_traceId,
+                    isRemote: isRemote,
+                    traceFlags: TraceFlags.SAMPLED,
+            }
+        }
+
+//        let newSpanContext : SpanContext = {
+//            // spanId: tele_spanId,
+//            spanId: '909090e310d836bb',
+//            traceId: '1c1c1c1806c32e34f85f09e53e082581', // tele_traceId,
+//            isRemote: isRemote,
+//            traceFlags: TraceFlags.SAMPLED,
+//        };
+//
+//        let newspanRoot = this.tracer.startSpan("span-name", undefined, api.context.active());
+//        let newspan = this.tracer.startSpan("span-name", undefined, this.myContext);
+//        let zz = api.context.active();
         // this.startSpan("edit");
         // this.setSpanStatus(optl.api.SpanStatusCode.OK);
         // this.setAttributes({
@@ -113,8 +217,11 @@ export class MyTelemetry implements Disposable {
     }
     public startSpan(name: string, span? : Span) : Span {
         let newspan : Span;
-        const ctx = span ? api.trace.setSpan(api.context.active(), span) : undefined;
-        newspan = this.tracer.startSpan(name, undefined, ctx);
+        // const ctx = span ? api.trace.setSpan(api.context.active(), span) : undefined;
+        //const ctx = span ? api.trace.setSpan(api.context.active(), span) : undefined;
+        // const ctx = span ? api.trace.setSpan(this.myContext, span) : undefined;
+        newspan = span ? this.tracer.startSpan(name, undefined, api.trace.setSpan(api.context.active(), span)) :
+            this.tracer.startSpan(name, undefined, setSpanContext(api.context.active(), this.myContext));
         return newspan;
     }
     public endSpanWithStatus(span: Span, status: SpanStatusCode, message?: string, attributes?: api.Attributes) {
@@ -188,7 +295,7 @@ class TailSamplingProcessor implements SpanProcessor {
                 }, (error: any) => {
                 // Error callback
                 // console.error('Export error:', error);
-                
+
             });
     }
   }
