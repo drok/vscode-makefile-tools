@@ -479,6 +479,7 @@ export class Goal extends Node implements Parser {
         FullyParsed: 1,
 
         /* Flags gathered from Make (phony, etc) */
+        FailedToBeUpdated: 2,
         BuiltIn: 4,
         Not_a_target: 8,
 
@@ -514,7 +515,7 @@ export class Goal extends Node implements Parser {
         if (line == "") {
             if (!this.goal)
                 throw new Error("Unexpected end of goal");
-            this.flags |= Goal.Flags.FullyParsed;
+            this.parsingComplete();
             return [ParserDisp.Leave, this];
         } else {
             if (!this.goal) {
@@ -540,6 +541,7 @@ export class Goal extends Node implements Parser {
                             return [ParserDisp.Continue, this];
                         case "Failed to be updated.":
                             /* FIXME: This should be handled */
+                            this.flags |= Goal.Flags.FailedToBeUpdated;
                             return [ParserDisp.Continue, this];
                         case "Builtin rule":
                             /* FIXME: Should warn user of non-portable if builtins are used */
@@ -601,8 +603,6 @@ export class Goal extends Node implements Parser {
                 else if (AutomakeNoiseRe.test(goal[1]))
                     this.flags |= Goal.Flags.Automake_noise;
 
-                this.goal = goal[1];
-
                 /* Record this goal on make's goal list */
                 /* Don't store automake auxiliary targets, they are thus
                  * unavailable for target selection
@@ -614,21 +614,32 @@ export class Goal extends Node implements Parser {
                 /* If a goal obj exists for this target, use it instead of this.
                     * If not, add it to the make's goal list
                     */
-                let go = this.make.goals.get(this.goal);
-                if (!go) {
-                    this.make.goals.set(this.goal, this);
-                } else return [ParserDisp.Continue, go];;// FIXME: Can return early if go already exists. avoid re-parsing depends
-                let thiso = go ?? this;
-                if (!(this.flags & (Goal.Flags.Automake_auxiliary |
-                    Goal.Flags.Not_a_target |
+                let thiso : Goal;
+                if (!this.goal) {
+                    let go = this.make.goals.get(goal[1]);
+                    this.goal = goal[1];
+                    if (!go) {
+                        // this.goal = goal[1];
+                    } else if (go.flags & Goal.Flags.FullyParsed)
+                        return [ParserDisp.Continue, go];// FIXME: Can return early if go already exists. avoid re-parsing depends
+                    else
+                        go.flags |= this.flags;
+                    thiso = go ?? this;
+                } else thiso = this;
+
+                if ((!(thiso.flags & (Goal.Flags.Automake_auxiliary |
+//                    Goal.Flags.Not_a_target |
                     Goal.Flags.Automake_noise
+                    )) || (
+                        thiso.flags & (Goal.Flags.Dependency)
                     ))
                     &&
                     /* Only worry about files inside the workspace */
-                    (!path.isAbsolute(this.goal) || vscode.workspace.getWorkspaceFolder(vscode.Uri.file(this.goal)))
+                    (!path.isAbsolute(thiso.goal!) || vscode.workspace.getWorkspaceFolder(vscode.Uri.file(thiso.goal!)))
                     ) {
 
 
+                    this.make.goals.set(goal[1], thiso);
                     if (goal[2]) {
                         if (thiso.goal == "test-suite.log") {
                             thiso.flags |= Goal.Flags.Test_Suite;
@@ -652,16 +663,35 @@ export class Goal extends Node implements Parser {
                                 // MUST filter on workspace|builddir files. This list contains /usr/include files
                                 .map(s => this.getGoal(s, Goal.Flags.Dependency));
                         }
-
                     } else if (!thiso.flags) {
                         // .test.log: (ie, implicit rules)
                         thiso.flags |= Goal.Flags.Automake_noise;
                     }
                 }
-                return [ParserDisp.Continue, thiso]; // FIXME: should ret thiso
+                return [ParserDisp.Continue, thiso];
             }
         }
         throw new Error(`Unexpected Goal line ${line}`);
+    }
+    parsingComplete() {
+        if (this.flags & Goal.Flags.FullyParsed) // shorcut due to repeated runs
+            return;
+
+        this.flags |= Goal.Flags.FullyParsed;
+        if ((this.flags & (Goal.Flags.FailedToBeUpdated | Goal.Flags.Not_a_target)) == (Goal.Flags.FailedToBeUpdated | Goal.Flags.Not_a_target)) {
+            let code = 'missing-rule';
+            for (const [name,g] of this.make.goals) {
+                if (g.depends?.includes(this)) {
+                    let diag = new vscode.Diagnostic(
+                        new vscode.Range(g.ruleLine! - 2, 0, g.ruleLine! - 2, 100),
+                        localize("gnumake.warn.missing.rule",
+                            `No rule to make '{0}', needed by '{1}'`,
+                            this.goal, name), vscode.DiagnosticSeverity.Error);
+                    this.make.addDiag(g.ruleMakefile!.path, diag, code);
+                }
+            }
+            telemetry.logEvent(this.make.ctx.span, code, undefined, true);
+        }
     }
     getGoal(s: string, flags: number = Goal.Flags.None) : Goal {
         let norms = path.normalize(s);
@@ -808,7 +838,7 @@ export class Recipe implements Parser {
     ];};
     ingest (line: string) : [ParserDisp, Parser] {
         if (line == "") {
-            this.goal.flags |= Goal.Flags.FullyParsed;
+            this.goal.parsingComplete()
             return [ParserDisp.Leave, this];
         }
         if (LinkerRe.test(line)) {
