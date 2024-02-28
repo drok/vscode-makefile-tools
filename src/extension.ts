@@ -783,6 +783,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         return Promise.resolve();
     }));
 
+    context.subscriptions.push(vscode.commands.registerCommand('autotools.setBuildConfiguration', async (sub: tree.Node | undefined) => {
+        telemetry.logEvent(extension.journey, "nC");
+        if (sub)
+            await configuration.setNewConfiguration(extension.journey, sub.make.ctx.fc);
+        else
+            await configuration.selectFolderConfig().then(
+                async fc => await configuration.setNewConfiguration(extension.journey, fc));
+    }));
+
     context.subscriptions.push(vscode.commands.registerCommand('autotools.outline.setBuildConfiguration', async (sub: tree.SubNode) => {
         telemetry.logEvent(extension.journey, "sBC");
 
