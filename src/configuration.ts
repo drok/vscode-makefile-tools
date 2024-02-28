@@ -882,6 +882,7 @@ export class FolderConfig implements vscode.Disposable {
         this._build_tree.ctx.diag.clear();
         this._build_tree.ctx.allmakes.set(this._build_tree.dir, this._build_tree);
         this._build_tree.goals.clear();
+        this._build_tree.seenVars.clear();
         this._build_tree.submake.clear();
         this._build_tree.ctx.allmakes.clear();
         this._build_tree.test_suite = undefined;

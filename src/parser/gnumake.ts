@@ -69,8 +69,6 @@ export interface MakeContext {
 export class Make implements Parser {
     constructor(public dir: string, public ctx: MakeContext)
     {
-        this.section = MakeSection.Starting;
-        this.goals = new Map<string, Goal>();
         if (ctx.root) ctx.fc.buildTargets.set(this.dir, this.goals);
     }
     static makeArgs(): string[] { return [
@@ -164,21 +162,8 @@ export class Make implements Parser {
                             // tests with spaces in their names, please send PR.
                             this.config_header = new Set(v.variable.value.split(' '));
                             return true;
-                        case "TESTS_ENVIRONMENT":
-                            this.ctx.fc.traits.overrides_TESTS_ENVIRONMENT = true;
-                            logger.message(`WARN: ${this.dir} Makefile overrides ${v.variable.name} with '${v.variable.value}'`, 'Normal');
-                            break;
                         default:
-                            if (v.variable.name.endsWith("LOG_DRIVER")) {
-                                /* Needs to be a RE because AC_CONFIG_AUX_DIR([config]) could put automake's script anywhere */
-                                if (!LogDriverRe.test(v.variable.value)) {
-                                    /* Customized test driver. */
-                                    logger.message(`WARN: ${this.dir} uses ${v.variable.name}=${v.variable.value}; ${Extension.whoami} will override it.`, 'Normal');
-                                    telemetry.logEvent(this.ctx.span, "warn-log-driver", {n: v.variable.name, v: v.variable.value}, true);
-                                }
-                                if (v.variable.name != "LOG_DRIVER") // This is overriden by default
-                                    this.ctx.fc.traits.log_drivers.add(v.variable.name);
-                            }
+                            break;
                     }
                     return false;
                 });
@@ -258,8 +243,8 @@ export class Make implements Parser {
                     if (g.flags & Goal.Flags.MissingRule) {
                         let diag = new vscode.Diagnostic(
                             new vscode.Range(g.ruleLine-2, 0, g.ruleLine-2, 100),
-                            localize("gnumake.warn.builtin.rule", `'{0}' in '{1}' relies on built-in rule to build '{2}'`,
-                                g.goal, g.make.dir, rea[4]), vscode.DiagnosticSeverity.Warning);
+                            localize("gnumake.warn.builtin.rule", `'{0}' relies on built-in rule to build '{1}'`,
+                                g.goal, rea[4]), vscode.DiagnosticSeverity.Warning);
                         this.addDiag(path.resolve(this.getDir(), g.ruleMakefile.path),
                             diag, 'implicit-rule-use');
                     }
@@ -282,9 +267,10 @@ export class Make implements Parser {
     }
 
     diags?: DiagnosticCollection;
-    section: MakeSection;
+    section: MakeSection = MakeSection.Starting;
     file: string | undefined;
-    goals: Map<string,Goal>;
+    goals: Map<string,Goal> = new Map<string, Goal>();
+    seenVars: Set<string> = new Set();
     config_header: Set<string> | undefined;
     submake: Map<string, Make> = new Map();
     /* builtins set prevents the same builtin warning to be printed multiple times */
@@ -325,7 +311,7 @@ export class Database implements Parser {
         if (FilesRE.test(line))
             return [ParserDisp.Enter, new EmptyLine(new Goal(this.make))];
         if (VariablesRE.test(line))
-            return [ParserDisp.Enter, new EmptyLine(new Variable())];
+            return [ParserDisp.Enter, new EmptyLine(new Variable(this.make))];
         return [ParserDisp.Continue, this];
             // throw new Error(`Unexpected line ${line}`);
     }
@@ -348,7 +334,7 @@ export class Database implements Parser {
                                         * interesting enough to collect */
                 this.variables.push(sub);
             }
-            return new Variable();
+            return new Variable(this.make);
         } else if (sub instanceof EmptyLine) { return undefined; }
         throw new Error(`Unexpected push in ${sub}`);
     }
@@ -358,6 +344,7 @@ export class Database implements Parser {
 // Lines which have variable content, but I don't need them
 // const VariableMakefileRe = /^# makefile \(from '(.*)', line (\d+)\)$/;
 const VariableFlagsRe = /^# (makefile|environment|automatic|default|command|'override'|variable)/;
+const MakefileCoordRe = /^# makefile \(from '(.*)', line (\d+)\)$/;
 const VariableDefinitionRe = /^(.*) = (.*)$/;
 /**
  * Parse information about a single variable, differentiating makefile,
@@ -373,6 +360,7 @@ export class Variable implements Parser {
         /* other variables */
         other: 2,
     };
+    constructor(private make: Make) {}
     static makeArgs(): string[] { return [
         // Nothing. The goals are output when the Database is output
     ];};
@@ -392,6 +380,11 @@ export class Variable implements Parser {
                             throw new Error(`Unexpected variable line '${line}'`);
                         case "makefile":
                             this.flags |= Variable.Flags.makefile;
+                            let coord = MakefileCoordRe.exec(line);
+                            if (coord) {
+                                this.makefile = coord[1];
+                                this.linenum = Number(coord[2]);
+                            }
                             break;
                         default:
                             this.flags |= Variable.Flags.other;
@@ -403,24 +396,48 @@ export class Variable implements Parser {
             }
             if (this.flags & Variable.Flags.makefile) {
                 let variable = VariableDefinitionRe.exec(line);
-                if (variable) {
+                if (variable && !this.make.seenVars.has(variable[1])) {
+                    this.make.seenVars.add(variable[1]);
+                    this.variable = { name: variable[1], value: variable[2] };
                     switch (variable[1]) {
                         case "TESTS_ENVIRONMENT":
-                        case "TESTS": this.variable = { name: variable[1], value: variable[2] }; break;
+                            this.make.ctx.fc.traits.overrides_TESTS_ENVIRONMENT = true;
+                            this.reportOverwrittenVariable();
+                            break;
+//                        case "TESTS": this.variable = { name: variable[1], value: variable[2] }; break;
                         default:
-                            if (variable[1].endsWith('LOG_DRIVER'))
-                                this.variable = { name: variable[1], value: variable[2] }; break;
+                            if (variable[1].endsWith('LOG_DRIVER')) {
+                                if (!LogDriverRe.test(variable[2]))
+                                    this.reportOverwrittenVariable();
+                            }
+                            if (variable[1] != "LOG_DRIVER") // This is overriden by default
+                                this.make.ctx.fc.traits.log_drivers.add(variable[1]);
+                            break;
                     }
                 }
             }
         }
         return [ParserDisp.Leave, this];
     }
+    reportOverwrittenVariable() : void {
+        let code : string = 'overwrites-' + util.slugify(this.variable!.name);
+
+        let diag = new vscode.Diagnostic(
+            new vscode.Range(this.linenum! - 1, 0, this.linenum! - 1, 100),
+            localize("gnumake.warn.overwrites.user.variable",
+                `'{0}' overwrites the user variable '{1}' with '{2}'`,
+                this.makefile, this.variable!.name, this.variable!.value), vscode.DiagnosticSeverity.Warning);
+        this.make.addDiag(path.resolve(this.make.getDir(), this.makefile!),
+            diag, code);
+            telemetry.logEvent(this.make.ctx.span, code, {n: this.variable!.name, v: this.variable!.value}, true);
+        }
     push(sub: Parser) {
         return undefined; /* The end of the Recipe is the end of the Goal */
     }
     variable: { name: string, value : string } | undefined;
     flags: number = Goal.Flags.None;
+    makefile?: string;
+    linenum?: number;
 }
 
 const GoalInfoRe = /^#  (.*)$/;
@@ -610,7 +627,7 @@ export class Goal extends Node implements Parser {
                     /* Only worry about files inside the workspace */
                     (!path.isAbsolute(this.goal) || vscode.workspace.getWorkspaceFolder(vscode.Uri.file(this.goal)))
                     ) {
-                
+
 
                     if (goal[2]) {
                         if (thiso.goal == "test-suite.log") {
@@ -628,7 +645,7 @@ export class Goal extends Node implements Parser {
                             thiso.flags |= Goal.Flags.Dependency;
                             thiso.depends = goal[2].split(' ')
                                 .filter(s => s && s != '|' && // remove the marker symbol for order-only deps
-                                    !AutomakeNoiseRe.test(s) && 
+                                    !AutomakeNoiseRe.test(s) &&
                                     !AutomakeAuxRe.test(s) &&
                                         (!path.isAbsolute(s) || // This includes builddir files (relative)
                                             vscode.workspace.getWorkspaceFolder(vscode.Uri.file(s))))
