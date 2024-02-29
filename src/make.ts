@@ -770,7 +770,7 @@ async function loadConfigurationFromCache(fc: FolderConfig, cacheFile: string, p
             });
 
             telemetry.endSpanWithStatus(span, SpanStatusCode.OK, undefined, {
-                stats: [
+                lcstats: [
                     configurationCache.customConfigurationProvider.workspaceBrowse.browsePath.length,
                     configurationCache.customConfigurationProvider.fileIndex.length,
                 ]});

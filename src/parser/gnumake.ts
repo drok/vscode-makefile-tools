@@ -429,7 +429,7 @@ export class Variable implements Parser {
                 this.makefile, this.variable!.name, this.variable!.value), vscode.DiagnosticSeverity.Warning);
         this.make.addDiag(path.resolve(this.make.getDir(), this.makefile!),
             diag, code);
-            telemetry.logEvent(this.make.ctx.span, code, {n: this.variable!.name, v: this.variable!.value}, true);
+            telemetry.logEvent(this.make.ctx.span, code, {setVar: this.variable!.name}, true);
         }
     push(sub: Parser) {
         return undefined; /* The end of the Recipe is the end of the Goal */

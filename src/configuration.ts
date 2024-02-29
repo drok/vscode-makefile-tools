@@ -527,8 +527,7 @@ export class FolderConfig implements vscode.Disposable {
         } else {
             result = "n/a";
         }
-        telemetry.logEvent(span, "analyze", { result: result });
-        span.end();
+        telemetry.endSpanWithStatus(span, hasMakefile ? SpanStatusCode.OK : SpanStatusCode.ERROR, result, {anRes: result});
         return Promise.resolve(hasMakefile);
     }
 
