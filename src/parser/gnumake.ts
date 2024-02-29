@@ -247,10 +247,25 @@ export class Make implements Parser {
                     if (!g.ruleMakefile || !g.ruleLine)
                         continue;
                     if (g.flags & Goal.Flags.MissingRule) {
-                        let diag = new vscode.Diagnostic(
-                            new vscode.Range(g.ruleLine-2, 0, g.ruleLine-2, 100),
+                        let diag = new Diagnostic(
+                            new Range(g.ruleLine-2, 0, g.ruleLine-2, 100),
                             localize("gnumake.warn.builtin.rule", `'{0}' relies on built-in rule to build '{1}'`,
-                                g.goal, rea[4]), vscode.DiagnosticSeverity.Warning);
+                                g.goal, rea[4]), DiagnosticSeverity.Warning);
+                            diag.relatedInformation = [];
+                            let slug  = rea[4].replace(/[^[:alnum:]+]/, '_');
+                            diag.relatedInformation.push(new DiagnosticRelatedInformation(
+                                g.make.getAmLocation(),
+                                localize("gnumake.warn.builtin.rule.hint.programs",
+                                    `Add '{0}' to 'check_PROGRAMS'.`,
+                                    rea[4])
+                            ));
+                            diag.relatedInformation.push(new DiagnosticRelatedInformation(
+                                g.make.getAmLocation(),
+                                localize("gnumake.warn.builtin.rule.hint.sources",
+                                    `Add '{0}_SOURCES = {1}.c' and {0}_CFLAGS = ... (if needed).`,
+                                    slug, rea[4])
+                            ));
+
                         this.addDiag(path.resolve(this.getDir(), g.ruleMakefile.path),
                             diag, 'implicit-rule-use');
                     }
