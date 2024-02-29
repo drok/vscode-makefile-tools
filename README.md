@@ -12,7 +12,7 @@ This extension enables VS Code to interact with projects using the GNU Autotools
  * Testing-related functions:
     * [Import test suites](#importing-test-suites) into VS Code's **Testing UI**.
     * _Run_ single tests or full test suites using the Testing UI.
-    * Support all automake test results (`PASS` ✔️, `FAIL` ❌, `XPASS` ☑️, `XFAIL` 🏳️, `SKIP` 🔳, `ERROR` 💣️, and `n/a` ❔)
+    * Support all automake test results (`PASS` ✔️, `FAIL` ❌, `XPASS` ☑️, `XFAIL` 🏳️, `SKIP` ⤵️, `ERROR` 🔺, and `n/a` ❔)
     * Debug individual tests, [_auto-configuring_ the debugger](#debugging-tests-pro). ![pro](https://img.shields.io/badge/Pro-green?style=plastic&link=https://autotools.mergesium.com)
     * [_Live-testing_](#live-testing-pro) / Test-driven development. ![pro](https://img.shields.io/badge/Pro-green?style=plastic&link=https://autotools.mergesium.com)
     * Discover [_Generate a test task_](#generated-test-tasks) for every individual test.

@@ -871,15 +871,14 @@ export enum TRS {
 export interface TestResult {
     results: Map<number, TRS>;
     global: TRS;
-    untagged?: TRS | undefined; // No environment tag
 };
 
 export const TRS_Info: { [key: number]: vscode.FileDecoration } = {
     [TRS.NONE]:  { tooltip: 'n/a',   badge: '❔' },
     [TRS.XPASS]: { tooltip: 'XPASS', badge: '☑️' },
     [TRS.PASS]:  { tooltip: 'PASS',  badge: '✔️' },
-    [TRS.SKIP]:  { tooltip: 'SKIP',  badge: '🔳' },
-    [TRS.ERROR]: { tooltip: 'ERROR', badge: /* '⭕' */ '💣️'},
+    [TRS.SKIP]:  { tooltip: 'SKIP',  badge: '⤵️' },
+    [TRS.ERROR]: { tooltip: 'ERROR', badge: '🔺' /* '⚠' */},
     [TRS.FAIL]:  { tooltip: 'FAIL',  badge: '❌' },
     [TRS.XFAIL]: { tooltip: 'XFAIL', badge: '🏳️' },
     [7]: { tooltip: 'THROW',   badge: '⁉️' },
@@ -931,8 +930,12 @@ export function readTRS(b: BuildTarget, fc: FolderConfig) : TestResult
                     let envid = parseInt(result[2],36);
                     if(te.some(e => e.hashCode == envid && (!e.dirs || e.dirs.includes(b.builddir))))
                         testResult.results.set(envid, TRSLookup.get(result[1]) || TRS.NONE);
-                } else if (result.length == 2)
-                    testResult.untagged = TRSLookup.get(result[1]);
+                } else if (result.length == 2 && te.length == 1) {
+                    /* If test environements are not in use, use the untagged result
+                     * as the default environment's result
+                     */
+                    testResult.results.set(fc.currentTestEnvironment.hashCode, TRSLookup.get(result[1]) || TRS.NONE);
+                }
             } else if (line.startsWith(':global-test-result:')) {
                 testResult.global = TRSLookup.get(line.split(' ', 2)[1]) || TRS.NONE;
             }

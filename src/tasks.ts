@@ -27,6 +27,10 @@ const presentSilent : vscode.TaskPresentationOptions = {
     reveal: vscode.TaskRevealKind.Silent,
     panel: vscode.TaskPanelKind.Dedicated,
     showReuseMessage: false }
+const reuseSilent : vscode.TaskPresentationOptions = {
+    reveal: vscode.TaskRevealKind.Silent,
+    panel: vscode.TaskPanelKind.Shared,
+    showReuseMessage: false }
 const defaultCheckPresentation : vscode.TaskPresentationOptions = {
     reveal: vscode.TaskRevealKind.Always,
     panel: vscode.TaskPanelKind.Dedicated,
@@ -471,6 +475,7 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
                 new ProcessExecution(b[0], b.slice(1), { env: { ACLOCAL_PATH: extension.m4Path }}),
                 ["autotools_configureac", "autotools_configure"]);
             this.bootstrapTask.group = TaskGroup.Build;
+            this.bootstrapTask.presentationOptions = reuseSilent;
             this.bootstrapTask.detail = localize("autotools.bootstrap", "$(tools) Bootstrap project using '{0}'", b.join(' '));
 
             /* This is not used yet. Instead, make.configure will automatically update Makefile.inS */
@@ -484,6 +489,7 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
                 "Autotools task",
                 new ProcessExecution('automake', ['--no-force']));
             this.reautomakeTask.group = TaskGroup.Build;
+            this.reautomakeTask.presentationOptions = reuseSilent;
             this.reautomakeTask.detail = localize("autotools.makefilein.update", "$(sync) Regenerate Makefile.in templates. See [Updating Makefile.inS](https://www.gnu.org/software/automake/manual/html_node/automake-Invocation.html#index-_002d_002dno_002dforce)");
 
             var autoreconf : string = configuration.autoreconfCmd().join(' ');
@@ -496,6 +502,7 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
                         `${autoreconf} -v && ./config.status`), { env: { ACLOCAL_PATH: extension.m4Path }}),
                             ["autotools_configureac", "autotools_configure"]);
             this.regenTask.group = TaskGroup.Build;
+            this.regenTask.presentationOptions = reuseSilent;
             this.regenTask.detail = localize("autotools.update", "$(sync) Regenerate Makefiles and headers. See [Autoconf output](https://www.gnu.org/software/autoconf/manual/autoconf-2.69/html_node/Output.html)");
 
             this.recheckTask = new Task({type: this.myType, action: 'recheck', folderIndex: this.fc.folder.index},
@@ -507,7 +514,7 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
                         }),
                         ["autotools_configureac", "autotools_configure"]);
             this.recheckTask.group = TaskGroup.Build;
-            this.recheckTask.presentationOptions = presentSilent;
+            this.recheckTask.presentationOptions = reuseSilent;
             this.recheckTask.detail = localize("autotools.recheck", "$(sync) Update configuration. See [config.status invocation - --recheck](https://www.gnu.org/software/autoconf/manual/autoconf-2.69/html_node/config_002estatus-Invocation.html)");
 
             this.myPromise = Promise.resolve([

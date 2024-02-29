@@ -641,9 +641,9 @@ export class FolderConfig implements vscode.Disposable {
          * .. the TRS in the file will not have the hashCode
          *
          */
-        let env = this.currentTestEnvironment;
-        let current : TRS | undefined = goal.trs!.results.get(env.hashCode);
-        let oldTRS = old?.results.get(env.hashCode) ?? TRS.NONE;
+        let teIndex = this._currentTestEnvironment.hashCode;
+        let current : TRS | undefined = goal.trs!.results.get(teIndex);
+        let oldTRS = old?.results.get(teIndex) ?? TRS.NONE;
         if (old !== undefined && current == undefined  && goal.trs!.global != TRS.NONE) {
             /* ie, There *is* a trs file, but lacks envids */
             if (this.unsupported_log_count++ < 4) {
@@ -652,12 +652,13 @@ export class FolderConfig implements vscode.Disposable {
             }
         } else
         if (old === undefined || (current ?? TRS.NONE) != oldTRS) {
-            (old != undefined) && extension.suiteDecorator.update(goal.getURI());//  vscode.Uri.from(
 //                {authority: Extension.whoami, scheme: 'test', path: '/' + dir, query: goal.goal}));
             //this.suiteDecorator.update(vscode.Uri.from(
             //    {authority: Extension.whoami, scheme: 'check', path: '/' + dir, query: 'test-suite.log'}));
-            if (old !== undefined) // Don't update when TRS's are initially read from disk
+            if (old !== undefined) {// Don't update when TRS's are initially read from disk
+                extension.suiteDecorator.update(goal.getURI());
                 this.failStatUpdate(oldTRS, current ?? TRS.NONE);
+            }
             // Don't update the test suites. They are auto summarized
             return true;
         }
@@ -812,6 +813,9 @@ export class FolderConfig implements vscode.Disposable {
     public get buildTargets() : Map<string, Map<string,Goal>> { return this._buildTargets; }
 
     public updateOutlineBadge() : void {
+        // updateOutlineStats(numFails, numSuspect, numTests, numUnknown);
+        updateWelcomeContexts();
+
         /* Todo - update the badge */
     }
 
@@ -912,7 +916,7 @@ export class FolderConfig implements vscode.Disposable {
             if (this.abs_top_builddir) {// Separate watcher for makes
                 this.targetDisposables.push(...Array.from(this.buildTargets.keys())
                 .map( (p) => {
-                    const srcdir = path.join(this.abs_top_builddir, p);
+                    const srcdir = path.join(this.folder.uri.path, p);
                     return new util.MyFileWatcher(srcdir, (e, f) => {
                         if (f == 'Makefile.am' || (f.endsWith('.in') && f != 'Makefile.in')) {
                             /* Regen if config*.in files change, other than Makefile.in which is updated due to Makefile.am */
@@ -1346,7 +1350,7 @@ export function cleanupLoadedTestEnvironments(loaded: TestEnvironment[], configu
 
 
 
-const defaultTestEnvName : string = "<null>";
+const defaultTestEnvName : string = "<no-env>";
 function nullTestEnvironment() : TestEnvironment {
         return {
             name: defaultTestEnvName,

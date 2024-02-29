@@ -57,7 +57,7 @@
             "environment": [
                 { "name": "MAKEFLAGS",  "value": "-I ${env:HOME}/.vscode-server/extensions/autotools/include" },
                 { "name": "LOG_DRIVER", "value": "${env:HOME}//.vscode-server/extensions/autotools/bin/test-driver"},
-                { "name": "LOG_DRIVER_FLAGS", "value": "--env-name \"<null>\" --env-id \"10qqdhdvoqz\" --env-keep \"$$ME_KEEP_ENV\""},
+                { "name": "LOG_DRIVER_FLAGS", "value": "--env-name \"<no-env>\" --env-id \"10qqdhdvoqz\" --env-keep \"$$ME_KEEP_ENV\""},
             ],
             "externalConsole": false,
             "MIMode": "gdb",

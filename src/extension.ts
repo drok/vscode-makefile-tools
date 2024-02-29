@@ -363,13 +363,12 @@ export class Extension {
 
         if (goal) {
             let old = goal.trs;
+            let old_global = goal.trs?.global ?? TRS.NONE;
             goal.trs = make.readTRS(new make.BuildTarget(dir, log), fc);
-// Avoiding move to .tmp doesn't work. on make clean, the icons should be updated.
-//
+
             if (fc.updateTRSInPanel(old, goal, dir))
                 fc.updateOutlineBadge();
 
-            let old_global = goal.trs?.global ?? TRS.NONE;
             if ( ((goal.test && goal.trs.global != old_global) || fc.testController?.busy) && !(goal.flags & Goal.Flags.Test_Suite))
                 /* If there is an active test run, use it to log the TRS result.
                  * Otherwise, create a new manual run
