@@ -25,6 +25,7 @@
    "autotools.command.visit.knowledgeBase.title": "Visit the knowledgebase about editing this project in vscode",
    "autotools.command.visit.packageURL.title": "Visit the package's homepage",
    "autotools.command.visit.packageBugs.title": "Report a bug to the package's maintainer",
+   "autotools.C_Cpp.ConfigurationProviderSelect.title": "Change C/C++ Intellisense Provider...",
 
    "autotools.palette.newConfiguration.title": "Create new build configuration",
    "autotools.command.editConfigureAc.title": "Edit configure.ac",

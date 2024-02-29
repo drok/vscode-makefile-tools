@@ -166,6 +166,10 @@
 
             },
             {
+                "command": "autotools.C_Cpp.ConfigurationProviderSelect",
+                "title": "%autotools.C_Cpp.ConfigurationProviderSelect.title%"
+            },
+            {
                 "command": "autotools.visit.packageURL",
                 "icon": "$(comment)",
                 "title": "%autotools.command.visit.packageURL.title%"
@@ -943,6 +947,10 @@
                     "when": "never"
                 },
                 {
+                    "command": "autotools.C_Cpp.ConfigurationProviderSelect",
+                    "when": "never"
+                },
+                {
                     "command": "autotools.gotoBuildDirectory",
                     "when": "never"
                 },
@@ -1042,7 +1050,7 @@
             ],
             "view/title": [
                 {
-                    "command": "C_Cpp.ConfigurationProviderSelect",
+                    "command": "autotools.C_Cpp.ConfigurationProviderSelect",
                     "when": "view == autotools.outline",
                     "group": "submenu@2"
                 },

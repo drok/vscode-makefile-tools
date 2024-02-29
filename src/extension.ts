@@ -149,8 +149,12 @@ export class Extension {
             }));
         }));
 
-        /* TODO: Rework this command */
+        extensionContext.subscriptions.push(vscode.commands.registerCommand('autotools.C_Cpp.ConfigurationProviderSelect', () => {
+            telemetry.logEvent(this.journey, "cppProv");
+            vscode.commands.executeCommand('C_Cpp.ConfigurationProviderSelect');
+        }));
 
+        /* TODO: Rework this command */
         extensionContext.subscriptions.push(vscode.commands.registerCommand('autotools.visit.packageBugs', async (sub: tree.SubNode) => {
             telemetry.logEvent(this.journey, "gpBugs");
             if (sub.make.ctx.fc.pkginfo?.bugreport)
