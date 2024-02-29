@@ -12,7 +12,13 @@ import * as logger from '../logger';
 import * as make from '../make';
 import * as util from '../util';
 import * as vscode from 'vscode';
-import { WorkspaceFolder, DiagnosticCollection } from 'vscode';
+import { WorkspaceFolder, DiagnosticCollection,
+    workspace,
+    TreeItemCollapsibleState, TreeItem, Task, TestItem,
+    ThemeColor, ThemeIcon,
+    Diagnostic, Location, Position, DiagnosticRelatedInformation, DiagnosticSeverity,
+    Range, Uri,
+    } from 'vscode';
 import * as path from 'path';
 import {Parser, ParserDisp, EmptyLine } from '../parser';
 import { Executing } from './shell';
@@ -55,13 +61,13 @@ const RecursingRE = /^Making (.*) in (.*)$/;
 export interface MakeContext {
     allmakes: Map<string, Make>; // All directories in this tree. Used to deduplicate make runs
     fc: FolderConfig;
-    diag: Map<string, vscode.Diagnostic[]>;
+    diag: Map<string, Diagnostic[]>;
     diags: DiagnosticCollection;
     /* Maps the URI for all makefiles (think blah.mak includes) where rules are read from
      * In simple cases without include, this will be a map of all 'Makefile' files.
      * Used so each Goal can store a shared reference, instead of a separate URI object
      */
-    makefiles: Map<string, vscode.Uri>;
+    makefiles: Map<string, Uri>;
     root: string;
     span: Span;
 }
@@ -254,7 +260,7 @@ export class Make implements Parser {
         }
         this.file = rea[4] ?? rea[5];
     }
-    public addDiag(file: string, d: vscode.Diagnostic, code: string): void {
+    public addDiag(file: string, d: Diagnostic, code: string): void {
         let diagsForFile = this.ctx.diag.get(file);
         if (!diagsForFile) {
             diagsForFile = [];
@@ -262,8 +268,17 @@ export class Make implements Parser {
         }
         d.code =  { value: code, target: this.ctx.fc._kbUrlStatic.with({fragment: code})};
         diagsForFile.push(d);
-        let u = vscode.Uri.file(file);
+        let u = Uri.file(file);
         this.ctx.diags.set(u, diagsForFile);
+    }
+    public getAmLocation() : Location {
+        return new Location(
+            Uri.file(path.resolve(this.ctx.fc.folder.uri.path, this.AmName)),
+            new Position(0,0));
+    }
+    /* Return the corresponding Makefile.am with relative dir prefix */
+    public get AmName() : string {
+        return this.dir ? path.join(this.dir, 'Makefile.am') : 'Makefile.am';
     }
 
     diags?: DiagnosticCollection;
@@ -422,11 +437,11 @@ export class Variable implements Parser {
     reportOverwrittenVariable() : void {
         let code : string = 'overwrites-' + util.slugify(this.variable!.name);
 
-        let diag = new vscode.Diagnostic(
-            new vscode.Range(this.linenum! - 1, 0, this.linenum! - 1, 100),
+        let diag = new Diagnostic(
+            new Range(this.linenum! - 1, 0, this.linenum! - 1, 100),
             localize("gnumake.warn.overwrites.user.variable",
                 `'{0}' overwrites the user variable '{1}' with '{2}'`,
-                this.makefile, this.variable!.name, this.variable!.value), vscode.DiagnosticSeverity.Warning);
+                this.makefile, this.variable!.name, this.variable!.value), DiagnosticSeverity.Warning);
         this.make.addDiag(path.resolve(this.make.getDir(), this.makefile!),
             diag, code);
             telemetry.logEvent(this.make.ctx.span, code, {setVar: this.variable!.name}, true);
@@ -501,11 +516,11 @@ export class Goal extends Node implements Parser {
     };
     public trs?: make.TestResult;
 
-    private static readonly iconColor = new vscode.ThemeColor('minimap.selectionHighlight');
-    private static readonly LinkedProgramIcon = new vscode.ThemeIcon('file-binary', this.iconColor);
-    private static readonly LinkedLibraryIcon = new vscode.ThemeIcon('library', this.iconColor);
-    private static readonly LinkedTestIcon = new vscode.ThemeIcon('beaker', this.iconColor);
-    static readonly CheckIcon = new vscode.ThemeIcon('check-all', this.iconColor);
+    private static readonly iconColor = new ThemeColor('minimap.selectionHighlight');
+    private static readonly LinkedProgramIcon = new ThemeIcon('file-binary', this.iconColor);
+    private static readonly LinkedLibraryIcon = new ThemeIcon('library', this.iconColor);
+    private static readonly LinkedTestIcon = new ThemeIcon('beaker', this.iconColor);
+    static readonly CheckIcon = new ThemeIcon('check-all', this.iconColor);
 
 
     static makeArgs(): string[] { return [
@@ -562,7 +577,7 @@ export class Goal extends Node implements Parser {
                                         let makefile = path.resolve(this.make.getDir(), recipe[2]);
                                         this.ruleMakefile = this.make.ctx.makefiles.get(makefile);
                                         if (!this.ruleMakefile)
-                                            this.make.ctx.makefiles.set(makefile, vscode.Uri.file(makefile));
+                                            this.make.ctx.makefiles.set(makefile, Uri.file(makefile));
                                         // FIXME: This is done more than once (repeated rules)
                                         this.ruleLine = Number(recipe[3]);
                                     }
@@ -635,7 +650,7 @@ export class Goal extends Node implements Parser {
                     ))
                     &&
                     /* Only worry about files inside the workspace */
-                    (!path.isAbsolute(thiso.goal!) || vscode.workspace.getWorkspaceFolder(vscode.Uri.file(thiso.goal!)))
+                    (!path.isAbsolute(thiso.goal!) || workspace.getWorkspaceFolder(Uri.file(thiso.goal!)))
                     ) {
 
 
@@ -659,7 +674,7 @@ export class Goal extends Node implements Parser {
                                     !AutomakeNoiseRe.test(s) &&
                                     !AutomakeAuxRe.test(s) &&
                                         (!path.isAbsolute(s) || // This includes builddir files (relative)
-                                            vscode.workspace.getWorkspaceFolder(vscode.Uri.file(s))))
+                                            workspace.getWorkspaceFolder(Uri.file(s))))
                                 // MUST filter on workspace|builddir files. This list contains /usr/include files
                                 .map(s => this.getGoal(s, Goal.Flags.Dependency));
                         }
@@ -682,40 +697,38 @@ export class Goal extends Node implements Parser {
             let code = 'missing-rule';
             for (const [name,g] of this.make.goals) {
                 if (g.depends?.includes(this)) {
-                    let diag = new vscode.Diagnostic(
-                        new vscode.Range(g.ruleLine! - 2, 0, g.ruleLine! - 2, 100),
+                    let diag = new Diagnostic(
+                        new Range(g.ruleLine! - 2, 0, g.ruleLine! - 2, 100),
                         localize("gnumake.warn.missing.rule",
                             `No rule to make '{0}', needed by '{1}'`,
-                            this.goal, name), vscode.DiagnosticSeverity.Error);
+                            this.goal, name), DiagnosticSeverity.Error);
                     /* The make dir where the dependency with missing rule is made */
                     let libMake = this.make.ctx.allmakes.get(path.normalize(path.join(this.make.dir, path.dirname(this.goal!))));
                     diag.relatedInformation = [];
                     if (libMake) {
-                        diag.relatedInformation.push(new vscode.DiagnosticRelatedInformation(
-                            new vscode.Location(vscode.Uri.file(path.resolve(this.make.ctx.fc.folder.uri.path, g.make.dir, 'Makefile.am')),
-                            new vscode.Position(0,0)),
+                        let goalLocation = g.make.getAmLocation();
+                        diag.relatedInformation.push(new DiagnosticRelatedInformation(
+                            goalLocation,
                             localize("gnumake.warn.missing.rule.hint.refactor",
                                 `Refactor '{0}' to include '{1}' so the '{2}' rule is available where '{3}' is made.`,
-                                path.join(g.make.dir, 'Makefile.am'), path.join(libMake.dir, 'Makefile.am'),
+                                this.make.AmName, libMake.AmName,
                                 this.goal, g.goal)
                         ));
                         if (libMake.goals.get(path.basename(this.goal!))) {
-                            diag.relatedInformation.push(new vscode.DiagnosticRelatedInformation(
-                                new vscode.Location(vscode.Uri.file(path.resolve(this.make.ctx.fc.folder.uri.path, this.make.dir, 'Makefile.am')),
-                                new vscode.Position(0,0)),
+                            diag.relatedInformation.push(new DiagnosticRelatedInformation(
+                                goalLocation,
                                 localize("gnumake.warn.missing.rule.hint.include",
                                     `Include '$(top_srcdir)/{0}' at the top of '{1}'.`,
-                                    path.join(libMake.dir, 'Makefile.am'), path.join(this.make.dir, 'Makefile.am'))
+                                    libMake.AmName, this.make.AmName)
                             ));
                         }
                         if (this.make.parent) {
-                            diag.relatedInformation.push(new vscode.DiagnosticRelatedInformation(
-                                new vscode.Location(vscode.Uri.file(path.resolve(this.make.ctx.fc.folder.uri.path, this.make.parent.dir, 'Makefile.am')),
-                                new vscode.Position(0,0)),
+                            let parentLocation = this.make.parent.getAmLocation()
+                            diag.relatedInformation.push(new DiagnosticRelatedInformation(
+                                this.make.parent.getAmLocation(),
                                 localize("gnumake.warn.missing.rule.hint.rmsubdir",
                                     `Remove '{0}' from SUBDIRS in '{1}'.`,
-                                    path.relative(this.make.parent.dir, libMake.dir),
-                                    path.join(this.make.ctx.fc.folder.uri.path, this.make.parent.dir, 'Makefile.am'))
+                                    libMake.dir, this.make.parent.AmName)
                             ));
                         }
                     }
@@ -747,10 +760,10 @@ export class Goal extends Node implements Parser {
         else
             return [];
     }
-    getTreeItem(state: vscode.TreeItemCollapsibleState): vscode.TreeItem {
+    getTreeItem(state: TreeItemCollapsibleState): TreeItem {
         if (!this.goal)
             throw new Error("Unexpected null goal");
-        let item = new vscode.TreeItem(this.goal);
+        let item = new TreeItem(this.goal);
         item.collapsibleState = state;
         item.tooltip = this.goal;
 //        item.contextValue = ["nodeType=task"]
@@ -791,23 +804,23 @@ export class Goal extends Node implements Parser {
         item.id = item.resourceUri?.path || this.getFilePath();
         return item;
     }
-    getURI() : vscode.Uri {
+    getURI() : Uri {
         if (this.flags & (Goal.Flags.Test_Suite | Goal.Flags.Test_Log))
-            return vscode.Uri.from({
+            return Uri.from({
                 scheme: (this.flags & Goal.Flags.Test_Suite) ? Scheme.Check : Scheme.Test,
                 authority: _empty,//Extension.whoami,
                 fragment: _empty,
                 path: this.getURIPath()
             });
         else if (this.flags & (Goal.Flags.Linked_binary))
-            return vscode.Uri.from({
+            return Uri.from({
                 scheme: Scheme.Bin,
                 authority: _empty,//Extension.whoami,
                 fragment: _empty,
                 path: this.getURIPath()
             });
         else
-            return vscode.Uri.from({
+            return Uri.from({
                 scheme: "file",
                 authority: _empty,//Extension.whoami,
                 fragment: _empty,
@@ -846,11 +859,11 @@ export class Goal extends Node implements Parser {
         */
     }
     depends: Goal[] | undefined = undefined;
-    livetask: Map<TestEnvironment,vscode.Task> | undefined;
-    task: vscode.Task | Map<TestEnvironment,vscode.Task> | undefined;
-    test: vscode.TestItem | undefined;
+    livetask: Map<TestEnvironment,Task> | undefined;
+    task: Task | Map<TestEnvironment,Task> | undefined;
+    test: TestItem | undefined;
     siblings?: Goal[]; // "Also makes" products of the same recipe.
-    ruleMakefile?: vscode.Uri;
+    ruleMakefile?: Uri;
     ruleLine?: number;
 }
 
