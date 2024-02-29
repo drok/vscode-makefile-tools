@@ -375,6 +375,36 @@
             "preLaunchTask": "compile",
         },
         {
+            "name": "Debug on Bitcoin",
+            "type": "extensionHost",
+            "request": "launch",
+            "runtimeExecutable": "${execPath}",
+            "args": [
+                "--extensionDevelopmentPath=${workspaceFolder}",
+                "/home/radu/proj/bitcoin"
+            ],
+            "sourceMaps": true,
+            "outFiles": [
+                "${workspaceFolder}/out/**/*.js"
+            ],
+            "preLaunchTask": "compile",
+        },
+        {
+            "name": "Debug on ugrep",
+            "type": "extensionHost",
+            "request": "launch",
+            "runtimeExecutable": "${execPath}",
+            "args": [
+                "--extensionDevelopmentPath=${workspaceFolder}",
+                "/home/radu/proj/ugrep"
+            ],
+            "sourceMaps": true,
+            "outFiles": [
+                "${workspaceFolder}/out/**/*.js"
+            ],
+            "preLaunchTask": "compile",
+        },
+        {
             "name": "Debug on me-auth-backend",
             "type": "extensionHost",
             "request": "launch",
