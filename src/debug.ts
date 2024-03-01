@@ -80,7 +80,7 @@ class MyConfiguration implements vscode.DebugConfiguration {
  * the builddir is pre-populated
  */
 export class DebugNow implements vscode.DebugConfiguration {
-    constructor(goal: Goal, public env?: configuration.TestEnvironment) {
+    constructor(log: Goal | undefined, goal: Goal, public env?: configuration.TestEnvironment) {
         this.$comment = [
             "Debug a hardcoded target in any build configuration; customize environment and args as needed",
             "The 'cwd' is set automatically to demonstrate how",
@@ -95,15 +95,12 @@ export class DebugNow implements vscode.DebugConfiguration {
             name: "srcdir",
             value: path.join(goal.make.ctx.fc.folder.uri.path, goal.make.dir)
         }]
-        if (goal?.depends?.length) {
-            let bingoal = goal.depends[0];
-            if (bingoal.flags & Goal.Flags.Libtool_Linked) {
-                let libtool = path.join(goal.make.ctx.root, 'libtool');
-                this.miDebuggerPath = extension.ltLauncher;
-                this.miDebuggerArgs = `gdb ${libtool} ${this.program}`;
-                this.MIMode = 'gdb';
-                this.externalConsole = false;
-            }
+        if (goal.flags & Goal.Flags.Libtool_Linked) {
+            let libtool = path.join(goal.make.ctx.root, 'libtool');
+            this.miDebuggerPath = extension.ltLauncher;
+            this.miDebuggerArgs = `gdb ${libtool} ${this.program}`;
+            this.MIMode = 'gdb';
+            this.externalConsole = false;
         }
         if (env) {
             if (env.testDebugEnv)
@@ -126,9 +123,11 @@ export class DebugNow implements vscode.DebugConfiguration {
         //    (built.builddir ? (' in ' + built.builddir) : ' at the top') : undefined;
         this.cwd = path.dirname(goal.getFilePath()); // path.resolve(goal.make.ctx.root, goal;
         this.setupCommands = defaultSetupCommands;
-        this.testUri = goal?.test?.uri?.with({scheme: "test"}) ?? vscode.Uri.from({scheme: "debug", path: this.cwd});
+        // this.testId = log?.test?.id || 'unk';
+        this.testUri = log?.test?.uri?.with({scheme: "test"}) ?? vscode.Uri.from({scheme: "debug", path: this.cwd});
     }
-    testUri: vscode.Uri | undefined;
+    // testId: string;
+    testUri: vscode.Uri;
     $comment: string[];
     name: string;
     type: string;
@@ -204,7 +203,7 @@ class MyDebugProvider implements DebugConfigurationProvider {
         if (folder) {
             let fc = configuration.getFolderConfig(folder);
             let conf = fc.getCurrentTarget()
-                .then(goal => new DebugNow(goal, fc.currentTestEnvironment));
+                .then(goal => new DebugNow(undefined, goal, fc.currentTestEnvironment));
             return conf;
         }
         //return null;

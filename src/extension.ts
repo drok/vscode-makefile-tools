@@ -492,7 +492,7 @@ export class Extension {
             try {
                 vscode.debug.startDebugging(
                     goal.make.ctx.fc.folder,
-                    new DebugNow(goal.depends[0], env),
+                    new DebugNow(goal, goal.depends[0], env),
                     dopt)
                 .then((z) => {});
             } catch(e) {
@@ -660,11 +660,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
     context.subscriptions.push(vscode.commands.registerCommand('autotools.checkAll', async (sub: tree.SubNode) => {
         telemetry.logEvent(extension.journey, "ckA");
-        // if (goal.test && goal.make.ctx.fc.testController)
 
         if (sub instanceof tree.SubNode)
-            return sub.make.ctx.fc.testController?.runAll(sub.make.ctx.fc.currentTestEnvironment);
-            // await sub.make.ctx.fc.checkTasks.checkAll();
+            return sub.make.ctx.fc.testController?.manualRun(false, undefined, sub.make.ctx.fc.currentTestEnvironment);
     }));
 
     context.subscriptions.push(vscode.commands.registerCommand('autotools.exportToIntelisense', async (sub: tree.SubNode) => {
@@ -721,7 +719,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             throw new Error("Missing check task on SubNode");
         assert(sub.make.test_suite.task instanceof Map, "test_suite.task should be a Map", sub.make.test_suite.task);
         sub.make.test_suite.test &&
-            sub.make.ctx.fc.testController?.run(sub.make.test_suite.test, sub.make.ctx.fc.currentTestEnvironment);
+            sub.make.ctx.fc.testController?.manualRun(false, sub.make.test_suite.test, sub.make.ctx.fc.currentTestEnvironment);
     }));
 
     context.subscriptions.push(vscode.commands.registerCommand('autotools.editMakefileAm', async (sub: tree.SubNode) => {
@@ -754,7 +752,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         if (!goal.task)
             throw new Error("Missing test task on TaskNode");
         if (goal.test && goal.make.ctx.fc.testController)
-            return goal.make.ctx.fc.testController.run(goal.test, goal.make.ctx.fc.currentTestEnvironment);
+            return goal.make.ctx.fc.testController.manualRun(false, goal.test, goal.make.ctx.fc.currentTestEnvironment);
     }));
 
     context.subscriptions.push(vscode.commands.registerCommand('autotools.debug', async (goal: Goal) => {

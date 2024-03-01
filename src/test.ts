@@ -23,6 +23,7 @@ import * as nls from 'vscode-nls';
 import { assert, markTimeline } from 'console';
 import { Span } from '@opentelemetry/api';
 import { Disposable } from 'vscode-jsonrpc';
+import { DebugNow } from './debug';
 nls.config({ messageFormat: nls.MessageFormat.bundle, bundleFormat: nls.BundleFormat.standalone })();
 const localize: nls.LocalizeFunc = nls.loadMessageBundle();
 
@@ -80,6 +81,7 @@ function delTag(tag: vscode.TestTag, test: TestItem) : vscode.TestTag[] | undefi
 export class MyTestController {
   private root: TestItem | undefined;
   private controller: vscode.TestController;
+  private profiles: Disposable[] = [];
   // private runProfiles: vscode.TestRunProfile[];
   // private debugProfiles: vscode.TestRunProfile[];
   private coverageProfile: vscode.TestRunProfile | undefined;
@@ -131,33 +133,19 @@ export class MyTestController {
     this.testCompletedEvent.fire();
   }
 
-  public run(test: TestItem, env: TestEnvironment) : void {
-    var cancelToken = new vscode.CancellationTokenSource();
-    env.run?.runHandler(new vscode.TestRunRequest([test], [], env.run), cancelToken.token);
-    cancelToken.dispose();
-  }
-  public runAll(env: TestEnvironment) : void {
-    var cancelToken = new vscode.CancellationTokenSource();
-    env.run?.runHandler(new vscode.TestRunRequest(undefined, [], env.run), cancelToken.token);
-    cancelToken.dispose();
-  }
   public async liverun(test: TestItem, env: TestEnvironment) : Promise<void> {
-    var cancelToken = new vscode.CancellationTokenSource();
-    this.runHandler(true, new vscode.TestRunRequest([test], [], env.run), cancelToken.token, env);
-    cancelToken.dispose();
+    this.runHandler(true, new vscode.TestRunRequest([test], [], env.run), undefined, env);
   }
 
   public async debug(span: Span, test: TestItem, env: TestEnvironment) : Promise<void> {
-    var cancelToken = new vscode.CancellationTokenSource();
     try {
-        env.debug?.runHandler(new vscode.TestRunRequest([test], [], env.run), cancelToken.token);
+        await this.manualDebug(test, env);
         telemetry.setSpanStatus(span, SpanStatusCode.OK);
     } catch (e) {
         console.error("Failed to start debugger", test);
         telemetry.logException(e, span);
         telemetry.setSpanStatus(span, SpanStatusCode.ERROR);
     }
-    cancelToken.dispose();
   }
   public addSuite(c: MakefileConfiguration, dir: string, sub: Goal) : void {
     sub.test =  this.controller.createTestItem(
@@ -264,7 +252,7 @@ export class MyTestController {
     if (this.livecheckid) {
         var test = this.controller.items.get(this.livecheckid);
         if (test) {
-            await this.liverun(test, this.fc.currentTestEnvironment);
+            await this.manualRun(true, test, this.fc.currentTestEnvironment);
         }
     }
   }
@@ -399,6 +387,7 @@ export class MyTestController {
         });
   }
   public deactivate() : void {
+    this.fc.disposeTests();
     this.clear();
     this.controller.dispose();
   }
@@ -408,11 +397,21 @@ export class MyTestController {
     new Map<RunDef, Goal[]>();
 
 
+    manualRun(
+        live: boolean,
+        test: TestItem | undefined,
+        env: configuration.TestEnvironment
+    ) {
+        this.runHandler(live,
+            new vscode.TestRunRequest(test ? [test] : undefined, [], env.run),
+            undefined,
+            env);
+    }
 
     runHandler(
         live: boolean,
         request: vscode.TestRunRequest,
-        token: vscode.CancellationToken,
+        token: vscode.CancellationToken | undefined,
         env: configuration.TestEnvironment
     ) {
         let name: string; // FIXME: The name is not shown in vscode 1.77.3 - how about 1.85?
@@ -428,7 +427,7 @@ export class MyTestController {
         const run = this.controller.createTestRun(request, name, false);
 
         // Loop through all included tests, or all known tests, and add them to our queue
-        let rundef : RunDef = {run: run, cancel: token, tmp_label: request.profile?.label, env: env, live: live,
+        let rundef : RunDef = {run: run, cancel: token || run.token, tmp_label: request.profile?.label, env: env, live: live,
             stats: emptyRunStats(), span: span};
         if (request.include) {
             let runnable_in_env : Goal[] = [];
@@ -461,16 +460,25 @@ export class MyTestController {
         this.runQueuedTests();
     }
 
+    manualDebug(
+        test: TestItem,
+        env: configuration.TestEnvironment
+    ) {
+        this.debugHandler(false,
+            new vscode.TestRunRequest([test], [], env.debug),
+            undefined, env);
+    }
     async debugHandler(
         live: boolean,
         request: vscode.TestRunRequest,
-        token: vscode.CancellationToken,
+        token: vscode.CancellationToken | undefined,
         env: configuration.TestEnvironment
     ) {
 
         if (request.include) {
             for (const test of request.include) {
                 let goal = this.testGoals.get(test);
+//                test.uri && token && this.cancelDebug.set(test, token);
                 if (goal) {
                     try {
                         await extension.debugGoal(goal, env);
@@ -536,7 +544,22 @@ export class MyTestController {
             [this.activeRun, this.activeQueue] = next.value;
     }
     cancelDisposable : Disposable[] = [];
-    activeExecution : vscode.TaskExecution | undefined;
+    cancel() : void {
+        while(this.runQueue.size) {
+            //let next = this.runQueue.entries().next();
+            //if (!next.done) {
+                this.startNextRun();
+                // const [this.activeRun, this.activeQueue] = next.value;
+                this.runQueue.delete(this.activeRun!);
+                this.endRun();
+                //this.advanceQueue();
+            }
+//        this.activeRun = undefined;
+//        this.activeQueue = [];
+//        this.activeGoal = undefined;
+//        this.runningTask = undefined;
+//        this.endRun();
+    }
     async startNextTest() : Promise<void> {
         if (this.activeRun) {
             this.activeGoal = this.activeQueue.pop();
@@ -555,13 +578,11 @@ export class MyTestController {
                             .then(e => {
 
                                 this.cancelDisposable.push(
-                                    this.activeRun!.cancel.onCancellationRequested(c => {
+                                    this.activeRun!.cancel.onCancellationRequested(() => {
                                         e.terminate();
-                                        this.cancelDisposable.forEach(d => d.dispose());
-                                        this.cancelDisposable = [];
+                                        this.cancel();
                                     }));
 
-                                this.activeExecution = e;
                                 (this.isBusy = true) && "ok"},
                             (r) =>
                             r.message);
@@ -600,13 +621,34 @@ export class MyTestController {
         return false;
     }
     debugSessions : WeakMap<vscode.DebugSession, Span> = new WeakMap<vscode.DebugSession, Span>();
+//    debuggedTests: WeakMap<vscode.DebugSession, Goal> = new WeakMap();
+//    cancelDebug : WeakMap<TestItem, vscode.CancellationToken> = new WeakMap();
+//    debugCancelDisposables : WeakMap<TestItem, Disposable> = new WeakMap();
     debugStarted(s: vscode.DebugSession, name: string) : void {
         let span = telemetry.startSpan(name, extension.journey);
         this.debugSessions.set(s, span);
+//        if ('testId' in s.configuration) {
+//            let test = this.controller.items.get(s.configuration.testId);
+//            if (test) {
+//                let cancel = this.cancelDebug.get(test);
+//                if (cancel) {
+//                    this.debugCancelDisposables.set(test, cancel.onCancellationRequested(() =>
+//                        vscode.debug.stopDebugging(s)));
+//                        this.cancelDebug.delete(test);
+//                }
+//            }
+//        }
     }
     debugEnded(s: vscode.DebugSession) : void {
         this.debugSessions.get(s)?.end();
         this.debugSessions.delete(s);
+//        if ('testId' in s.configuration) {
+//            let test = this.controller.items.get(s.configuration.testId);
+//            if (test) {
+//                this.debugCancelDisposables.get(test)?.dispose();
+//                this.debugCancelDisposables.delete(test);
+//            }
+//        }
     }
 }
 

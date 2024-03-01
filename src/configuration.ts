@@ -407,6 +407,7 @@ export class FolderConfig implements vscode.Disposable {
                     this._testEnvironments.push(e);
             });
         }
+        this.disposeTests();
         this.traits.log_drivers.forEach(d => {
             this._testEnvironments.forEach(e => {
                 let driver_flags = `--env-name "${e.name}" --env-id "${(e.hashCode).toString(36)}" --env-keep "$$ME_KEEP_ENV"`;
@@ -433,6 +434,12 @@ export class FolderConfig implements vscode.Disposable {
     }
     public accountForTraits(): void {
         this.updateEnvironmentsForTraits();
+    }
+    disposeTests() {
+        this._testEnvironments.forEach(e => {
+            e.debug?.dispose(); e.debug = undefined;
+            e.run?.dispose(); e.run = undefined;
+        });
     }
     clearTraits() {
         this.traits = {
