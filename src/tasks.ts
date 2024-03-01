@@ -44,6 +44,18 @@ const boostrap_scripts : string[] = [
     "autogen.sh",
 ];
 
+const testProblemMatchers : string[] = [
+    '$autotools.make',
+    '$autotools.gcc',
+    '$autotools.ld',
+    '$autotools.generic',
+];
+const buildProblemMatchers : string[] = testProblemMatchers;
+const configureProblemMatchers : string[] = [
+    "autotools_configureac",
+    "autotools_configure",
+];
+
 export class AutoToolsBuildTaskProvider implements MyTaskProvider {
 	readonly myType = 'build';
     private all: Map<vscode.WorkspaceFolder, Task[]> = new Map();
@@ -77,7 +89,7 @@ export class AutoToolsBuildTaskProvider implements MyTaskProvider {
                                 (c.top_builddir ? ['-C', c.top_builddir] : [])
                                 .concat(dir ? ['-C', dir] : [])
                                 .concat(c.makeArgs || [])
-                                .concat(g.goal)), "$gcc");
+                                .concat(g.goal)), buildProblemMatchers);
                         g.task.group = TaskGroup.Build;
                         g.task.detail =
                             (g.flags & Goal.Flags.Linked_binary) ? localize("automake.program", "$(combine) $(file-binary) Build program") :
@@ -98,6 +110,7 @@ export class AutoToolsBuildTaskProvider implements MyTaskProvider {
             target: g
         };
         let c = this.fc.buildConfig;
+        this.fc.lastTaskMakeDir = path.join(this.fc.abs_top_builddir, g.builddir);
         var task = new Task(kind, TaskScope.Workspace, "build " + g.goal,
             "autotools",
             new ProcessExecution(
@@ -105,7 +118,7 @@ export class AutoToolsBuildTaskProvider implements MyTaskProvider {
                 (c.top_builddir ? ['-C', c.top_builddir] : [])
                 .concat(g.builddir ? ['-C', g.builddir] : [])
                 .concat(c.makeArgs || [])
-                .concat(g.goal)),"$gcc");
+                .concat(g.goal)), buildProblemMatchers);
         task.group = TaskGroup.Build;
         //task.detail =
         //    (g.flags & Goal.Flags.Linked_binary) ? localize("automake.program", "$(combine) $(file-binary) Build program") :
@@ -129,7 +142,7 @@ export class AutoToolsBuildTaskProvider implements MyTaskProvider {
                     (fc.buildConfig.top_builddir ? ['-C', fc.buildConfig.top_builddir] : [])
                     .concat(target.builddir ? ['-C', target.builddir] : [])
                     .concat(fc.buildConfig.makeArgs || [])
-                    .concat(target.goal ?? t_all.goal)),"$gcc");
+                    .concat(target.goal ?? t_all.goal)), buildProblemMatchers);
         return undefined;
 	}
 }
@@ -198,7 +211,7 @@ export class AutoToolsTestTaskProvider implements MyTaskProvider {
                                         `ME_KEEP_ENV=${ME_KEEP_ENV}`,
                                         "--eval=include Mergesium.rules",
                                         "TEST_LOGS=" + test.goal
-                                    ]), env.testExecOptions),"$gcc");
+                                    ]), env.testExecOptions), testProblemMatchers);
                                 newTask.group = TaskGroup.Test;
                                 newTask.detail = localize("automake.test", "$(check) Run test '{0}'", path.basename(dgoal, ".log"));
                                 newTask.presentationOptions = presentSilent;
@@ -244,7 +257,7 @@ export class AutoToolsTestTaskProvider implements MyTaskProvider {
                 .concat(["-esi",
                     "check",
                     "TEST_LOGS=" + test.goal
-                ]), fc.currentTestEnvironment.testExecOptions),"$gcc");
+                ]), fc.currentTestEnvironment.testExecOptions), testProblemMatchers);
 	}
 }
 
@@ -297,7 +310,7 @@ export class AutoToolsCheckTaskProvider implements MyTaskProvider {
                             "me-check",
                             `ME_KEEP_ENV=${ME_KEEP_ENV}`,
                             "--eval=include Mergesium.rules"]),
-                        env.checkExecOptions),"$gcc");
+                        env.checkExecOptions), testProblemMatchers);
                     newTask.group = TaskGroup.Test;
                     newTask.detail = localize("automake.check", "$(checklist) Test Suite");
                     newTask.presentationOptions = defaultCheckPresentation;
@@ -315,7 +328,7 @@ export class AutoToolsCheckTaskProvider implements MyTaskProvider {
                             "test-suite.log",
                             `ME_KEEP_ENV=${ME_KEEP_ENV}`
                         ]),
-                        env.updateExecOptions), "$gcc");
+                        env.updateExecOptions), testProblemMatchers);
                     newTask.group = TaskGroup.Test;
                     newTask.presentationOptions = defaultCheckPresentation;
                     newTask.detail = localize("automake.livecheck", "$(checklist) $(broadcast) Test Suite Update");
@@ -341,7 +354,7 @@ export class AutoToolsCheckTaskProvider implements MyTaskProvider {
                     env: {
                         TESTS_ENVIRONMENT: ''
                     }
-                }),"$gcc");
+                }), testProblemMatchers);
         this.checkAllTask.group = TaskGroup.Test;
         this.checkAllTask.presentationOptions = defaultCheckPresentation;
         this.checkAllTask.detail = localize("autotools.check.noenv", "$(checklist) Run full test suite without test environment");
@@ -374,6 +387,7 @@ export class AutoToolsCheckTaskProvider implements MyTaskProvider {
         if (this.checkAllTask) {
             let isBusy: boolean = false;
             await this.fc.autotoolsTask.waitToTouchMakefiles();
+            this.fc.lastTaskMakeDir = path.join(this.fc.abs_top_builddir);
             let reason = await vscode.tasks.executeTask(this.checkAllTask)
                 .then(e => (isBusy = true) && "ok", (r) => r.message);
             if (!isBusy) {
@@ -473,7 +487,7 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
                 localize("autotools.bootstrap.task", "Bootstrap {0}", this.fc.folder.name),
                 "Autotools task",
                 new ProcessExecution(b[0], b.slice(1), { env: { ACLOCAL_PATH: extension.m4Path }}),
-                ["autotools_configureac", "autotools_configure"]);
+                configureProblemMatchers);
             this.bootstrapTask.group = TaskGroup.Build;
             this.bootstrapTask.presentationOptions = reuseSilent;
             this.bootstrapTask.detail = localize("autotools.bootstrap", "$(tools) Bootstrap project using '{0}'", b.join(' '));
@@ -500,7 +514,7 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
                 new ShellExecution(
                     (c.top_builddir ? `${autoreconf} -v && CDPATH= cd ${c.top_builddir} && ./config.status` :
                         `${autoreconf} -v && ./config.status`), { env: { ACLOCAL_PATH: extension.m4Path }}),
-                            ["autotools_configureac", "autotools_configure"]);
+                            configureProblemMatchers);
             this.regenTask.group = TaskGroup.Build;
             this.regenTask.presentationOptions = reuseSilent;
             this.regenTask.detail = localize("autotools.update", "$(sync) Regenerate Makefiles and headers. See [Autoconf output](https://www.gnu.org/software/autoconf/manual/autoconf-2.69/html_node/Output.html)");
@@ -512,7 +526,7 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
                             env: { ACLOCAL_PATH: extension.m4Path },
                             cwd: this.fc.abs_top_builddir
                         }),
-                        ["autotools_configureac", "autotools_configure"]);
+                        configureProblemMatchers);
             this.recheckTask.group = TaskGroup.Build;
             this.recheckTask.presentationOptions = reuseSilent;
             this.recheckTask.detail = localize("autotools.recheck", "$(sync) Update configuration. See [config.status invocation - --recheck](https://www.gnu.org/software/autoconf/manual/autoconf-2.69/html_node/config_002estatus-Invocation.html)");
@@ -606,7 +620,7 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
                 "Autotools task",
                 new ProcessExecution(path.join(this.fc.folder.uri.path, 'configure'), configureArgs,
                     {cwd : destdir}),
-                    ['autotools_configureac', 'autotools_configure']);
+                    configureProblemMatchers);
             task.detail = localize("automake.configure.help", "$(tools) Configure build directory");
 
             await this.waitToTouchMakefiles();

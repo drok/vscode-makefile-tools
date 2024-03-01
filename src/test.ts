@@ -576,7 +576,7 @@ export class MyTestController {
                         await this.fc.autotoolsTask.waitToTouchMakefiles();
                         let reason = await vscode.tasks.executeTask(this.runningTask)
                             .then(e => {
-
+                                this.fc.lastTaskMakeDir = this.activeGoal?.make.getDir();
                                 this.cancelDisposable.push(
                                     this.activeRun!.cancel.onCancellationRequested(() => {
                                         e.terminate();

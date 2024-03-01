@@ -273,22 +273,6 @@
         ],
         "problemMatchers": [
             {
-                "name": "configureAc",
-                "source": "autotools",
-                "owner": "autotools",
-                "fileLocation":[
-                    "relative",
-                    "${workspaceFolder}"
-                ],
-                "pattern": {
-                    "regexp": "^(.*?):(\\d+):\\s+(warning|error):\\s+(.*)$",
-                    "file": 1,
-                    "line": 2,
-                    "severity": 3,
-                    "message": 4
-                }
-            },
-            {
                 "name": "autotools_configure",
                 "label": "configure script errors",
                 "source": "autotools",
@@ -324,30 +308,71 @@
                 }
             },
             {
-              "name": "gcc",
-              "source": "gcc",
-              "owner": "autotools",
-              "fileLocation": [
-                "autoDetect"
-               ],
-              "pattern": {
-                "regexp": "^(.*?):(\\d+):(\\d*):?\\s+(?:fatal\\s+)?(warning|error):\\s+(.*)$",
-                "file": 1,
-                "line": 2,
-                "column": 3,
-                "severity": 4,
-                "message": 5
-              }
+                "name": "autotools.gcc",
+                "source": "GCC",
+                "owner": "autotools",
+                "fileLocation": [
+                        "autoDetect",
+                        "${workspaceFolder}"
+                ],
+                "pattern": {
+                        "regexp": "^(.*?):(\\d+):(\\d*):?\\s+(?:fatal\\s+)?(warning|error):\\s+(.*)(?:\\[(.*)\\])\\s*$",
+                        "file": 1,
+                        "line": 2,
+                        "column": 3,
+                        "severity": 4,
+                        "message": 5,
+                        "code": 6
+                      }
             },
             {
-               "name": "msvc",
-               "source": "msvc",
-               "owner": "autotools",
-               "base": "$msCompile",
-               "fileLocation": [
-                 "autoDetect"
-               ]
-             }
+                "name": "autotools.ld",
+                "source": "LD linker",
+                "owner": "autotools",
+                "fileLocation": [
+                        "autoDetect",
+                        "${workspaceFolder}"
+                ],
+                "pattern": {
+                        "regexp": "^(.*?):(\\d+):\\s+(undefined reference.*)$",
+                        "file": 1,
+                        "line": 2,
+                        "message": 3
+                }
+            },
+            {
+                "name": "autotools.make",
+                "source": "GNU Make",
+                "owner": "autotools",
+                "fileLocation": [
+                        "relative",
+                        "${command:autotools.locateMakefile}"
+                ],
+                "base": "$autotools.ld",
+                "pattern": {
+                        "regexp": "^(Makefile.*?):(\\d+):\\s+(.*)$",
+                        "file": 1,
+                        "line": 2,
+                        "message": 3
+                }
+            },
+            {
+                "name": "autotools.generic",
+                "source": "Tooling",
+                "owner": "autotools",
+                "fileLocation": [
+                        "autoDetect",
+                        "${workspaceFolder}"
+                ],
+                "base": "$autotools.ld",
+                "pattern": {
+                        "regexp": "^(.*?):(\\d+):\\s+(.*)$",
+                        "file": 1,
+                        "line": 2,
+                        "message": 3
+                }
+            }
+
           ],
         "configuration": [
         {

@@ -252,6 +252,7 @@ export class FolderConfig implements vscode.Disposable {
     }
     readonly state: State;
     readonly abs_top_builddir: string;
+    public lastTaskMakeDir: string | undefined; // for problem matching, autotools.locateMakefile
     _configureAc: string | undefined;
     readonly config: MakefileConfiguration;
     readonly numConfigs: number;

@@ -633,6 +633,16 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     let validact = telemetry.startSpan('act', extension.journey);
     act = validact;
 
+    context.subscriptions.push(vscode.commands.registerCommand('autotools.locateMakefile', async (a: string[]) => {
+        let fc = configuration.findFolderConfig(vscode.Uri.file(a[0]));
+        if (fc) {
+            if (fc.lastTaskMakeDir) {
+                return fc.lastTaskMakeDir;
+            }
+            return fc.abs_top_builddir;
+        }
+        return Promise.reject('unknown location');
+    }));
     /** End of commands that shouldn't be exposed in package.json, they are used for command substitution in launch.json and tasks.json. */
 
     context.subscriptions.push(vscode.commands.registerCommand('autotools.addAutotools', async (sub: tree.SubNode) => {
@@ -693,8 +703,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         telemetry.logEvent(extension.journey, "b");
         if (!goal.task)
             throw new Error("Missing build task on TaskNode");
-        if (goal.task instanceof vscode.Task)
+        if (goal.task instanceof vscode.Task) {
+            goal.make.ctx.fc.lastTaskMakeDir = goal.make.getDir();
             return await vscode.tasks.executeTask(goal.task);
+        }
     }));
 
     context.subscriptions.push(vscode.commands.registerCommand('autotools.livecheck', async (sub: tree.SubNode) => {
