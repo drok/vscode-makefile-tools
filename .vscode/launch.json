@@ -375,13 +375,28 @@
             "preLaunchTask": "compile",
         },
         {
-            "name": "Debug on Bitcoin",
+            "name": "Debug on proj/Bitcoin",
             "type": "extensionHost",
             "request": "launch",
             "runtimeExecutable": "${execPath}",
             "args": [
                 "--extensionDevelopmentPath=${workspaceFolder}",
                 "/home/radu/proj/bitcoin"
+            ],
+            "sourceMaps": true,
+            "outFiles": [
+                "${workspaceFolder}/out/**/*.js"
+            ],
+            "preLaunchTask": "compile",
+        },
+        {
+            "name": "Debug on ~/Bitcoin",
+            "type": "extensionHost",
+            "request": "launch",
+            "runtimeExecutable": "${execPath}",
+            "args": [
+                "--extensionDevelopmentPath=${workspaceFolder}",
+                "/home/radu/bitcoin"
             ],
             "sourceMaps": true,
             "outFiles": [

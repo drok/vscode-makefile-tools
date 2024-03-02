@@ -250,6 +250,7 @@ export async function generateParseContent(span: Span, fc: FolderConfig): Promis
         let completeErr: string = "";
         let heartBeat: number = Date.now();
         let parserStack: Parser[] = [build_tree];
+        build_tree.ctx.parserStack = parserStack;
         let linenumber: number = 0;
         let lineBuffer: string = "";
         let parseFailedAt: number = 0;
@@ -303,7 +304,7 @@ export async function generateParseContent(span: Span, fc: FolderConfig): Promis
                             if (!(parser instanceof Goal))
                                 logger.message(' '.repeat(parserStack.length *2) + `+ line ${linenumber}: ${s}`, "Debug");
                         } else {
-                            let next = parserStack[parserStack.length - 1].push(parser);
+                            let next = parserStack[parserStack.length - 1].push(parser, parserStack);
                             if (next)  {
                                 if (next != parser && next != parserStack[parserStack.length - 1]) {
                                     // when subsection which list, this adds a new element to the list
@@ -316,7 +317,7 @@ export async function generateParseContent(span: Span, fc: FolderConfig): Promis
                                 while (!next && parserStack.length) {
                                     parser = parserStack.pop();
                                     if (parser && parserStack.length) {
-                                        next = parserStack[parserStack.length - 1].push(parser);
+                                        next = parserStack[parserStack.length - 1].push(parser, parserStack);
                                     }
                                 };
                                 if (next && next != parserStack[parserStack.length - 1]) {

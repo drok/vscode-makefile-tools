@@ -1230,9 +1230,9 @@
 
         "esbuild-base": "esbuild ./src/extension.ts --bundle --outfile=$npm_package_main --external:vscode --platform=node",
         "esbuild": "npm run esbuild-base -- --sourcemap",
-        "test-compile": "tsc -p ./",
+        "test-compile": "tsc --inlineSourceMap -p ./",
 
-        "watch": "tsc -watch -p ./",
+        "watch": "tsc -watch --inlineSourceMap -p ./",
         "package": "[ ! -z $TARGET ] && vsce package --pre-release --target $TARGET --yarn -o autotools.$npm_package_version-pre-$TARGET.vsix",
         "publish": "echo I WOULD vsce publish --pre-release --yarn -i autotools.vsix",
         "pretest": "yarn compile",

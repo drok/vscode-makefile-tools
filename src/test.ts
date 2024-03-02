@@ -178,8 +178,12 @@ export class MyTestController {
 
     suite.children.add(goal.test);
   }
-  public addSubTest(suite: TestItem, sub: TestItem) : void {
-    suite.children.add(sub);
+  /* Returns true if added, false if duplicate */
+  public addSubTest(suite: TestItem, sub: TestItem) : boolean {
+    let last = suite.children.get(sub.id);
+    if (!last) // Since loops are handled, this never fails. The logic should be simplified
+        suite.children.add(sub);
+    return !last;
   }
 
   public clear() : void {

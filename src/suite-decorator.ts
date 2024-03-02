@@ -184,7 +184,24 @@ export class SuiteDecorations implements vscode.FileDecorationProvider {
             }
         } else
         if (uri.scheme == Scheme.Make) {
+            let coords = URIFolderIndexRe.exec(uri.path);
+            if (coords) {
+                let fc = configuration.findFolderConfigByIndex(Number(coords[1]));
+                if (fc) {
+                    let reldir = path.relative(fc.abs_top_builddir, coords[2]);
+                    if (reldir.startsWith('..'))
+                        reldir = coords[2];
+                    let make = fc.build_tree.ctx.allmakes.get(reldir);
+                    if (make)
+                        if (make.flags & Make.Flags.LoopFrom) {
+                            return { tooltip: "make loop from here", badge: '🔺'}
+                        } else if (make.flags && Make.Flags.LoopVia) {
+                            return { tooltip: "make loop to here", badge: '🔻'}
+                        }
+                }
+            }
         }
+
 
         return undefined; // This will log an error in ExtensionHost about invalid/empty deco
 	}

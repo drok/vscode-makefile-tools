@@ -227,6 +227,7 @@ export class FolderConfig implements vscode.Disposable {
             root: this.abs_top_builddir,
             span: extension.journey,
             allmakes: new Map(),
+            parserStack: [],
             makefiles: new Map()
         }, undefined);
         statusBar.setConfiguration(this);
@@ -571,7 +572,7 @@ export class FolderConfig implements vscode.Disposable {
         this.isTreeUpdate = true;
         this.updateOutlineBadge();
 
-        this.updateTestSuite(this.build_tree, this._build_tree, true);
+        this.updateTestSuite(this._build_tree, this._build_tree, true);
         this.testController?.onOpenedDocument().then(
             ok => {},
             notok => {});
@@ -904,7 +905,7 @@ export class FolderConfig implements vscode.Disposable {
         this.targetDisposables.forEach((d) => d.dispose());
         this.targetDisposables = Array.from(this.buildTargets.keys())
             .map( (p) => {
-                const builddir = path.join(this.abs_top_builddir, p);
+                const builddir = path.resolve(this.abs_top_builddir, p);
                 if (!this.abs_top_builddir) // In-tree build, watch the same dir for both
                     return new util.MyFileWatcher(builddir, (e, f) => {
                         if (f == 'Makefile.am' || (f.endsWith('.in') && f != 'Makefile.in')) {
@@ -912,19 +913,19 @@ export class FolderConfig implements vscode.Disposable {
                             this.autotoolsTask.reautomake(telemetry.startSpan("upAM", extension.journey));
                         }
                         if (f.endsWith(".trs"))
-                            extension.trsChange(this, vscode.Uri.file(path.join(builddir,f)));
+                            extension.trsChange(this, vscode.Uri.file(path.resolve(builddir,f)));
                     });
                 else
                     return new util.MyFileWatcher(builddir, (e, f) => {
                         if (f.endsWith(".trs"))
-                            extension.trsChange(this, vscode.Uri.file(path.join(builddir,f)));
+                            extension.trsChange(this, vscode.Uri.file(path.resolve(builddir,f)));
                     });
 
             });
             if (this.abs_top_builddir) {// Separate watcher for makes
                 this.targetDisposables.push(...Array.from(this.buildTargets.keys())
                 .map( (p) => {
-                    const srcdir = path.join(this.folder.uri.path, p);
+                    const srcdir = path.resolve(this.folder.uri.path, p);
                     return new util.MyFileWatcher(srcdir, (e, f) => {
                         if (f == 'Makefile.am' || (f.endsWith('.in') && f != 'Makefile.in')) {
                             /* Regen if config*.in files change, other than Makefile.in which is updated due to Makefile.am */
@@ -1016,15 +1017,19 @@ export class FolderConfig implements vscode.Disposable {
     updateTestSuite(sub: Make, parent: Make, top: boolean): void {
         //        let c = configuration.getCurrentMakefileConfiguration();
         for (let submake of sub.submake.values()) {
+            let added : boolean = true;
             if (submake.test_suite?.test) {
                 // add it to my parent if I don't have suite
                 // This can happen if 1+ intermediate dir has no TESTS
                 let suiteparent = sub.test_suite?.test ?? parent.test_suite?.test;
                 if (suiteparent)
-                    this.testController!.addSubTest(suiteparent, submake.test_suite.test);
+                    /* This avoids adding itself as its child as in bitcoin src calling $(top_src) looop */
+                    added = suiteparent != submake.test_suite.test &&
+                        this.testController!.addSubTest(suiteparent, submake.test_suite.test);
             }
             //if (submake.test_suite?.test)
-            this.updateTestSuite(submake, sub.test_suite ? sub : parent, top && !sub.test_suite);
+            if (added)
+                this.updateTestSuite(submake, sub.test_suite ? sub : parent, top && !sub.test_suite);
         }
         if (sub.test_suite && sub.test_suite.test) {
             //let logpath = path.join(c.top_builddir, sub.dir);

@@ -60,6 +60,7 @@ const RecursingRE = /^Making (.*) in (.*)$/;
  */
 export interface MakeContext {
     allmakes: Map<string, Make>; // All directories in this tree. Used to deduplicate make runs
+    parserStack: Parser[]; // Used to find make loops
     fc: FolderConfig;
     diag: Map<string, Diagnostic[]>;
     diags: DiagnosticCollection;
@@ -73,6 +74,13 @@ export interface MakeContext {
 }
 
 export class Make implements Parser {
+    public static readonly Flags = {
+        None: 0,
+        /* This make calls its parents */
+        LoopFrom: 1,
+        /* this is a make called from its submakes */
+        LoopVia: 2,
+    };
     constructor(public dir: string, public ctx: MakeContext, public parent: Make | undefined)
     {
         if (ctx.root) ctx.fc.buildTargets.set(this.dir, this.goals);
@@ -202,8 +210,9 @@ export class Make implements Parser {
             if (sub.dir == this.dir) {
                 logger.message(`ERROR: Unexpected make @ ${sub.dir} is a dependency of two targets: ${this.file} and ${sub.file} called from different hierarchical depths`);
                 telemetry.logException(new Error(`make-multi-depth ${this.file} and ${sub.file}`), this.ctx.span);
-            } else
+            } else {
                 this.submake.set(sub.dir, sub);
+            }
             return this;
         } else if (sub instanceof Executing) {
             if (this.section == MakeSection.Copyright) {
@@ -218,7 +227,49 @@ export class Make implements Parser {
     }
     enter(dir: string) : [ParserDisp, Parser] {
         let reldir = path.relative(this.ctx.root, dir);
-        return [ParserDisp.Enter, this.getMake(reldir)];
+        if (reldir.startsWith('..'))
+            reldir = dir;
+        if (path.isAbsolute(reldir) && !this.ctx.allmakes.has(reldir)) {
+            let line = this.lastRuleLine ? this.lastRuleLine - 1 : 0;
+            let diag = new Diagnostic(
+                new Range(0, 0, 0, 100),
+            localize("gnumake.warn.make.outside.builddir.rule", `Rule '{0}' makes outside '$builddir' in '{1}'`,
+                    this.file, reldir), DiagnosticSeverity.Warning);
+            diag.relatedInformation = [];
+
+            diag.relatedInformation.push(new DiagnosticRelatedInformation(
+                this.getMakefileLocation(line),
+                localize("gnumake.warn.make.outside.builddir.hint",
+                    `Review rule '{0}' - only one warning of this kind is shown per Makefile`,
+                    this.file)
+            ));
+
+            this.addDiag(this.amPath,
+                diag, 'make-outside-builddir');
+        }
+        let sub = this.getMake(reldir);
+        if (this != sub && !(this.flags & Make.Flags.LoopFrom) && !(sub.flags & Make.Flags.LoopVia) && this.ctx.parserStack.includes(sub)) {
+            this.flags |= Make.Flags.LoopFrom;
+            sub.flags |= Make.Flags.LoopVia;
+
+            let line = this.lastRuleLine ? this.lastRuleLine - 1 : 0;
+            let diag = new Diagnostic(
+                new Range(0, 0, 0, 100),
+            localize("gnumake.warn.make.loop", `Rule '{0}' creates a make loop to '{1}'`,
+                    this.file, sub.getDir()), DiagnosticSeverity.Warning);
+            diag.relatedInformation = [];
+
+            diag.relatedInformation.push(new DiagnosticRelatedInformation(
+                this.getMakefileLocation(line),
+                localize("gnumake.warn.make.loop.hint",
+                    `Review rule '{0}'`,
+                    this.file)
+            ));
+
+            this.addDiag(this.amPath,
+                diag, 'circular-make');
+        }
+        return [ParserDisp.Enter, sub];
     }
     getMake(reldir: string) : Make {
         if (reldir == this.dir) return this;
@@ -233,7 +284,7 @@ export class Make implements Parser {
         return this.file;
     }
     public getDir(): string {
-        return path.join(this.ctx.root, this.dir);
+        return path.isAbsolute(this.dir) ? this.dir : path.join(this.ctx.root, this.dir);
     }
     public finish(): void { this.section = MakeSection.Copyright; }
     public startExecuting(rea: RegExpMatchArrayWithIndices) {
@@ -303,6 +354,7 @@ export class Make implements Parser {
     seenVars: Set<string> = new Set();
     config_header: Set<string> | undefined;
     submake: Map<string, Make> = new Map();
+    flags: number = Make.Flags.None;
     /* builtins set prevents the same builtin warning to be printed multiple times */
     test_suite: Goal | undefined;
     hasStats?: boolean;
@@ -775,7 +827,7 @@ export class Goal extends Node implements Parser {
         else
             return [];
     }
-    getTreeItem(state: TreeItemCollapsibleState): TreeItem {
+    getTreeItem(state: TreeItemCollapsibleState, provider?: vscode.TreeDataProvider<Node>): TreeItem {
         if (!this.goal)
             throw new Error("Unexpected null goal");
         let item = new TreeItem(this.goal);
@@ -915,10 +967,22 @@ export class Recipe implements Parser {
     }
     push(sub: Parser) { return undefined;}
 }
-
 export function countStats(sub: Make): number[] {
+    if (sub.hasStats)
+        return [
+            sub.stats.programs,
+            sub.stats.sharedlibs,
+            sub.stats.tests,
+            sub.stats.testbins,
+            sub.stats.subdirs, // NOTE different than return below
+            sub.stats.checks
+        ];
     sub.stats.subdirs = sub.submake.size;
+    sub.hasStats = true;
     for (let submake of sub.submake.values()) {
+        if (sub === submake) {
+            throw new Error(`Loop in countStats @ ${sub.dir}`);
+        }
         let [t, sl, n, tp, s, c] = countStats(submake);
         sub.stats.programs += t;
         sub.stats.sharedlibs += sl;
