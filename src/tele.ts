@@ -45,7 +45,9 @@ export class MyTelemetry implements Disposable {
         resource.attributes[SemanticResourceAttributes.SERVICE_VERSION] = extensionContext.extension.packageJSON.version;
         resource.attributes['buildinfo'] = `${buildinfo.platform}-${buildinfo.arch}`;
         resource.attributes[SemanticResourceAttributes.SERVICE_NAMESPACE] =
-            (env.appName == "Visual Studio Code" ? "vscode" : env.appName) + "." + env.appHost + '-' + vscode.version + '-' + env.language;
+            ((env.appName == "Visual Studio Code" || env.appName == "Visual Studio Code - Insiders") ?
+                /* The insiders version contains -insider suffix */
+                "vscode" : env.appName) + "." + env.appHost + '-' + vscode.version + '-' + env.language;
         this.sdk = new optl.NodeSDK({
             traceExporter,
 
