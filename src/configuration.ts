@@ -1226,14 +1226,6 @@ export function readCppProvider() : void {
     let c = vscode.workspace.getConfiguration("C_Cpp.default", null);
     cppProvider = c?.get<string>("configurationProvider", '');
 }
-// prompt to clean when the active configuration changes?
-//   true : prompt, clean if user confirms
-//   false: no prompting, no cleaning
-let promptClean: boolean;
-export function getPromptClean(): boolean { return promptClean; }
-export function readpromptClean() : void {
-    promptClean = util.getSettingOr<boolean>(null, "promptClean", true);
-}
 
 let traceLiveTestRuns: boolean;
 export function gettraceLiveTestRuns(): boolean { return traceLiveTestRuns; }
@@ -1241,57 +1233,16 @@ export function readtraceLiveTestRuns() : void {
     traceLiveTestRuns = util.getSettingOr<boolean>(null, "traceLiveTestRuns", false);
 }
 
-let autoreconfWarnCross: boolean;
-export function getautoreconfWarnCross(): boolean { return autoreconfWarnCross; }
-export function readautoreconfWarnCross() : void {
-    autoreconfWarnCross = util.getSettingOr<boolean>(null, "autoreconfWarnCross", false);
-}
 
-let autoreconfWarnPortability: boolean;
-export function getautoreconfWarnPortability(): boolean { return autoreconfWarnPortability; }
-export function readautoreconfWarnPortability() : void {
-    autoreconfWarnPortability = util.getSettingOr<boolean>(null, "autoreconfWarnPortability", false);
-}
-
-let autoreconfWarnObsolete: boolean;
-export function getautoreconfWarnObsolete(): boolean { return autoreconfWarnObsolete; }
-export function readautoreconfWarnObsolete() : void {
-    autoreconfWarnObsolete = util.getSettingOr<boolean>(null, "autoreconfWarnObsolete", false);
-}
-
-let autoreconfWarnOverride: boolean;
-export function getautoreconfWarnOverride(): boolean { return autoreconfWarnOverride; }
-export function readautoreconfWarnOverride() : void {
-    autoreconfWarnOverride = util.getSettingOr<boolean>(null, "autoreconfWarnOverride", false);
-}
-
-let autoreconfWarnUnsupported: boolean;
-export function getautoreconfWarnUnsupported(): boolean { return autoreconfWarnUnsupported; }
-export function readautoreconfWarnUnsupported() : void {
-    autoreconfWarnUnsupported = util.getSettingOr<boolean>(null, "autoreconfWarnUnsupported", true);
-}
-
-let autoreconfWarnGnu: boolean;
-export function getautoreconfWarnGnu(): boolean { return autoreconfWarnGnu; }
-export function readautoreconfWarnGnu() : void {
-    autoreconfWarnGnu = util.getSettingOr<boolean>(null, "autoreconfWarnGnu", false);
-}
-
-let autoreconfTool: string = 'autoreconf';
-export function getAutoreconfTool(): string { return autoreconfTool; }
-export async function readAutoreconfTool() : Promise<void> {
-    autoreconfTool = await util.getSettingOr<string>(null, "autoreconfTool", 'autoreconf');
-}
-
-export function autoreconfCmd(): string[] {
+export function autoreconfCmd(c: vscode.WorkspaceConfiguration): string[] {
     let cmd : string[] = [];
-    cmd.push(getAutoreconfTool());
-    if (getautoreconfWarnCross()) cmd.push("-Wcross");
-    if (getautoreconfWarnPortability()) cmd.push("-Wportability");
-    if (getautoreconfWarnObsolete()) cmd.push("-Wobsolete");
-    if (getautoreconfWarnOverride()) cmd.push("-Woverride");
-    if (getautoreconfWarnGnu()) cmd.push("-Wgnu");
-    if (!getautoreconfWarnUnsupported()) cmd.push("-Wno-unsupported");
+    cmd.push(c.get<string>('autoreconfTool', 'autoreconf'));
+    if  (c.get<boolean>('autoreconfWarnCross',false)) cmd.push("-Wcross");
+    if  (c.get<boolean>('autoreconfWarnPortability',false)) cmd.push("-Wportability");
+    if  (c.get<boolean>('autoreconfWarnObsolete',false)) cmd.push("-Wobsolete");
+    if  (c.get<boolean>('autoreconfWarnOverride',false)) cmd.push("-Woverride");
+    if  (c.get<boolean>('autoreconfWarnGnu',false)) cmd.push("-Wgnu");
+    if (!c.get<boolean>('autoreconfWarnUnsupported',true)) cmd.push("-Wno-unsupported");
     return cmd;
 }
 
@@ -1400,14 +1351,6 @@ export async function initFromSettings(activation: boolean = false, span: Span):
     readLoggingLevel();
     await readMakePath();
     readtraceLiveTestRuns();
-    readpromptClean();
-    readautoreconfWarnCross();
-    readautoreconfWarnObsolete();
-    readautoreconfWarnPortability();
-    readautoreconfWarnOverride();
-    readautoreconfWarnGnu();
-    readautoreconfWarnUnsupported();
-    await readAutoreconfTool();
     readCppProvider();
 
     // await setCurrentMakefileConfiguration(currentMakefileConfigurationName);
@@ -1510,7 +1453,7 @@ export async function initFromSettings(activation: boolean = false, span: Span):
                     fc.config.configureArgs = updatedConfiguration?.configureArgs;
                     updatedSettingsSubkeys.push(`${folder.index}.${subKey}.configureArgs`);
                     var configuring : Promise<boolean> = fc.configure(span);
-                    if (promptClean) {
+                    if (c.get<boolean>('promptClean', true)) {
                         const cleanit: string = localize("autotools.cleanit", "Clean");
                         const setit: string = localize("autotools.edit.setting", "Setting...");
 
@@ -1530,130 +1473,31 @@ export async function initFromSettings(activation: boolean = false, span: Span):
                     if (configuring)
                         configuring.finally();
             }
-/*
-            subKey = "keepDryRuns";
-            let updatedkeepDryRuns : boolean = util.getSettingOr<boolean>(subKey, false);
-            if (updatedkeepDryRuns !== keepDryRuns) {
-                readkeepDryRuns();
+
+            subKey = "traceLiveTestRuns";
+            let updatedtraceLiveTestRuns : boolean = c.get<boolean>(subKey, false);
+            let updatedTestTasks : boolean = (updatedtraceLiveTestRuns !== traceLiveTestRuns);
+            if (updatedtraceLiveTestRuns !== traceLiveTestRuns) {
+                traceLiveTestRuns = updatedtraceLiveTestRuns;
                 updatedSettingsSubkeys.push(`${folder.index}.${subKey}`);
             }
 
-            subKey = "traceLiveTestRuns";
-            let updatedtraceLiveTestRuns : boolean = util.getSettingOr<boolean>(subKey, false);
-            let updatedTestTasks : boolean = (updatedtraceLiveTestRuns !== traceLiveTestRuns);
-            if (updatedtraceLiveTestRuns !== traceLiveTestRuns) {
-                readtraceLiveTestRuns();
-                updatedSettingsSubkeys.push(${folder.index}.${subKey});
-            }
-
-
-            subKey = "keepConfigurationCache";
-            let updatedkeepConfigurationCache : boolean = util.getSettingOr<boolean>(subKey, false);
-            if (updatedkeepConfigurationCache !== keepConfigurationCache) {
-                readkeepConfigurationCache();
-                updatedSettingsSubkeys.push(${folder.index}.${subKey});
-            }
-
-            subKey = "autoreconfWarnCross";
-            let updatedautoreconfWarnCross : boolean = util.getSettingOr<boolean>(subKey, false);
-            if (updatedautoreconfWarnCross !== autoreconfWarnCross) {
-                readautoreconfWarnCross();
-                updatedSettingsSubkeys.push(${folder.index}.${subKey});
-            }
-
-            subKey = "autoreconfWarnPortability";
-            let updatedautoreconfWarnPortability : boolean = util.getSettingOr<boolean>(subKey, false);
-            if (updatedautoreconfWarnPortability !== autoreconfWarnPortability) {
-                readautoreconfWarnPortability();
-                updatedSettingsSubkeys.push(${folder.index}.${subKey});
-            }
-
-            subKey = "autoreconfWarnObsolete";
-            let updatedautoreconfWarnObsolete : boolean = util.getSettingOr<boolean>(subKey, false);
-            if (updatedautoreconfWarnObsolete !== autoreconfWarnObsolete) {
-                readautoreconfWarnObsolete();
-                updatedSettingsSubkeys.push(${folder.index}.${subKey});
-            }
-
-            subKey = "autoreconfWarnOverride";
-            let updatedautoreconfWarnOverride : boolean = util.getSettingOr<boolean>(subKey, false);
-            if (updatedautoreconfWarnOverride !== autoreconfWarnOverride) {
-                readautoreconfWarnOverride();
-                updatedSettingsSubkeys.push(${folder.index}.${subKey});
-            }
-
-            subKey = "autoreconfWarnGnu";
-            let updatedautoreconfWarnGnu : boolean = util.getSettingOr<boolean>(subKey, false);
-            if (updatedautoreconfWarnGnu !== autoreconfWarnGnu) {
-                readautoreconfWarnGnu();
-                updatedSettingsSubkeys.push(${folder.index}.${subKey});
-            }
-
-            subKey = "autoreconfWarnUnsupported";
-            let updatedautoreconfWarnUnsupported : boolean = util.getSettingOr<boolean>(subKey, true);
-            if (updatedautoreconfWarnUnsupported !== autoreconfWarnUnsupported) {
-                readautoreconfWarnUnsupported();
-                updatedSettingsSubkeys.push(${folder.index}.${subKey});
-            }
-
-            subKey = "autoreconfTool";
-            let updatedautoreconfTool : string | undefined = await util.getExpandedSetting<string>(subKey);
-            if (updatedautoreconfTool !== autoreconfTool) {
-                await readAutoreconfTool();
-                updatedSettingsSubkeys.push(${folder.index}.${subKey});
-            }
-
             // Final updates in some constructs that depend on more than one of the above settings.
-            if (!extension.getState().configureDirty) {
+            if (!fc.state.configureDirty) {
                 if (updatedTestEnvironments) {
-                    updateEnvironmentsForTraits();
-                    extension.resyncTasks();
+                    fc.updateEnvironmentsForTraits();
+                    fc.resyncTasks();
                 } else if (updatedTestTasks || updatedMakeArgs) {
-                    extension.resyncTasks();
+                    fc.resyncTasks();
                 }
             } else {
-                if (await analyzeConfigureParams(span, true, false)) {
-                    await make.configure(span, make.TriggeredBy.configureAfterConfigurationChange, folder);
+                if (needConfigure || await fc.analyzeConfigureParams(span, true, false)) {
+                    await make.configure(span, make.TriggeredBy.configureAfterConfigurationChange, fc);
                 }
-            }
-
-            // Report all the settings changes detected by now.
-            // TODO: to avoid unnecessary telemetry processing, evaluate whether the changes done
-            // in the object autotools.launchConfigurations and autotools.configurations
-            // apply exactly to the current launch configuration, since we don't collect and aggregate
-            // information from all the array yet.
-            updatedSettingsSubkeys.forEach(async (subKey) => {
-                let key: string = keyRoot + "." + subKey;
-                logger.message(`${key} setting changed.`, "Verbose");
-                try {
-                    // For settings that use "." in their name, make sure we send the right object
-                    // to the telemetry function. Currently, the schema for such a setting
-                    // is represented differently than the workspace setting value.
-                    let settingObj: any;
-                    let workspaceConfiguration: vscode.WorkspaceConfiguration = vscode.workspace.getConfiguration(keyRoot, util.getConfigScope());
-                    if (subKey.includes(".")) {
-                       const subKeys: string[] = subKey.split(".");
-                       settingObj = workspaceConfiguration;
-                       subKeys.forEach(key => {
-                          settingObj = settingObj[key];
-                       });
-                    } else {
-                       settingObj = workspaceConfiguration[subKey];
-                    }
-
-                } catch (e) {
-                    telemetry.logException(e, span);
-                    logger.message(e.message);
-                }
-            });
-
-*/
-            if (fc.state.configureDirty) {
-                await make.configure(span, make.TriggeredBy.configureAfterConfigurationChange, fc);
             }
         }
         telemetry.endSpanWithStatus(span, SpanStatusCode.OK, undefined, {
-            changed: updatedSettingsSubkeys.join(",")
+            changedSetting: updatedSettingsSubkeys.join(",")
         });
 
     }));

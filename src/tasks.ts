@@ -282,7 +282,7 @@ export class AutoToolsCheckTaskProvider implements MyTaskProvider {
         let c = this.fc.buildConfig;
         var targets : Task[] = [];
         let e = this.fc.testEnvironments;
-        let traceLiveTestRuns = configuration.gettraceLiveTestRuns();
+        let traceLiveTestRuns = this.fc.wsConfig.get<boolean>("traceLiveTestRuns", false);
         this.fc.buildTargets.forEach((goals, dir) => {
             const kind: CheckTask = {
                 type: this.myType,
@@ -465,7 +465,7 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
                     return [fullpath];
             }
         }
-        return configuration.autoreconfCmd().concat('-i');
+        return configuration.autoreconfCmd(this.fc.wsConfig).concat('-i');
     }
     private isErroredConfiguration: boolean = false;
     public isConfigured(): boolean {
@@ -506,7 +506,7 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
             this.reautomakeTask.presentationOptions = reuseSilent;
             this.reautomakeTask.detail = localize("autotools.makefilein.update", "$(sync) Regenerate Makefile.in templates. See [Updating Makefile.inS](https://www.gnu.org/software/automake/manual/html_node/automake-Invocation.html#index-_002d_002dno_002dforce)");
 
-            var autoreconf : string = configuration.autoreconfCmd().join(' ');
+            var autoreconf : string = configuration.autoreconfCmd(this.fc.wsConfig).join(' ');
 
             this.regenTask = new Task({type: this.myType, action: 'regen', folderIndex: this.fc.folder.index},
                     TaskScope.Workspace, "Update Makefiles and config headers",
