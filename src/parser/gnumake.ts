@@ -324,6 +324,7 @@ export class Make implements Parser {
             }
             make.builtin_targets.add(this.dir + "/" + rea[4]);
         }
+        this.lastRuleLine = Number(rea[3]);
         this.file = rea[4] ?? rea[5];
     }
     public addDiag(file: string, d: Diagnostic, code: string): void {
@@ -339,8 +340,16 @@ export class Make implements Parser {
     }
     public getAmLocation() : Location {
         return new Location(
-            Uri.file(path.resolve(this.ctx.fc.folder.uri.path, this.AmName)),
+            Uri.file(this.amPath),
             new Position(0,0));
+    }
+    public getMakefileLocation(linenum: number) : Location {
+        return new Location(
+            Uri.file(path.resolve(this.getDir(), 'Makefile')),
+            new Position(linenum,0));
+    }
+    public get amPath() : string {
+        return path.resolve(this.ctx.fc.folder.uri.path, this.AmName);
     }
     /* Return the corresponding Makefile.am with relative dir prefix */
     public get AmName() : string {
@@ -349,7 +358,8 @@ export class Make implements Parser {
 
     diags?: DiagnosticCollection;
     section: MakeSection = MakeSection.Starting;
-    file: string | undefined;
+    file?: string;
+    lastRuleLine?: number; // make does not record rule line if the rule has no comands.
     goals: Map<string,Goal> = new Map<string, Goal>();
     seenVars: Set<string> = new Set();
     config_header: Set<string> | undefined;
