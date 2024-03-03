@@ -471,7 +471,10 @@ export async function generateParseContent(span: Span, fc: FolderConfig): Promis
             elapsed: elapsedTime
         };
     } catch (error) {
-        logger.message("Parsing the configuration failed due to: " + error);
+//        if (error instanceof Error)
+//            logger.message('Parsing the configuration failed due to: ' + error.toString() + '\n' + error.stack);
+//        else
+            logger.message('Parsing the configuration failed due to: ' + error.toString(true));
         telemetry.logException(error, span);
         telemetry.setSpanStatus(span, SpanStatusCode.ERROR, "exception");
         ui.getUI().setStatus(ui.UIStatus.RUNTIME, build_tree.ctx.fc);
