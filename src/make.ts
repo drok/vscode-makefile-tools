@@ -103,6 +103,7 @@ export interface pkgInfo {
     tarname: string;
     automake: string;
     maint?: string;
+    ac_config_files_line: number;
 }
 function fixupPackageURLs(theinfo: pkgInfo) : void {
     if (!theinfo.url && theinfo.tarname && theinfo.name.startsWith('GNU '))
@@ -116,7 +117,15 @@ function fixupPackageURLs(theinfo: pkgInfo) : void {
 export async function getPackageJSON(fc: FolderConfig): Promise<pkgInfo | undefined> {
     return new Promise<pkgInfo|undefined>(async (resolve, reject) => {
         let c = fc.config;
-        let theinfo : pkgInfo | undefined;
+        let theinfo : pkgInfo = {
+            name: 'unk',
+            version: 'unk',
+            bugreport: 'unk',
+            tarname: '',
+            url: '',
+            automake: 'unk',
+            ac_config_files_line: 0,
+        };
 
         if (fc.isConfigured) {
             try {
@@ -132,6 +141,19 @@ export async function getPackageJSON(fc: FolderConfig): Promise<pkgInfo | undefi
                     theinfo = JSON.parse(info || "");
                 if (theinfo) {
                     fixupPackageURLs(theinfo);
+
+                    const result: util.SpawnProcessResult = await util.spawnChildProcess(
+                        "autoconf", ['--trace=AC_CONFIG_FILES:\\$f%%%\\$l%%%\\$n%%%'],
+                        fc.folder.uri.path,
+                        true, true,
+                        undefined,
+                        (x) => {
+                            var ac_init = x.trimEnd().split('%%%');
+                            if (ac_init[2] == 'AC_CONFIG_FILES') {
+                                theinfo.ac_config_files_line = Number(ac_init[1]);
+                            }
+                        }, undefined);
+
                     return resolve(theinfo);
                 }
                 else resolve(undefined);
@@ -140,22 +162,23 @@ export async function getPackageJSON(fc: FolderConfig): Promise<pkgInfo | undefi
             }
         } else {
             const result: util.SpawnProcessResult = await util.spawnChildProcess(
-                "autoconf", ["--trace=AC_INIT:\\$f%%%\\$l%%%\\$n%%%\\${%%%}%"],
+                "autoconf", ["--trace=AC_INIT:\\$f%%%\\$l%%%\\$n%%%\\${%%%}%", '--trace=AC_CONFIG_FILES:\\$f%%%\\$l%%%\\$n%%%'],
                 fc.folder.uri.path,
                 true, true,
                 undefined,
                 (x) => {
                     var ac_init = x.trimEnd().split('%%%');
                     if (ac_init && ac_init.length > 4 && ac_init[0] == "configure.ac" && ac_init[2] == "AC_INIT") {
-                        theinfo = {
-                            "name": ac_init[3],
-                            "version": ac_init[4] ?? '',
-                            "bugreport": ac_init[5] ?? '',
-                            "tarname": ac_init[6] ?? '',
-                            "url": ac_init.slice(7).join(':') ?? '',
-                            "automake": "unk",
-                        };
+                        theinfo.name = ac_init[3];
+                        theinfo.version = ac_init[4] ?? '',
+                        theinfo.bugreport = ac_init[5] ?? '',
+                        theinfo.tarname = ac_init[6] ?? '',
+                        theinfo.url = ac_init.slice(7).join(':') ?? '',
+                        theinfo.automake =  "unk",
                         fixupPackageURLs(theinfo);
+                    } else
+                    if (ac_init[2] == 'AC_CONFIG_FILES') {
+                        theinfo.ac_config_files_line = Number(ac_init[1]);
                     }
                 }, undefined);
             if (result.returnCode !== 0) resolve(undefined);
@@ -457,7 +480,9 @@ export async function generateParseContent(span: Span, fc: FolderConfig): Promis
                 build_tree.stats.sharedlibs,
                 build_tree.stats.tests,
                 build_tree.stats.testbins,
-                build_tree.stats.checks ]
+                build_tree.stats.checks,
+            ],
+            mRules: build_tree.stats.missingRules, // separate because it is a measure of added value
         });
         ui.getUI().setStatus(result.returnCode !== ConfigureBuildReturnCodeTypes.success ? ui.UIStatus.ERR : ui.UIStatus.OK, build_tree.ctx.fc);
 
@@ -666,7 +691,7 @@ export async function configure(parentSpan: Span, triggeredBy: TriggeredBy, fc: 
             logger.message('Exporting can be re-attempted with "Autotools: Export Configuration to Intellisense"', "Normal");
             logger.message('KB: ' + kbUrl.toString(true) + '#intellisense-export-fail', "Normal");
         } else if (retc == 2) { /* Makefile is broken */
-            if (triggeredBy != TriggeredBy.configureAfterConfigurationChange && triggeredBy != TriggeredBy.amUpdate) {
+            if (triggeredBy == TriggeredBy.cleanConfigure) {
                 logger.message('Trying to recover by re-checking the configuration (config.status)', "Normal");
                 await fc.autotoolsTask.recheck(telemetry.startSpan("recover", span));
             }

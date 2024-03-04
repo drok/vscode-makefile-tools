@@ -746,6 +746,9 @@ export class FolderConfig implements vscode.Disposable {
     public updateBuildTree (): void {
         if (!this.build_tree.hasStats) {
             countStats(this._build_tree);
+            for (const [dir,make] of this._build_tree.ctx.allmakes)
+                this._build_tree.stats.missingRules += make.reportMissingTargets();
+
             this.build_tree.hasStats = true;
         }
 
@@ -895,7 +898,7 @@ export class FolderConfig implements vscode.Disposable {
         this._build_tree.ctx.allmakes.clear();
         this._build_tree.ctx.allmakes.set('', this._build_tree);
         this._build_tree.test_suite = undefined;
-        this._build_tree.stats = {programs: 0, sharedlibs: 0, tests: 0, testbins:0, checks: 0, subdirs: 0};
+        this._build_tree.stats = Make.StatsZero;
         this._build_tree.hasStats = false;
         this.targetDisposables.forEach(d => d.dispose());
         this.buildTargets.clear();

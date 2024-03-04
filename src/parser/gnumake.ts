@@ -355,7 +355,16 @@ export class Make implements Parser {
     public get AmName() : string {
         return this.dir ? path.join(this.dir, 'Makefile.am') : 'Makefile.am';
     }
-
+    reportMissingTargets() : number {
+        let nummissing : number = 0;
+        for (const [name,goal] of this.goals) {
+            if ((goal.flags & (Goal.Flags.FailedToBeUpdated | Goal.Flags.Not_a_target)) == (Goal.Flags.FailedToBeUpdated | Goal.Flags.Not_a_target)) {
+                goal.ReportMissingTargets();
+                nummissing++;
+            }
+        }
+        return nummissing;
+    }
     diags?: DiagnosticCollection;
     section: MakeSection = MakeSection.Starting;
     file?: string;
@@ -375,14 +384,17 @@ export class Make implements Parser {
         testbins: number;
         subdirs: number;
         checks: number;
-    } = {
+        missingRules: number;
+    } = Make.StatsZero;
+    static get StatsZero() { return {
         tests: 0,
         programs: 0,
         sharedlibs: 0,
         testbins: 0,
         subdirs: 0,
-        checks: 0
-    };
+        checks: 0,
+        missingRules: 0,
+    };}
 }
 
 const DatabaseRE = /^# Make data base, printed on (.*)$/;
@@ -770,50 +782,62 @@ export class Goal extends Node implements Parser {
             return;
 
         this.flags |= Goal.Flags.FullyParsed;
-        if ((this.flags & (Goal.Flags.FailedToBeUpdated | Goal.Flags.Not_a_target)) == (Goal.Flags.FailedToBeUpdated | Goal.Flags.Not_a_target)) {
-            let code = 'missing-rule';
-            for (const [name,g] of this.make.goals) {
-                if (g.depends?.includes(this)) {
-                    let diag = new Diagnostic(
-                        new Range(g.ruleLine! - 2, 0, g.ruleLine! - 2, 100),
-                        localize("gnumake.warn.missing.rule",
-                            `No rule to make '{0}', needed by '{1}'`,
-                            this.goal, name), DiagnosticSeverity.Error);
-                    /* The make dir where the dependency with missing rule is made */
-                    let libMake = this.make.ctx.allmakes.get(path.normalize(path.join(this.make.dir, path.dirname(this.goal!))));
-                    diag.relatedInformation = [];
-                    if (libMake) {
-                        let goalLocation = g.make.getAmLocation();
+    }
+    ReportMissingTargets() : void {
+        let code = 'missing-rule';
+        for (const [name,g] of this.make.goals) {
+            if (g.depends?.includes(this)) {
+                let diag = new Diagnostic(
+                    new Range(0, 0, 0, 100),
+                    localize("gnumake.warn.missing.rule",
+                        `No rule to make '{0}', needed by '{1}'`,
+                        this.goal, name), DiagnosticSeverity.Error);
+                /* The make dir where the dependency with missing rule is made */
+                let libMake = this.make.ctx.allmakes.get(path.normalize(path.join(this.make.dir, path.dirname(this.goal!))));
+                diag.relatedInformation = [];
+                if (libMake) {
+                    let goalLocation = g.make.getAmLocation();
+                    diag.relatedInformation.push(new DiagnosticRelatedInformation(
+                        goalLocation,
+                        localize("gnumake.warn.missing.rule.hint.refactor",
+                            `This can be avoided by moving the rules for inter-dependent targets {0} and {1} into the same Makefile.`,
+                            this.goal, g.goal)
+                    ));
+                    diag.relatedInformation.push(new DiagnosticRelatedInformation(
+                        goalLocation,
+                        localize("gnumake.warn.missing.rule.hint.refactor",
+                            `Example: Refactor '{0}' to include '{1}' so the '{2}' and '{3}' rules are in the same location.`,
+                            this.make.AmName, libMake.AmName,
+                            this.goal, g.goal)
+                    ));
+                    if (libMake.parent) {
                         diag.relatedInformation.push(new DiagnosticRelatedInformation(
-                            goalLocation,
-                            localize("gnumake.warn.missing.rule.hint.refactor",
-                                `Refactor '{0}' to include '{1}' so the '{2}' rule is available where '{3}' is made.`,
-                                this.make.AmName, libMake.AmName,
-                                this.goal, g.goal)
+                            libMake.parent.getAmLocation(),
+                            localize("gnumake.warn.missing.rule.hint.rmsubdir",
+                                `Remove '{0}' from SUBDIRS in the caller, '{1}'.`,
+                                libMake.dir, libMake.parent.AmName)
                         ));
-                        if (libMake.goals.get(path.basename(this.goal!))) {
-                            diag.relatedInformation.push(new DiagnosticRelatedInformation(
-                                goalLocation,
-                                localize("gnumake.warn.missing.rule.hint.include",
-                                    `Include '$(top_srcdir)/{0}' at the top of '{1}'.`,
-                                    libMake.AmName, this.make.AmName)
-                            ));
-                        }
-                        if (this.make.parent) {
-                            let parentLocation = this.make.parent.getAmLocation()
-                            diag.relatedInformation.push(new DiagnosticRelatedInformation(
-                                this.make.parent.getAmLocation(),
-                                localize("gnumake.warn.missing.rule.hint.rmsubdir",
-                                    `Remove '{0}' from SUBDIRS in '{1}'.`,
-                                    libMake.dir, this.make.parent.AmName)
-                            ));
-                        }
                     }
-
-                    this.make.addDiag(g.ruleMakefile!.path, diag, code);
+                    let acline = this.make.ctx.fc.pkginfo?.ac_config_files_line ? this.make.ctx.fc.pkginfo?.ac_config_files_line - 1 : 0;
+                    let acLocation = new Location(Uri.file(path.resolve(this.make.ctx.fc.folder.uri.path, this.make.ctx.fc.configureAc || 'configure.ac')),
+                        new Position(acline,0));
+                    diag.relatedInformation.push(new DiagnosticRelatedInformation(
+                        acLocation,
+                        localize("gnumake.warn.missing.rule.hint.rm.ac_config_files",
+                            `Remove '{0}/Makefile' from AC_CONFIG_FILES.`,
+                            libMake.dir)
+                    ));
+                    let line = g.ruleLine ? g.ruleLine - 2 : 0;
+                    diag.relatedInformation.push(new DiagnosticRelatedInformation(
+                        g.make.getMakefileLocation(line),
+                        localize("gnumake.warn.missing.rule.hint.makefile",
+                            `Jump to rule '{0}'`,
+                            name)
+                    ));
                 }
+
+                this.make.addDiag(g.make.amPath, diag, code);
             }
-            telemetry.logEvent(this.make.ctx.span, code, undefined, true);
         }
     }
     getGoal(s: string, flags: number = Goal.Flags.None) : Goal {
