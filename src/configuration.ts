@@ -748,6 +748,10 @@ export class FolderConfig implements vscode.Disposable {
             countStats(this._build_tree);
             for (const [dir,make] of this._build_tree.ctx.allmakes)
                 this._build_tree.stats.missingRules += make.reportMissingTargets();
+            if (!this.wsConfig.get<boolean>("no-warn-local-rules", false)) {
+                for (const [dir,make] of this._build_tree.ctx.allmakes)
+                    this._build_tree.stats.localRules += make.ReportLocalRules();
+            }
 
             this.build_tree.hasStats = true;
         }

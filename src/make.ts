@@ -483,6 +483,7 @@ export async function generateParseContent(span: Span, fc: FolderConfig): Promis
                 build_tree.stats.checks,
             ],
             mRules: build_tree.stats.missingRules, // separate because it is a measure of added value
+            lRules: build_tree.stats.localRules, // separate because it is a measure of added value
         });
         ui.getUI().setStatus(result.returnCode !== ConfigureBuildReturnCodeTypes.success ? ui.UIStatus.ERR : ui.UIStatus.OK, build_tree.ctx.fc);
 

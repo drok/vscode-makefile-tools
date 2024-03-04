@@ -432,6 +432,13 @@
         {   "title": "Building Options (users)",
             "order": 2,
             "properties": {
+                "autotools.no-warn-local-rules": {
+                    "order": 2,
+                    "scope": "resource",
+                    "type": "boolean",
+                    "markdownDescription": "%autotools.configuration.no-warn-local-rules.description%",
+                    "default": false
+                },
                 "autotools.configurations": {
                     "scope": "resource",
                     "order": 1,

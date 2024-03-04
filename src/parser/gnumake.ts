@@ -51,6 +51,7 @@ export const ExecutingRE = /^(<builtin>|(.+):(\d+)): (?:update target '(.*)' due
 const UptodateRE = /^make(?:\[\d+\])?: '(.*)' is up to date\.$/;
 export const CopyrightRE = /^# (?:GNU Make|Mergesium Dry-Runner)/;
 const RecursingRE = /^Making (.*) in (.*)$/;
+const LocalRuleRE = /^(.*)-local$/;
 /**
  * Parse the stdout of a GNU make run, and expect a Dumped database,
  * directory entry/leaving trace messages, and expanded shell fragments would
@@ -365,6 +366,25 @@ export class Make implements Parser {
         }
         return nummissing;
     }
+    ReportLocalRules() : number {
+        let code = 'local-rule';
+        let count : number = 0;
+        for (const [name,g] of this.goals) {
+            let lr = LocalRuleRE.exec(name);
+            if (lr) {
+                count++;
+                let line = g.ruleLine ? g.ruleLine - 2 : 0;
+                let makefile = g.ruleMakefile ? g.ruleMakefile.path : this.amPath;
+                let diag = new Diagnostic(
+                    new Range(line, 0, line, 100),
+                    localize("gnumake.warn.local.rule",
+                        `Local Rule Hook '{0}' may be non-portable`,
+                        name), DiagnosticSeverity.Warning);
+                this.addDiag(makefile, diag, code);
+            }
+        }
+        return count;
+    }
     diags?: DiagnosticCollection;
     section: MakeSection = MakeSection.Starting;
     file?: string;
@@ -385,6 +405,7 @@ export class Make implements Parser {
         subdirs: number;
         checks: number;
         missingRules: number;
+        localRules: number;
     } = Make.StatsZero;
     static get StatsZero() { return {
         tests: 0,
@@ -394,6 +415,7 @@ export class Make implements Parser {
         subdirs: 0,
         checks: 0,
         missingRules: 0,
+        localRules: 0,
     };}
 }
 
