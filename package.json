@@ -429,8 +429,7 @@
                 }
             }
         },
-        {
-            "title": "Building Options (users)",
+        {   "title": "Building Options (users)",
             "order": 2,
             "properties": {
                 "autotools.configurations": {
@@ -516,8 +515,7 @@
                 }
             }
         },
-        {
-            "title": "Advanced options (maintainers)",
+        {   "title": "Advanced options (maintainers)",
             "order": 4,
             "properties": {
                 "autotools.keepDryRuns": {
@@ -592,8 +590,7 @@
                 }
             }
         },
-        {
-            "title": "Testing",
+        {   "title": "Testing",
             "order": 3,
             "properties": {
                 "autotools.TESTS_ENVIRONMENT" : {
