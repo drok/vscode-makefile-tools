@@ -528,7 +528,9 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
                         }),
                         configureProblemMatchers);
             this.recheckTask.group = TaskGroup.Build;
-            this.recheckTask.presentationOptions = reuseSilent;
+            // FIXME: If the parsing had to re-configure, the separate "Prepare" and "Recheck" terminal windows
+            // should be closed, as they are out-of-date #72
+            this.recheckTask.presentationOptions = presentSilent;
             this.recheckTask.detail = localize("autotools.recheck", "$(sync) Update configuration. See [config.status invocation - --recheck](https://www.gnu.org/software/autoconf/manual/autoconf-2.69/html_node/config_002estatus-Invocation.html)");
 
             this.myPromise = Promise.resolve([
@@ -622,6 +624,7 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
                     {cwd : destdir}),
                     configureProblemMatchers);
             task.detail = localize("automake.configure.help", "$(tools) Configure build directory");
+            task.presentationOptions = presentSilent;
 
             await this.waitToTouchMakefiles();
             vscode.tasks.executeTask(task)
