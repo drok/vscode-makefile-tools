@@ -53,17 +53,18 @@ An autotools project has the following basic stages: boostrapping, configuration
 
 Basic familiarity with autotools projects is implied. Often projects have pre-requisites, like installing dependencies, making configuration choices or running specific bootstrapping commands before the first build. For those cases, the various steps can be run or repeated manually, using palette commands.
 
-The primary pallette commands are:
+Commands available in the project context menu (right-click project/folder name in Autotools panel):
 
- 1. "Autotools: Bootstrap" - this is automatic when needed
- 2. "Autotools: Configure" - creates the Default configuration in the subdir `build/Default`
- 3. "Autotools: Build All" - runs `make all` in the build directory
- 4. "Autotools: Run all tests (make check)" - builds, then runs all default tests
+ 1. "Bootstrap" - this is automatic when needed, it can be repeated manually any time.
+ 2. "Configure" - Re-runs the `configure` script in the current build configuration directory.
+ 3. "Select build configuration" - switches or creates another build config/directory.
+ 4. "Edit configure.ac" - shortcut to open the autoconf configuration.
+ 5. "Edit Makefile.am" - shortcut to open any folder's `Makefile.am` file.
 
 <figure id="figure-3">
-    <img src="https://autotools.mergesium.com/s/autotools-palette.png"
-         alt="Sample command palette">
-    <figcaption>Figure 3 - Command palette</figcaption>
+    <img src="https://autotools.mergesium.com/s/autotools-proj-context-menu.png"
+         alt="Shows the main commands to interact with the project, accessible in the context menu">
+    <figcaption>Figure 3 - Main commands in context menu</figcaption>
 </figure>
 
 ### Bootstrapping, out-of-tree vs in-tree build configurations
@@ -498,9 +499,8 @@ The KB is intended to be the front line of support if a project does not functio
 
 ## TODO list at this pre-release:
 
-* libtool support is incomplete
-* compatibility with multi-folder workspaces
 * more translations
+* more diagnostics
 * syntax highlight / completions for `configure.ac` and `Makefile.am` files (other extensions fill this gap for now)
 * `check-local` target not yet handled
 
