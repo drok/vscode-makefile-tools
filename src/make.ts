@@ -474,17 +474,20 @@ export async function generateParseContent(span: Span, fc: FolderConfig): Promis
             fc.updateBuildTree();
             fc.updateWatchers();
         }
-        telemetry.setAttributes(span, {
-            stats: [ linenumber,
+        let attrs : Attributes = {
+            lines: linenumber,
+            stats: [
                 build_tree.stats.programs,
                 build_tree.stats.sharedlibs,
                 build_tree.stats.tests,
                 build_tree.stats.testbins,
                 build_tree.stats.checks,
             ],
-            mRules: build_tree.stats.missingRules, // separate because it is a measure of added value
-            lRules: build_tree.stats.localRules, // separate because it is a measure of added value
-        });
+        };
+        // separate because it is a measure of added value
+        if (build_tree.stats.missingRules) attrs.mRules = build_tree.stats.missingRules;
+        if (build_tree.stats.localRules) attrs.lRules = build_tree.stats.localRules;
+        telemetry.setAttributes(span, attrs);
         ui.getUI().setStatus(result.returnCode !== ConfigureBuildReturnCodeTypes.success ? ui.UIStatus.ERR : ui.UIStatus.OK, build_tree.ctx.fc);
 
         // Update the projname because the dry-run may have updated config.status
@@ -744,13 +747,15 @@ export async function configure(parentSpan: Span, triggeredBy: TriggeredBy, fc: 
 
     extension.setCompletedConfigureInSession(true);
 
-    telemetry.setAttributes(span, {
+    let attrs : Attributes = {
         numFiles: provider.fileIndex.size,
-        numConfigs: fc.numConfigs,
-        firstTime: !ranConfigureInCodebaseLifetime,
-        readCache: readCache,
-    });
-    span.end();
+    };
+    if (fc.numConfigs > 1) attrs.numConfigs = fc.numConfigs;
+    if (!ranConfigureInCodebaseLifetime) attrs.firstTime = !ranConfigureInCodebaseLifetime;
+    if (readCache) attrs.readCache = readCache;
+    telemetry.endSpanWithStatus(span,
+        retc == ConfigureBuildReturnCodeTypes.success ?
+            SpanStatusCode.OK : SpanStatusCode.ERROR, "confmsg", attrs);
 
     if (retc !== ConfigureBuildReturnCodeTypes.success) {
       logger.showOutputChannel();
