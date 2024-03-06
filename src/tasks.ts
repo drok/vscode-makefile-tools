@@ -4,12 +4,13 @@
  *--------------------------------------------------------------------------------------------*/
 import * as path from 'path';
 import { Task, TaskDefinition, TaskScope, TaskGroup, TaskProvider,
+    CancellationToken,
     ProcessExecution, ShellExecution } from 'vscode';
 import { Goal } from './parser/gnumake';
 import * as configuration from './configuration';
-import { TestEnvironment } from './configuration';
+import { FolderConfig, TestEnvironment } from './configuration';
 import { BuildTarget, t_all, t_none, readTRS, TRS, isSuspect, emptyRunStats } from './make';
-import { resolvePathToRoot, checkFileExistsSync, createDirectorySync } from './util';
+import { checkFileExistsSync, createDirectorySync } from './util';
 import * as vscode from 'vscode';
 
 import * as nls from 'vscode-nls';
@@ -19,12 +20,17 @@ import * as logger from './logger';
 import { env } from 'process';
 import * as ui from './ui';
 import { Span, SpanStatusCode } from '@opentelemetry/api';
+import { getStartTime } from './tele';
 nls.config({ messageFormat: nls.MessageFormat.bundle, bundleFormat: nls.BundleFormat.standalone })();
 const localize: nls.LocalizeFunc = nls.loadMessageBundle();
 
 const presentSilent : vscode.TaskPresentationOptions = {
     reveal: vscode.TaskRevealKind.Silent,
     panel: vscode.TaskPanelKind.Dedicated,
+    showReuseMessage: false }
+const reuseSilent : vscode.TaskPresentationOptions = {
+    reveal: vscode.TaskRevealKind.Silent,
+    panel: vscode.TaskPanelKind.Shared,
     showReuseMessage: false }
 const defaultCheckPresentation : vscode.TaskPresentationOptions = {
     reveal: vscode.TaskRevealKind.Always,
@@ -39,63 +45,77 @@ const boostrap_scripts : string[] = [
     "autogen.sh",
 ];
 
+const testProblemMatchers : string[] = [
+    '$autotools.make',
+    '$autotools.gcc',
+    '$autotools.ld',
+    '$autotools.generic',
+];
+const buildProblemMatchers : string[] = testProblemMatchers;
+const configureProblemMatchers : string[] = [
+    "autotools_configureac",
+    "autotools_configure",
+];
+
 export class AutoToolsBuildTaskProvider implements MyTaskProvider {
 	readonly myType = 'build';
-	private myPromise: Thenable<Task[]> | undefined = undefined;
-
-	public provideTasks(): Thenable<Task[]> | undefined {
-		return this.myPromise;
+    private readonly myTasks: Task[] = [];
+    constructor(private fc: FolderConfig) {}
+	public provideTasks(token: CancellationToken): Task[] {
+        return this.myTasks;
 	}
 
-    changeConfiguration(c: configuration.MakefileConfiguration, disposables: vscode.Disposable[]) : void {
-        this.myPromise = Promise.resolve([])
+    changeConfiguration() : void {
+        this.myTasks.splice(0);
     }
-    public update(disposables: vscode.Disposable[]) : boolean {
-        let c = configuration.getCurrentMakefileConfiguration();
-        var targets: Task[] = [];
-        configuration.getAllBuildTargets().forEach((goals, dir) => {
+    public update() : boolean {
+        let c = this.fc.buildConfig;
+        this.myTasks.splice(0);
+        this.fc.buildTargets.forEach((goals, dir) => {
             for (let g of goals.values()) {
                 if (g.flags & (Goal.Flags.Linked_binary)) {
                     if (g.goal) {
                         const kind: BuildTask = {
                             type: this.myType,
+                            folderIndex: this.fc.folder.index,
                             target: new BuildTarget(dir, g.goal)
                         };
-                        g.task = new Task(kind, TaskScope.Workspace, "build " + g.goal + (dir ? (' in ' + dir) : ' at the top'),
+                        g.task = new Task(kind, this.fc.folder, "build " + g.goal + (dir ? (' in ' + dir) : ' at the top'),
                             "autotools",
                             new ProcessExecution(
                                 configuration.getMakePath(),
                                 (c.top_builddir ? ['-C', c.top_builddir] : [])
                                 .concat(dir ? ['-C', dir] : [])
                                 .concat(c.makeArgs || [])
-                                .concat(g.goal)), "$gcc");
+                                .concat(g.goal)), buildProblemMatchers);
                         g.task.group = TaskGroup.Build;
                         g.task.detail =
                             (g.flags & Goal.Flags.Linked_binary) ? localize("automake.program", "$(combine) $(file-binary) Build program") :
                             localize("automake.build", "$(combine) Build");
-                        targets.push(g.task);
+                        this.myTasks.push(g.task);
                     }
                 }
             }
         });
-        this.myPromise = Promise.resolve(targets);
         return false;
     }
 
     public build(g : BuildTarget) : void {
         const kind: BuildTask = {
             type: this.myType,
+            folderIndex: this.fc.folder.index,
             target: g
         };
-        let c = configuration.getCurrentMakefileConfiguration();
-        var task = new Task(kind, TaskScope.Workspace, "build " + g.goal,
+        let c = this.fc.buildConfig;
+        this.fc.lastTaskMakeDir = path.join(this.fc.abs_top_builddir, g.builddir);
+        var task = new Task(kind, this.fc.folder, "build " + g.goal,
             "autotools",
             new ProcessExecution(
                 configuration.getMakePath(),
                 (c.top_builddir ? ['-C', c.top_builddir] : [])
                 .concat(g.builddir ? ['-C', g.builddir] : [])
                 .concat(c.makeArgs || [])
-                .concat(g.goal)),"$gcc");
+                .concat(g.goal)), buildProblemMatchers);
         task.group = TaskGroup.Build;
         //task.detail =
         //    (g.flags & Goal.Flags.Linked_binary) ? localize("automake.program", "$(combine) $(file-binary) Build program") :
@@ -103,64 +123,60 @@ export class AutoToolsBuildTaskProvider implements MyTaskProvider {
         //    localize("automake.build", "$(combine) Build");
         vscode.tasks.executeTask(task);
     }
-	public resolveTask(_task: Task): Task | undefined {
-		const target = _task.definition.target;
-        if (!target)
-            return undefined;
+	public resolveTask(_task: Task, token: CancellationToken): Task | undefined {
 
         // resolveTask requires that the same definition object be used.
         const definition: BuildTask = <any>_task.definition;
-        let c = configuration.getCurrentMakefileConfiguration();
-        return new Task(definition, _task.scope ?? TaskScope.Workspace, target.goal ?? t_all.goal,
-            this.myType,
-            new ProcessExecution(
-                configuration.getMakePath(),
-                (c.top_builddir ? ['-C', c.top_builddir] : [])
-                .concat(target.builddir ? ['-C', target.builddir] : [])
-                .concat(c.makeArgs || [])
-                .concat(target.goal ?? t_all.goal)),"$gcc");
+        if (!definition || !definition.target || !definition.target.goal)
+            return undefined;
+        const goal = this.fc.buildTargets
+            .get(definition.target.builddir || '')
+            ?.get(definition.target.goal);
+        if (goal) {
+            if (goal.task instanceof Task)
+                return goal.task;
+        }
+        if (!definition.target.builddir === undefined)
+            return undefined;
+        else
+            return undefined;
 	}
 }
 
 
 export class AutoToolsTestTaskProvider implements MyTaskProvider {
 	readonly myType = 'test';
-	private myPromise: Thenable<Task[]> | undefined = undefined;
+    private readonly myTasks: Task[] = [];
+    constructor(private fc: FolderConfig) {}
+	public provideTasks(token: CancellationToken): Task[] {
+        return this.myTasks;
+	}
     public numFails : number = 0;
     public numTests : number = 0;
     public numUnknown : number = 0;
     public numSuspect : number = 0;
 
-	public provideTasks(): Thenable<Task[]> | undefined {
-		return this.myPromise;
-	}
+    private all: Map<vscode.WorkspaceFolder, Task[]> = new Map();
 
-    changeConfiguration(c: configuration.MakefileConfiguration, disposables: vscode.Disposable[]) : void {
-        this.myPromise = Promise.resolve([])
+    changeConfiguration() : void {
+        this.myTasks.splice(0);
     }
-    public update(disposables: vscode.Disposable[]) : boolean {
-        let c = configuration.getCurrentMakefileConfiguration();
-        var targets: Task[] = [];
+
+    public update() : boolean {
+        let c = this.fc.buildConfig;
         this.numFails = 0;
         this.numTests = 0;
         this.numUnknown = 0;
         this.numSuspect = 0;
-        let tc = extension.testController;
-        let t = configuration.getAllBuildTargets();
-        let cte = configuration.getCurrentTestEnvironment();
-        let e = configuration.getTestEnvironments();
+        let tc = this.fc.testController;
+        let e = this.fc.testEnvironments;
         let updateBadge : boolean = false;
-        t.forEach((goals, dir) => {
+        this.myTasks.splice(0);
+        this.fc.buildTargets.forEach((goals, dir) => {
             for (let g of goals.values()) {
                 if (g.flags & Goal.Flags.Test_Suite) {
                     g.test || tc?.addSuite(c, dir, g);
                     if (g.goal && g.depends) {
-                        let p : string = util.resolvePathToRoot(path.join(c.top_builddir, dir));
-                        disposables.push(new util.MyFileWatcher(p, (e, f) => {
-                            let cte = configuration.getCurrentTestEnvironment();
-                            if (f.endsWith(".trs"))
-                                extension.trsChange(c, cte, vscode.Uri.file(path.join(p,f)));
-                        }));
                         let envs = FilterEnvsByDir(e, dir);
                         let ME_KEEP_ENV = KeepList(envs);
                         g.depends.forEach((d) => {
@@ -170,35 +186,35 @@ export class AutoToolsTestTaskProvider implements MyTaskProvider {
                             let test = new BuildTarget(dir, dgoal);
                             const kind: TestTask = {
                                 type: this.myType,
+                                folderIndex: this.fc.folder.index,
                                 test: test
                             };
                             var newMap : Map<TestEnvironment, vscode.Task> = new Map();
                             d.task = newMap;
                             envs.forEach((env) => {
-                                var newTask = new Task(kind, TaskScope.Workspace,
+                                var newTask = new Task(kind, this.fc.folder,
                                     "Run test \'" + dgoal + "\' " + ((dir ? ('in ' + dir) : 'at the top') + (' @ ' + env.name)),
                                 "autotools",
 
                                 new ProcessExecution(
                                     configuration.getMakePath(),
-                                    (c.top_builddir ? ['-C', c.top_builddir] : [])
-                                    .concat(dir ? ['-C', dir] : [])
+                                    (dir ? ['-C', dir] : [])
                                     .concat(c.makeArgs || [])
-                                    .concat(["-Resi",
+                                    .concat(["-Res",
                                         "me-check",
                                         `ME_KEEP_ENV=${ME_KEEP_ENV}`,
                                         "--eval=include Mergesium.rules",
                                         "TEST_LOGS=" + test.goal
-                                    ]), env.testExecOptions),"$gcc");
+                                    ]), env.testExecOptions), testProblemMatchers);
                                 newTask.group = TaskGroup.Test;
                                 newTask.detail = localize("automake.test", "$(check) Run test '{0}'", path.basename(dgoal, ".log"));
                                 newTask.presentationOptions = presentSilent;
                                 newMap.set(env, newTask);
-                                targets.push(newTask);
+                                this.myTasks.push(newTask);
                             });
 
                             /* Read existing TRS file to show correct last known status in the outline */
-                            d.trs = readTRS(test, c);
+                            d.trs = readTRS(test, this.fc);
                             //let current : TRS = d.trs.results.get(cte.hashCode) ?? TRS.NONE;
                             let results : number[] = emptyRunStats();
                             d.trs.results.forEach(v => results[v]++);
@@ -207,13 +223,12 @@ export class AutoToolsTestTaskProvider implements MyTaskProvider {
                             this.numSuspect += results[TRS.ERROR] + results[TRS.XFAIL];
                             this.numTests+=envs.length;
 
-                            updateBadge = extension.updateTRSInPanel(cte,undefined,d,dir) || updateBadge;
+                            updateBadge = this.fc.updateTRSInPanel(undefined,d,dir) || updateBadge;
                             // tc.addTest(suite, d, trs);
                         });
                     }
                 }
             }});
-        this.myPromise = Promise.resolve(targets);
         return updateBadge;
     }
 
@@ -223,42 +238,51 @@ export class AutoToolsTestTaskProvider implements MyTaskProvider {
             return undefined;
 
         // resolveTask requires that the same definition object be used.
+        // FIXME: there should only be one global resolveTask
         const definition: TestTask = <any>_task.definition;
-        let c = configuration.getCurrentMakefileConfiguration();
-        return new Task(definition, _task.scope ?? TaskScope.Workspace, test.goal,
-            this.myType,
-            new ProcessExecution(
-                configuration.getMakePath(),
-                (c.top_builddir ? ['-C', c.top_builddir] : [])
-                .concat(test.builddir ? ['-C', test.builddir] : [])
-                .concat(c.makeArgs || [])
-                .concat(["-esi",
-                    "check",
-                    "TEST_LOGS=" + test.goal
-                ]), configuration.getCurrentTestEnvironment().testExecOptions),"$gcc");
+        if (!definition || !definition.test || !definition.test.goal)
+            return undefined;
+        const goal = this.fc.buildTargets
+            .get(definition.test.builddir || '')
+            ?.get(definition.test.goal);
+        if (goal) {
+            if (goal.task instanceof Map) {
+                let env = definition.env ?
+                    this.fc.getTestEnvironment(definition.env) :
+                    this.fc.currentTestEnvironment;
+                return goal.task.get(env);
+            }
+        }
+        if (!definition.test.builddir === undefined)
+            return undefined;
+        else
+            return undefined;
 	}
 }
 
 export class AutoToolsCheckTaskProvider implements MyTaskProvider {
 	readonly myType = 'check';
-	private myPromise: Thenable<Task[]> | undefined = undefined;
     private checkAllTask: Task | undefined;
 
-    provideTasks(): Thenable<Task[]> | undefined {
-		return this.myPromise;
+    private readonly myTasks: Task[] = [];
+    constructor(private fc: FolderConfig) {}
+	public provideTasks(token: CancellationToken): Task[] {
+        return this.myTasks;
 	}
 
-    changeConfiguration(c: configuration.MakefileConfiguration, disposables: vscode.Disposable[]) : void {
-        this.myPromise = Promise.resolve([])
+    changeConfiguration() : void {
+        this.myTasks.splice(0);
     }
-    public update(disposables: vscode.Disposable[]) : boolean {
-        let c = configuration.getCurrentMakefileConfiguration();
-        var targets : Task[] = [];
-        let e = configuration.getTestEnvironments();
-        let traceLiveTestRuns = configuration.gettraceLiveTestRuns();
-        configuration.getAllBuildTargets().forEach((goals, dir) => {
+
+    public update() : boolean {
+        let c = this.fc.buildConfig;
+        let e = this.fc.testEnvironments;
+        let traceLiveTestRuns = this.fc.wsConfig.get<boolean>("traceLiveTestRuns", false);
+        this.myTasks.splice(0);
+        this.fc.buildTargets.forEach((goals, dir) => {
             const kind: CheckTask = {
                 type: this.myType,
+                folderIndex: this.fc.folder.index,
                 builddir: dir
             };
             if (!env.dirs || env.dirs.includes(dir))
@@ -272,66 +296,66 @@ export class AutoToolsCheckTaskProvider implements MyTaskProvider {
                 let ME_KEEP_ENV = KeepList(envs);
 
                 envs.forEach((env) => {
-                    var newTask = new Task(kind, TaskScope.Workspace, 'Run test suite ' + (dir ? ('in ' + dir) : 'at the top') + (' @ ' + env.name),
+                    var newTask = new Task(kind, this.fc.folder, 'Run test suite ' + (dir ? ('in ' + dir) : 'at the top') + (' @ ' + env.name),
                         "autotools",
                     new ProcessExecution(
                         configuration.getMakePath(),
-                        (c.top_builddir ? ['-C', c.top_builddir] : [])
-                        .concat(dir ? ['-C', dir] : [])
+                        (dir ? ['-C', dir] : [])
                         .concat(c.makeArgs || [])
-                        .concat(["-Resi",
+                        .concat(["-Res",
                             "me-check",
                             `ME_KEEP_ENV=${ME_KEEP_ENV}`,
                             "--eval=include Mergesium.rules"]),
-                        env.checkExecOptions),"$gcc");
+                        env.checkExecOptions), testProblemMatchers);
                     newTask.group = TaskGroup.Test;
                     newTask.detail = localize("automake.check", "$(checklist) Test Suite");
                     newTask.presentationOptions = defaultCheckPresentation;
                     newMap.set(env, newTask);
-                    targets.push(newTask);
+                    this.myTasks.push(newTask);
 
-                    newTask = new Task(kind, TaskScope.Workspace, 'Update test suite ' + (dir ? ('log in ' + dir) : 'log at the top')  + (' @ ' + env.name),
+                    newTask = new Task(kind, this.fc.folder, 'Update test suite ' + (dir ? ('log in ' + dir) : 'log at the top')  + (' @ ' + env.name),
                     "autotools",
                     new ProcessExecution(
                         traceLiveTestRuns ? extension.dryRunner : configuration.getMakePath(),
-                        (c.top_builddir ? ['-C', c.top_builddir] : [])
-                        .concat(dir ? ['-C', dir] : [])
+                        (dir ? ['-C', dir] : [])
                         .concat(c.makeArgs || [])
                         .concat(traceLiveTestRuns ? ["--trace", "--silent"] : [])
-                        .concat(["-Resi",
+                        .concat(["-Res",
                             "test-suite.log",
                             `ME_KEEP_ENV=${ME_KEEP_ENV}`
                         ]),
-                        env.updateExecOptions), "$gcc");
+                        env.updateExecOptions), testProblemMatchers);
                     newTask.group = TaskGroup.Test;
                     newTask.presentationOptions = defaultCheckPresentation;
                     newTask.detail = localize("automake.livecheck", "$(checklist) $(broadcast) Test Suite Update");
                     newLiveMap.set(env, newTask);
-                    targets.push(newTask);
+                    this.myTasks.push(newTask);
                 });
 
             }}});
-        this.checkAllTask = new Task({
-                type: this.myType,
-                builddir: ''}, TaskScope.Workspace, 'Run user test suite (make check)',
+        let checkAllTaskDef : CheckTask = {
+            type: this.myType,
+            folderIndex: this.fc.folder.index,
+            builddir: ''
+        };
+        this.checkAllTask = new Task(checkAllTaskDef, this.fc.folder, 'Run user test suite (make check)',
             "autotools",
             new ProcessExecution(
                 configuration.getMakePath(),
                 (c.top_builddir ? ['-C', c.top_builddir] : [])
                 .concat(c.makeArgs || [])
-                .concat(["-Resi",
+                .concat(["-Res",
                     "check"]),
                 {
                     env: {
                         TESTS_ENVIRONMENT: ''
                     }
-                }),"$gcc");
+                }), testProblemMatchers);
         this.checkAllTask.group = TaskGroup.Test;
         this.checkAllTask.presentationOptions = defaultCheckPresentation;
         this.checkAllTask.detail = localize("autotools.check.noenv", "$(checklist) Run full test suite without test environment");
-        targets.push(this.checkAllTask);
+        this.myTasks.push(this.checkAllTask);
 
-        this.myPromise = Promise.resolve(targets);
         return false;
     }
 
@@ -341,29 +365,32 @@ export class AutoToolsCheckTaskProvider implements MyTaskProvider {
             return undefined;
 
         // resolveTask requires that the same definition object be used.
-        const definition: TestTask = <any>_task.definition;
-        let c = configuration.getCurrentMakefileConfiguration();
-        return new Task(definition, _task.scope ?? TaskScope.Workspace, "check",
-            this.myType,
-            new ProcessExecution(
-                configuration.getMakePath(),
-                (c.top_builddir ? ['-C', c.top_builddir] : [])
-                .concat(check.builddir ? ['-C', check.builddir] : [])
-                .concat(c.makeArgs || [])
-                .concat(definition.target.goal)
-                .concat(check.TESTS ? 'TESTS=' +  check.TESTS.join(' ') : [])
-                .concat(check.TEST_SUITE_LOG ? 'TEST_SUITE_LOG=' +  check.TEST_SUITE_LOG : []),
-                configuration.getCurrentTestEnvironment().checkExecOptions));
+        const definition: CheckTask = <any>_task.definition;
+        if (!definition || definition.builddir === undefined)
+            return undefined;
+        const goal = this.fc.buildTargets
+            .get(definition.builddir)
+            ?.get("test-suite.log");
+        if (goal) {
+            if (goal.task instanceof Map) {
+                let env = definition.env ?
+                    this.fc.getTestEnvironment(definition.env) :
+                    this.fc.currentTestEnvironment;
+                return goal.task.get(env);
+            }
+        }
+        return undefined;
 	}
     public async checkAll() : Promise<void> {
         if (this.checkAllTask) {
             let isBusy: boolean = false;
-            await extension.waitToTouchMakefiles();
+            await this.fc.autotoolsTask.waitToTouchMakefiles();
+            this.fc.lastTaskMakeDir = path.join(this.fc.abs_top_builddir);
             let reason = await vscode.tasks.executeTask(this.checkAllTask)
                 .then(e => (isBusy = true) && "ok", (r) => r.message);
             if (!isBusy) {
                 logger.message(`ERROR: Failed to start task ${this.checkAllTask.name}`, 'Normal');
-                extension.autotoolsDoneNoResult();
+                this.fc.autotoolsTask.autotoolsDoneNoResult();
             }
         }
     }
@@ -371,15 +398,21 @@ export class AutoToolsCheckTaskProvider implements MyTaskProvider {
 
 export interface MyTaskProvider extends TaskProvider {
     readonly myType: string;
-    update(disposables: vscode.Disposable[]): boolean;
-    changeConfiguration(c: configuration.MakefileConfiguration, disposables: vscode.Disposable[]): void;
+    update(): boolean;
+    changeConfiguration(): void;
 }
 
 export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
 	readonly myType = 'autotools';
-	private myPromise: Thenable<Task[]> | undefined = undefined;
+    private readonly myTasks: Task[] = [];
+	public provideTasks(token: CancellationToken): Task[] {
+        return this.myTasks;
+	}
+
     public bootstrapTask?: vscode.Task;
     public regenTask?: vscode.Task;
+    public reautomakeTask?: vscode.Task;
+    // public autoreconfTask?: vscode.Task;
     public recheckTask?: vscode.Task;
     public helpTask?: vscode.Task;
     private the_bootstrap_cmd : string[] | undefined;
@@ -389,30 +422,29 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
             "configure.ac",
             "configure.in",
     ];
-    constructor() {
+    constructor(private fc: FolderConfig) {
         const helpkind: AutotoolsTask = {
             type: this.myType,
+            folderIndex: fc.folder.index,
             action: 'help'
         };
-        this.helpTask = new Task(helpkind, TaskScope.Workspace,
+        this.helpTask = new Task(helpkind, this.fc.folder,
             localize("autotools.configure.help.task", "Display package configuration options"),
             "Autotools task",
             new ProcessExecution("./configure", ["--help"]));
         this.helpTask.detail = localize("autotools.configure.help", "$(tools) Output package configuration options using 'configure --help'");
     }
-	provideTasks(): Thenable<Task[]> | undefined {
-        if (this.bootstrapTask) {
-            return this.myPromise;
-        }
-        return Promise.reject();
-	}
 
 	resolveTask(_task: Task): Task | undefined {
         const definition: AutotoolsTask = <any>_task.definition;
         if (definition.action === 'bootstrap')
             return this.bootstrapTask;
+//        if (definition.action === 'autoreconf')
+//            return this.autoreconfTask;
         if (definition.action === 'regen')
             return this.regenTask;
+        if (definition.action === 'reautomake')
+            return this.reautomakeTask;
         if (definition.action === 'help')
             return this.helpTask;
 	}
@@ -420,109 +452,145 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
     public bootstrap_cmd(): string[] | undefined {
         if (this.the_bootstrap_cmd)
             return this.the_bootstrap_cmd;
-        if (!configuration.getConfigureAc()) {
+        if (!this.fc.isAutotoolsProject) {
             return undefined;
         } else {
             for (const script of boostrap_scripts) {
-                let fullpath = resolvePathToRoot(script);
+                let fullpath = path.join(this.fc.folder.uri.path, script);
                 if (checkFileExistsSync(fullpath))
                     return [fullpath];
             }
         }
-        return configuration.autoreconfCmd().concat('-i');
-    }
-    public isBootstrapped(): boolean {
-        return checkFileExistsSync(resolvePathToRoot("configure"));
+        return configuration.autoreconfCmd(this.fc.wsConfig).concat('-i');
     }
     private isErroredConfiguration: boolean = false;
-    public isConfigured(c: configuration.MakefileConfiguration): boolean {
+    public isConfigured(): boolean {
         return !this.isErroredConfiguration &&
-            checkFileExistsSync(resolvePathToRoot(path.join(c.top_builddir, "config.status")));
+            checkFileExistsSync(path.join(this.fc.abs_top_builddir, "config.status"));
     }
 
-    changeConfiguration(c: configuration.MakefileConfiguration, disposables: vscode.Disposable[]) : void
+    changeConfiguration() : void
     {
+        let c = this.fc.buildConfig;
         let b = this.bootstrap_cmd();
+        this.myTasks.splice(0);
         if (b) {
             const kind: AutotoolsTask = {
                 type: this.myType,
+                folderIndex: this.fc.folder.index,
                 action: 'bootstrap'
             };
-            this.bootstrapTask = new Task(kind, TaskScope.Workspace,
-                localize("autotools.bootstrap.task", "Bootstrap {0}", extension.getProjectName()),
+            this.bootstrapTask = new Task(kind, this.fc.folder,
+                localize("autotools.bootstrap.task", "Bootstrap {0}", this.fc.folder.name),
                 "Autotools task",
-                new ProcessExecution(b[0], b.slice(1)));
+                new ProcessExecution(b[0], b.slice(1), { env: { ACLOCAL_PATH: extension.m4Path }}),
+                configureProblemMatchers);
             this.bootstrapTask.group = TaskGroup.Build;
+            this.bootstrapTask.presentationOptions = reuseSilent;
             this.bootstrapTask.detail = localize("autotools.bootstrap", "$(tools) Bootstrap project using '{0}'", b.join(' '));
 
-            var autoreconf : string = configuration.autoreconfCmd().join(' ');
+            /* This is not used yet. Instead, make.configure will automatically update Makefile.inS */
+            const automake_kind: AutotoolsTask = {
+                type: this.myType,
+                folderIndex: this.fc.folder.index,
+                action: 'reautomake'
+            };
+            this.reautomakeTask = new Task(automake_kind, this.fc.folder,
+                localize("autotools.reautomakecmd.task", "Update Makefile.in and config headers"),
+                "Autotools task",
+                new ProcessExecution('automake', ['--no-force']));
+            this.reautomakeTask.group = TaskGroup.Build;
+            this.reautomakeTask.presentationOptions = reuseSilent;
+            this.reautomakeTask.detail = localize("autotools.makefilein.update", "$(sync) Regenerate Makefile.in templates. See [Updating Makefile.inS](https://www.gnu.org/software/automake/manual/html_node/automake-Invocation.html#index-_002d_002dno_002dforce)");
 
-            this.regenTask = new Task({type: this.myType, action: 'regen'},
-                    TaskScope.Workspace, "Update Makefiles and config headers",
+            var autoreconf : string = configuration.autoreconfCmd(this.fc.wsConfig).join(' ');
+
+            this.regenTask = new Task({type: this.myType, action: 'regen', folderIndex: this.fc.folder.index},
+                    this.fc.folder, "Update Makefiles and config headers",
                 localize("autotools.update.task", "Configuration output"),
                 new ShellExecution(
-                    c.top_builddir ? `${autoreconf} -v && CDPATH= cd ${c.top_builddir} && ./config.status` :
-                        `${autoreconf} -v && ./config.status`));
+                    (c.top_builddir ? `${autoreconf} -v && CDPATH= cd ${c.top_builddir} && ./config.status` :
+                        `${autoreconf} -v && ./config.status`), { env: { ACLOCAL_PATH: extension.m4Path }}),
+                            configureProblemMatchers);
             this.regenTask.group = TaskGroup.Build;
+            this.regenTask.presentationOptions = reuseSilent;
             this.regenTask.detail = localize("autotools.update", "$(sync) Regenerate Makefiles and headers. See [Autoconf output](https://www.gnu.org/software/autoconf/manual/autoconf-2.69/html_node/Output.html)");
 
-            this.recheckTask = new Task({type: this.myType, action: 'recheck'},
-                TaskScope.Workspace, "Re-check configuration",
+            this.recheckTask = new Task({type: this.myType, action: 'recheck', folderIndex: this.fc.folder.index},
+                this.fc.folder, "Re-check configuration",
                 localize("autotools.recheck.task", "Configuration update"),
-                new ShellExecution(
-                    c.top_builddir ? `${autoreconf} && CDPATH= cd ${c.top_builddir} && ./config.status --recheck && ./config.status` :
-                        `${autoreconf} && ./config.status --recheck && ./config.status`));
+                new ShellExecution('./config.status --recheck && ./config.status', {
+                            env: { ACLOCAL_PATH: extension.m4Path },
+                            cwd: this.fc.abs_top_builddir
+                        }),
+                        configureProblemMatchers);
             this.recheckTask.group = TaskGroup.Build;
+            // FIXME: If the parsing had to re-configure, the separate "Prepare" and "Recheck" terminal windows
+            // should be closed, as they are out-of-date #72
             this.recheckTask.presentationOptions = presentSilent;
             this.recheckTask.detail = localize("autotools.recheck", "$(sync) Update configuration. See [config.status invocation - --recheck](https://www.gnu.org/software/autoconf/manual/autoconf-2.69/html_node/config_002estatus-Invocation.html)");
 
-            this.myPromise = Promise.resolve([
+            this.myTasks.push(
                     this.bootstrapTask,
+                    this.reautomakeTask,
                     this.regenTask,
                     this.recheckTask
-                ]);
+                );
         }
         else {
             telemetry.setSpanStatus(extension.journey, SpanStatusCode.ERROR, "no-bootstrap-task");
-            this.myPromise = Promise.reject("Runtime error - no bootstrap task")
         }
     }
-    update(disposables: vscode.Disposable[]): boolean {
+    update(): boolean {
         return false;
     }
-    public async bootstrap(): Promise<vscode.TaskExecution | undefined> {
+    public async bootstrap(): Promise<vscode.TaskExecution> { // FIXME: add span
         if (this.bootstrapTask) {
             await this.waitToTouchMakefiles();
             return await vscode.tasks.executeTask(this.bootstrapTask).then((te: vscode.TaskExecution) => {
-                ui.getUI().setLoading(ui.UIStatus.REGEN);
+                ui.getUI().setLoading(ui.UIStatus.REGEN, this.fc);
                 return te;
             },(e) => {
-                ui.getUI().setLoading(ui.UIStatus.ERR);
-                return undefined;
+                ui.getUI().setLoading(ui.UIStatus.ERR, this.fc);
+                return Promise.reject("Failed to start boostrap task");
             });
         }
-        return undefined;
+        return Promise.reject("No boostrap task");
+    }
+    /* runs automake --no-force, then recheck.
+     * This is quicker than bootstrapping + configure
+     */
+    public async reautomake(span: Span): Promise<void> {
+        if (this.reautomakeTask && !this.isWorking) {
+            await this.waitToTouchMakefiles();
+            vscode.tasks.executeTask(this.reautomakeTask).then((e) => {
+                ui.getUI().setLoading(ui.UIStatus.REGEN, this.fc);
+                extension.running.set(e, span);
+            });
+        }
     }
     public async regen(): Promise<void> {
         // Use regenWorking to avoid restarting when already running.
         // Eg, Makefile.in is updated in the workspace, which triggers
         // a separate, unnecesary update.
-        if (this.regenTask) {
+        if (this.regenTask && !this.isWorking) {
             await this.waitToTouchMakefiles();
-            vscode.tasks.executeTask(this.regenTask).then(() => {
-                ui.getUI().setLoading(ui.UIStatus.REGEN);
+            vscode.tasks.executeTask(this.regenTask).then((e) => {
+                ui.getUI().setLoading(ui.UIStatus.REGEN, this.fc);
+                extension.running.set(e, telemetry.startSpan("regen", extension.journey));
             });
         }
     }
-    public async recheck(): Promise<void> {
+    public async recheck(span: Span): Promise<void> {
         // Use regenWorking to avoid restarting when already running.
         // Eg, Makefile.in is updated in the workspace, which triggers
         // a separate, unnecesary update.
         if (this.recheckTask) {
             await this.waitToTouchMakefiles();
-            await extension.readPkgInfo();
-            vscode.tasks.executeTask(this.recheckTask).then(() => {
-                ui.getUI().setLoading(ui.UIStatus.REGEN);
+            await this.fc.readPkgInfo();
+            vscode.tasks.executeTask(this.recheckTask).then((e) => {
+                ui.getUI().setLoading(ui.UIStatus.REGEN, this.fc);
+                extension.running.set(e, span);
             });
         }
     }
@@ -532,26 +600,28 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
         }
     }
     public async configure(span: Span): Promise<boolean> {
-        let c = configuration.getCurrentMakefileConfiguration();
+        let c = this.fc.buildConfig;
         let success = false;
 
         const configurekind: AutotoolsTask = {
             type: this.myType,
+            folderIndex: this.fc.folder.index,
             action: 'configure'
         };
-        let destdir = resolvePathToRoot(c.top_builddir);
+        let destdir = this.fc.abs_top_builddir;
         try {
-            if (destdir)
+            if (this.fc.buildConfig.top_builddir)
                 createDirectorySync(destdir);
 
             let configureArgs = c.configureArgs || [];
-            let task = new Task(configurekind, TaskScope.Workspace,
+            let task = new Task(configurekind, this.fc.folder,
                 localize("autotools.configure.task", "Prepare build directory"),
                 "Autotools task",
-                new ProcessExecution(resolvePathToRoot("configure"), configureArgs,
+                new ProcessExecution(path.join(this.fc.folder.uri.path, 'configure'), configureArgs,
                     {cwd : destdir}),
-                    ['autotools_configure']);
+                    configureProblemMatchers);
             task.detail = localize("automake.configure.help", "$(tools) Configure build directory");
+            task.presentationOptions = presentSilent;
 
             await this.waitToTouchMakefiles();
             vscode.tasks.executeTask(task)
@@ -593,24 +663,27 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
     public get isWorking() : boolean {
         return this.working;
     }
-    public async autotoolsDone(task: ProcessExecution | ShellExecution | vscode.CustomExecution | undefined, exitCode: number): Promise<void> {
+    public async autotoolsDone(span: Span, task: ProcessExecution | ShellExecution | vscode.CustomExecution | undefined, exitCode: number): Promise<void> {
         if (exitCode != 0) {
-            var kbUrl : vscode.Uri = await extension.kbUrl();
+            var kbUrl : vscode.Uri = await this.fc.kbUrl();
             if (task == this.bootstrapTask?.execution) {
-                logger.message('Bootstrap failed. Review the Terminal tab for cause.', "Normal");
+                logger.message(localize('autotools.regen.failed', '{0}: ERROR: Bootstrap failed. Review the Terminal tab for cause.',
+                    getStartTime(span).toISOString()), "Normal");
                 logger.message('Bootstrapping can be re-attempted with "Autotools: Bootstrap"', "Normal");
                 logger.message('KB: ' + kbUrl.toString(true) + '#bootstrap-fail', "Normal");
-                logger.showOutputChannel();
+                // logger.showOutputChannel();
             }
             else if (task == this.regenTask?.execution) {
-                logger.message('Regen failed. Review the Terminal tab for cause.', "Normal");
+                logger.message(localize('autotools.regen.failed', '{0}: ERROR: Regen failed. Review the Terminal tab for cause.',
+                    getStartTime(span).toISOString()), "Normal");
                 logger.message('KB: ' + kbUrl.toString(true) + '#regen-fail', "Normal");
-                logger.showOutputChannel();
+                // logger.showOutputChannel();
             }
             else if (task == this.recheckTask?.execution) {
-                logger.message('Recheck failed. Review the Terminal tab for cause.', "Normal");
+                logger.message(localize('autotools.recheck.failed', '{0}: ERROR: Recheck failed. Review the Terminal tab for cause.',
+                    getStartTime(span).toISOString()), "Normal");
                 logger.message('KB: ' + kbUrl.toString(true) + '#recheck-fail', "Normal");
-                logger.showOutputChannel();
+                // logger.showOutputChannel();
             }
         }
         if (this.working)
@@ -628,25 +701,41 @@ function FilterEnvsByDir(e: TestEnvironment[], dir: string) : TestEnvironment[] 
 function KeepList(e: TestEnvironment[]) : string {
     return e.map(i => i.hashCode.toString(36)).join(',');
 }
-export interface BuildTask extends TaskDefinition {
+export interface BuildTask {
     /*
      * The makefile goal that this task operates on
      */
+    readonly type: string;
     target?: BuildTarget;
+    
+    folderIndex: number;
 };
 
-export interface TestTask extends TaskDefinition {
+export interface TestTask {
     /*
      * The test output log this task creates.
      */
+    readonly type: string;
     test?: BuildTarget;
+    folderIndex: number;
+
+    /* test environment name - if missing, use current env */
+    env?: string;
+    exitCode?: number | undefined;
 };
 
-interface CheckTask extends TaskDefinition {
+export interface CheckTask {
     /*
      * Test suite arguments (default: none, ie, run 'make check' )
      */
+    readonly type: string;
     check?: CheckTarget;
+    folderIndex: number;
+    builddir: string;
+    /* test environment name - if missing, use current env */
+    env?: string;
+
+    exitCode?: number | undefined;
 };
 
 export class CheckTarget {
@@ -654,6 +743,8 @@ export class CheckTarget {
     TEST_SUITE_LOG?: string;
 }
 
-export interface AutotoolsTask extends TaskDefinition {
-    "action": string;
+export interface AutotoolsTask {
+    readonly type: string;
+    action: string;
+    folderIndex: number;
 };

@@ -29,6 +29,7 @@ scripts/
 vendor/
 
 # esbundler means these should not be packaged
+out/main.js.map
 node_modules/
 out/src
 .git

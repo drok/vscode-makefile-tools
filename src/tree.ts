@@ -6,18 +6,19 @@
 import * as configuration from './configuration';
 import * as path from 'path';
 import * as util from './util';
-import { Make, Goal } from './parser/gnumake';
+import { Make, Goal, MakeContext } from './parser/gnumake';
 import * as vscode from 'vscode';
+import {
+    ThemeColor, ThemeIcon,
+    WorkspaceFolder } from 'vscode';
 
 import * as nls from 'vscode-nls';
 import { extension, telemetry } from './extension';
 import { Span } from '@opentelemetry/api';
+import { envHash, FolderConfig } from './configuration';
+import { TreeItem } from 'vscode';
 nls.config({ messageFormat: nls.MessageFormat.bundle, bundleFormat: nls.BundleFormat.standalone })();
 const localize: nls.LocalizeFunc = nls.loadMessageBundle();
-
-interface NamedItem {
-    name: string;
-}
 
 const _empty = '';
 
@@ -30,20 +31,24 @@ export enum Scheme {
 
 export abstract class Node {
     // constructor(public readonly id: string) { }
-    abstract getTreeItem(): vscode.TreeItem;
+    abstract getTreeItem(state: vscode.TreeItemCollapsibleState, provider?: vscode.TreeDataProvider<Node>): vscode.TreeItem;
     abstract getChildren(): Node[];
     abstract logfile(): string | undefined;
     abstract make : Make;
 }
 
 export class SubNode extends Node {
-    constructor(public make: Make, public parent: SubNode | undefined | null, private tree : Map<Make, SubNode>,  private flags: number) {
+    constructor(public make: Make, public parent: SubNode | undefined | null, public tree : Map<Make, SubNode>,  private flags: number) {
         super();
     }
     private disableSuite : boolean = false;
+    private static readonly iconColor = new ThemeColor('minimap.warningHighlight');
+    private static readonly RecursiveDir = new ThemeIcon('alert', this.iconColor);
 
     getChildren(): Node[] {
-        let gg = [...this.make.submake.values()];
+        // Some of the submakes are not in a loop
+        let gg = [...this.make.submake.values()]
+            .filter(m => !(m.flags & Make.Flags.LoopVia));
         if (this.flags & Goal.Flags.Test_Suite) {
             gg = gg.filter(g => g.stats.tests)
         }
@@ -58,7 +63,8 @@ export class SubNode extends Node {
     }
     // Like getChildren but filtered for dirs of testenvironments
     getDirChildren() : Node[] {
-        let gg = [...this.make.submake.values()];
+        let gg = [...this.make.submake.values()]
+            .filter(m => !(m.flags & Make.Flags.LoopVia));
         if (this.flags & Goal.Flags.Test_Suite) {
             gg = gg.filter(g => g.stats.tests)
         }
@@ -70,47 +76,75 @@ export class SubNode extends Node {
         this.disableSuite = en;
     }
     private item : vscode.TreeItem | undefined;
-    getTreeItem(): vscode.TreeItem {
+    resetItem() : void { this.item = undefined; }
+    getTreeItem(state: vscode.TreeItemCollapsibleState, provider?: vscode.TreeDataProvider<Node>): vscode.TreeItem {
         if (!this.item) {
-            this.item = new vscode.TreeItem(this.make.dir);
-            this.item.collapsibleState = vscode.TreeItemCollapsibleState.Collapsed;
-            if (this.flags & Goal.Flags.Test_Suite) {
-                this.item.description = this.make.stats.tests ? localize("autotools.subnode.suite", "{0} tests",
-                    this.make.stats.tests) : undefined;
+            let isTestSuite = !!(this.flags & Goal.Flags.Test_Suite);
+            let label = this.parent ? (this.make.dir ?? "<buildDir>") : (
+                isTestSuite ? `${this.make.ctx.fc.folder.name}` :
+                this.make.ctx.fc.getProjectName()
+            );
+
+            this.item = new vscode.TreeItem(label);
+            this.item.collapsibleState = state; // vscode.TreeItemCollapsibleState.Collapsed;
+            if (this.make.flags & Make.Flags.LoopFrom)
+                this.item.iconPath = SubNode.RecursiveDir;
+
+            this.item.id = this.parent ?
+                `${this.parent.item?.id},${this.make.dir}` :
+                `${this.make.ctx.fc.folder.index},${this.make.dir}`;
+            if (isTestSuite) {
+                if (this.make.test_suite) this.item.iconPath = Goal.CheckIcon;
+                this.item.description = this.item.id ? (this.make.stats.tests ? localize("autotools.subnode.suite", "{0} tests",
+                    this.make.stats.tests) : undefined) : this.make.ctx.fc.currentTestEnvironment.name;
                 this.item.resourceUri = vscode.Uri.from({
                         scheme: Scheme.Check,
                         authority: _empty,
-                        path: '/' + this.make.dir,
+                        path: this.make.getDir(),
                         query: 'test-suite.log'
                     });
+                this.item.tooltip = this.make.dir || this.make.ctx.root;
             } else {
                 this.item.resourceUri = vscode.Uri.from({
                     scheme: Scheme.Make,
                     authority: _empty,
-                    path: '/' + this.make.dir
+                    path: '/' + this.make.ctx.fc.folder.index + '/' + this.make.getDir()
                 });
-                this.item.description = this.make.stats.programs ? localize("autotools.subnode.programs", "{0} programs",
-                    this.make.stats.programs) : undefined;
-                this.item.contextValue = ['nodeType=sub', 'nodeType=allbuild']
-                    .join(',');
+                // FIXME: This GetItem is called before parse, to set commands.
+                // The description needs to be updated after parse
+                this.item.description = this.item.id ? (this.make.stats.programs ? localize("autotools.subnode.programs", "{0} programs",
+                    this.make.stats.programs) : undefined) : this.make.ctx.fc.buildConfig.name;
+                this.item.tooltip =
+                    (this.make.stats.sharedlibs && this.make.stats.testbins) ?
+                    localize("autotools.subnode.programs.tooltip.ST", "{0}: {1} shared libs, {2} test programs",
+                        this.make.dir || this.make.ctx.root, this.make.stats.sharedlibs, this.make.stats.testbins) :
+                    (this.make.stats.sharedlibs) ?
+                    localize("autotools.subnode.programs.tooltip.S", "{0}: {1} shared libs",
+                        this.make.dir || this.make.ctx.root, this.make.stats.sharedlibs) :
+                    (this.make.stats.testbins) ?
+                    localize("autotools.subnode.programs.tooltip.S", "{0}: {1} test programs",
+                        this.make.dir || this.make.ctx.root, this.make.stats.testbins) :
+                    this.make.dir || this.make.ctx.root;
             }
-            this.item.tooltip =  this.make.dir;
-            this.item.id = this.make.dir;
-        }
-        if (this.flags & Goal.Flags.Test_Suite) {
-            // recalculate on every refresh because some suites must be disabled if dirs exclude them
-            this.item.contextValue = ["nodeType=sub"]
-            .concat((!this.disableSuite && (this.flags & Goal.Flags.Test_Suite) && this.make.test_suite) ? ['nodeType=check'] : [])
-            .join(',');
-        }
-
+            let context : string[] = ["nodeType=sub"];
+            if (!this.parent) { // Top of the tree
+                let fc = this.make.ctx.fc;
+                context.push('folderNode');
+                if (fc.isAutotoolsProject) context.push('isAutotoolsProject')
+                if (fc.isBootstrapped) context.push('isBootstrapped');
+                if (fc.isConfigured) context.push('isConfigured');
+                if (fc.build_tree.stats.programs) context.push('hasTargets');
+                if (fc.pkginfo?.bugreport) context.push('hasBugReport');
+                if (fc.pkginfo?.url) context.push('hasPackageUrl');
+                if (!path.isAbsolute(fc.buildConfig.top_builddir)) context.push('relBuildDir');
+                if (fc.gTestEnvironment.XFAIL_TESTS?.length) context.push('haveGlobalWaivers');
+            }
+            this.item.contextValue = context
+                .concat((!this.disableSuite && (this.flags & Goal.Flags.Test_Suite) && this.make.test_suite) ? ['nodeType=check'] : [])
+                .join(',');
+        } else
+            return this.item;
         return this.item;
-    }
-    makefile() : string {
-        if (this.make.dir)
-            // If a relative directory, make it absolute wrt. root of workspace
-            path.join('', path.join(this.make.dir, 'Makefile.am'));
-        return path.join(this.make.dir, 'Makefile.am');
     }
     logfile() : string | undefined {
         if ((this.flags & Goal.Flags.Test_Log) && this.make.dir) {
@@ -124,22 +158,29 @@ export class ProjectOutlineProvider implements vscode.TreeDataProvider<Node> {
     private readonly _changeEvent = new vscode.EventEmitter<Node | null>();
 
     private readonly flag: number = Goal.Flags.Linked_binary;
-    private tree: Make;
-    private subnodes : Map<Make, SubNode> = new Map();
-    constructor(span: Span, private configuration: string | undefined) {
-        this.tree = new Make('', span, '')
+    private trees: Map<FolderConfig, Make>;
+    private subnodes : Map<FolderConfig, Map<Make, SubNode>> = new Map();
+    constructor() {
+        this.trees = new Map();
     }
 
     get onDidChangeTreeData(): any {
         return this._changeEvent.event;
     }
-    async getTreeItem(node: Node): Promise<vscode.TreeItem> {
-        return node.getTreeItem();
+    getTreeItem(node: Node): vscode.TreeItem {
+        if (node instanceof SubNode) {
+            let state = node.make.ctx.fc.state.expandedMakes.includes(subHash(node)) ?
+            vscode.TreeItemCollapsibleState.Expanded : vscode.TreeItemCollapsibleState.Collapsed;
+            return node.getTreeItem(state, this);
+        }
+        return node.getTreeItem(vscode.TreeItemCollapsibleState.None, this);
     }
     getChildren(node?: Node): Node[] {
         let goals : Node[];
         if (!node) {
-            goals = [this.subnodes.get(this.tree)!];
+            goals = Array.from(this.trees.entries())
+                .sort((a,b) => a[0].folder.index - b[0].folder.index)
+                .map(([fc,m]) => this.subnodes.get(fc)!.get(m)!);
         } else {
             goals = node.getChildren();
         }
@@ -149,57 +190,77 @@ export class ProjectOutlineProvider implements vscode.TreeDataProvider<Node> {
         if (element instanceof SubNode)
             return element.parent;
         else
-            return this.subnodes.get(element.make);
+            return this.subnodes.get(element.make.ctx.fc)!
+                .get(element.make);
     }
 
-    public selectRdepends(path: string) : Goal[] {
+    public selectRdepends(uri: vscode.Uri) : Goal[] {
         let targets : Goal[] = [];
 
-        function dependsOnRecursive(path: string, goals: Goal[]) : boolean {
-            return goals.some( g => {
-                let goalpath = g.getFilePath();
-                return (goalpath == path || (g.depends && dependsOnRecursive(path, g.depends)));
+        let fc = configuration.findFolderConfig(uri);
+        if (fc) {
+            function dependsOnRecursive(path: string, goals: Goal[]) : boolean {
+                return goals.some( g => {
+                    let goalpath = g.getFilePath();
+                    return (goalpath == path || (g.depends && dependsOnRecursive(path, g.depends)));
+                });
+            }
+            fc.buildTargets.forEach((v, k) => {
+                v.forEach(g => {
+                    if ((g.flags & (Goal.Flags.Linked_binary | Goal.Flags.Test_Log)) &&
+                        g.depends && dependsOnRecursive(uri.path, g.depends))
+                        targets.push(g);
+                });
             });
         }
-        configuration.getAllBuildTargets().forEach((v, k) => {
-            v.forEach(g => {
-                if ((g.flags & (Goal.Flags.Linked_binary | Goal.Flags.Test_Log)) &&
-                    g.depends && dependsOnRecursive(path, g.depends))
-                    targets.push(g);
-            });
-        });
         telemetry.logEvent(extension.journey, "sR", { num: targets.length});
         return targets;
     }
     // Updates the tree when build configuration changes
     public all : Map<string,Goal> = new Map();
-    async update(configuration: string): Promise<void> {
-        this.configuration = configuration;
-        this.updateTree();
+    async update(fc: FolderConfig): Promise<void> {
+        // this.configuration = "Available Label";
+        // this.subnodes.get(this.trees.get(fc)!)
+        this.updateTree(this.subnodes.get(fc)!.get(fc.build_tree)!);
     }
 
-    clear() : void {
-        this.updateTargets(new Make('', extension.journey, ''));
+    removeFolder(fc: FolderConfig) : void {
+        this.trees.delete(fc);
+        this.subnodes.delete(fc);
+        this._changeEvent.fire(null);
     }
     // Updates the tree when settings.json changes
-    updateTargets(build_tree: Make) : void {
-        this.tree = build_tree;
-        this.subnodes.clear();
-        buildParents(build_tree, undefined, this.subnodes, this.flag);
-        this.updateTree();
+    updateTargets(fc: FolderConfig, update: boolean) : void {
+        let firstPaint = !this.trees.size;
+        this.trees.set(fc, fc.build_tree);
+        let oldtop = this.subnodes.get(fc)?.get(fc.build_tree);
+        let nodeMap = new Map();
+        this.subnodes.set(fc, nodeMap);
+        let newtop = buildParents(fc.build_tree, undefined, oldtop, nodeMap, this.flag);
+        (update || !firstPaint) && this.updateTree(!firstPaint ? null : oldtop ?? newtop);
     }
 
-    updateTree(): void {
-        this._changeEvent.fire(null);
+    updateTree(top: SubNode | null): void {
+        this._changeEvent.fire(top);
     }
 }
 
-function buildParents(tree: Make, parent: SubNode | undefined | null, parents: Map<Make, SubNode>, flags : number, depth: number = 0) : SubNode {
-    let myNode = new SubNode(tree, parent, parents, flags);
+function buildParents(tree: Make, parent: SubNode | undefined | null, oldtop: SubNode | undefined, parents: Map<Make, SubNode>, flags : number, depth: number = 0) : SubNode {
+    let myNode = oldtop ?? new SubNode(tree, parent, parents, flags);
+    if (oldtop) {
+        oldtop.tree = parents;
+        oldtop.resetItem();
+    }
     if (depth > 10) // Avoid infinite loop. a dependency tree 10-deep should be enough for everyone
         return myNode;
     for (const [dir,m] of tree.submake) {
-        parents.set(m, buildParents(m, myNode, parents, flags, depth+1));
+        if (!parents.has(m)) {
+            /* Don't overwrite. in infinite dir loops, this means all the leaf items
+             * will appear at the top-most instance a subnode. */
+            parents.set(m, myNode); // set something so child will detect has()
+            let newParent = buildParents(m, myNode, undefined, parents, flags, depth+1);
+            parents.set(m, newParent);
+        }
     }
     parents.set(tree, myNode);
     return myNode;
@@ -209,35 +270,33 @@ export class ProjectTestsProvider implements vscode.TreeDataProvider<Node> {
     private readonly _changeEvent = new vscode.EventEmitter<Node | null>();
 
     private readonly flag : number = Goal.Flags.Test_Suite;
-    private tree: Make;
-    private subnodes : Map<Make, SubNode> = new Map();
+    private trees: Map<FolderConfig, Make>;
+    private subnodes : Map<FolderConfig, Map<Make, SubNode>> = new Map();
     private env: configuration.TestEnvironment | undefined;
-    constructor(span: Span) {
-        this.tree = new Make('', span, '')
-    }
-
-    public refresh(): any {
-        this._changeEvent.fire(null);
+    constructor() {
+        this.trees = new Map();
     }
 
     get onDidChangeTreeData(): any {
         return this._changeEvent.event;
     }
-    async getTreeItem(node: Node): Promise<vscode.TreeItem> {
-        return node.getTreeItem();
+    getTreeItem(node: Node): vscode.TreeItem {
+        if (node instanceof SubNode) {
+            let state = node.make.ctx.fc.state.expandedChecks.includes(subHash(node)) ?
+            vscode.TreeItemCollapsibleState.Expanded : vscode.TreeItemCollapsibleState.Collapsed;
+            return node.getTreeItem(state, this);
+        }
+        return node.getTreeItem(vscode.TreeItemCollapsibleState.None);
     }
     getChildren(node?: Node): Node[] {
         let goals : Node[];
         if (!node) {
-            if (!this.tree.stats.checks)
-                return []; // ie, show the welcome message
-
-            goals = [this.subnodes.get(this.tree)!];
-            if (!this.env || !this.env?.dirs || this.env.dirs.includes(this.tree.dir))
-                if (this.tree.test_suite?.depends)
-                    goals
-                    .push(...this.tree.test_suite.depends);
-        } else 
+            // will show the welcome message if no trees have checks
+            goals = Array.from(this.trees.entries())
+                .sort((a,b) => a[0].folder.index - b[0].folder.index)
+                .filter(([k,v]) => v.stats.checks)
+                .map(([fc,m]) => this.subnodes.get(fc)!.get(m)!);
+        } else
           if (!this.env || !this.env?.dirs || this.env.dirs.includes(node.make.dir))
             goals = node.getChildren();
           else if (node instanceof SubNode)
@@ -256,30 +315,40 @@ export class ProjectTestsProvider implements vscode.TreeDataProvider<Node> {
         if (element instanceof SubNode)
             return element.parent;
         else
-            return this.subnodes.get(element.make);
-    }
+            return this.subnodes.get(element.make.ctx.fc)!
+                .get(element.make);
+}
 
     // Updates the tree when build configuration changes
     // alltests is an array used to find the decoration for each test
     public all : Map<string,Goal> = new Map();
-    async update(confname: string): Promise<void> {
-        this.updateTree(configuration.getCurrentTestEnvironment());
+    async update(fc: FolderConfig): Promise<void> {
+        this.updateTree(this.subnodes.get(fc)!.get(fc.build_tree)!);
     }
 
-    clear() : void {
-        this.updateTargets(new Make('', extension.journey, ''));
-    }
-    // Updates the tree when settings.json changes
-    updateTargets(build_tree: Make) : void {
-        this.tree = build_tree;
-        this.subnodes.clear();
-        buildParents(build_tree, undefined, this.subnodes, this.flag);
-        this.updateTree(configuration.getCurrentTestEnvironment());
-    }
-
-    updateTree(env: configuration.TestEnvironment): void {
-        this.env = env;
-        this.all.clear(); // it will be refilled with goals that are currently displayed
+    removeFolder(fc: FolderConfig) : void {
+        this.trees.delete(fc);
+        this.subnodes.delete(fc);
         this._changeEvent.fire(null);
     }
+    // Updates the tree when settings.json changes
+    updateTargets(fc: FolderConfig, update: boolean) : void {
+        let firstPaint = !this.trees.size;
+        this.trees.set(fc, fc.build_tree);
+        let oldtop = this.subnodes.get(fc)?.get(fc.build_tree);
+        let nodeMap = new Map();
+        this.subnodes.set(fc, nodeMap);
+        let newtop = buildParents(fc.build_tree, undefined, oldtop, nodeMap, this.flag);
+        (update || !firstPaint) && this.updateTree(!firstPaint ? null : oldtop ?? newtop);
+    }
+
+    updateTree(top: SubNode | null): void {
+        this._changeEvent.fire(top);
+    }
+    // updateTreeItems(fc: FolderConfig): void {
+    //     this.updateTree(this.subnodes.get(fc)!.get(fc.build_tree)!);
+    // }
+}
+export function subHash(sub: SubNode): number {
+    return envHash(`${sub.make.ctx.fc.folder.name}/${sub.make.dir}`);
 }

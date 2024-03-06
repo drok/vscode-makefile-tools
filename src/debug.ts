@@ -1,11 +1,10 @@
 import * as path from 'path';
 import * as vscode from 'vscode';
-import { getCurrentTarget,
-        getCurrentMakefileConfiguration,
+import {
         MakefileConfiguration } from './configuration';
 import { BuildTarget } from './make';
 import { DebugConfigurationProvider, WorkspaceFolder, DebugConfiguration, ProviderResult } from 'vscode';
-import { resolvePathToRoot } from './util';
+import { getSettingOr } from './util';
 import * as configuration from './configuration';
 import { Goal } from './parser/gnumake';
 import { extension } from './extension';
@@ -22,23 +21,37 @@ let defaultSetupCommands = [{
 }
 ];
 
+const frameworks_support : { [key: string]: string } =
+{
+    /* Google Test
+     * https://google.github.io/googletest/advanced.html#turning-assertion-failures-into-break-points
+     */
+    GTEST_BREAK_ON_FAILURE: "1",
+    GTEST_CATCH_EXCEPTIONS: "0",
+
+    /* Check
+     * https://libcheck.github.io/check/doc/check_html/check_7.html#Environment-Variable-Reference
+     */
+    CK_FORK: "no",
+}
+
 export function isDebuggable(goal: Goal) : boolean {
     return !!(goal.flags & Goal.Flags.Linked_binary);
 }
 class MyConfiguration implements vscode.DebugConfiguration {
-    constructor(built: BuildTarget) {
+    constructor(goal: Goal) {
         this.$comment = [
             "Debug a hardcoded target in any build configuration; customize environment and args as needed",
             "The 'cwd' is set automatically to demonstrate how",
             "This is a (carefully designed) template, but it can be editted as needed"
         ];
         this.type = "autotools";
-        this.name = "Debug '" + built.goal + "'" +
-            (built.builddir ? " in " + built.builddir : "");
+        this.name = "Debug '" + goal.goal + "'" +
+            (goal.make.dir ? " in " + goal.make.dir : "");
         this.request = "launch";
         this.program = "$(command:autotools.builddir)/" +
-            (built.builddir ? path.join(built.builddir, built.goal) :
-            built.goal);
+            (goal.make.dir ? path.join(goal.make.dir, goal.goal!) :
+            goal.goal);
         this.environment = [];
         this.args = [];
         this.stopAtEntry = true;
@@ -67,25 +80,28 @@ class MyConfiguration implements vscode.DebugConfiguration {
  * the builddir is pre-populated
  */
 export class DebugNow implements vscode.DebugConfiguration {
-    constructor(c: MakefileConfiguration, goal: Goal | undefined, built: BuildTarget, buildit: boolean, public env?: configuration.TestEnvironment) {
+    constructor(log: Goal | undefined, goal: Goal, public env?: configuration.TestEnvironment) {
         this.$comment = [
             "Debug a hardcoded target in any build configuration; customize environment and args as needed",
             "The 'cwd' is set automatically to demonstrate how",
             "This is a (carefully designed) template, but it can be editted as needed"
         ];
         this.type = "autotools";
-        this.name = "Debug '" + built.goal + "'" +
-            (built.builddir ? " in " + built.builddir : "") + ` @ ${env?.name ?? extension.userEnvName}`;
+        this.name = "Debug '" + goal.goal + "'" +
+            (goal.make.dir ? " in " + goal.make.dir : "") + ` @ ${env?.name ?? extension.userEnvName}`;
         this.request = "launch";
-        this.program =
-            resolvePathToRoot( buildit ?
-                path.join(c.top_builddir, (built.builddir ? path.join(built.builddir, built.goal) :
-            built.goal)):
-            path.join(built.builddir, built.goal));
+        this.program = path.join(goal.make.getDir(), goal.goal!);
         this.environment = [{
             name: "srcdir",
-            value: resolvePathToRoot(built.builddir)
+            value: path.join(goal.make.ctx.fc.folder.uri.path, goal.make.dir)
         }]
+        if (goal.flags & Goal.Flags.Libtool_Linked) {
+            let libtool = path.join(goal.make.ctx.root, 'libtool');
+            this.miDebuggerPath = extension.ltLauncher;
+            this.miDebuggerArgs = `gdb ${libtool} ${this.program}`;
+            this.MIMode = 'gdb';
+            this.externalConsole = false;
+        }
         if (env) {
             if (env.testDebugEnv)
                 Object.entries(env.testDebugEnv).forEach(([k,v]) => {
@@ -95,15 +111,23 @@ export class DebugNow implements vscode.DebugConfiguration {
                     });
                 });
         }
+        Object.entries(frameworks_support).forEach(([k,v]) => {
+            this.environment.push({
+                name: k,
+                value: v
+            });
+        });
         this.args = [];
-        this.stopAtEntry = true;
+        this.stopAtEntry = goal ? getSettingOr<boolean>(goal.make.ctx.fc.folder, "stopAtEntry", false) : true;
         //this.preLaunchTask = buildit ? "autotools: build " + built.goal +
         //    (built.builddir ? (' in ' + built.builddir) : ' at the top') : undefined;
-        this.cwd = resolvePathToRoot(path.join(c.top_builddir, built.builddir));
+        this.cwd = path.dirname(goal.getFilePath()); // path.resolve(goal.make.ctx.root, goal;
         this.setupCommands = defaultSetupCommands;
-        this.testUri = goal?.test?.uri?.with({scheme: "test"}) ?? vscode.Uri.from({scheme: "debug", path: this.cwd});
+        // this.testId = log?.test?.id || 'unk';
+        this.testUri = log?.test?.uri?.with({scheme: "test"}) ?? vscode.Uri.from({scheme: "debug", path: this.cwd});
     }
-    testUri: vscode.Uri | undefined;
+    // testId: string;
+    testUri: vscode.Uri;
     $comment: string[];
     name: string;
     type: string;
@@ -115,15 +139,21 @@ export class DebugNow implements vscode.DebugConfiguration {
     //preLaunchTask: string | undefined;
     cwd: string;
     setupCommands: { description: string, text: string, ignoreFailures: boolean }[];
+
+    /* mi params used for debugging Libtool bins */
+    miDebuggerPath?: string;
+    miDebuggerArgs?: string;
+    MIMode?: string;
+    additionalSOLibSearchPath?: string;
+    externalConsole?: boolean;
 }
 
 class MyDebugProvider implements DebugConfigurationProvider {
 
   provideDebugConfigurations(folder: WorkspaceFolder | undefined): ProviderResult<DebugConfiguration[]> {
-    // Return an array of debug configurations
-    // let c = getCurrentMakefileConfiguration();
-    return getCurrentTarget()
-        .then(goal => {
+    if (folder) {
+        let fc = configuration.getFolderConfig(folder);
+        return fc.getCurrentTarget().then(goal => {
             return [new MyConfiguration(goal),
             {
                 $comment: [
@@ -142,6 +172,9 @@ class MyDebugProvider implements DebugConfigurationProvider {
                 setupCommands: defaultSetupCommands
             }];
         });
+    } else {
+        return [];
+    }
 //    let r : DebugConfiguration;
 //    r = Promise.resolve(t.then(goal =>
 //        r = new MyConfiguration(goal.builddir, goal.goal)));
@@ -167,9 +200,12 @@ class MyDebugProvider implements DebugConfigurationProvider {
   resolveDebugConfiguration(folder: WorkspaceFolder | undefined, config: DebugConfiguration): ProviderResult<DebugConfiguration> {
     // If needed, modify the debug configuration before launching the debug session
     if (config.type === undefined) {
-        let conf = getCurrentTarget()
-            .then(goal => new DebugNow(getCurrentMakefileConfiguration(), undefined, goal, true, configuration.getCurrentTestEnvironment()));
-        return conf
+        if (folder) {
+            let fc = configuration.getFolderConfig(folder);
+            let conf = fc.getCurrentTarget()
+                .then(goal => new DebugNow(undefined, goal, fc.currentTestEnvironment));
+            return conf;
+        }
         //return null;
         // return new MyConfiguration("dir-name", "test-name");
     }

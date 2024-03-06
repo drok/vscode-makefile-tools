@@ -15,3 +15,5 @@ OneLocBuild
 /share
 /include/gnumake.h
 /src/test/fakeSuite/Repros/.vscode/compile_commands.json
+/buildinfo.ts
+/buildinfo.js

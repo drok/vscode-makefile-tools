@@ -17,7 +17,7 @@ import { parse, quote } from '@mergesium/shell-quote';
 // import  from '../extension';
 import { extension, telemetry } from '../extension';
 import { Making } from './tool';
-import { Make, EnteringRE, CopyrightRE, ExecutingRE } from './gnumake';
+import { RegExpMatchArrayWithIndices, Make, EnteringRE, CopyrightRE, ExecutingRE } from './gnumake';
 import { SpanStatusCode } from '@opentelemetry/api';
 
 export interface PreprocessDryRunOutputReturnType {
@@ -205,22 +205,22 @@ export class Executing implements Parser {
             return [ParserDisp.Leave, this];
         }
 
-        let executing = ExecutingRE.exec(line);
+        let executing = ExecutingRE.exec(line) as RegExpMatchArrayWithIndices;
         if (executing) {
             this.make.startExecuting(executing);
             return [ParserDisp.Leave, this];
         }
         // FIXME: line could be emitted by a script snippet, and it could throw the parser. try Catch here.
         try {
-            let makes = new Making(parseToolCmd(line), this);
+            let makes = new Making(parseToolCmd(line, path.resolve(this.make.ctx.fc.folder.uri.path,this.make.dir)), this);
             if (makes.done())
                 this.makes.push(makes);
         } catch (e) {
             if (failureReported < 6) {
-                telemetry.logEvent(this.make.span, "tpaFail", {proj: extension.pkginfo?.name});
-                telemetry.setSpanStatus(this.make.span, SpanStatusCode.ERROR, "tpaFAIL");
+                telemetry.logEvent(this.make.ctx.span, "tpaFail", {proj: this.make.ctx.fc.pkginfo?.name});
+                telemetry.setSpanStatus(this.make.ctx.span, SpanStatusCode.ERROR, "tpaFAIL");
                 logger.message(`ERROR: Failed to parse recipe for '${this.make.file}'`, "Normal");
-                if (!failureReported) logger.message('KB: ' + extension.kbUrlStatic.toString(true) + '#' + util.slugify(`config-parse-fail-${this.make.file}`), "Normal");
+                if (!failureReported) logger.message('KB: ' + this.make.ctx.fc._kbUrlStatic.toString(true) + '#' + util.slugify(`config-parse-fail-${this.make.file}`), "Normal");
                 this.makes.push(new Making([failToParseTool], this));
                 failureReported++;
             }
@@ -250,8 +250,13 @@ const LibtoolRE = /^[^\s]+ [^\s]+\/libtool .* (?:--mode=(\w+)) (.*)\s*$/;
 const TickRe = /`[^`]*`/g;
 // Parse a command line, removing comments, compound statements (||, &&)
 // redirections, and unescaping shell escape sequences
-function parseToolCmd(line: string) : Tool[] {
-    line = line.replace(TickRe,'');
+function parseToolCmd(line: string, abs_srcdir: string) : Tool[] {
+    // BAD: replaces rpath with dir
+    // /bin/bash ../libtool  --tag=CC   --mode=link gcc  -g -O2 -rpath `cd ../lasso/.libs/; pwd` -static  -o tests tests.o login_tests.o basic_tests.o non_regression_tests.o random_tests.o metadata_tests.o login_tests_saml2.o assertion_query_saml2.o ../lasso/liblasso.la -L/usr/local/lib -lz  -lgobject-2.0 -lglib-2.0 -lxmlsec1-openssl -lxmlsec1 -lssl -lcrypto -lxmlsec1-openssl -lxmlsec1 -lssl -lcrypto -lxslt -lxml2 -lssl -lcrypto -lcheck_pic -pthread -lrt -lm -lsubunit
+    // Also BAD:
+    // resolve uses PWD
+    line = line.replace(TickRe, abs_srcdir + '/');
+
     let libtool_cmd = LibtoolRE.exec(line);
     let ltmode : string | undefined;
     if (libtool_cmd) {

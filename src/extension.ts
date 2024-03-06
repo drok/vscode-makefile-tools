@@ -4,41 +4,37 @@
 // Makefile Tools extension
 
 import * as configuration from './configuration';
-import { MakefileConfiguration, TestEnvironment } from './configuration';
+import { FolderConfig, MakefileConfiguration, TestEnvironment } from './configuration';
 import * as cpptools from './cpptools';
 import * as logger from './logger';
 import * as util from './util';
 import * as make from './make';
 import { TRS } from './make';
-import * as toolParser from './parser/tool';
 import * as gnumake from './parser/gnumake';
 import { Goal } from './parser/gnumake';
 import * as path from 'path';
-import * as state from './state';
 import { SpanStatusCode, getStartTime } from './tele';
 import {
     ProjectOutlineProvider,
     ProjectTestsProvider,
+    subHash,
     } from './tree';
 import * as tree from './tree';
 import * as ui from './ui';
-import { resolvePathToRoot,
-         checkFileExistsSync } from './util';
 import * as vscode from 'vscode';
 import { TestItem } from 'vscode';
 import * as cpp from 'vscode-cpptools';
+import { CppConfigurationProvider } from './cpptools';
 import * as debugProvider from './debug';
 import { DebugNow } from './debug';
-import { MyTestController } from './test';
-import { AutoToolsBuildTaskProvider,
-        AutoToolsTestTaskProvider,
-        AutoToolsCheckTaskProvider,
-        AutoToolsBootstrapTaskProvider,
+import {
         AutotoolsTask,
-        BuildTask,
         TestTask,
-        MyTaskProvider } from './tasks';
-import { SuiteDecorations } from './suite-decorator';
+        BuildTask,
+        CheckTask,
+        MyTaskProvider,
+        AutoToolsCheckTaskProvider} from './tasks';
+import { SuiteDecorations, URIFolderIndexRe } from './suite-decorator';
 import { TestGrid, GridShowOptions } from './testgrid';
 import * as tele from './tele';
 import * as nls from 'vscode-nls';
@@ -66,119 +62,159 @@ export class Extension {
     static readonly myVersion = 0;
 
     public readonly journey;
-    private mementoState : state.StateManager;
     public readonly _projectOutlineProvider;
     public readonly _projectTestSuitesProvider;
-    private _projectOutlineTreeView : vscode.TreeView<tree.Node> | undefined;
-    private _projectTestSuitesView : vscode.TreeView<tree.Node> | undefined;
+    public _projectOutlineTreeView : vscode.TreeView<tree.Node> | undefined;
+    private _expandedMakes: Map<number,Set<number>> = new Map();
+    public _projectTestSuitesView : vscode.TreeView<tree.Node> | undefined;
+    private _expandedChecks: Map<number,Set<number>> = new Map();
     public readonly suiteDecorator = new SuiteDecorations();
 
-    private readonly cppConfigurationProvider = new cpptools.CppConfigurationProvider();
-    public getCppConfigurationProvider(): cpptools.CppConfigurationProvider { return this.cppConfigurationProvider; }
-
-    private cppToolsAPI?: cpp.CppToolsApi;
-    private cppConfigurationProviderRegister?: Promise<void>;
-    private tasks: MyTaskProvider[];
-    public autotoolsTask: AutoToolsBootstrapTaskProvider;
-    private buildTasks: AutoToolsBuildTaskProvider;
-    private testTasks: AutoToolsTestTaskProvider;
-    private checkTasks: AutoToolsCheckTaskProvider;
-    private needTaskFetchBugWorkaround: boolean = true;
+    public cppToolsAPI?: cpp.CppToolsApi;
+    public needTaskFetchBugWorkaround: boolean = true;
     private compilerFullPath ?: string;
     public readonly dryRunner : string;
     public readonly testRunner : string;
+    public readonly ltLauncher : string;
     public readonly rulesPath : string;
+    public readonly m4Path : string;
     public readonly userEnvName : string = "<none>";
-    public testController : MyTestController | undefined;
-    public pkginfo : make.pkgInfo | undefined;
     private _treeDisposables: vscode.Disposable[] = [];
     public running: WeakMap<vscode.TaskExecution, Span> = new WeakMap();
+
+    /* Intellisense Data */
+    private readonly _cppConfigurationProvider : CppConfigurationProvider = new CppConfigurationProvider();
+    public get cppConfigurationProvider() : CppConfigurationProvider { return this._cppConfigurationProvider; }
+
 
     public constructor(public readonly extensionContext: vscode.ExtensionContext, teleParams: tele.Params) {
         telemetry = new tele.MyTelemetry(extensionContext, teleParams);
         this.journey = telemetry.startSpan('j');
 
-        this.mementoState = new state.StateManager(this.extensionContext);
-        this._projectOutlineProvider = new ProjectOutlineProvider(this.journey, this.mementoState.buildConfiguration);
-        this._projectTestSuitesProvider = new ProjectTestsProvider(this.journey); // <null>
+        this._projectOutlineProvider = new ProjectOutlineProvider();
+        this._projectTestSuitesProvider = new ProjectTestsProvider(); // <null>
 
-        this.autotoolsTask = new AutoToolsBootstrapTaskProvider();
-        this.buildTasks = new AutoToolsBuildTaskProvider();
-        this.testTasks = new AutoToolsTestTaskProvider();
-        this.checkTasks = new AutoToolsCheckTaskProvider();
-        this.tasks = [
-            this.autotoolsTask,
-            this.buildTasks,
-            this.testTasks,
-            this.checkTasks,
-        ];
         this.dryRunner = path.join(extensionContext.extensionPath, "bin/make" + (process.platform === 'win32' ? ".exe" : ""));
         this.testRunner = path.join(extensionContext.extensionPath, "bin/test-driver");
+        this.ltLauncher = path.join(extensionContext.extensionPath, "bin/lt-debug.sh");
         this.rulesPath = path.join(extensionContext.extensionPath, "include")
+        this.m4Path = path.join(extensionContext.extensionPath, "m4")
 
         extensionContext.subscriptions.push(vscode.commands.registerCommand('autotools.bootstrap', async () => {
             telemetry.logEvent(this.journey, "cBs");
-            let te = await this.autotoolsTask.bootstrap();
-            te && this.running.set(te, extension.journey);
+            await configuration.selectFolderConfig().then(
+                async fc => await fc.autotoolsTask.bootstrap()
+                    .then(te => this.running.set(te, extension.journey))
+            )
+        }));
+        extensionContext.subscriptions.push(vscode.commands.registerCommand('autotools.outline.bootstrap', async (sub: tree.SubNode) => {
+            telemetry.logEvent(this.journey, "cBs");
+            await sub.make.ctx.fc.autotoolsTask.bootstrap()
+                    .then(te => this.running.set(te, extension.journey));
         }));
         extensionContext.subscriptions.push(vscode.commands.registerCommand('autotools.command.regen', async () => {
             telemetry.logEvent(this.journey, "cRegen");
-            await this.autotoolsTask.regen();
+            await configuration.selectFolderConfig().then(
+                async fc => await fc.autotoolsTask.regen()
+            );
         }));
         extensionContext.subscriptions.push(vscode.commands.registerCommand('autotools.configure.help', async () => {
             telemetry.logEvent(this.journey, "cHelp");
-            await this.autotoolsTask.help();
+            await configuration.selectFolderConfig().then(
+                async fc => await fc.autotoolsTask.help()
+            );
         }));
         extensionContext.subscriptions.push(vscode.commands.registerCommand('autotools.visit.knowledgeBase', async () => {
             telemetry.logEvent(this.journey, "gKB");
-            await this.gotoKnowledgeBase();
+            await configuration.selectFolderConfig().then(
+                async fc => await fc.gotoKnowledgeBase()
+            );
         }));
+        /* TODO: Rework this command */
+
         extensionContext.subscriptions.push(vscode.commands.registerCommand('autotools.visit.packageURL', async () => {
             telemetry.logEvent(this.journey, "gpU");
-            if (this.pkginfo?.url)
-                vscode.commands.executeCommand('vscode.open', this.pkginfo.url);
+            await configuration.selectFolderConfig().then(
+                async fc => {
+                    if (fc.pkginfo?.url)
+                        vscode.commands.executeCommand('vscode.open', fc.pkginfo.url);
+            });
         }));
+
         extensionContext.subscriptions.push(vscode.commands.registerCommand('autotools.gotoBuildDirectory', async (goal: Goal) => {
             telemetry.logEvent(this.journey, "gBD");
             vscode.commands.executeCommand('revealInExplorer', vscode.Uri.from({
                 scheme: 'file',
-                path: util.resolvePathToRoot(configuration.getCurrentMakefileConfiguration().top_builddir)
+                path: goal.make.ctx.root
             }));
         }));
 
-        extensionContext.subscriptions.push(vscode.commands.registerCommand('autotools.visit.packageBugs', async () => {
+        extensionContext.subscriptions.push(vscode.commands.registerCommand('autotools.C_Cpp.ConfigurationProviderSelect', () => {
+            telemetry.logEvent(this.journey, "cppProv");
+            vscode.commands.executeCommand('C_Cpp.ConfigurationProviderSelect');
+        }));
+
+        /* TODO: Rework this command */
+        extensionContext.subscriptions.push(vscode.commands.registerCommand('autotools.visit.packageBugs', async (sub: tree.SubNode) => {
             telemetry.logEvent(this.journey, "gpBugs");
-            if (this.pkginfo?.bugreport)
-                vscode.commands.executeCommand('vscode.open', this.pkginfo.bugreport);
+            if (sub.make.ctx.fc.pkginfo?.bugreport) {
+                let uri = vscode.Uri.parse(sub.make.ctx.fc.pkginfo.bugreport);
+                vscode.commands.executeCommand('vscode.open', uri);
+            }
         }));
-        extensionContext.subscriptions.push(vscode.commands.registerCommand('autotools.command.openKnowledgeBase', async () => {
-            await this.gotoKnowledgeBase();
+
+        extensionContext.subscriptions.push(vscode.commands.registerCommand('autotools.command.openKnowledgeBase', async (sub: tree.SubNode) => {
+            telemetry.logEvent(this.journey, "gKB");
+            await sub.make.ctx.fc.gotoKnowledgeBase()
         }));
-        extensionContext.subscriptions.push(vscode.commands.registerCommand('autotools.command.testgrid.top', async (e) => {
+        extensionContext.subscriptions.push(vscode.commands.registerCommand('autotools.command.testgrid.top', async (sub: tree.SubNode | TestItem) => {
             telemetry.logEvent(this.journey, "topgrid");
-            let summary : vscode.Uri = vscode.Uri.from({
-                scheme: TestGrid.scheme,
-                authority: "mergesium.autotools",
-                path: TestGrid.top,
-            });
-            await focusPreviewedDocument(summary);
+            if (sub instanceof tree.SubNode /*&& sub.make.test_suite*/) {
+                // dir = sub.make.dir;
+                let fc = sub.make.ctx.fc;
+                let summary : vscode.Uri = vscode.Uri.from({
+                    scheme: TestGrid.scheme,
+                    authority: "mergesium.autotools",
+                    path: path.resolve('/', fc.folder.index.toString(), TestGrid.top),
+                });
+                await focusPreviewedDocument(summary);
+            } else if (instanceOfTestItem(sub)) {
+                let dir = URIFolderIndexRe.exec(sub.parent?.id ?? sub.id);
+                if (dir) {
+                    let summary : vscode.Uri = vscode.Uri.from({
+                        scheme: TestGrid.scheme,
+                        authority: "mergesium.autotools",
+                        path: `/${dir[1]}/${TestGrid.top}`,
+                    });
+                    await focusPreviewedDocument(summary);
+                }
+            }
         }));
 
         extensionContext.subscriptions.push(vscode.commands.registerCommand('autotools.command.testgrid.item', async (sub: tree.SubNode | TestItem) => {
             telemetry.logEvent(this.journey, "itemgrid");
             let dir : string | undefined;
+            let fc : FolderConfig;
             if (sub instanceof tree.SubNode && sub.make.test_suite) {
                 dir = sub.make.dir;
-            } else if (instanceOfTestItem(sub)) {
-                dir = sub.parent?.id ?? sub.id;
-            }
-            if (dir) {
+                fc = sub.make.ctx.fc;
                 let summary : vscode.Uri = vscode.Uri.from({
                     scheme: TestGrid.scheme,
                     authority: "mergesium.autotools",
-                    path: '/' + dir,
+                    path: path.resolve('/', fc.folder.index.toString(), dir),
                 });
                 await focusPreviewedDocument(summary);
+            } else if (instanceOfTestItem(sub)) {
+                //dir = sub.parent?.id ?? sub.id;
+                let dir = sub.children.size ? sub.id : sub.parent?.id;
+                if (dir) {
+                    let summary : vscode.Uri = vscode.Uri.from({
+                        scheme: TestGrid.scheme,
+                        authority: "mergesium.autotools",
+                        path: `${dir}`,
+                    });
+                    await focusPreviewedDocument(summary);
+                }
             }
         }));
 
@@ -189,7 +225,7 @@ export class Extension {
             configuration.setCurrentGoalBins(undefined);
             configuration.setCurrentGoalTests(undefined);
             vscode.commands.executeCommand('autotools.tests.focus');
-            let goals = extension._projectOutlineProvider.selectRdepends(sub.path);
+            let goals = extension._projectOutlineProvider.selectRdepends(sub);
             let status : boolean = true;
             for (const g of goals) {
                 if (g.flags & Goal.Flags.Test_Log) {
@@ -219,60 +255,9 @@ export class Extension {
 
         debugProvider.activate(extensionContext);
     }
-    public getProjectName() : string {
-        if (this.pkginfo) {
-            if (this.pkginfo.version)
-                return `${this.pkginfo.name} ${this.pkginfo.version}`;
-            else
-                return `${this.pkginfo.name}`;
-        }
-        return configuration.getFolder();
-    }
-    // Force read pkginfo even if already set, used when configure.ac changes
-    public async readPkgInfo() : Promise<void> {
-        this.pkginfo = await make.getPackageJSON().catch<undefined>(() =>
-            Promise.resolve(undefined));
-        vscode.commands.executeCommand("setContext", "autotools:packageHasURL",
-            this.pkginfo?.url ? 1 : 2);
-        vscode.commands.executeCommand("setContext", "autotools:packageHasIssues",
-            this.pkginfo?.bugreport ? 1 : 2);
-    }
-    public kbUrlStatic : vscode.Uri = vscode.Uri.from({
-        scheme: 'https',
-        authority: 'autotools.mergesium.com',
-        path: `/kb/${configuration.getFolder()}`});
-
-    public async kbUrl() : Promise<vscode.Uri> {
-        if (!this.pkginfo)
-            await this.readPkgInfo();
-
-        if (!this.pkginfo)
-            return Promise.resolve(this.kbUrlStatic);
-
-        this.kbUrlStatic = vscode.Uri.from({
-            scheme: 'https',
-            authority: 'autotools.mergesium.com',
-            path: '/kb/' + util.slugify(this.pkginfo?.name ?? 'unknown'),
-            // The s- prefix matches my_kramdown_patch
-            // Used for headings that start with digits (1.0.0) because html element ids cannot begin with non letter
-            query: this.pkginfo?.version.match(/^a-zA-Z/) ?
-                'v=' + util.slugify('s-' + this.pkginfo?.version) :
-                this.pkginfo?.version ? 'v=' + util.slugify(this.pkginfo?.version) : undefined
-        });
-        return Promise.resolve(this.kbUrlStatic);
-    }
-    async gotoKnowledgeBase() {
-        let kburl = await this.kbUrl();
-        vscode.commands.executeCommand('vscode.open', kburl.toString(true));
-    }
     public createPanel() : void {
         if (this._projectOutlineTreeView)
             return; // otherwise "No tree view id 'autotools.outline' registered rejected promise wehn
-            // extensionHost attempts to getChildren()". Looks like createTreeView schedules an async
-            // deferred registration.
-            // Maybe there's a bug in vscode 1.77
-            // Try it again on other versions, uncomment the deletePanel
-            // this.deletePanel();
         this._projectOutlineTreeView = vscode.window.createTreeView('autotools.outline', {
             treeDataProvider: this._projectOutlineProvider,
             canSelectMany: true,
@@ -291,12 +276,29 @@ export class Extension {
                 this.suiteDecorator.highlightRelevant(configuration.currentGoals);
             }
         }));
+        this._treeDisposables.push(this._projectOutlineTreeView.onDidCollapseElement((e: vscode.TreeViewExpansionEvent<tree.Node>) => {
+            let s = this._expandedMakes.get(e.element.make.ctx.fc.folder.index);
+            if (!s) {
+                s = new Set(e.element.make.ctx.fc.state.expandedMakes);
+                this._expandedMakes.set(e.element.make.ctx.fc.folder.index,s);
+            }
+            s.delete(subHash(e.element as tree.SubNode));
+            e.element.make.ctx.fc.state.expandedMakes = Array.from(s);
+        }));
+        this._treeDisposables.push(this._projectOutlineTreeView.onDidExpandElement((e: vscode.TreeViewExpansionEvent<tree.Node>) => {
+            let s = this._expandedMakes.get(e.element.make.ctx.fc.folder.index);
+            if (!s) {
+                s = new Set(e.element.make.ctx.fc.state.expandedMakes);
+                this._expandedMakes.set(e.element.make.ctx.fc.folder.index,s);
+            }
+            s.add(subHash(e.element as tree.SubNode));
+            e.element.make.ctx.fc.state.expandedMakes = Array.from(s);
+        }));
 
         this._projectTestSuitesView = vscode.window.createTreeView('autotools.tests', {
             treeDataProvider: this._projectTestSuitesProvider,
             canSelectMany: true,
             showCollapseAll: false
-
         });
         this._treeDisposables.push(this._projectTestSuitesView.onDidChangeSelection((e) => {
             let oldGoals = configuration.currentGoalsTests;
@@ -316,17 +318,24 @@ export class Extension {
                 }
             }
         }));
-    }
-    public setConfiguration(name: string) {
-        if (this._projectOutlineTreeView) {
-            var projname = this.pkginfo ? (this.pkginfo.name + ' ' + this.pkginfo.version) : "";
-            this._projectOutlineTreeView.description = `${projname} - ${name}`;
-        }
-    }
-    public setTestEnvironmentName(name: string) {
-        if (this._projectTestSuitesView) {
-            this._projectTestSuitesView.description = `env: "${name}"`;
-        }
+        this._treeDisposables.push(this._projectTestSuitesView.onDidCollapseElement((e: vscode.TreeViewExpansionEvent<tree.Node>) => {
+            let s = this._expandedChecks.get(e.element.make.ctx.fc.folder.index);
+            if (!s) {
+                s = new Set(e.element.make.ctx.fc.state.expandedChecks);
+                this._expandedChecks.set(e.element.make.ctx.fc.folder.index,s);
+            }
+            s.delete(subHash(e.element as tree.SubNode));
+            e.element.make.ctx.fc.state.expandedChecks = Array.from(s);
+        }));
+        this._treeDisposables.push(this._projectTestSuitesView.onDidExpandElement((e: vscode.TreeViewExpansionEvent<tree.Node>) => {
+            let s = this._expandedChecks.get(e.element.make.ctx.fc.folder.index);
+            if (!s) {
+                s = new Set(e.element.make.ctx.fc.state.expandedChecks);
+                this._expandedChecks.set(e.element.make.ctx.fc.folder.index,s);
+            }
+            s.add(subHash(e.element as tree.SubNode));
+            e.element.make.ctx.fc.state.expandedChecks = Array.from(s);
+        }));
     }
     public deletePanel() : void {
         this._treeDisposables.forEach((d) => d.dispose());
@@ -337,152 +346,83 @@ export class Extension {
         this._treeDisposables = [];
 }
 
-    failStatUpdate(oldresult: make.TRS, result: make.TRS) {
-        assert(oldresult != result, "in failStatUpdate result should be different", [oldresult, result]);
-        if ((result == make.TRS.NONE || result == make.TRS.ERROR) &&
-            !(oldresult == make.TRS.NONE || oldresult == make.TRS.ERROR))
-            this.testTasks.numUnknown++;
-        else if ((oldresult == make.TRS.NONE || oldresult == make.TRS.ERROR) &&
-                !(result == make.TRS.NONE || result == make.TRS.ERROR))
-            this.testTasks.numUnknown--;
-
-        if (oldresult == make.TRS.FAIL || oldresult == make.TRS.XPASS)
-            this.testTasks.numFails--;
-        else if (result == make.TRS.FAIL || result == make.TRS.XPASS)
-            this.testTasks.numFails++;
-
-        if (make.isSuspect(oldresult))
-            this.testTasks.numSuspect--;
-        else if (make.isSuspect(result))
-            this.testTasks.numSuspect++;
-    }
-
     /**
      * Handler for TRS file changes. Updates the Goal's trs structure with the current and global results
      * @param c {@linkcode MakefileConfiguration Current build configuration}
      * @param env {@linkcode TestEnvironment} The TestEnvironment that is the "current", used to select the right :test-result: TRS line
      * @param uri the uri of the TRS file as reported by fs.watch
      */
-    trsChange(c: MakefileConfiguration, env: TestEnvironment, uri: vscode.Uri) : void {
+    trsChange(fc: FolderConfig, uri: vscode.Uri) : void {
 
         /* The test driver moves the trs to trs.tmp when generating a new one. Avoid test status updating to 'NONE'
          * while tests are running.
          */
-        if (this.testController?.busyNonLiveTest)
+        if (fc.testController?.busyNonLiveTest)
             return;
         /* This is only used when the FS changes without a testRun in progress */
-        let dir = path.relative(util.resolvePathToRoot(c.top_builddir), path.dirname(uri.path));
+        let dir = path.relative(fc.abs_top_builddir, path.dirname(uri.path));
         let log = path.basename(uri.path, ".trs") + ".log";
-        let goal = configuration.getAllBuildTargets()
+        let goal = fc.buildTargets
             ?.get(dir)
             ?.get('test-suite.log')
             ?.depends?.find((d) => d.goal === log);
 
         if (goal) {
             let old = goal.trs;
-            goal.trs = make.readTRS(new make.BuildTarget(dir, log), c);
-// Avoiding move to .tmp doesn't work. on make clean, the icons should be updated.
-//
-            if (this.updateTRSInPanel(env, old, goal, dir))
-                this.updateOutlineBadge();
-
             let old_global = goal.trs?.global ?? TRS.NONE;
-            if ( ((goal.test && goal.trs.global != old_global) || this.testController?.busy) && !(goal.flags & Goal.Flags.Test_Suite))
+            goal.trs = make.readTRS(new make.BuildTarget(dir, log), fc);
+
+            if (fc.updateTRSInPanel(old, goal, dir))
+                fc.updateOutlineBadge();
+
+            if ( ((goal.test && goal.trs.global != old_global) || fc.testController?.busy) && !(goal.flags & Goal.Flags.Test_Suite))
                 /* If there is an active test run, use it to log the TRS result.
                  * Otherwise, create a new manual run
                  */
-                if (!this.testController?.markActiveTestTRS(goal, dir))
-                    goal.test && this.testController?.trsChange(goal.test, dir);
-        }
-    }
-    private unsupported_log_count : number = 0;
-    // return true if the Outline badge should update
-    public updateTRSInPanel(env: TestEnvironment, old: make.TestResult | undefined, goal: Goal, dir: string) : boolean {
-        /* The ?? defaults are needed when the test is not using my LOG_DRIVER
-         * .. the TRS in the file will not have the hashCode
-         *
-         */
-        let current : TRS | undefined = goal.trs!.results.get(env.hashCode);
-        let oldTRS = old?.results.get(env.hashCode) ?? TRS.NONE;
-        if (old !== undefined && current == undefined  && goal.trs!.global != TRS.NONE) {
-            /* ie, There *is* a trs file, but lacks envids */
-            if (this.unsupported_log_count++ < 4) {
-                logger.message(`ERROR: The test ${dir}/${goal.goal} did not use the ${Extension.whoami} LOG_DRIVER. Per-environment results not available.`);
-                telemetry.setSpanStatus(this.journey, SpanStatusCode.ERROR, "unknown ?_LOG_DRIVER");
-            }
-        } else
-        if (old === undefined || (current ?? TRS.NONE) != oldTRS) {
-            (old != undefined) && this.suiteDecorator.update(goal.getURI());//  vscode.Uri.from(
-//                {authority: Extension.whoami, scheme: 'test', path: '/' + dir, query: goal.goal}));
-            //this.suiteDecorator.update(vscode.Uri.from(
-            //    {authority: Extension.whoami, scheme: 'check', path: '/' + dir, query: 'test-suite.log'}));
-            if (old !== undefined) // Don't update when TRS's are initially read from disk
-                this.failStatUpdate(oldTRS, current ?? TRS.NONE);
-            // Don't update the test suites. They are auto summarized
-            return true;
-        }
-        return false;
-    }
-
-    public async bootstrapWithPrompt(span: Span) : Promise<void>  {
-        if (!this.autotoolsTask.isBootstrapped()) {
-            let cmd = this.autotoolsTask.bootstrap_cmd();
-            if (cmd) {
-                const doit: string = localize("autotools.bootstrap.me", "Bootstrap");
-                const setit: string = localize("autotools.edit.setting", "Setting...");
-                await vscode.window.showWarningMessage(
-                    localize("autotools.want.bootstrap", "The project needs to be bootstrapped ('{0}').", cmd.join(' ')),
-                    doit,
-                    localize("autotools.cancel", "Cancel"), setit).then(async (value) => {
-                    if (value === doit) {
-                        let te = await this.autotoolsTask.bootstrap();
-                        te && this.running.set(te, span);
-                    } else if (value === setit) {
-                        openSettings("autotools.autoBootstrap");
-                    }
-                });
-            }
+                if (!fc.testController?.markActiveTestTRS(goal, dir))
+                    goal.test && fc.testController?.trsChange(goal.test, dir);
         }
     }
 
     public registerTasks(): void {
-        // FIXME: Implement Disposable
-        this.tasks.forEach((provider) => vscode.tasks.registerTaskProvider(provider.myType, provider));
         // It's possible that the fileWatcher takes too many descriptors, so
         // it might be replaced with waiting for exit codes.
         // Monitoring exit codes is blind to the user manually doing "make clean" or "make check"
         this.extensionContext.subscriptions.push(vscode.tasks.onDidEndTask((e) =>{
             let task = e.execution.task;
-            let span = this.running.get(e.execution);
-            if (task) {
+            // let span = this.running.get(e.execution);
+            this.running.delete(e.execution);
+            if (task && ('folderIndex' in task.definition)) {
                 const definition: TestTask = <any>task.definition;
+                if (definition.folderIndex < 0) // ie, bug workaround
+                    return;
+                let fc = configuration.findFolderConfigByIndex(definition.folderIndex);
                 if (definition.type == "test" && definition.test) {
-                    let suite = configuration.getAllBuildTargets()
-                        ?.get(definition.test.builddir)
+                    let suite = fc.buildTargets
+                        .get(definition.test.builddir)
                         ?.get('test-suite.log');
                     if (suite) {
                         let goal = suite.depends?.find((d) => d.goal === definition.test?.goal);
                         if (goal) {
-                            definition.test && goal.test && this.testController!.testCompleted(e.execution, goal, definition.test);
+                            definition.test && goal.test && fc.testController!.testCompleted(e.execution, goal, definition.test);
                         }
                     }
-                    this.autotoolsDoneNoResult();
+                    fc.autotoolsTask.autotoolsDoneNoResult();
                     extension.updateAllGrids();
                 } else if (definition.type == 'check') {
-                    let suite = configuration.getAllBuildTargets()
-                        ?.get(definition.builddir)
+                    const def: CheckTask = task.definition as CheckTask;
+                    let suite = fc.buildTargets
+                        .get(def.builddir)
                         ?.get('test-suite.log');
                     if (suite && suite.test) {
-                        this.testController?.suiteCompleted(e.execution, suite, definition.builddir);
+                        fc.testController?.suiteCompleted(e.execution, suite, def.builddir);
                     }
-                    this.autotoolsDoneNoResult();
+                    fc.autotoolsTask.autotoolsDoneNoResult();
                     extension.updateAllGrids();
                 } else if (definition.type == "autotools") {
-                    this.autotoolsDoneNoResult();
+                    fc.autotoolsTask.autotoolsDoneNoResult();
                 }
             }
-            span?.end();
-
         }));
         this.extensionContext.subscriptions.push(vscode.tasks.onDidEndTaskProcess(async (e) => {
             let task = e.execution.task;
@@ -491,52 +431,39 @@ export class Extension {
                 let span = tspan ?? extension.journey;
                 const definition: TestTask = <any>task.definition;
                 if (definition.type == "test" && definition.test) {
+                    definition.exitCode = e.exitCode;
                 } else if (definition.type == 'check') {
+                    definition.exitCode = e.exitCode;
                 } else if (definition.type == "autotools") {
                     const definition: AutotoolsTask = <any>task.definition;
-                    ui.getUI().setStatus(e.exitCode ? ui.UIStatus.ERR : ui.UIStatus.OK);
-                    //if (definition?.action == "regen" || definition?.action == "recheck")
-                    await this.autotoolsTask.autotoolsDone(task.execution,
-                            (typeof e.exitCode == 'number') ? e.exitCode : (e.exitCode ? 1 : 0));
-                    if (!e.exitCode) {
-                        if (definition?.action == "bootstrap") {
-                            let r = await configuration.analyzeConfigureParams(span, false, false) &&
-                                !await make.configure(span, make.TriggeredBy.configureAfterConfigurationChange);
-                            if (r)
-                                if (this.testController) {
-                                    this.testController.onSavedAll();
-                                };
-                        } else if (definition?.action == "regen" || definition?.action == "recheck" || definition?.action == "configure") {
-                            let r = await configuration.analyzeConfigureParams(span, false, true) &&
-                                !await make.configure(span, make.TriggeredBy.configureAfterConfigurationChange);
-                            if (r)
-                                if (this.testController) {
-                                    this.testController.onSavedAll();
-                                };
-                        }
-                        tspan && telemetry.setSpanStatus(tspan, SpanStatusCode.OK);
-                    } else {
-                        ui.getUI().setLoading(ui.UIStatus.ERR);
-                        tspan && telemetry.setSpanStatus(tspan, SpanStatusCode.ERROR, `status ${e.exitCode}`);
-                    }
+
+                    let fc = configuration.findFolderConfigByIndex(definition.folderIndex);
+                    ui.getUI().setStatus(e.exitCode ? ui.UIStatus.ERR : ui.UIStatus.OK, fc);
+                    await fc.taskFSM(e, definition, span, task);
                 }
+                tspan?.end();
             }
         }));
         this.extensionContext.subscriptions.push(vscode.debug.onDidStartDebugSession(e => {
             let type = e.configuration.testUri ?
                 (e.configuration.testUri.scheme == "test" ? "debugT" : "debugR") : "debug";
-            extension.testController?.debugStarted(e, type);
+            if (e.workspaceFolder) {
+                let fc = configuration.getFolderConfig(e.workspaceFolder);
+                fc.testController?.debugStarted(e, type);
+            }
         }));
         this.extensionContext.subscriptions.push(vscode.debug.onDidTerminateDebugSession(e => {
-            // if (e.configuration.testUri) {
-                extension.testController?.debugEnded(e);
-            //}
+            if (e.workspaceFolder) {
+                let fc = configuration.getFolderConfig(e.workspaceFolder);
+                fc.testController?.debugEnded(e);
+            }
         }));
     }
     tasksBugWorkaround() : void {
-        if (this.needTaskFetchBugWorkaround && this.isAutotoolsProject()) {
+        if (this.needTaskFetchBugWorkaround) {
             // FIXME: This is a workaround for vscode not parsing tasks.json prior to fetchTasks()
             const kind:BuildTask = {
+                folderIndex: -1,
                 type: "build",
                 target: new make.BuildTarget(".", "fetchTasks-bug-workaround")
             };
@@ -551,127 +478,23 @@ export class Extension {
             vscode.tasks.executeTask(workaroundTask);
         }
     }
-    updateOutlineBadge() : void {
-        if (!this._projectTestSuitesView) {
-            return;
-        }
-        if (this.testTasks.numFails) {
-            this._projectTestSuitesView.badge =
-                {tooltip:
-                    localize("autotools.failing.tests", "{0}/{1} tests FAIL",
-                        this.testTasks.numFails, this.testTasks.numTests),
-                value: this.testTasks.numFails};
-        } else if (this.testTasks.numSuspect) {
-            this._projectTestSuitesView.badge =
-                {tooltip:
-                    localize("autotools.suspect.tests", "{0}/{1} tests are suspect (XPASS/XFAIL/ERROR)",
-                        this.testTasks.numSuspect, this.testTasks.numTests),
-                value: this.testTasks.numSuspect};
-// FIXME: this miscounts when TRS file is deleted (3x inotify on test updates). Re-test
-//
-//        } else if (this.testTasks.numTests && this.testTasks.numUnknown) {
-//            this._projectTestSuitesView.badge =
-//                {tooltip:
-//                    localize("autotools.unknown.tests", "{0}/{1} tests are available/not yet run",
-//                        this.testTasks.numUnknown, this.testTasks.numTests),
-//                value: this.testTasks.numUnknown};
-        } else {
-            this._projectTestSuitesView.badge =
-                {tooltip:
-                    localize("autotools.no.tests", "No tests available"),
-                value: 0
-            };
-        }
-    }
 
     public readonly projectTestGrid = new TestGrid();
     public updateAllGrids() : void {
         this.projectTestGrid.updateAll();
     }
 
-    public updateWatchers() {
-        this.configDisposables.concat([...Array.from(configuration.getAllBuildTargets().keys())
-            .map( (p) => new util.MyFileWatcher(resolvePathToRoot(p), (e, f) => {
-                if (f == 'Makefile.am' || (f.endsWith('.in') && f != 'Makefile.in'))
-                    /* Regen if config*.in files change, other than Makefile.in which is updated due to Makefile.am */
-                    extension.regen();
-            }))]);
-    }
-    private configDisposables : vscode.Disposable[] = [];
-    private buildTree: gnumake.Make | undefined;
-    public resyncTasks(): void {
-        if (this.buildTree)
-            this.updateTasks(this.buildTree);
-    }
-    public updateTasks(build_tree: gnumake.Make): void {
-        this.buildTree = build_tree;
-        if (!build_tree.hasStats) {
-            countStats(build_tree);
-            build_tree.hasStats = true;
-
-            vscode.commands.executeCommand('setContext', "autotools:haveParallelHarness", build_tree.stats.checks ? 1 : 2);
-        }
-        if (build_tree.stats.checks) {
-            if (!this.testController) {
-                this.testController = new MyTestController(
-                    Extension.whoami, "Autotools tests", extension.getState().liveCheckId);
-            } else {
-                this.testController?.deactivate();
-                this.testController?.restart();
-            }
-        } else {
-            this.testController?.deactivate();
-            this.testController = undefined;
-        }
-        let updateBadge : boolean = false;
-        this.tasks.forEach((provider) => updateBadge = provider.update(this.configDisposables) || updateBadge);
-        if (this._projectOutlineTreeView) {
-            this._projectOutlineProvider.updateTargets(build_tree);
-        }
-        if (this._projectTestSuitesView) {
-            this._projectTestSuitesProvider.updateTargets(build_tree);
-            this.updateOutlineBadge();
-        }
-        vscode.commands.executeCommand("setContext", "autotools:hasTargets", 1);
-        this.updateTestSuite(build_tree, build_tree, true);
-        this.testController?.onOpenedDocument();
-        this.testController?.restoreLiveCheck();
-    }
-    updateTestSuite(sub: gnumake.Make, parent: gnumake.Make, top: boolean): void {
-        let c = configuration.getCurrentMakefileConfiguration();
-        for (let submake of sub.submake.values()) {
-            if (submake.test_suite?.test) {
-                // add it to my parent if I don't have suite
-                // This can happen if 1+ intermediate dir has no TESTS
-                let suiteparent = sub.test_suite?.test ?? parent.test_suite?.test;
-                if (suiteparent)
-                    extension.testController?.addSubTest(suiteparent, submake.test_suite.test);
-            }
-            //if (submake.test_suite?.test)
-            this.updateTestSuite(submake, sub.test_suite ? sub : parent, top && !sub.test_suite);
-        }
-        if (sub.test_suite && sub.test_suite.test) {
-            //let logpath = path.join(c.top_builddir, sub.dir);
-            sub.test_suite.depends?.forEach((test) => {
-                sub.test_suite?.test && extension.testController?.addTest(c, sub.dir, sub.test_suite.test, test)});
-        }
-        if (top && sub.test_suite?.test)
-            this.testController?.update(sub.test_suite.test);
-    }
-
     // goal is the *.log goal. The executable will be read from .depends[0]
-    async debugGoal(goal: Goal, builddir: string, env: configuration.TestEnvironment) : Promise<void> {
+    async debugGoal(goal: Goal, env: configuration.TestEnvironment) : Promise<void> {
         if (goal?.depends?.length && goal.depends[0].goal) {
             this.journey.addEvent("deb");
-            let c = configuration.getCurrentMakefileConfiguration();
             let dopt : vscode.DebugSessionOptions = {
                 compact: true
             };
             try {
                 vscode.debug.startDebugging(
-                    vscode.workspace.workspaceFolders?.[0],
-                    new DebugNow(c, goal, {goal: goal.depends[0].goal, builddir: builddir},
-                            !!(goal.depends[0].flags & Goal.Flags.Linked_binary), env),
+                    goal.make.ctx.fc.folder,
+                    new DebugNow(goal, goal.depends[0], env),
                     dopt)
                 .then((z) => {});
             } catch(e) {
@@ -681,79 +504,37 @@ export class Extension {
             this.journey.addEvent("debNoS");
     }
 
-    public onConfigurationSelect(c: configuration.MakefileConfiguration) : void {
-        this.tasks.forEach((provider) => provider.changeConfiguration(c, this.configDisposables));
-        this.configDisposables.forEach((d) => d.dispose());
-        this.configDisposables = [];
-    }
-    public bootstrap(span: Span): void {
-        this.autotoolsTask.bootstrap();
-    }
+    // public onConfigurationSelect(c: MakefileConfiguration) : void {
+    //     this.tasks.forEach((provider) => provider.changeConfiguration(c));
+    //     this.configDisposables.forEach((d) => d.dispose());
+    //     this.configDisposables = [];
+    // }
+    //public bootstrap(span: Span): void {
+    //    this.autotoolsTask.bootstrap();
+    //}
+    //public async reautomake(span: Span): Promise<void> {
+    //    await this.autotoolsTask.reautomake(span);
+    //}
     // config.status (just re-output)
-    public async regen(): Promise<void> { await this.autotoolsTask.regen(); }
+    // public async regen(): Promise<void> { await this.autotoolsTask.regen(); }
     // config.status --recheck
-    public async recheck(changed: boolean): Promise<void> {
-        if (changed) {
-            if (!this.isBootstrapped()) {
-                await this.bootstrapWithPrompt(extension.journey);
-                return Promise.resolve();
-            } else if (this.isAutotoolsProject()) {
-                let span = telemetry.startSpan("recheck", extension.journey);
-                // newly installed
-                statusBar.show();
-                configuration.initFromState();
-                await configuration.initFromSettings(true, span);
-                await configuration.analyzeConfigureParams(span, false, false);
-                await outputLogHeader();
-                await extension.configure(span);
-                span.end();
-                return Promise.resolve();
-            } else if (this.isAutotoolsProject() && !this.autotoolsTask.bootstrap_cmd()) {
-                // Disable extension, configure.ac deleted
-                return Promise.resolve();
-            }
-        }
-        await this.autotoolsTask.recheck();
-        if (changed && vscode.workspace.textDocuments.find((d) => d.isDirty))
-            this.testController?.onSavedAll();
-        return Promise.resolve();
-    }
-    public autotoolsDoneNoResult(): void { this.autotoolsTask.autotoolsDoneNoResult(); }
-    public async waitToTouchMakefiles(): Promise<void> { await this.autotoolsTask.waitToTouchMakefiles(); }
+//    public async recheck(span: Span): Promise<void> {
+//        await this.autotoolsTask.recheck(span);
+//        return Promise.resolve();
+//    }
+    //public autotoolsDoneNoResult(): void { this.autotoolsTask.autotoolsDoneNoResult(); }
+    //public async waitToTouchMakefiles(): Promise<void> { await this.autotoolsTask.waitToTouchMakefiles(); }
 
-    public build(target: make.BuildTarget): void { this.buildTasks.build(target); }
-    public async checkAll(): Promise<void> { await this.checkTasks.checkAll(); }
-    public async configure(span: Span): Promise<boolean> {
-        this.needTaskFetchBugWorkaround = false;
-        var success =  await this.autotoolsTask.configure(span);
-        if (!success) {
-            let kbUrl = await extension.kbUrl();
-            logger.message('Configure failed. Review the Terminal tab for cause.', "Normal");
-            logger.message('Configuring can be re-attempted with "Autotools: Configure"', "Normal");
-            logger.message('KB: ' + kbUrl.toString(true) + '#config-fail', "Normal");
-        }
-        this.updateMakefileFilePresent(success);
-        return success;
-    };
-    public isAutotoolsProject(): boolean { return !!configuration.getConfigureAc(); }
-    public isBootstrapped(): boolean { return this.autotoolsTask.isBootstrapped(); }
-    public isConfigured(): boolean { return this.autotoolsTask.isConfigured(configuration.getCurrentMakefileConfiguration()); }
-
-    public updateMakefileFilePresent(newValue: boolean): void {
-        vscode.commands.executeCommand("setContext", "autotools:makefileFilePresent", newValue ? 1 : 2);
-    }
-
-    public getState(): state.StateManager { return this.mementoState; }
+    //public build(target: make.BuildTarget): void { this.buildTasks.build(target); }
+    //public async checkAll(): Promise<void> { await this.checkTasks.checkAll(); }
+    // public isBootstrapped(): boolean { return this.autotoolsTask.isBootstrapped(); }
+    // public isConfigured(): boolean { return this.autotoolsTask.isConfigured(configuration.getCurrentMakefileConfiguration()); }
 
     public dispose(): void {
         this.deletePanel();
-        this.configDisposables.forEach((d) => d.dispose());
         if (this.cppToolsAPI) {
             this.cppToolsAPI.dispose();
         }
-        this.testController?.deactivate();
-        this.testController = undefined;
-
         this.journey.end();
     }
 
@@ -767,160 +548,72 @@ export class Extension {
     public getCompletedConfigureInSession() : boolean | undefined { return this.completedConfigureInSession; }
     public setCompletedConfigureInSession(completed: boolean) : void { this.completedConfigureInSession = completed; }
 
-    // Register this extension as a new provider or request an update
-    public async registerCppToolsProvider(): Promise<void> {
-        await this.ensureCppToolsProviderRegistered();
-
-        // Call notifyReady earlier than when the provider is updated,
-        // as soon as we know that we are going to actually parse for IntelliSense.
-        // This allows CppTools to ask earlier about source files in use
-        // and Makefile Tools may return a targeted source file configuration
-        // if it was already computed in our internal arrays (make.ts: customConfigProviderItems).
-        // If the requested file isn't yet processed, it will get updated when configure is finished.
-        // TODO: remember all requests that are coming and send an update as soon as we detect
-        // any of them being pushed into make.customConfigProviderItems.
-        if (this.cppToolsAPI) {
-            if (!this.ranNotifyReadyInSession && this.cppToolsAPI.notifyReady) {
-                // FIXME: not ready yet.
-                this.cppToolsAPI.notifyReady(this.cppConfigurationProvider);
-                this.setRanNotifyReadyInSession(true);
-            }
-        } else {
-            let kbUrl = await extension.kbUrl();
-            logger.message('C/C++ Intellisense is not loaded. Install an extension to enable syntax highlighting and completions.', "Normal");
-            logger.message('KB: ' + kbUrl.toString(true) + '#intellisense-not-loaded', "Normal");
-        }
-    }
-
-    // Clear cached config data
-    public resetCppToolsProvider(): void {
-        let cache = this.cppConfigurationProvider.getCustomConfigurationProvider();
-        cache.fileIndex.clear();
-        cache.workspaceBrowse = {
-            browsePath: [],
-            compilerArgs: [],
-            compilerPath: undefined,
-            standard: undefined,
-            windowsSdkVersion: undefined
-        };
-        this.cppConfigurationProvider.setCustomConfigurationProvider(cache);
-        // workspaceBrowseConfiguration
-        // this.updateCppToolsProvider();
-    }
-
-    // Request a custom config provider update.
-    public updateCppToolsProvider(): number {
-        if (this.cppToolsAPI) {
-            this.cppConfigurationProvider.logConfigurationProviderBrowse();
-            this.cppToolsAPI.didChangeCustomConfiguration(this.cppConfigurationProvider);
-        }
-        return 0;
-    }
-
-    public ensureCppToolsProviderRegistered(): Promise<void> {
-        // make sure this extension is registered as provider only once
-        if (!this.cppConfigurationProviderRegister) {
-            this.cppConfigurationProviderRegister = this.registerCppTools();
-        }
-
-        return this.cppConfigurationProviderRegister;
-    }
-
     public getCppToolsVersion(): cpp.Version | undefined {
         return this.cppToolsAPI?.getVersion();
     }
 
     public async registerCppTools(): Promise<void> {
-        if (!this.cppToolsAPI) {
-            this.cppToolsAPI = await cpp.getCppToolsApi(cpp.Version.v6);
-        }
-
+        this.cppToolsAPI = await cpp.getCppToolsApi(cpp.Version.v6);
+    // Register this folder as a new provider or request an update
         if (this.cppToolsAPI) {
-            this.cppToolsAPI.registerCustomConfigurationProvider(this.cppConfigurationProvider);
+
+            // Call notifyReady earlier than when the provider is updated,
+            // as soon as we know that we are going to actually parse for IntelliSense.
+            // This allows CppTools to ask earlier about source files in use
+            // and Makefile Tools may return a targeted source file configuration
+            // if it was already computed in our internal arrays (make.ts: customConfigProviderItems).
+            // If the requested file isn't yet processed, it will get updated when configure is finished.
+            // TODO: remember all requests that are coming and send an update as soon as we detect
+            // any of them being pushed into make.customConfigProviderItems.
+            extension.cppToolsAPI?.registerCustomConfigurationProvider(this._cppConfigurationProvider);
+            extension.cppToolsAPI?.notifyReady(this._cppConfigurationProvider);
+        }
+    }
+    // Request a custom config provider update.
+    public updateCppToolsProvider(): void {
+        if (extension.cppToolsAPI) {
+            this._cppConfigurationProvider.logConfigurationProviderBrowse();
+            extension.cppToolsAPI.didChangeCustomConfiguration(this._cppConfigurationProvider);
         }
     }
 
-    public buildCustomConfigurationProvider(customConfigProviderItem: toolParser.CustomConfigProviderItem): void {
-        this.compilerFullPath = customConfigProviderItem.compilerFullPath;
-        let provider: cpptools.CustomConfigurationProvider = this.getCppConfigurationProvider().getCustomConfigurationProvider();
-
-        const configuration: cpp.SourceFileConfiguration = {
-            defines: customConfigProviderItem.defines,
-            standard: customConfigProviderItem.standard,
-            includePath: customConfigProviderItem.includes,
-            forcedInclude: customConfigProviderItem.forcedIncludes,
-            intelliSenseMode: customConfigProviderItem.intelliSenseMode,
-            compilerPath: customConfigProviderItem.compilerFullPath,
-            compilerArgs: customConfigProviderItem.compilerArgs,
-            windowsSdkVersion: customConfigProviderItem.windowsSDKVersion
-        };
-
-        // cummulativeBrowsePath incorporates all the files and the includes paths
-        // of all the compiler invocations of the current configuration
-        customConfigProviderItem.files.forEach(filePath => {
-            let uri: vscode.Uri = vscode.Uri.file(filePath);
-            let sourceFileConfigurationItem: cpptools.SourceFileConfigurationItem = {
-                uri,
-                configuration,
-                compileCommand: {
-                   command: customConfigProviderItem.line,
-                   directory: customConfigProviderItem.currentPath,
-                   file: filePath
-                }
-            };
-
-            // These are the configurations processed during the current configure.
-            // Store them in the 'delta' file index instead of the final one.
-            provider.fileIndex.set(path.normalize((process.platform === "win32") ? uri.fsPath.toUpperCase() : uri.fsPath),
-                                                  sourceFileConfigurationItem);
-            extension.getCppConfigurationProvider().logConfigurationProviderItem(sourceFileConfigurationItem);
-
-            let folder: string = path.dirname(filePath); // FIXME: uses a Set, avoid the lsearch
-            if (!provider.workspaceBrowse.browsePath.includes(folder)) {
-                provider.workspaceBrowse.browsePath.push(folder);
-            }
-        });
-
-        customConfigProviderItem.includes.forEach(incl => { // FIXME: uses a Set, avoid the lsearch
-            if (!provider.workspaceBrowse.browsePath.includes(incl)) {
-                provider.workspaceBrowse.browsePath.push(incl);
-            }
-        });
-
-        customConfigProviderItem.forcedIncludes.forEach(fincl => {
-            let folder: string = path.dirname(fincl); // FIXME: uses a Set, avoid the lsearch
-            if (!provider.workspaceBrowse.browsePath.includes(folder)) {
-                provider.workspaceBrowse.browsePath.push(fincl);
-            }
-        });
-    }
 
     public getCompilerFullPath() : string | undefined { return this.compilerFullPath; }
+
+    private isActive: boolean = false;
+    readonly _activatedEvent: vscode.EventEmitter<boolean> = new vscode.EventEmitter<boolean>();
+    async waitActivated() : Promise<boolean> {
+        if (this.isActive)
+            return Promise.resolve(this.isActive);
+        return new Promise<boolean>(resolve => {
+            let a = this._activatedEvent.event(e => {
+                a.dispose();
+                return resolve(e);
+            });
+        });
+    }
 }
 
-export async function openSettings(setting: string) : Promise<void> {
-    await vscode.commands.executeCommand("workbench.action.openSettings", setting);
-    await vscode.commands.executeCommand("workbench.action.openWorkspaceSettings");
+export async function openSettings(setting: string, folder: vscode.WorkspaceFolder | null, json: boolean) : Promise<void> {
+//    await vscode.commands.executeCommand("workbench.action.openSettings", setting);
+    await vscode.commands.executeCommand(json ? "workbench.action.openWorkspaceSettings" : "workbench.action.openWorkspaceSettingsFile", {
+        query: setting,
+        openToSide: false,
+        focusSearch: true});
 }
 
-export async function openEditor(file: string) {
-    await vscode.workspace.findFiles(file, undefined, 1).then(
-        files => {
-            if (files.length > 0) {
-                vscode.workspace.openTextDocument(files[0]).then(
-                    doc => vscode.window.showTextDocument(doc, { preview: true})
-                    );
-            }
-        }
-    )
+export async function openEditor(file: string) : Promise<void> {
+    await vscode.workspace.openTextDocument(file).then(
+        doc => vscode.window.showTextDocument(doc, { preview: true})
+        );
 }
 
 function openLog(selected: tree.Node): Thenable<vscode.TextDocument> {
-    let top_builddir =
-        configuration.getCurrentMakefileConfiguration().top_builddir;
+    //let top_builddir =
+    //    configuration.getCurrentMakefileConfiguration().top_builddir;
     let logfile = selected.logfile();
-    if (logfile && top_builddir) {
-        let uri = vscode.Uri.file(resolvePathToRoot(path.join(top_builddir, logfile)));
+    if (logfile) {
+        let uri = vscode.Uri.file(path.join(selected.make.ctx.fc.abs_top_builddir, logfile));
         return vscode.workspace.openTextDocument(uri).then((e) =>
             vscode.window.showTextDocument(e,
                     {preview: true, viewColumn: vscode.ViewColumn.One, preserveFocus: true})
@@ -934,19 +627,6 @@ function openLog(selected: tree.Node): Thenable<vscode.TextDocument> {
     return Promise.reject();
 }
 
-/* returns whether configuration was done or not (bool) */
-let isActive: boolean = false;
-let _activatedEvent: vscode.EventEmitter<boolean> = new vscode.EventEmitter<boolean>();
-export async function waitActivated() : Promise<boolean> {
-    if (isActive)
-        return Promise.resolve(isActive);
-    return new Promise<boolean>(resolve => {
-        let a = _activatedEvent.event(e => {
-            a.dispose();
-            return resolve(e);
-        });
-    });
-}
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
     let act : Span | undefined = undefined;
     try {
@@ -958,144 +638,80 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     let validact = telemetry.startSpan('act', extension.journey);
     act = validact;
 
-    context.subscriptions.push(vscode.commands.registerCommand('autotools.setBuildConfiguration', async () => {
-        telemetry.logEvent(extension.journey, "sBC");
-        if (!configuration.getCurrentMakefileConfiguration().top_builddir && extension.isConfigured()) {
-            const doit: string = localize("autotools.switch.to.out.of.tree", "Browse doc page");
-            vscode.window.showErrorMessage(
-                localize("autotools.want.out-of-tree", "The project does not support additional build configurations until it is switched to out-of-tree build mode."),
-                doit,
-                localize("autotools.cancel", "Cancel")).then((value) => {
-                if (value === doit) {
-                    // this.autotoolsTask.bootstrap();
-                    vscode.commands.executeCommand('vscode.open', "https://autotools.mergesium.com/kb/docs/#switch-to-out-of-tree-configuration");
-                }
-            });
-        // https://github.com/microsoft/vscode/blob/0bb69da87ca19412a768d5966fcb0e7b36b2dd3f/src/vs/workbench/contrib/extensions/browser/extensions.contribution.ts#L277
-            // await vscode.commands.executeCommand('extension.open', context.extension.id, 'readme', true);
-            // await vscode.commands.executeCommand('extension.open', "ms-vscode-remote.remote-ssh");
-            // await vscode.commands.executeCommand('extension.open', "ms-vscode-remote.remote-ssh#getting-started");
-            // vscode.commands.executeCommand('vscode.open', "https://autotools.mergesium.com/doc/switch-to-out-of-tree-configurations");
-        } else {
-            try {
-                await configuration.setNewConfiguration(extension.journey);
-            } catch (e) {
-                logger.message(`ERROR: switching configuration failed: ${e}`, 'Normal');
-
+    context.subscriptions.push(vscode.commands.registerCommand('autotools.locateMakefile', async (a: string[]) => {
+        let fc = configuration.findFolderConfig(vscode.Uri.file(a[0]));
+        if (fc) {
+            if (fc.lastTaskMakeDir) {
+                return fc.lastTaskMakeDir;
             }
+            return fc.abs_top_builddir;
         }
-    }));
-
-    context.subscriptions.push(vscode.commands.registerCommand('autotools.getConfiguration', async () => {
-        telemetry.logEvent(extension.journey, "aGC");
-        return configuration.getCurrentMakefileConfiguration();
-    }));
-
-    context.subscriptions.push(vscode.commands.registerCommand('autotools.goal', async () => {
-        telemetry.logEvent(extension.journey, "agoal");
-        return (await configuration.getCurrentTarget()).goal;
-    }));
-
-    /* also need top_builddir */
-    context.subscriptions.push(vscode.commands.registerCommand('autotools.builddir', async () => {
-        telemetry.logEvent(extension.journey, "abd");
-        return (await configuration.getCurrentTarget()).builddir;
-    }));
-
-    // Return the relative path to the default build task's target
-    // or the first Linked_binary target detected.
-    // Due to bug in cpptools, this temporarily returns an absolute path (always), but
-    // this will eventually be fixed. Don't rely on abs paths.
-    context.subscriptions.push(vscode.commands.registerCommand('autotools.default_program', async () => {
-        telemetry.logEvent(extension.journey, "adp");
-        let built = await configuration.getCurrentTarget();
-        // cpptools has a bug where if the "program" member of a launch debug configuration
-        // is a relative path, it checks in the wrong directory and fails to find it.
-        // Work around this by using the absolute path of the builddir until bug is fixed
-        // I want to use relative path to avoid accessing parent dirs (which may be EACCESS)
-        // but currently a lot of vscode would break if parent dirs to to user's home
-        // were EACCESS.
-        let cpptools_stat_bug = true;
-        let goal_path = path.join(built.builddir ?? '.', built.goal);
-        let c = configuration.getCurrentMakefileConfiguration();
-        // goal_path can be absolute if the builddir in task.json is absolute
-        // automatic tasks have a relative builddir
-        if (cpptools_stat_bug) {
-            let builddir = c.top_builddir;
-            let abs_builddir =
-                path.isAbsolute(builddir) ? builddir :
-                resolvePathToRoot(c.top_builddir);
-            return path.isAbsolute(goal_path) ?
-                goal_path :
-                path.join(abs_builddir, goal_path).normalize();
-        }
-        return path.isAbsolute(goal_path) ?
-            goal_path :
-            path.join(c.top_builddir, goal_path).normalize();
-    }));
-
-    // Return the name of the build task that would build the default_program. It is meant to be
-    // used in the preLaunchTask property of a debug configuration, so the debugged program is built
-    // before launching
-    context.subscriptions.push(vscode.commands.registerCommand('autotools.default_program_build_task', async () => {
-        telemetry.logEvent(extension.journey, "dpbt");
-        let built = await configuration.getCurrentTarget();
-        return 'autotools: build \'' + built.goal + '\' in ' + built.builddir;
+        return Promise.reject('unknown location');
     }));
     /** End of commands that shouldn't be exposed in package.json, they are used for command substitution in launch.json and tasks.json. */
 
-    context.subscriptions.push(vscode.commands.registerCommand('autotools.addAutotools', async () => {
+    context.subscriptions.push(vscode.commands.registerCommand('autotools.addAutotools', async (sub: tree.SubNode) => {
         telemetry.logEvent(extension.journey, "aa");
-        await installAutotools();
+        await installAutotools(sub.make.ctx.fc);
     }));
 
     context.subscriptions.push(vscode.commands.registerCommand('autotools.outline.buildAll', async (sub: tree.SubNode) => {
         telemetry.logEvent(extension.journey, "obA");
         if (sub instanceof tree.SubNode)
-            extension.build(new make.BuildTarget(sub.make.dir, make.t_all.goal));
-        else
-            extension.build(make.t_all);
+            sub.make.ctx.fc.buildTasks.build(new make.BuildTarget(sub.make.dir, make.t_all.goal));
     }));
 
     context.subscriptions.push(vscode.commands.registerCommand('autotools.buildAll', async (sub: tree.SubNode) => {
         telemetry.logEvent(extension.journey, "ba");
         if (sub instanceof tree.SubNode)
-            extension.build(new make.BuildTarget(sub.make.dir, make.t_all.goal));
-        else
-            extension.build(make.t_all);
+            sub.make.ctx.fc.buildTasks.build(new make.BuildTarget(sub.make.dir, make.t_all.goal));
     }));
 
-    context.subscriptions.push(vscode.commands.registerCommand('autotools.outline.checkAll', async () => {
+    context.subscriptions.push(vscode.commands.registerCommand('autotools.outline.checkAll', async (sub: tree.SubNode) => {
         telemetry.logEvent(extension.journey, "ocA");
-        await extension.checkAll();
+        if (sub instanceof tree.SubNode)
+            await sub.make.ctx.fc.checkTasks.checkAll();
     }));
 
-    context.subscriptions.push(vscode.commands.registerCommand('autotools.checkAll', async () => {
+    context.subscriptions.push(vscode.commands.registerCommand('autotools.checkAll', async (sub: tree.SubNode) => {
         telemetry.logEvent(extension.journey, "ckA");
-        await extension.checkAll();
+
+        if (sub instanceof tree.SubNode)
+            return sub.make.ctx.fc.testController?.manualRun(false, undefined, sub.make.ctx.fc.currentTestEnvironment);
     }));
 
-    context.subscriptions.push(vscode.commands.registerCommand('autotools.exportToIntelisense', async () => {
+    context.subscriptions.push(vscode.commands.registerCommand('autotools.exportToIntelisense', async (sub: tree.SubNode) => {
         telemetry.logEvent(extension.journey, "exp");
-        await make.configure(extension.journey, make.TriggeredBy.configure);
+        if (sub instanceof tree.SubNode)
+            await make.configure(extension.journey, make.TriggeredBy.configure, sub.make.ctx.fc);
     }));
 
-    context.subscriptions.push(vscode.commands.registerCommand('autotools.outline.recheck', () => {
+    context.subscriptions.push(vscode.commands.registerCommand('autotools.outline.recheck', (sub: tree.SubNode) => {
         telemetry.logEvent(extension.journey, "orc");
-        extension.recheck(false);
+        if (sub instanceof tree.SubNode)
+            sub.make.ctx.fc.autotoolsTask.recheck(telemetry.startSpan('recheck', extension.journey));
     }));
 
+    context.subscriptions.push(vscode.commands.registerCommand('autotools.outline.configure', async (sub: tree.SubNode) => {
+        telemetry.logEvent(extension.journey, "oc");
+        if (sub instanceof tree.SubNode)
+            sub.make.ctx.fc.configure(extension.journey);
+    }));
     context.subscriptions.push(vscode.commands.registerCommand('autotools.configure', async () => {
         telemetry.logEvent(extension.journey, "c");
-        await extension.configure(extension.journey);
+        await configuration.selectFolderConfig().then( async fc => {
+            await fc.configure(extension.journey)
+        });
     }));
 
     context.subscriptions.push(vscode.commands.registerCommand('autotools.build', async (goal: Goal) => {
         telemetry.logEvent(extension.journey, "b");
         if (!goal.task)
             throw new Error("Missing build task on TaskNode");
-        if (goal.task instanceof vscode.Task)
+        if (goal.task instanceof vscode.Task) {
+            goal.make.ctx.fc.lastTaskMakeDir = goal.make.getDir();
             return await vscode.tasks.executeTask(goal.task);
+        }
     }));
 
     context.subscriptions.push(vscode.commands.registerCommand('autotools.livecheck', async (sub: tree.SubNode) => {
@@ -1107,7 +723,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             throw new Error("Missing check task on SubNode");
         assert(sub.make.test_suite.task instanceof Map, "test_suite.task should be a Map", sub.make.test_suite.task);
         sub.make.test_suite.test &&
-            extension.testController?.togglelivecheck(sub.getTreeItem(),sub.make.test_suite.test);
+            sub.make.ctx.fc.testController?.togglelivecheck(sub.getTreeItem(vscode.TreeItemCollapsibleState.Expanded),sub.make.test_suite.test);
             // return await vscode.tasks.executeTask(sub.submake.test_suite.test);
     }));
 
@@ -1120,42 +736,48 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             throw new Error("Missing check task on SubNode");
         assert(sub.make.test_suite.task instanceof Map, "test_suite.task should be a Map", sub.make.test_suite.task);
         sub.make.test_suite.test &&
-            extension.testController?.run(sub.make.test_suite.test, configuration.getCurrentTestEnvironment());
-            // return await vscode.tasks.executeTask(sub.submake.test_suite.test);
+            sub.make.ctx.fc.testController?.manualRun(false, sub.make.test_suite.test, sub.make.ctx.fc.currentTestEnvironment);
     }));
 
     context.subscriptions.push(vscode.commands.registerCommand('autotools.editMakefileAm', async (sub: tree.SubNode) => {
         telemetry.logEvent(extension.journey, "eAm");
-        await openEditor(sub.makefile());
+        let p = path.join(sub.make.ctx.fc.folder.uri.path,sub.make.dir,'Makefile.am');
+        await openEditor(p);
     }));
 
     context.subscriptions.push(vscode.commands.registerCommand('autotools.newConfiguration', async (sub: tree.Node | undefined) => {
         telemetry.logEvent(extension.journey, "nC");
-        openSettings("autotools.configurations");
+        if (sub)
+            openSettings("autotools.configurations", sub.make.ctx.fc.folder, false);
+        else
+            await configuration.selectFolderConfig().then(
+                async fc => openSettings("autotools.configurations", fc.folder, false));
+
     }));
 
     context.subscriptions.push(vscode.commands.registerCommand('autotools.editConfigureAc', async (sub: tree.SubNode) => {
         telemetry.logEvent(extension.journey, "eAc");
-        let configureAc = configuration.getConfigureAc();
-        if (configureAc)
-            await openEditor(configureAc);
+        if (sub instanceof tree.SubNode) {
+            let configureAc = sub.make.ctx.fc.configureAc;
+            if (configureAc)
+                await openEditor(path.join(sub.make.ctx.fc.folder.uri.path, configureAc));
+        }
     }));
 
     context.subscriptions.push(vscode.commands.registerCommand('autotools.test', (goal: Goal) => {
         telemetry.logEvent(extension.journey, "t");
         if (!goal.task)
             throw new Error("Missing test task on TaskNode");
-        if (goal.test && extension.testController)
-            return extension.testController.run(goal.test, configuration.getCurrentTestEnvironment());
-        //return await vscode.tasks.executeTask(sub.goal.task);
+        if (goal.test && goal.make.ctx.fc.testController)
+            return goal.make.ctx.fc.testController.manualRun(false, goal.test, goal.make.ctx.fc.currentTestEnvironment);
     }));
 
     context.subscriptions.push(vscode.commands.registerCommand('autotools.debug', async (goal: Goal) => {
         if (!goal.task)
             throw new Error("Missing test task on TaskNode");
         let span = telemetry.startSpan("debugCmd", extension.journey);
-        if (goal.test && extension.testController)
-            extension.testController.debug(span, goal.test, configuration.getCurrentTestEnvironment());
+        if (goal.test && goal.make.ctx.fc.testController)
+            goal.make.ctx.fc.testController.debug(span, goal.test, goal.make.ctx.fc.currentTestEnvironment);
         else
             telemetry.setSpanStatus(span, SpanStatusCode.ERROR, "noTestOrController");
         span.end();
@@ -1179,14 +801,41 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         return Promise.resolve();
     }));
 
-    context.subscriptions.push(vscode.commands.registerCommand('autotools.outline.setBuildConfiguration', () => {
-        telemetry.logEvent(extension.journey, "sBCo");
-        return vscode.commands.executeCommand("autotools.setBuildConfiguration");
+    context.subscriptions.push(vscode.commands.registerCommand('autotools.setBuildConfiguration', async (sub: tree.Node | undefined) => {
+        telemetry.logEvent(extension.journey, "nC");
+        if (sub)
+            await configuration.setNewConfiguration(extension.journey, sub.make.ctx.fc);
+        else
+            await configuration.selectFolderConfig().then(
+                async fc => await configuration.setNewConfiguration(extension.journey, fc));
     }));
 
-    context.subscriptions.push(vscode.commands.registerCommand('autotools.outline.setTestEnvironment', () => {
+    context.subscriptions.push(vscode.commands.registerCommand('autotools.outline.setBuildConfiguration', async (sub: tree.SubNode) => {
+        telemetry.logEvent(extension.journey, "sBC");
+
+        if (!sub.make.ctx.fc.buildConfig.top_builddir && sub.make.ctx.fc.isConfigured) {
+            const doit: string = localize("autotools.switch.to.out.of.tree", "Browse doc page");
+            vscode.window.showErrorMessage(
+                localize("autotools.want.out-of-tree", "The project does not support additional build configurations until it is switched to out-of-tree build mode."),
+                doit,
+                localize("autotools.cancel", "Cancel")).then((value) => {
+                if (value === doit) {
+                    // this.autotoolsTask.bootstrap();
+                    vscode.commands.executeCommand('vscode.open', "https://autotools.mergesium.com/kb/docs/#switch-to-out-of-tree-configuration");
+                }
+            });
+        } else {
+            try {
+                await configuration.setNewConfiguration(extension.journey, sub.make.ctx.fc);
+            } catch (e) {
+                logger.message(`ERROR: switching configuration failed: ${e}`, 'Normal');
+            }
+        }
+    }));
+
+    context.subscriptions.push(vscode.commands.registerCommand('autotools.outline.setTestEnvironment', async (sub: tree.SubNode) => {
         telemetry.logEvent(extension.journey, "sTE");
-        return configuration.setNewEnvironment();
+        await configuration.setNewEnvironment(sub.make.ctx.fc);
     }));
 
     logger.message(`${getStartTime(validact).toISOString()}: starting ${Extension.whoami} ${context.extension.packageJSON.version}/${buildinfo.platform}-${buildinfo.arch}`, 'Normal');
@@ -1197,39 +846,79 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         telemetry.endSpanWithStatus(act, SpanStatusCode.ERROR, "binIncompatible");
         return;
     }
-    detectWorkspaceMode();
-    if (vscode.workspace.workspaceFolders == undefined) {
-        context.subscriptions.push(vscode.workspace.onDidChangeWorkspaceFolders(async (e) => {
-            detectWorkspaceMode();
-            if(vscode.workspace.workspaceFolders?.length == 1) {
-                let span = telemetry.startSpan("openWS", extension.journey);
-                await startupWithWorkspace(context, span, span);
-                // span.end();
+
+    context.subscriptions.push(vscode.workspace.onDidChangeWorkspaceFolders(async (e) => {
+        let span = telemetry.startSpan("openWS", extension.journey);
+        await configuration.onWorkspaceChange(e, span);
+        span.end();
+    }));
+
+    context.subscriptions.push(vscode.workspace.onDidSaveTextDocument(async (f) => {
+        let fcs : Set<FolderConfig> = new Set;
+        if (f.uri.scheme === "file" &&
+            !ignoredSaveFiles.has(path.basename(f.uri.fsPath))) {
+                let fc = configuration.findFolderConfig(f.uri);
+                if (fc) fcs.add(fc);
+            if (!vscode.workspace.textDocuments.some((d) => d.isDirty))
+                fcs.forEach(async fc => await fc.testController?.onSavedAll());
+        }
+    }));
+
+    context.subscriptions.push(vscode.workspace.onDidCreateFiles(async (f) => {
+        //        if (extension.testController && f.uri.scheme === "file" &&
+        //            !ignoredSaveFiles.has(path.basename(f.uri.fsPath))) {
+        //            if (!vscode.workspace.textDocuments.some((d) => d.isDirty))
+        //                await extension.testController?.onSavedAll();
+        //        }
+                logger.message("created files", 'debug');
+    }));
+
+    // context.subscriptions.push(vscode.window.onDidChangeVisibleTextEditors( (editors) => {
+    //     // logger.message(`Opened file ${.uri}`, "Normal");
+    context.subscriptions.push(vscode.window.tabGroups.onDidChangeTabs(async (tabs) => {
+        let changed = [...tabs.opened,...tabs.closed];
+        let notified : Set<FolderConfig> = new Set();
+        tabs.opened.forEach(t => {
+            if ((t.input instanceof vscode.TabInputText) &&  t.input.uri.scheme === "file") {
+            let fc = configuration.findFolderConfig(t.input.uri);
+            if (fc && !notified.has(fc)) {
+                notified.add(fc);
+                fc.testController?.onOpenedDocument();
             }
-        }));
-        telemetry.endSpanWithStatus(act, SpanStatusCode.OK, "noWS");
-    } else if (vscode.workspace.workspaceFolders.length != 1) {
-        context.subscriptions.push(vscode.workspace.onDidChangeWorkspaceFolders(async (e) => {
-            detectWorkspaceMode();
-            if(vscode.workspace.workspaceFolders?.length == 1) {
-                let span = telemetry.startSpan("openWS", extension.journey);
-                await startupWithWorkspace(context, span, span);
-                // span.end();
-            }
-        }));
-        telemetry.endSpanWithStatus(act, SpanStatusCode.OK, "multiRoot", {n: vscode.workspace.workspaceFolders.length});
-    } else {
-        context.subscriptions.push(vscode.workspace.onDidChangeWorkspaceFolders(async (e) => {
-            // ie, if the folder was deleted, the editor will think it exists when it activates.
-            // if the user re-clones, bootstrap and configure it.
-            detectWorkspaceMode();
-            if(vscode.workspace.workspaceFolders?.length == 1) {
-                await extension.autotoolsTask.recheck();
-                // span.end();
-            }
-        }));
-        await startupWithWorkspace(context, validact, act);
+        }});
+    }));
+
+    context.subscriptions.push(vscode.window.registerFileDecorationProvider(extension.suiteDecorator));
+
+    context.subscriptions.push(vscode.workspace.registerTextDocumentContentProvider(TestGrid.scheme, extension.projectTestGrid));
+    context.subscriptions.push(vscode.workspace.onDidCloseTextDocument((doc) => {
+        if (doc.uri.scheme === TestGrid.scheme) {
+            extension.projectTestGrid.closeDocument(doc.uri);
+        }
+    }))
+
+    await configuration.initFromSettings(true, act);
+
+    if (configuration.cppProvider != Extension.whoami) {
+        telemetry.setAttributes(act, {cppProvider: configuration.cppProvider});
     }
+
+    util.scheduleAsyncTask<void>(async () => {
+        await extension.registerCppTools();
+        if (!extension.cppToolsAPI) {
+            logger.message('C/C++ Intellisense is not loaded. Install an extension to enable syntax highlighting and completions.', "Normal");
+        }
+
+        configuration.loadAllFolders();
+        await configuration.startAllFolders(validact);
+        logger.message("=======================", "Normal");
+        if (configuration.hasAnyAutotoolsFolders()) {
+            extension.tasksBugWorkaround();
+        }
+        extension._activatedEvent.fire(true);
+        validact.end();
+    });
+
     } catch (e) {
         /* Can be caused by:
             extensionHost.js:
@@ -1248,114 +937,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         if (act) telemetry.endSpanWithStatus(act, SpanStatusCode.ERROR, e.toString());
 
     }
-}
-
-function detectWorkspaceMode() {
-    util.setConfigScope();
-    vscode.commands.executeCommand('setContext', "autotools:workspace",
-        (vscode.workspace.workspaceFolders == undefined) ? 2 :
-        (vscode.workspace.workspaceFolders.length == 1) ? 1 :
-        3);
-}
-export async function startupWithWorkspace(context: vscode.ExtensionContext, validact: Span, act: Span) : Promise<void> {
-    let configureAc = AutoToolsBootstrapTaskProvider.manifests.find((m) => checkFileExistsSync(resolvePathToRoot(m)));
-    configuration.setConfigureAc(configureAc);
-
-    // Read from the workspace state before reading from settings,
-    // becase the latter may use state info in variable expansion.
-    if (extension.isAutotoolsProject()) {
-        statusBar.show();
-        configuration.initFromState();
-        await configuration.initFromSettings(true, act);
-
-        await configuration.analyzeConfigureParams(act, false, false);
-
-        await outputLogHeader();
-        await extension.bootstrapWithPrompt(act);
-    }
-
-    extension.tasksBugWorkaround();
-
-    context.subscriptions.push(vscode.workspace.onDidSaveTextDocument(async (f) => {
-        if (extension.testController && f.uri.scheme === "file" &&
-            !ignoredSaveFiles.has(path.basename(f.uri.fsPath))) {
-            if (!vscode.workspace.textDocuments.some((d) => d.isDirty))
-                await extension.testController?.onSavedAll();
-        }
-    }));
-
-    context.subscriptions.push(vscode.workspace.onDidCreateFiles(async (f) => {
-//        if (extension.testController && f.uri.scheme === "file" &&
-//            !ignoredSaveFiles.has(path.basename(f.uri.fsPath))) {
-//            if (!vscode.workspace.textDocuments.some((d) => d.isDirty))
-//                await extension.testController?.onSavedAll();
-//        }
-        logger.message("created files", 'debug');
-    }));
-
-
-    // context.subscriptions.push(vscode.window.onDidChangeVisibleTextEditors( (editors) => {
-    //     // logger.message(`Opened file ${.uri}`, "Normal");
-    context.subscriptions.push(vscode.window.tabGroups.onDidChangeTabs(async (tabs) => {
-        if (
-            (tabs.opened &&
-                tabs.opened.find(t => (t.input instanceof vscode.TabInputText) &&  t.input.uri.scheme === "file")) ||
-            (tabs.closed &&
-                    tabs.closed.find(t => (t.input instanceof vscode.TabInputText) &&  t.input.uri.scheme === "file"))
-            )
-            await extension.testController?.onOpenedDocument();
-    }));
-
-    if (vscode.workspace.workspaceFolders) {
-        let configureAc = vscode.workspace.createFileSystemWatcher(
-            new vscode.RelativePattern(vscode.workspace.workspaceFolders[0], (configuration.getConfigureAc() || "configure.ac")));
-        context.subscriptions.push(configureAc.onDidChange(async (e) => await extension.recheck(true)));
-        context.subscriptions.push(configureAc.onDidCreate(async (e) => await extension.recheck(true)));
-        context.subscriptions.push(configureAc.onDidDelete(async (e) => await extension.recheck(true)));
-    }
-
-    context.subscriptions.push(vscode.window.registerFileDecorationProvider(extension.suiteDecorator));
-
-    context.subscriptions.push(vscode.workspace.registerTextDocumentContentProvider(TestGrid.scheme, extension.projectTestGrid));
-    context.subscriptions.push(vscode.workspace.onDidCloseTextDocument((doc) => {
-        if (doc.uri.scheme === TestGrid.scheme) {
-            extension.projectTestGrid.closeDocument(doc.uri);
-        }
-    }))
-
-    if (!configuration.getConfigurationMakefile()) {
-        if (!extension.autotoolsTask.isWorking) // if bootstrapping was started above, don't flag now. the bootstrap result will tell.
-            ui.getUI().setLoading(extension.isAutotoolsProject() ? ui.UIStatus.ERR : ui.UIStatus.NON_AUTOTOOLS);
-        act.end();
-        isActive = true;
-        _activatedEvent.fire(isActive);
-        return;
-    }
-    if (!configuration.initialConfigurationAttempted)
-        util.scheduleAsyncTask<void>(async () => {
-            await make.configure(validact, make.TriggeredBy.cleanConfigure);
-            validact.end();
-            isActive = true;
-            _activatedEvent.fire(isActive);
-            });
-    else {
-        act.end();
-        isActive = true;
-        _activatedEvent.fire(isActive);
-    }
-}
-
-export async function outputLogHeader() : Promise<void> {
-
-    var kburl = await extension.kbUrl();
-    if (extension.pkginfo/* && !currentMakefileConfiguration*/) {
-        let pkg = extension.pkginfo;
-        logger.message(localize('autotools.package.coordinates', "Package \"{0}\" version {1} - bug reports: {2}, url: {3}",
-        pkg.name || "unknown", pkg.version || "unk", pkg.bugreport || "unknown", pkg.url || "unknown"), "Normal");
-        logger.message(localize('autotools.ref.kb', "Knowledge Base: {0}", kburl.toString(true)), "Normal");
-        logger.message("=======================", "Normal");
-    }
-    return Promise.resolve();
 }
 
 export async function deactivate(): Promise<void> {
@@ -1378,30 +959,6 @@ export async function deactivate(): Promise<void> {
     return Promise.resolve();
 }
 
-function countStats(sub: gnumake.Make): number[] {
-    sub.stats.subdirs = sub.submake.size;
-    for (let submake of sub.submake.values()) {
-        let [t, n, s, c] = countStats(submake);
-        sub.stats.programs += t;
-        sub.stats.tests += n;
-        sub.stats.subdirs += s;
-        sub.stats.checks += c;
-    }
-    for (let [goal, g] of sub.goals)
-        sub.stats.programs += ((g.flags & Goal.Flags.Linked_binary)
-            && !(g.flags & Goal.Flags.Test_Program)) ? 1 : 0;
-
-    let numTestsHere = (sub.goals.get("test-suite.log")?.depends?.length ?? 0);
-    sub.stats.tests += numTestsHere;
-    sub.stats.checks += (numTestsHere ? 1 : 0);
-    return [
-        sub.stats.programs,
-        sub.stats.tests,
-        sub.submake.size,
-        sub.stats.checks
-    ];
-}
-
 async function focusPreviewedDocument(uri: vscode.Uri) : Promise<void> {
     let summary = vscode.Uri.from({scheme: TestGrid.scheme, path: uri.path});
     let existingEditor : vscode.TextEditor | undefined =
@@ -1410,8 +967,9 @@ async function focusPreviewedDocument(uri: vscode.Uri) : Promise<void> {
     let opened = vscode.workspace.textDocuments.find(d => d.uri.path == summary.path);
     if (!existingEditor) {
         await vscode.window.showTextDocument(summary, GridShowOptions).then((editor) => {
-            if (!opened)
+            if (!opened) {
                 vscode.languages.setTextDocumentLanguage(editor.document, "markdown");
+            }
         });
         if (!opened) await vscode.commands.executeCommand("markdown.showPreview", summary);
     }

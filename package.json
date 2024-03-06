@@ -46,10 +46,12 @@
         "commands": [
             {
                 "command": "autotools.rdepends",
+                "icon": "$(type-hierarchy)",
                 "title": "%autotools.rdepends.title%"
             },
             {
                 "command": "autotools.closeIrrelevant",
+                "icon": "$(filter)",
                 "title": "%autotools.closeIrrelevant.title%"
             },
             {
@@ -60,6 +62,11 @@
                 "command": "autotools.bootstrap",
                 "title": "%autotools.command.bootstrap.title%"
             },
+            {
+                "command": "autotools.outline.bootstrap",
+                "title": "%autotools.command.outline.bootstrap.title%"
+            },
+
             {
                 "command": "autotools.buildAll",
                 "icon": "$(combine)",
@@ -94,7 +101,7 @@
             },
             {
                 "command": "autotools.command.testgrid.top",
-                "icon": "$(checklist)",
+                "icon": "$(dashboard)",
                 "title": "Open project Test Result Summary",
                 "category": "autotools"
             },
@@ -143,19 +150,24 @@
                 "title": "%autotools.command.debug.title%"
             },
             {
-                "command": "autotools.setBuildConfiguration",
-                "title": "%autotools.command.makefile.setBuildConfiguration.title%"
-            },
-            {
                 "command": "autotools.configure",
                 "icon": "$(refresh)",
                 "title": "%autotools.command.configure.title%"
+            },
+            {
+                "command": "autotools.outline.configure",
+                "icon": "$(refresh)",
+                "title": "%autotools.command.outline.configure.title%"
             },
             {
                 "command": "autotools.visit.knowledgeBase",
                 "icon": "$(comment)",
                 "title": "%autotools.command.visit.knowledgeBase.title%"
 
+            },
+            {
+                "command": "autotools.C_Cpp.ConfigurationProviderSelect",
+                "title": "%autotools.C_Cpp.ConfigurationProviderSelect.title%"
             },
             {
                 "command": "autotools.visit.packageURL",
@@ -168,6 +180,10 @@
                 "icon": "$(comment)",
                 "title": "%autotools.command.visit.packageBugs.title%"
 
+            },
+            {
+                "command": "autotools.gotoBuildDirectory",
+                "title": "%autotools.command.gotoBuildDirectory.title%"
             },
             {
                 "command": "autotools.exportToIntelisense",
@@ -197,26 +213,68 @@
                 "icon": "$(refresh)"
             }
         ],
-        "problemMatchers": [
+        "languages": [
             {
-                "name": "configureAc",
-                "source": "autotools",
-                "owner": "autotools",
-                "fileLocation":[
-                    "relative",
-                    "${workspaceFolder}"
+                "id": "tarball",
+                "aliases": [
+                    "Source Tarball"
                 ],
-                "pattern": {
-                    "regexp": "^(.*?):(\\d+):\\s+(warning|error):\\s+(.*)$",
-                    "file": 1,
-                    "line": 2,
-                    "severity": 3,
-                    "message": 4
+                "filenames": [
+                    "aclocal.m4",
+                    "compile",
+                    "ar-lib",
+                    "configure",
+                    "depcomp",
+                    "install-sh",
+                    "missing",
+                    "test-driver",
+                    "config.h.in",
+                    "config.sub",
+                    "config.guess",
+                    "config.cache",
+                    "ltmain.sh",
+                    "Makefile",
+                    "Makefile.in"
+                ],
+                "icon": {
+                    "dark": "res/icon/archive-dark.svg",
+                    "light": "res/icon/archive-light.svg"
                 }
             },
             {
+                "id": "m4",
+                "aliases": [
+                    "Autoconf M4", "m4"
+                ],
+                "extensions": [
+                    ".ac"
+                ],
+                "filenames": [
+                    "configure.ac", "configure.in"
+                ],
+                "icon": {
+                    "dark": "res/icon/A-dark.svg",
+                    "light": "res/icon/A-light.svg"
+                }
+            },
+            {
+                "id": "automake",
+                "aliases": [
+                    "Automake"
+                ],
+                "filenames": [
+                    "Makefile.am"
+                ],
+                "icon": {
+                    "dark": "res/icon/AM-dark.svg",
+                    "light": "res/icon/AM-light.svg"
+                }
+            }
+        ],
+        "problemMatchers": [
+            {
                 "name": "autotools_configure",
-                "label": "ccc",
+                "label": "configure script errors",
                 "source": "autotools",
                 "owner": "external",
                 "fileLocation":[
@@ -224,7 +282,7 @@
                     "${workspaceFolder}"
                 ],
                 "pattern": {
-                    "regexp": "^(configure): (error|WARNING): (.*)$",
+                    "regexp": "(configure): (error|WARNING): (.*)$",
                     "kind": "file",
                     "file": 1,
                     "severity": 2,
@@ -232,30 +290,89 @@
                 }
             },
             {
-              "name": "gcc",
-              "source": "gcc",
-              "owner": "autotools",
-              "fileLocation": [
-                "autoDetect"
-               ],
-              "pattern": {
-                "regexp": "^(.*?):(\\d+):(\\d*):?\\s+(?:fatal\\s+)?(warning|error):\\s+(.*)$",
-                "file": 1,
-                "line": 2,
-                "column": 3,
-                "severity": 4,
-                "message": 5
-              }
+                "name": "autotools_configureac",
+                "label": "configure.ac errors",
+                "source": "autotools",
+                "owner": "external",
+                "fileLocation":[
+                    "relative",
+                    "${workspaceFolder}"
+                ],
+                "pattern": {
+                    "regexp": "(configure\\.ac):(\\d+): (error|WARNING): (.*)$",
+                    "kind": "line",
+                    "file": 1,
+                    "line": 2,
+                    "severity": 3,
+                    "message": 4
+                }
             },
             {
-               "name": "msvc",
-               "source": "msvc",
-               "owner": "autotools",
-               "base": "$msCompile",
-               "fileLocation": [
-                 "autoDetect"
-               ]
-             }
+                "name": "autotools.gcc",
+                "source": "GCC",
+                "owner": "autotools",
+                "fileLocation": [
+                        "autoDetect",
+                        "${workspaceFolder}"
+                ],
+                "pattern": {
+                        "regexp": "^(.*?):(\\d+):(\\d*):?\\s+(?:fatal\\s+)?(warning|error):\\s+(.*)(?:\\[(.*)\\])\\s*$",
+                        "file": 1,
+                        "line": 2,
+                        "column": 3,
+                        "severity": 4,
+                        "message": 5,
+                        "code": 6
+                      }
+            },
+            {
+                "name": "autotools.ld",
+                "source": "LD linker",
+                "owner": "autotools",
+                "fileLocation": [
+                        "autoDetect",
+                        "${workspaceFolder}"
+                ],
+                "pattern": {
+                        "regexp": "^(.*?):(\\d+):\\s+(undefined reference.*)$",
+                        "file": 1,
+                        "line": 2,
+                        "message": 3
+                }
+            },
+            {
+                "name": "autotools.make",
+                "source": "GNU Make",
+                "owner": "autotools",
+                "fileLocation": [
+                        "relative",
+                        "${command:autotools.locateMakefile}"
+                ],
+                "base": "$autotools.ld",
+                "pattern": {
+                        "regexp": "^(Makefile.*?):(\\d+):\\s+(.*)$",
+                        "file": 1,
+                        "line": 2,
+                        "message": 3
+                }
+            },
+            {
+                "name": "autotools.generic",
+                "source": "Tooling",
+                "owner": "autotools",
+                "fileLocation": [
+                        "autoDetect",
+                        "${workspaceFolder}"
+                ],
+                "base": "$autotools.ld",
+                "pattern": {
+                        "regexp": "^(.*?):(\\d+):\\s+(.*)$",
+                        "file": 1,
+                        "line": 2,
+                        "message": 3
+                }
+            }
+
           ],
         "configuration": [
         {
@@ -289,6 +406,13 @@
                     "markdownDescription": "%autotools.configuration.traceLiveTestRuns.markdownDescription%",
                     "default": false
                 },
+                "autotools.stopAtEntry": {
+                    "order": 2,
+                    "type": "boolean",
+                    "scope": "resource",
+                    "markdownDescription": "%autotools.configuration.stopAtEntry.markdownDescription%",
+                    "default": true
+                },
                 "autotools.promptClean": {
                     "order": 2,
                     "scope": "resource",
@@ -305,10 +429,16 @@
                 }
             }
         },
-        {
-            "title": "Building Options (users)",
+        {   "title": "Building Options (users)",
             "order": 2,
             "properties": {
+                "autotools.no-warn-local-rules": {
+                    "order": 2,
+                    "scope": "resource",
+                    "type": "boolean",
+                    "markdownDescription": "%autotools.configuration.no-warn-local-rules.description%",
+                    "default": false
+                },
                 "autotools.configurations": {
                     "scope": "resource",
                     "order": 1,
@@ -392,8 +522,7 @@
                 }
             }
         },
-        {
-            "title": "Advanced options (maintainers)",
+        {   "title": "Advanced options (maintainers)",
             "order": 4,
             "properties": {
                 "autotools.keepDryRuns": {
@@ -468,8 +597,7 @@
                 }
             }
         },
-        {
-            "title": "Testing",
+        {   "title": "Testing",
             "order": 3,
             "properties": {
                 "autotools.TESTS_ENVIRONMENT" : {
@@ -547,7 +675,7 @@
             {
                 "view": "autotools.outline",
                 "contents": "%autotools.welcome.parsing.markdownDescription%",
-                "when": "autotools:makefileFilePresent == 1"
+                "when": "autotools:isConfigured == 1"
             },
             {
                 "view": "autotools.outline",
@@ -567,7 +695,7 @@
             {
                 "view": "autotools.outline",
                 "contents": "%autotools.welcome.configure.markdownDescription%",
-                "when": "autotools:haveManifest == 1 && autotools:makefileFilePresent > 1"
+                "when": "autotools:haveManifest == 1 && autotools:isConfigured > 1"
             },
             {
                 "view": "autotools.outline",
@@ -663,21 +791,6 @@
                 },
                 "configurationSnippets": [
                     {
-                        "label": "Autotools: Launch the default build target",
-                        "descriptionMarkdown": "Uses ${command:autotools.default_program} to automatically detect the target. Useful for debugging multiple programs with the same args and env. `autotools:default_program_build_task` is the default build task if set and is a linked binary program, otherwise the first program detected by importing the Makefiles",
-                        "body": {
-                            "type": "cppdbg",
-                            "request": "launch",
-                            "name": "${1:Launch the default build target}",
-                            "program": "^\"\\${command:autotools.default_program}\"",
-                            "preLaunchTask": "^\"\\${command:autotools.default_program_build_task}\"",
-                            "cwd": "^\"\\${workspaceFolder}\"",
-                            "environment": [],
-                            "args": [],
-                            "stopAtEntry": false
-                        }
-                    },
-                    {
                         "label": "Autotools: Launch a program",
                         "description": "Hardcoded program path. Useful for debugging programs with different args or env",
                         "body": {
@@ -698,14 +811,14 @@
         "viewsContainers": {
             "activitybar": [
                 {
-                    "id": "autotools__viewContainer",
+                    "id": "autotools",
                     "title": "Autotools",
                     "icon": "res/viewcontainer.svg"
                 }
             ]
         },
         "views": {
-            "autotools__viewContainer": [
+            "autotools": [
                 {
                     "id": "autotools.outline",
                     "icon": "res/viewcontainer.svg",
@@ -723,7 +836,7 @@
         "taskDefinitions": [
             {
                 "type": "build",
-                "when": "processExecutionSupported && autotools:makefileFilePresent == 1",
+                "when": "processExecutionSupported",
                 "required": ["label", "target"],
                 "properties": {
                     "label": {
@@ -751,7 +864,7 @@
             },
             {
                 "type": "test",
-                "when": "processExecutionSupported && autotools:makefileFilePresent == 1",
+                "when": "processExecutionSupported",
                 "required": ["label", "test"],
                 "properties": {
                     "label": {
@@ -778,7 +891,7 @@
             },
             {
                 "type": "check",
-                "when": "processExecutionSupported && autotools:makefileFilePresent == 1",
+                "when": "processExecutionSupported",
                 "required": ["label"],
                 "properties": {
                     "label": {
@@ -808,7 +921,7 @@
             },
             {
                 "type": "autotools",
-                "when": "processExecutionSupported && autotools:makefileFilePresent == 1",
+                "when": "processExecutionSupported",
                 "required": ["label"],
                 "properties": {
                     "label": {
@@ -848,7 +961,7 @@
                 },
                 {
                     "command": "autotools.addAutotools",
-                    "when": "autotools:haveManifest > 1"
+                    "when": "never"
                 },
                 {
                     "command": "autotools.check",
@@ -860,11 +973,35 @@
                 },
                 {
                     "command": "autotools.exportToIntelisense",
-                    "when": "autotools:makefileFilePresent == 1"
+                    "when": "autotools:isConfigured == 1"
                 },
                 {
                     "command": "autotools.bootstrap",
                     "when": "autotools:isBootstrapped"
+                },
+                {
+                    "command": "autotools.outline.bootstrap",
+                    "when": "never"
+                },
+                {
+                    "command": "autotools.visit.packageURL",
+                    "when": "never"
+                },
+                {
+                    "command": "autotools.visit.packageBugs",
+                    "when": "never"
+                },
+                {
+                    "command": "autotools.visit.knowledgeBase",
+                    "when": "never"
+                },
+                {
+                    "command": "autotools.C_Cpp.ConfigurationProviderSelect",
+                    "when": "never"
+                },
+                {
+                    "command": "autotools.gotoBuildDirectory",
+                    "when": "never"
                 },
                 {
                     "command": "autotools.configure",
@@ -876,11 +1013,7 @@
                 },
                 {
                     "command": "autotools.newConfiguration",
-                    "when": "autotools:haveManifest"
-                },
-                {
-                    "command": "autotools.setBuildConfiguration",
-                    "when": "autotools:haveConfigurations"
+                    "when": "never"
                 },
                 {
                     "command": "autotools.test",
@@ -900,11 +1033,11 @@
                 },
                 {
                     "command": "autotools.buildAll",
-                    "when": "autotools:makefileFilePresent == 1"
+                    "when": "never"
                 },
                 {
                     "command": "autotools.checkAll",
-                    "when": "autotools:makefileFilePresent == 1"
+                    "when": "never"
                 },
                 {
                     "command": "autotools.outline.recheck",
@@ -912,7 +1045,7 @@
                 },
                 {
                     "command": "autotools.configure.help",
-                    "when": "autotools:haveManifest"
+                    "when": "never"
                 },
                 {
                     "command": "autotools.outline.setBuildConfiguration",
@@ -945,6 +1078,18 @@
                     "group": "2_files@10"
                 }
             ],
+            "editor/title": [
+                {
+                    "command": "autotools.closeIrrelevant",
+                    "when": "autotools:filterByTarget",
+                    "group": "navigation@1"
+                },
+                {
+                    "command": "autotools.rdepends",
+                    "when": "autotools:hasTargets == 1",
+                    "group": "navigation@1"
+                }
+            ],
             "explorer/context" : [
                 {
                     "command": "autotools.rdepends",
@@ -954,48 +1099,13 @@
             ],
             "view/title": [
                 {
-                    "command": "autotools.command.testgrid.top",
-                    "when": "view == autotools.tests",
-                    "group": "navigation@3"
-                },
-                {
-                    "command": "autotools.outline.recheck",
+                    "command": "autotools.C_Cpp.ConfigurationProviderSelect",
                     "when": "view == autotools.outline",
-                    "group": "1_makefileOutline@3"
-                },
-                {
-                    "command": "autotools.outline.buildAll",
-                    "when": "view == autotools.outline",
-                    "group": "1_makefileOutline@3"
-                },
-                {
-                    "command": "autotools.newConfiguration",
-                    "when": "view == autotools.outline",
-                    "group": "1_makefileOutline@3"
-                },
-                {
-                    "command": "autotools.outline.checkAll",
-                    "when": "view == autotools.tests",
-                    "group": "1_makefileOutline@3"
+                    "group": "submenu@2"
                 },
                 {
                     "command": "autotools.visit.knowledgeBase",
                     "when": "view == autotools.outline",
-                    "group": "navigation@1"
-                },
-                {
-                    "command": "autotools.outline.recheck",
-                    "when": "view == autotools.outline",
-                    "group": "navigation@2"
-                },
-                {
-                    "command": "autotools.outline.setBuildConfiguration",
-                    "when": "view == autotools.outline",
-                    "group": "navigation@1"
-                },
-                {
-                    "command": "autotools.outline.setTestEnvironment",
-                    "when": "view == autotools.tests",
                     "group": "navigation@1"
                 }
             ],
@@ -1006,14 +1116,89 @@
                     "group": "inline@8"
                 },
                 {
+                    "command": "autotools.command.testgrid.top",
+                    "when": "view == autotools.tests && viewItem =~ /folderNode/",
+                    "group": "inline@5"
+                },
+                {
                     "command": "autotools.build",
                     "when": "view == autotools.outline && viewItem =~ /nodeType=build/",
                     "group": "inline@10"
                 },
                 {
                     "command": "autotools.buildAll",
-                    "when": "view == autotools.outline && viewItem =~ /nodeType=allbuild/",
+                    "when": "view == autotools.outline && viewItem =~ /nodeType=sub/",
                     "group": "inline@10"
+                },
+                {
+                    "command": "autotools.editConfigureAc",
+                    "when": "view == autotools.outline && viewItem =~ /folderNode/ && viewItem =~ /isAutotoolsProject/",
+                    "group": "1_edit@5"
+                },
+                {
+                    "command": "autotools.editMakefileAm",
+                    "when": "view == autotools.outline && viewItem =~ /nodeType=sub/",
+                    "group": "1_edit@4"
+                },
+                {
+                    "command": "autotools.outline.setBuildConfiguration",
+                    "when": "view == autotools.outline && viewItem =~ /folderNode/ && viewItem =~ /isAutotoolsProject/",
+                    "group": "2_select@10"
+                },
+                {
+                    "command": "autotools.newConfiguration",
+                    "when": "view == autotools.outline && viewItem =~ /folderNode/ && viewItem =~ /isBootstrapped/",
+                    "group": "2_select@20"
+                },
+                {
+                    "command": "autotools.editMakefileAm",
+                    "when": "view == autotools.outline && viewItem =~ /nodeType=sub/",
+                    "group": "inline@4"
+                },
+                {
+                    "command": "autotools.outline.recheck",
+                    "when": "view == autotools.outline && viewItem =~ /folderNode/ && viewItem =~ /isConfigured/",
+                    "group": "3_autoActions@1"
+                },
+                {
+                    "command": "autotools.outline.configure",
+                    "when": "view == autotools.outline && viewItem =~ /folderNode/ && viewItem =~ /isBootstrapped/",
+                    "group": "3_autoActions@5"
+                },
+                {
+                    "command": "autotools.outline.bootstrap",
+                    "when": "view == autotools.outline && viewItem =~ /folderNode/ && viewItem =~ /isAutotoolsProject/",
+                    "group": "3_autoActions@10"
+                },
+                {
+                    "command": "autotools.gotoBuildDirectory",
+                    "when": "view == autotools.outline && viewItem =~ /folderNode/ && viewItem =~ /relBuildDir/",
+                    "group": "4_navi@5"
+                },
+                {
+                    "command": "autotools.configure.help",
+                    "when": "view == autotools.outline && viewItem =~ /folderNode/ && viewItem =~ /isBootstrapped/",
+                    "group": "5_help@5"
+                },
+                {
+                    "command": "autotools.visit.packageURL",
+                    "when": "view == autotools.outline && viewItem =~ /folderNode/ && viewItem =~ /hasPackageUrl/",
+                    "group": "5_help@10"
+                },
+                {
+                    "command": "autotools.visit.packageBugs",
+                    "when": "view == autotools.outline && viewItem =~ /folderNode/ && viewItem =~ /hasBugReport/",
+                    "group": "5_help@10"
+                },
+                {
+                    "command": "autotools.visit.knowledgeBase",
+                    "when": "view == autotools.outline && viewItem =~ /folderNode/ && viewItem =~ /isAutotoolsProject/",
+                    "group": "5_help@10"
+                },
+                {
+                    "command": "autotools.exportToIntelisense",
+                    "when": "view == autotools.outline && viewItem =~ /folderNode/ && viewItem =~ /isConfigured/",
+                    "group": "6_debug@10"
                 },
                 {
                     "command": "autotools.test",
@@ -1037,13 +1222,8 @@
                 },
                 {
                     "command": "autotools.checkAll",
-                    "when": "view == autotools.tests && viewItem =~ /nodeType=allcheck/",
-                    "group": "inline@11"
-                },
-                {
-                    "command": "autotools.editMakefileAm",
-                    "when": "view == autotools.outline && viewItem =~ /nodeType=sub/",
-                    "group": "inline@1"
+                    "when": "view == autotools.tests && viewItem =~ /folderNode/",
+                    "group": "inline@10"
                 },
                 {
                     "command": "autotools.openLog",
@@ -1051,20 +1231,15 @@
                     "group": "inline@2"
                 },
                 {
-                    "command": "autotools.editConfigureAc",
-                    "when": "view == autotools.outline && viewItem =~ /nodeType=configuration/",
-                    "group": "inline@5"
-                },
-                {
-                    "command": "autotools.outline.recheck",
-                    "when": "view == autotools.outline && viewItem =~ /nodeType=configuration/",
-                    "group": "1_stateActions@1"
+                    "command": "autotools.outline.setTestEnvironment",
+                    "when": "view == autotools.tests && viewItem =~ /folderNode/ && viewItem =~ /isAutotoolsProject/",
+                    "group": "2_select@10"
                 }
             ]
         }
     },
     "scripts": {
-        "vscode:prepublish": "yarn compile-production && npm run esbuild-base -- --minify",
+        "vscode:prepublish": "yarn compile-production && npm run esbuild -- --minify",
         "bootstrap": "cd vendor/gnumake && [ -f configure ] || autoreconf -fvi",
         "preconfigure": "yarn run bootstrap",
         "configure": "mkdir -p build/make && cd build/make && [ -f config.status ] || ../../vendor/gnumake/configure --disable-dependency-tracking --with-guile=no --disable-job-server --disable-load 'INSTALL_PROGRAM=install -cs' 'CFLAGS=-g0 -O2' --disable-nls --prefix=$PWD/../..",
@@ -1077,11 +1252,11 @@
         "translations-generate": "gulp translations-generate",
         "translations-import": "gulp translations-import",
 
-        "esbuild-base": "esbuild ./src/extension.ts --bundle --outfile=$npm_package_main --external:vscode --platform=node",
+        "esbuild-base": "esbuild ./src/extension.ts --bundle --outfile=$npm_package_main --external:vscode --platform=node --sourcemap",
         "esbuild": "npm run esbuild-base -- --sourcemap",
-        "test-compile": "tsc -p ./",
+        "test-compile": "tsc --inlineSourceMap -p ./",
 
-        "watch": "tsc -watch -p ./",
+        "watch": "tsc -watch --inlineSourceMap -p ./",
         "package": "[ ! -z $TARGET ] && vsce package --pre-release --target $TARGET --yarn -o autotools.$npm_package_version-pre-$TARGET.vsix",
         "publish": "echo I WOULD vsce publish --pre-release --yarn -i autotools.vsix",
         "pretest": "yarn compile",

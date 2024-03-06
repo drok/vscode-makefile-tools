@@ -1,5 +1,12 @@
 # What's New?
 
+## Autotools Integration 0.2.0
+
+  - Add multi-root support
+  - Implement diagnostics
+  - Impelement debugging libtool'ed tests with one-click
+  - Fix stack overflow when parsing make loops (https://github.com/Mergesium/autotools/issues/12)
+
 ## Autotools Integration 0.1.3 - hotfix
 
   - Fix Dry-running seg-faults in some projects (https://github.com/Mergesium/autotools/issues/11)

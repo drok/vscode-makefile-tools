@@ -33,7 +33,7 @@ export interface Parser {
     // If it returns this, the parent will be called on the next line
     // if it returns undefined, the parent will pushed, and the stack will be popped
     // until a parent is found that returns this (ie, wants to continue at the next line)
-    push (sub: Parser) : Parser | undefined;
+    push (sub: Parser, parserStack: Parser[]) : Parser | undefined;
 }
 
 export class EmptyLine implements Parser {

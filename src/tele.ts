@@ -17,22 +17,37 @@ import * as vscode from 'vscode'
 import { buildinfo } from '../buildinfo';
 
 import { trace,
-    Span, SpanStatusCode, SpanContext, Context, SpanOptions } from '@opentelemetry/api'
+    TraceFlags,
+    Span, SpanStatusCode, SpanContext, Context } from '@opentelemetry/api'
 import { Disposable } from 'vscode-jsonrpc';
+import { setSpanContext } from '@opentelemetry/api/build/src/trace/context-utils';
 
 export { SpanStatusCode } from '@opentelemetry/api';
+// Example header, the content format can be `<trace-id>:<span-id>`
+const MyHeader = 'my-header';
 
+// See https://github.com/open-telemetry/opentelemetry-js/blob/main/doc/propagation.md
 export class MyTelemetry implements Disposable {
     private sdk : optl.NodeSDK;
     private tracer : optl.api.Tracer;
+    private myContext : SpanContext;
     private disposables: Disposable[] = [];
+    public rootSpan: Span | undefined;
+    static teleContextKey: string = 'tc';
 
     constructor(extensionContext: vscode.ExtensionContext, params: Params) {
         let traceExporter = new OTLPTraceExporter({
                 // url: 'http://192.168.20.152:4318/v1/traces',
                 url: 'https://log.mergesium.com/v1/traces',
              });
-
+        const resource = Resource.empty();
+        resource.attributes[SemanticResourceAttributes.SERVICE_NAME] = extensionContext.extension.packageJSON.name;
+        resource.attributes[SemanticResourceAttributes.SERVICE_VERSION] = extensionContext.extension.packageJSON.version;
+        resource.attributes['buildinfo'] = `${buildinfo.platform}-${buildinfo.arch}`;
+        resource.attributes[SemanticResourceAttributes.SERVICE_NAMESPACE] =
+            ((env.appName == "Visual Studio Code" || env.appName == "Visual Studio Code - Insiders") ?
+                /* The insiders version contains -insider suffix */
+                "vscode" : env.appName) + "." + env.appHost + '-' + vscode.version + '-' + env.language;
         this.sdk = new optl.NodeSDK({
             traceExporter,
 
@@ -44,25 +59,13 @@ export class MyTelemetry implements Disposable {
             instrumentations: [],
             resourceDetectors: [],
             autoDetectResources: false,
-            resource: new Resource({
-                [SemanticResourceAttributes.SERVICE_NAME]: extensionContext.extension.packageJSON.name,
-                [SemanticResourceAttributes.SERVICE_VERSION]: extensionContext.extension.packageJSON.version,
-                ['buildinfo']: `${buildinfo.platform}-${buildinfo.arch}`,
-                [SemanticResourceAttributes.SERVICE_NAMESPACE]:
-                    (env.appName == "Visual Studio Code" ? "vscode" : env.appName) + "." + env.appHost + '-' + vscode.version,
-                [SemanticResourceAttributes.OS_TYPE]: process.platform,
-                [SemanticResourceAttributes.HOST_ARCH]: process.arch,
-                [SemanticResourceAttributes.PROCESS_RUNTIME_VERSION]: process.version,
-                [SemanticResourceAttributes.SERVICE_INSTANCE_ID]: env.sessionId,
-                [SemanticResourceAttributes.DEVICE_ID]: env.machineId.slice(0, 8),
-                ['lang']: env.language,
-            })
+            resource: resource
         });
         const contextManager = new AsyncHooksContextManager();
         contextManager.enable();
         api.context.setGlobalContextManager(contextManager);
 
-        if (env.isTelemetryEnabled && getSettingOr<boolean>("telemetry", true)) {
+        if (env.isTelemetryEnabled && getSettingOr<boolean>(null, "telemetry", true)) {
             this.sdk.start();
         }
         this.disposables.push(env.onDidChangeTelemetryEnabled((e) => {
@@ -78,20 +81,32 @@ export class MyTelemetry implements Disposable {
             .catch((error) => console.log('Error terminating tracing', error))
             .finally(() => process.exit(0));
           });
+        let c = api.context.active()
         this.tracer = trace.getTracer(
             extensionContext.extension.packageJSON.name,
             extensionContext.extension.packageJSON.version);
-        // this.startSpan("edit");
-        // this.setSpanStatus(optl.api.SpanStatusCode.OK);
-        // this.setAttributes({
-        //     "a": 1,
-        //     "b": false
-        // });
-        // this.endSpan();
+
+        // extensionContext.globalState.update(MyTelemetry.teleContextKey, undefined);
+        let tele_context = extensionContext.globalState.get<string>(MyTelemetry.teleContextKey);
+        const isRemote : boolean = !!tele_context;
+        if (!tele_context) {
+            this.rootSpan = this.tracer.startSpan('install', undefined, undefined);
+            this.myContext = this.rootSpan.spanContext();
+            extensionContext.globalState.update(MyTelemetry.teleContextKey, `${this.myContext.traceId}:${this.myContext.spanId}`);
+            this.logEvent(this.rootSpan, "installed", undefined, true);
+        } else {
+            const [traceId, spanId] = tele_context.split(':');
+            this.myContext = {
+                    // spanId: tele_spanId,
+                    spanId: spanId,
+                    traceId: traceId, // tele_traceId,
+                    isRemote: isRemote,
+                    traceFlags: TraceFlags.SAMPLED,
+            }
+        }
     }
 
     public async deactivate() {
-        // this.spans.forEach(s => s.end());
         return this.sdk.shutdown();
     }
 
@@ -112,10 +127,8 @@ export class MyTelemetry implements Disposable {
         span.recordException({code: exception.name, message: exception.message, stack: exception.stack});
     }
     public startSpan(name: string, span? : Span) : Span {
-        let newspan : Span;
-        const ctx = span ? api.trace.setSpan(api.context.active(), span) : undefined;
-        newspan = this.tracer.startSpan(name, undefined, ctx);
-        return newspan;
+        return span ? this.tracer.startSpan(name, undefined, api.trace.setSpan(api.context.active(), span)) :
+            this.tracer.startSpan(name, undefined, setSpanContext(api.context.active(), this.myContext));
     }
     public endSpanWithStatus(span: Span, status: SpanStatusCode, message?: string, attributes?: api.Attributes) {
 
@@ -188,7 +201,7 @@ class TailSamplingProcessor implements SpanProcessor {
                 }, (error: any) => {
                 // Error callback
                 // console.error('Export error:', error);
-                
+
             });
     }
   }
@@ -339,6 +352,7 @@ function setContext(n: number) : void {
 const preReleaseInformedUserKey : string = "maprei";
 export async function gatePreRelease(context: vscode.ExtensionContext) : Promise<Params | undefined> {
         let informedUser = context.globalState.get<number>(preReleaseInformedUserKey);
+        let folder = vscode.workspace.workspaceFolders ? vscode.workspace.workspaceFolders[0] : null;
         if (informedUser == undefined || informedUser != Extension.myVersion) {
             const treeData = new EmptyOutlineProvider();
 
@@ -347,7 +361,7 @@ export async function gatePreRelease(context: vscode.ExtensionContext) : Promise
                 _activatedEvent.fire(true);
             }),
             vscode.commands.registerCommand('autotools.editTelemetry', async () => {
-                openSettings("autotools.telemetry");
+                openSettings("autotools.telemetry", folder, false);
             })
             ];
             let treeView = vscode.window.createTreeView('autotools.outline', {
@@ -362,7 +376,7 @@ export async function gatePreRelease(context: vscode.ExtensionContext) : Promise
             disp.forEach(i => i.dispose());
             treeView.dispose();
         }
-        while (env.isTelemetryEnabled && getSettingOr<boolean>("telemetry", true)) {
+        while (env.isTelemetryEnabled && getSettingOr<boolean>(folder, "telemetry", true)) {
                 let tele = await getParams();
                 if (tele.pre_ok !== undefined) {
                         let allow = allowRunning(tele, context);

@@ -4,7 +4,7 @@
 // Support for make operations
 
 import * as configuration from './configuration';
-import { MakefileConfiguration, clearTraits } from './configuration';
+import { FolderConfig, MakefileConfiguration } from './configuration';
 import * as cpp from 'vscode-cpptools';
 import * as cpptools from './cpptools';
 import {extension, telemetry} from './extension';
@@ -15,15 +15,18 @@ import * as logger from './logger';
 import {Executing} from './parser/shell';
 import {Making} from './parser/tool';
 import {CompileCommand} from './parser/tool';
-import {Make, Goal, Variable, Database} from './parser/gnumake';
+import {MakeContext, Make, Goal, Variable, Database} from './parser/gnumake';
 import {Parser, ParserDisp} from './parser';
 import * as path from 'path';
 import * as util from './util';
 import * as vscode from 'vscode';
+import { WorkspaceFolder } from 'vscode';
 import * as ui from './ui';
 import { quote } from '@mergesium/shell-quote';
+import * as diag from './diag';
 
 import * as nls from 'vscode-nls';
+import { log } from 'console';
 nls.config({ messageFormat: nls.MessageFormat.bundle, bundleFormat: nls.BundleFormat.standalone })();
 const localize: nls.LocalizeFunc = nls.loadMessageBundle();
 const recursiveString = localize("recursive", "(recursive)");
@@ -68,6 +71,7 @@ export enum Operations {
 }
 
 export enum TriggeredBy {
+    amUpdate = "Makefile.am updated",
     buildAll = "command pallette (buildAll)",
     configure = "command pallette (configure)",
     cleanConfigure = "command pallette (clean configure)",
@@ -99,6 +103,7 @@ export interface pkgInfo {
     tarname: string;
     automake: string;
     maint?: string;
+    ac_config_files_line: number;
 }
 function fixupPackageURLs(theinfo: pkgInfo) : void {
     if (!theinfo.url && theinfo.tarname && theinfo.name.startsWith('GNU '))
@@ -109,17 +114,25 @@ function fixupPackageURLs(theinfo: pkgInfo) : void {
             theinfo.bugreport = `mailto:${theinfo.bugreport}`;
     }
 }
-export async function getPackageJSON(): Promise<pkgInfo | undefined> {
+export async function getPackageJSON(fc: FolderConfig): Promise<pkgInfo | undefined> {
     return new Promise<pkgInfo|undefined>(async (resolve, reject) => {
-        let c = configuration.getCurrentMakefileConfiguration();
-        let theinfo : pkgInfo | undefined;
+        let c = fc.config;
+        let theinfo : pkgInfo = {
+            name: 'unk',
+            version: 'unk',
+            bugreport: 'unk',
+            tarname: '',
+            url: '',
+            automake: 'unk',
+            ac_config_files_line: 0,
+        };
 
-        if (extension.isConfigured()) {
+        if (fc.isConfigured) {
             try {
                 let info : string | undefined;
                 const result: util.SpawnProcessResult = await util.spawnChildProcess(
-                    util.resolvePathToRoot(path.join(c.top_builddir, "config.status")), ["--file=-:-"],
-                    util.getWorkspaceRoot(),
+                    path.join(fc.abs_top_builddir, "config.status"), ["--file=-:-"],
+                    fc.folder.uri.path,
                     true, true,
                     '{ "name": "@PACKAGE@", "version": "@VERSION@", "tarname": "@PACKAGE_TARNAME@", "bugreport": "@PACKAGE_BUGREPORT@", "url": "@PACKAGE_URL@", "automake": "@AUTOMAKE@", "maint": "@MAINTAINER_MODE_FALSE@" }',
                     (x) => {info = x}, undefined).catch<util.SpawnProcessResult>((r) => Promise.resolve({ returnCode: 33, signal: "ERR" }));
@@ -128,6 +141,19 @@ export async function getPackageJSON(): Promise<pkgInfo | undefined> {
                     theinfo = JSON.parse(info || "");
                 if (theinfo) {
                     fixupPackageURLs(theinfo);
+
+                    const result: util.SpawnProcessResult = await util.spawnChildProcess(
+                        "autoconf", ['--trace=AC_CONFIG_FILES:\\$f%%%\\$l%%%\\$n%%%'],
+                        fc.folder.uri.path,
+                        true, true,
+                        undefined,
+                        (x) => {
+                            var ac_init = x.trimEnd().split('%%%');
+                            if (ac_init[2] == 'AC_CONFIG_FILES') {
+                                theinfo.ac_config_files_line = Number(ac_init[1]);
+                            }
+                        }, undefined);
+
                     return resolve(theinfo);
                 }
                 else resolve(undefined);
@@ -136,22 +162,23 @@ export async function getPackageJSON(): Promise<pkgInfo | undefined> {
             }
         } else {
             const result: util.SpawnProcessResult = await util.spawnChildProcess(
-                "autoconf", ["--trace=AC_INIT:\\$f%%%\\$l%%%\\$n%%%\\${%%%}%"],
-                util.getWorkspaceRoot(),
+                "autoconf", ["--trace=AC_INIT:\\$f%%%\\$l%%%\\$n%%%\\${%%%}%", '--trace=AC_CONFIG_FILES:\\$f%%%\\$l%%%\\$n%%%'],
+                fc.folder.uri.path,
                 true, true,
                 undefined,
                 (x) => {
                     var ac_init = x.trimEnd().split('%%%');
                     if (ac_init && ac_init.length > 4 && ac_init[0] == "configure.ac" && ac_init[2] == "AC_INIT") {
-                        theinfo = {
-                            "name": ac_init[3],
-                            "version": ac_init[4] ?? '',
-                            "bugreport": ac_init[5] ?? '',
-                            "tarname": ac_init[6] ?? '',
-                            "url": ac_init.slice(7).join(':') ?? '',
-                            "automake": "unk",
-                        };
+                        theinfo.name = ac_init[3];
+                        theinfo.version = ac_init[4] ?? '',
+                        theinfo.bugreport = ac_init[5] ?? '',
+                        theinfo.tarname = ac_init[6] ?? '',
+                        theinfo.url = ac_init.slice(7).join(':') ?? '',
+                        theinfo.automake =  "unk",
                         fixupPackageURLs(theinfo);
+                    } else
+                    if (ac_init[2] == 'AC_CONFIG_FILES') {
+                        theinfo.ac_config_files_line = Number(ac_init[1]);
                     }
                 }, undefined);
             if (result.returnCode !== 0) resolve(undefined);
@@ -162,53 +189,27 @@ export async function getPackageJSON(): Promise<pkgInfo | undefined> {
     });
 }
 
-export interface AutotoolsStats {
-    programs: number;
-    tests: number;
-    checks: number;
-};
-
-let export_stats : AutotoolsStats;
-export function getStats() : AutotoolsStats {
-    return export_stats;
-}
-
 export var builtin_targets : Set<string> = new Set();
 // Targets need to parse a dryrun make invocation that does not include a target name
 // (other than default empty "" or the standard "all"), otherwise it would produce
 // a subset of all the targets involved in the makefile (only the ones triggered
 // by building the current target).
-export async function generateParseContent(span: Span): Promise<ConfigureSubphaseStatus> {
-    const makefilePath :string | undefined = configuration.getConfigurationMakefile();
-    if (!makefilePath) {
-        extension.resetCppToolsProvider();
-
-        // Without a makefile, this function should never be called. This is a runtime error (a bug).
-        throw new Error("No makefile found.");
-    }
-
+export async function generateParseContent(span: Span, fc: FolderConfig): Promise<ConfigureSubphaseStatus> {
     let startTime: number = Date.now();
 
-    let c = configuration.getCurrentMakefileConfiguration();
+    let c = fc.buildConfig;
 
     // Continue with the make dryrun invocation
     let makeArgs: string[] = [];
 
-    // FIXME: if current target = make.t_all, dir is empty, make will be done in proj dir
-    // make directory and makefile. If a target is selected, only set the target dir
-    let dir = c.top_builddir;
-    if (dir) {
-        makeArgs.push(...["-C", dir]);
-    }
-    let topMakefile = configuration.gettopMakefile();
+    let topMakefile = fc.topMakefile;
     if (topMakefile) {
         // FIXME: this refers to the configuration makefile, not the target's makefile
         makeArgs.push(...["-f", topMakefile]);
     }
 
-    let abs_top_builddir = util.resolvePathToRoot(dir || "");
-    configuration.clearTargets();
-    let build_tree: Make = new Make('', telemetry.startSpan("Make", span), abs_top_builddir);
+    fc.clearBuildTargets(span);
+    let build_tree = fc.build_tree;
 
     // Include all the make arguments defined in autotools.configurations.makeArgs
     makeArgs = makeArgs.concat(c.makeArgs || []);
@@ -234,10 +235,10 @@ export async function generateParseContent(span: Span): Promise<ConfigureSubphas
     makeArgs.push(...Executing.makeArgs());
 
     makeArgs.push("--dry-run");
-    makeArgs.push("'--assume-old=\\$(top_srcdir)/configure'",
-        "'--assume-old=\\$(top_builddir)/config.status'");
-    if (!dir)
-        makeArgs.push("--assume-old=configure"); // Only works in-tree
+//    makeArgs.push("'--assume-old=\\$(top_srcdir)/configure'",
+//        "'--assume-old=\\$(top_builddir)/config.status'");
+//    if (!fc.buildConfig.top_builddir)
+//        makeArgs.push("--assume-old=configure"); // Only works in-tree
 
     makeArgs.push(
         /* Don't stop for errors like "No rule to make ..." because those say
@@ -261,10 +262,10 @@ export async function generateParseContent(span: Span): Promise<ConfigureSubphas
         // TODO: Use stream writes
         // Problem is described here: https://stackoverflow.com/questions/3459476/how-to-append-to-a-file-in-node/43370201#43370201
         const lineEnding: string = (process.platform === "win32" && process.env.MSYSTEM === undefined) ? "\r\n" : "\n";
-        let keepDryRuns: boolean = configuration.getKeepDryRuns();
         let dryrunFile : string = "all.dryrun.log";
-        if (keepDryRuns) {
-            dryrunFile = path.join(configuration.getConfigurationCachePath(), dryrunFile);
+        let dryRunPath = fc.dryRunPath;
+        if (dryRunPath) {
+            dryrunFile = path.join(dryRunPath, dryrunFile);
             logger.message(`Writing the dry-run output: ${dryrunFile}`);
             let quoted_cmd = quote([extension.dryRunner].concat(makeArgs));
             util.writeFile(dryrunFile, `${quoted_cmd}${lineEnding}`);
@@ -272,18 +273,17 @@ export async function generateParseContent(span: Span): Promise<ConfigureSubphas
         let completeErr: string = "";
         let heartBeat: number = Date.now();
         let parserStack: Parser[] = [build_tree];
+        build_tree.ctx.parserStack = parserStack;
         let linenumber: number = 0;
         let lineBuffer: string = "";
         let parseFailedAt: number = 0;
 
         // Clear the existing Intellisense config from cache or previous parsing
-        extension.resetCppToolsProvider();
-
-        export_stats = {programs: 0, tests: 0, checks: 0};
+        // fc.resetCppToolsProvider();
 
         let stdout: any = (result: string): void => {
             // FIXME: should end look after caught exception
-            if (keepDryRuns)
+            if (dryRunPath)
                 fs.appendFileSync(dryrunFile, result);
 
             // slice remove the very last newline.
@@ -327,7 +327,7 @@ export async function generateParseContent(span: Span): Promise<ConfigureSubphas
                             if (!(parser instanceof Goal))
                                 logger.message(' '.repeat(parserStack.length *2) + `+ line ${linenumber}: ${s}`, "Debug");
                         } else {
-                            let next = parserStack[parserStack.length - 1].push(parser);
+                            let next = parserStack[parserStack.length - 1].push(parser, parserStack);
                             if (next)  {
                                 if (next != parser && next != parserStack[parserStack.length - 1]) {
                                     // when subsection which list, this adds a new element to the list
@@ -340,15 +340,15 @@ export async function generateParseContent(span: Span): Promise<ConfigureSubphas
                                 while (!next && parserStack.length) {
                                     parser = parserStack.pop();
                                     if (parser && parserStack.length) {
-                                        next = parserStack[parserStack.length - 1].push(parser);
+                                        next = parserStack[parserStack.length - 1].push(parser, parserStack);
                                     }
                                 };
                                 if (next && next != parserStack[parserStack.length - 1]) {
                                     // After a subsection is complete, this allows the parent to continue
                                     // with a new subsection.
                                     parserStack.push(next);
-                                } else {
-                                    logger.message(' '.repeat(parserStack.length *2) + `/ ${linenumber}: ${s}`, "Debug");
+                                // } else {
+                                    //logger.message(' '.repeat(parserStack.length *2) + `/ ${linenumber}: ${s}`, "Debug");
                                 } // else parent continues
                             }
                         }
@@ -367,21 +367,38 @@ export async function generateParseContent(span: Span): Promise<ConfigureSubphas
             heartBeat = Date.now();
         };
 
+        var kbUrl : vscode.Uri = await fc.kbUrl();
         let stderr: any = (result: string): void => {
             // Sometimes there is useful information coming via the stderr
             // (one example is even a bug of the make tool, because it reports
             // "Entering directory" on stderr instead of stdout causing various issues).
             completeErr += result;
+
+
+            if (dryRunPath) {
+                logger.message(`ERROR in ${dryrunFile}:${linenumber}:`, 'Normal');
+            }
+            let mi = util.findLastIndex(parserStack, p => p instanceof Make);
+            if (mi >= 0) {
+                let m = parserStack[mi] as Make;
+                logger.message(`In ${path.join(m.dir,'Makefile')} > ${m.file}`, 'Normal');
+            }
+
+            let msg = result
+                .replace(/^/, "    ")
+                .replace(/^\s*(.* No rule to make target.*)$/gm, "WARNING: $&\nWARNING: This leads to debugging out-of-date programs.")
+                .replace(/^\s*(.* overriding recipe for target*)$/gm, `WARNING: $&\nWARNING: Discovered test tasks will not run as the maintainers expect.\nKB: ${kbUrl.toString(true)}#overrides-check-target`);
+            logger.message(msg, 'Normal');
+
         };
 
         const heartBeatTimeout: number = 300; // half minute. TODO: make this a setting
         let timeout: NodeJS.Timeout = setInterval(function (): void {
             let elapsedHeartBit: number = util.elapsedTimeSince(heartBeat);
             if (elapsedHeartBit > heartBeatTimeout) {
-                vscode.window.showWarningMessage("Dryrun timeout. See Makefile Tools Output Channel for details.");
-                logger.message("Dryrun timeout. Verify that the make command works properly " +
-                "in your development terminal (it could wait for stdin).");
-                if (keepDryRuns) {
+                vscode.window.showWarningMessage("Dryrun timeout. See Autotools Output Channel for details.");
+                logger.message(`Dryrun timeout. See ${kbUrl.toString(true)}#dry-run-timeout`, "Normal");
+                if (dryRunPath) {
                     logger.message(`Double check the dryrun output log: ${dryrunFile}`);
                 }
 
@@ -393,9 +410,9 @@ export async function generateParseContent(span: Span): Promise<ConfigureSubphas
         // The dry-run analysis should operate on english.
         const result: util.SpawnProcessResult = await util.spawnChildProcess(
                 extension.dryRunner,
-                makeArgs, util.getWorkspaceRoot(), true, true, undefined, stdout, stderr);
+                makeArgs, fc.abs_top_builddir, true, true, undefined, stdout, stderr);
         builtin_targets.clear();
-        if (keepDryRuns && completeErr) {
+        if (dryRunPath && completeErr) {
             fs.appendFileSync(dryrunFile,
                 lineEnding +
                 lineEnding +
@@ -408,22 +425,15 @@ export async function generateParseContent(span: Span): Promise<ConfigureSubphas
         let elapsedTime: number = util.elapsedTimeSince(startTime);
         logger.message(`Generating dry-run elapsed time: ${elapsedTime}`, "Verbose");
 
-        parseFile = keepDryRuns ? dryrunFile : (dryrunFile + " (not saved)");
+        parseFile = dryRunPath ? dryrunFile : (dryrunFile + " (not saved)");
 
         // The error codes returned by the targets invocation (make -pRrq) mean something else
         // (for example if targets are out of date). We can ignore the return code for this
         // because it "can't fail". It represents only display of database and no targets are actually run.
         // try syntax error
         if (result.returnCode !== ConfigureBuildReturnCodeTypes.success) {
-            var kbUrl : vscode.Uri = await extension.kbUrl();
-            logger.message(completeErr
-                .replace(/^(.* No rule to make target.*)$/gm, "WARNING: $&\nWARNING: This leads to debugging out-of-date programs.")
-                .replace(/^(.* overriding recipe for target*)$/gm, `WARNING: $&\nWARNING: Discovered test tasks will not run as the maintainers expect.\nKB: ${kbUrl.toString(true)}#overrides-check-target`)
-
-            );
-
             if (result.returnCode == ConfigureBuildReturnCodeTypes.describedError) {
-                if (configuration.getAllBuildTargets().size != 0) {
+                if (fc.buildTargets.size != 0) {
                     logger.message("Exporting project config was partially successful.");
                 } else {
                     logger.message("Exporting project config failed.");
@@ -440,7 +450,7 @@ export async function generateParseContent(span: Span): Promise<ConfigureSubphas
             if (result.returnCode == ConfigureBuildReturnCodeTypes.describedError) {
                 logger.message('KB: ' + kbUrl.toString(true) + '#dry-run-warnings', "Normal");
             } else {
-                await util.reportDryRunError(dryrunFile);
+                await util.reportDryRunError(fc, dryrunFile);
             }
             // FIXME: Since dry-running failed, also unlink the configCache file
         } else {
@@ -448,7 +458,7 @@ export async function generateParseContent(span: Span): Promise<ConfigureSubphas
             if (parseFailedAt) {
                 /* Partial parse ... something in the make output could not be parsed */
                 telemetry.setAttributes(span, {failAtLine: parseFailedAt});
-                var kbUrl : vscode.Uri = await extension.kbUrl();
+                var kbUrl : vscode.Uri = await fc.kbUrl();
                 logger.message('KB: ' + kbUrl.toString(true) + '#config-parse-fail', "Normal");
             } else
                 telemetry.setSpanStatus(span, SpanStatusCode.OK);
@@ -458,31 +468,31 @@ export async function generateParseContent(span: Span): Promise<ConfigureSubphas
             result.returnCode != ConfigureBuildReturnCodeTypes.outOfDate &&
             result.returnCode != ConfigureBuildReturnCodeTypes.describedError) {
             /* Reset, to make it obvious that something very wrong happened */
-            extension.resetCppToolsProvider();
+            fc.resetCppToolsProvider();
         } else {
-            // All done, notify that new data is available
-            if (!result.returnCode)
-                result.returnCode = extension.updateCppToolsProvider();
-            else
-                extension.updateCppToolsProvider();
-
-            export_stats = build_tree.stats;
-            configuration.accountForTraits();
-            extension.updateTasks(build_tree);
-            extension.updateWatchers();
+            fc.accountForTraits();
+            fc.updateBuildTree();
+            fc.updateWatchers();
         }
-        telemetry.setAttributes(span, {
-            stats: [ linenumber,
+        let attrs : Attributes = {
+            lines: linenumber,
+            stats: [
                 build_tree.stats.programs,
+                build_tree.stats.sharedlibs,
                 build_tree.stats.tests,
-                build_tree.stats.checks ]
-        });
-        ui.getUI().setStatus(result.returnCode !== ConfigureBuildReturnCodeTypes.success ? ui.UIStatus.ERR : ui.UIStatus.OK);
+                build_tree.stats.testbins,
+                build_tree.stats.checks,
+            ],
+        };
+        // separate because it is a measure of added value
+        if (build_tree.stats.missingRules) attrs.mRules = build_tree.stats.missingRules;
+        if (build_tree.stats.localRules) attrs.lRules = build_tree.stats.localRules;
+        telemetry.setAttributes(span, attrs);
+        ui.getUI().setStatus(result.returnCode !== ConfigureBuildReturnCodeTypes.success ? ui.UIStatus.ERR : ui.UIStatus.OK, build_tree.ctx.fc);
 
         // Update the projname because the dry-run may have updated config.status
         // TODO - this can be done by reading PACKAGE var at dry-run, avoid the extra exec
-        await extension.readPkgInfo();
-        extension.setConfiguration(configuration.getCurrentMakefileConfiguration().name);
+        await fc.readPkgInfo();
 
         curPID = -1;
         return {
@@ -490,10 +500,13 @@ export async function generateParseContent(span: Span): Promise<ConfigureSubphas
             elapsed: elapsedTime
         };
     } catch (error) {
-        logger.message("Parsing the configuration failed due to: " + error);
+//        if (error instanceof Error)
+//            logger.message('Parsing the configuration failed due to: ' + error.toString() + '\n' + error.stack);
+//        else
+            logger.message('Parsing the configuration failed due to: ' + error.toString(true));
         telemetry.logException(error, span);
         telemetry.setSpanStatus(span, SpanStatusCode.ERROR, "exception");
-        ui.getUI().setStatus(ui.UIStatus.RUNTIME);
+        ui.getUI().setStatus(ui.UIStatus.RUNTIME, build_tree.ctx.fc);
         return {
             retc: ConfigureBuildReturnCodeTypes.notFound,
             elapsed: util.elapsedTimeSince(startTime)
@@ -619,26 +632,20 @@ function getRelevantConfigStats(stats: any): ConfigureSubphaseStatusItem[] {
 // There is the downside that any files that are removed from the makefile
 // (thus disappearing from the log with commands) will still have IntelliSense loaded
 // until the next clean configure.
-export async function configure(parentSpan: Span, triggeredBy: TriggeredBy): Promise<number> {
+export async function configure(parentSpan: Span, triggeredBy: TriggeredBy, fc: FolderConfig): Promise<number> {
   // Mark that this workspace had at least one attempt at configuring, before any chance of early return,
   // to accurately identify whether this project configured successfully out of the box or not.
   let ranConfigureInCodebaseLifetime: boolean =
-    extension.getState().ranConfigureInCodebaseLifetime;
-  extension.getState().ranConfigureInCodebaseLifetime = true;
-
-  // If there are no Makefiles, cannot configure Intellisense.
-  if (!configuration.getConfigurationMakefile()) {
-    return ConfigureBuildReturnCodeTypes.fullFeatureFalse;
-  }
+    fc.state.ranConfigureInCodebaseLifetime;
+  fc.state.ranConfigureInCodebaseLifetime = true;
 
   let span = telemetry.startSpan("conf", parentSpan);
   // Same start time for configure and an eventual pre-configure.
   let configureStartTime: number = Date.now();
 
   // Identify for telemetry whether this configure will read configuration constructs from cache.
-  let configurationCache: string =
-        path.join(configuration.getConfigurationCachePath(),
-        "all.cache");
+  let configurationCache: string = fc.cachePath ?
+        path.join(fc.cachePath, "all.cache") : '';
   let readCache: boolean = configurationCache ?
     util.checkFileExistsSync(configurationCache) : false;
 
@@ -646,25 +653,23 @@ export async function configure(parentSpan: Span, triggeredBy: TriggeredBy): Pro
   let retc: number = ConfigureBuildReturnCodeTypes.success;
   let subphaseStats: ConfigureSubphasesStatus = {};
 
-  await util.scheduleAsyncTask(async () => {await extension.registerCppToolsProvider(); });
-
-  await extension.waitToTouchMakefiles();
+  await fc.autotoolsTask.waitToTouchMakefiles();
   try {
-    ui.getUI().setLoading(ui.UIStatus.LOADING);
-    subphaseStats = await doConfigure(readCache, configurationCache, false, span);
-    extension.autotoolsDoneNoResult();
+    ui.getUI().setLoading(ui.UIStatus.LOADING, fc);
+    subphaseStats = await doConfigure(readCache, configurationCache, false, span, fc);
+    fc.autotoolsTask.autotoolsDoneNoResult();
 
-    ui.getUI().setLoading(ui.UIStatus.OK);
     // If not cancelled already, analyze all doConfigure subphases
     // to decide how we should look at the final configure outcome.
     // retc is set to cancel in onCancellationRequested
     // and we don't need to look which subphase cancelled.
     retc = analyzeConfigureSubphases(subphaseStats);
+    ui.getUI().setLoading(!retc ? ui.UIStatus.OK : ui.UIStatus.ERR, fc);
 
-    extension.getState().configureDirty = !(retc === ConfigureBuildReturnCodeTypes.success);
+    fc.state.configureDirty = !(retc === ConfigureBuildReturnCodeTypes.success);
 
     if (retc === ConfigureBuildReturnCodeTypes.success) {
-        let fileIndex = extension.getCppConfigurationProvider().getCustomConfigurationProvider().fileIndex;
+        let fileIndex = fc.cppConfigurationProvider.getCustomConfigurationProvider().fileIndex;
 
         let sample = Array.from(fileIndex.keys()).slice(0, 3)
                 .concat("...")
@@ -679,15 +684,21 @@ export async function configure(parentSpan: Span, triggeredBy: TriggeredBy): Pro
             "Intellisense data available, but not used, for {0} source files like {1}",
                 fileIndex.size, sample.join(", ")));
       }
+      let stats = fc.build_tree.stats;
       logger.message(localize("autotools.log.config.exported2",
             "Generated tasks: {0} build tasks and {1} test tasks in {2} check suites (see Run Task... command)",
-            export_stats.programs, export_stats.tests, export_stats.checks));
+            stats.programs, stats.tests, stats.checks));
     } else {
         if (retc == 1) {/* ie, Intellisense API not available */
-            var kbUrl : vscode.Uri = await extension.kbUrl();
+            var kbUrl : vscode.Uri = await fc.kbUrl();
             logger.message('Export to Intellisense failed. Review the OUTPUT tab of C++ for cause.', "Normal");
             logger.message('Exporting can be re-attempted with "Autotools: Export Configuration to Intellisense"', "Normal");
             logger.message('KB: ' + kbUrl.toString(true) + '#intellisense-export-fail', "Normal");
+        } else if (retc == 2) { /* Makefile is broken */
+            if (triggeredBy == TriggeredBy.cleanConfigure) {
+                logger.message('Trying to recover by re-checking the configuration (config.status)', "Normal");
+                await fc.autotoolsTask.recheck(telemetry.startSpan("recover", span));
+            }
         }
     }
 
@@ -701,8 +712,8 @@ export async function configure(parentSpan: Span, triggeredBy: TriggeredBy): Pro
     retc = ConfigureBuildReturnCodeTypes.other;
     return e.errno;
   } finally {
-    let provider: cpptools.CustomConfigurationProvider = extension
-      .getCppConfigurationProvider()
+    let provider: cpptools.CustomConfigurationProvider = fc
+      .cppConfigurationProvider
       .getCustomConfigurationProvider();
     let ConfigurationCache: ConfigurationCache = {
       customConfigurationProvider: {
@@ -715,7 +726,6 @@ export async function configure(parentSpan: Span, triggeredBy: TriggeredBy): Pro
     if (!isConfigurationEmpty(ConfigurationCache)) {
       // Rewrite the configuration cache according to the last updates of the internal arrays,
       if (
-        configuration.getKeepConfigurationCache() &&
         configurationCache
       ) {
         util.writeFile(
@@ -736,14 +746,17 @@ export async function configure(parentSpan: Span, triggeredBy: TriggeredBy): Pro
     logger.message(`Configure elapsed time: ${configureElapsedTime}`, "Verbose");
 
     extension.setCompletedConfigureInSession(true);
-    
-    telemetry.setAttributes(span, {
+
+    let attrs : Attributes = {
         numFiles: provider.fileIndex.size,
-        numConfigs: configuration.getMakefileConfigurations().length,
-        firstTime: !ranConfigureInCodebaseLifetime,
-        readCache: readCache,
-    });
-    span.end();
+    };
+    if (fc.numConfigs > 1) attrs.numConfigs = fc.numConfigs;
+    if (!ranConfigureInCodebaseLifetime) attrs.firstTime = !ranConfigureInCodebaseLifetime;
+    if (readCache) attrs.readCache = readCache;
+    if (fc.errorCodes.size) attrs.errors = Array.from(fc.errorCodes.keys());
+    telemetry.endSpanWithStatus(span,
+        retc == ConfigureBuildReturnCodeTypes.success ?
+            SpanStatusCode.OK : SpanStatusCode.ERROR, "confmsg", attrs);
 
     if (retc !== ConfigureBuildReturnCodeTypes.success) {
       logger.showOutputChannel();
@@ -757,7 +770,7 @@ export async function configure(parentSpan: Span, triggeredBy: TriggeredBy): Pro
  * This function should not be called if there is no cache to load.
  * @param cacheFile - the filename including path of the cache in json format
  */
-async function loadConfigurationFromCache(cacheFile: string, parentSpan: Span): Promise<ConfigureSubphaseStatus> {
+async function loadConfigurationFromCache(fc: FolderConfig, cacheFile: string, parentSpan: Span): Promise<ConfigureSubphaseStatus> {
 
     let span = telemetry.startSpan("lc", parentSpan);
     let startTime: number = Date.now();
@@ -778,30 +791,22 @@ async function loadConfigurationFromCache(cacheFile: string, parentSpan: Span): 
             let json  = JSON.parse(content);
             configurationCache = json;
 
-            let stats: Attributes = {
-                stats: [configurationCache.customConfigurationProvider.workspaceBrowse.browsePath.length,
-                configurationCache.customConfigurationProvider.fileIndex.length,
-            ]};
             // Deserialize object.
             // configurationCache.customConfigurationProvider.fileIndex.uri is converted to vscode.Uri objects
             // buildTargets is converted to Map
-            await util.scheduleTask(() => {
-                configurationCache.customConfigurationProvider.fileIndex.forEach(i => {
-                    i[1].uri = vscode.Uri.file(i[0]);
-                });
+            configurationCache.customConfigurationProvider.fileIndex.forEach(i => {
+                i[1].uri = vscode.Uri.file(i[0]);
             });
 
-            await util.scheduleTask(() => {
-                // The configurations saved in the cache are read directly into the final file index.
-                extension.getCppConfigurationProvider().setCustomConfigurationProvider({
-                    workspaceBrowse: configurationCache.customConfigurationProvider.workspaceBrowse,
-                    // Trick to read a map from json
-                    fileIndex: new Map<string, cpptools.SourceFileConfigurationItem>(configurationCache.customConfigurationProvider.fileIndex)
-                });
+            // The configurations saved in the cache are read directly into the final file index.
+            fc.cppConfigurationProvider.setCustomConfigurationProvider({
+                workspaceBrowse: configurationCache.customConfigurationProvider.workspaceBrowse,
+                // Trick to read a map from json
+                fileIndex: new Map<string, cpptools.SourceFileConfigurationItem>(configurationCache.customConfigurationProvider.fileIndex)
             });
 
             telemetry.endSpanWithStatus(span, SpanStatusCode.OK, undefined, {
-                stats: [
+                lcstats: [
                     configurationCache.customConfigurationProvider.workspaceBrowse.browsePath.length,
                     configurationCache.customConfigurationProvider.fileIndex.length,
                 ]});
@@ -813,13 +818,13 @@ async function loadConfigurationFromCache(cacheFile: string, parentSpan: Span): 
         elapsedTime = util.elapsedTimeSince(startTime);
         logger.message(`Load configuration from cache elapsed time: ${elapsedTime}`, "Verbose");
 
+        extension.updateCppToolsProvider();
+
         // Log all the files read from cache after elapsed time is calculated.
         // IntelliSense should be available by now for all files.
         // Don't await for this logging step. This may produce some interleaved output
         // but it will still be readable.
-        await util.scheduleTask(() => {
-            extension.getCppConfigurationProvider().logConfigurationProviderComplete();
-        });
+        fc.cppConfigurationProvider.logConfigurationProviderComplete();
     } else {
         telemetry.endSpanWithStatus(span, SpanStatusCode.ERROR, "nodata");
         return {
@@ -839,7 +844,7 @@ async function loadConfigurationFromCache(cacheFile: string, parentSpan: Span): 
 // Sometimes the targets do not need an update (for example, when there has been
 // a change in the current build target), as requested through the boolean.
 // This saves unnecessary parsing which may be signifficant for very big code bases.
-export async function doConfigure(readCache: boolean, cacheFile: string, recursiveDoConfigure: boolean = false, span: Span): Promise<ConfigureSubphasesStatus> {
+export async function doConfigure(readCache: boolean, cacheFile: string, recursiveDoConfigure: boolean = false, span: Span, fc: FolderConfig): Promise<ConfigureSubphasesStatus> {
     let subphaseStats: ConfigureSubphasesStatus = {};
 
     // If available, load all the configure constructs via json from the cache file.
@@ -851,22 +856,19 @@ export async function doConfigure(readCache: boolean, cacheFile: string, recursi
     // The loading from cache is cheap, but logging it (for Verbose level) may interfere unnecessarily
     // with the output channel, especially since that logging is not awaited for.
     if (!recursiveDoConfigure && !extension.getCompletedConfigureInSession() && readCache) {
-        subphaseStats.loadFromCache = await loadConfigurationFromCache(cacheFile, span);
+        subphaseStats.loadFromCache = await loadConfigurationFromCache(fc, cacheFile, span);
     } else {
         logger.message("Loading configurations from cache is not necessary.", "Verbose");
     }
 
-    /* Reset traits collected from parsing the makefile */
-    clearTraits();
-
     telemetry.setAttributes(span, {
-            proj: extension.pkginfo?.name ?? configuration.getFolder(),
-            ver: extension.pkginfo?.version,
-            am: extension.pkginfo?.automake.split("-").slice(-1)[0],
+            proj: fc.pkginfo?.name ?? fc.folder.name,
+            ver: fc.pkginfo?.version,
+            am: fc.pkginfo?.automake.split("-").slice(-1)[0],
         });
     // This generates the dryrun output (saving it on disk) or reads an alternative build log.
     // Timings for this sub-phase happen inside.
-    subphaseStats.generateParseContent = await generateParseContent(span);
+    subphaseStats.generateParseContent = await generateParseContent(span, fc);
 
     switch (subphaseStats.generateParseContent.retc) {
         case ConfigureBuildReturnCodeTypes.success:
@@ -905,15 +907,14 @@ export enum TRS {
 export interface TestResult {
     results: Map<number, TRS>;
     global: TRS;
-    untagged?: TRS | undefined; // No environment tag
 };
 
 export const TRS_Info: { [key: number]: vscode.FileDecoration } = {
     [TRS.NONE]:  { tooltip: 'n/a',   badge: '❔' },
     [TRS.XPASS]: { tooltip: 'XPASS', badge: '☑️' },
     [TRS.PASS]:  { tooltip: 'PASS',  badge: '✔️' },
-    [TRS.SKIP]:  { tooltip: 'SKIP',  badge: '🔳' },
-    [TRS.ERROR]: { tooltip: 'ERROR', badge: /* '⭕' */ '💣️'},
+    [TRS.SKIP]:  { tooltip: 'SKIP',  badge: '⤵️' },
+    [TRS.ERROR]: { tooltip: 'ERROR', badge: '🔺' /* '⚠' */},
     [TRS.FAIL]:  { tooltip: 'FAIL',  badge: '❌' },
     [TRS.XFAIL]: { tooltip: 'XFAIL', badge: '🏳️' },
     [7]: { tooltip: 'THROW',   badge: '⁉️' },
@@ -947,10 +948,10 @@ const noTRS : TestResult = { global: TRS.NONE, results: new Map<number, TRS>() }
  * @param c Current build configuration.
  * @returns a {@linkcode make.TRS TRS enum value}
  */
-export function readTRS(b: BuildTarget, c: MakefileConfiguration) : TestResult
+export function readTRS(b: BuildTarget, fc: FolderConfig) : TestResult
 {
-    let te = configuration.getTestEnvironments();
-    let trs = util.resolvePathToRoot(path.join(c.top_builddir, b.builddir, path.basename(b.goal, ".log") + ".trs"));
+    let te = fc.testEnvironments;
+    let trs = path.join(fc.abs_top_builddir, b.builddir, path.basename(b.goal, ".log") + ".trs");
     let testResult: TestResult = { global: TRS.NONE, results: new Map<number, TRS>() };
     try {
         const fileContent = fs.readFileSync(trs, 'utf8');
@@ -965,8 +966,12 @@ export function readTRS(b: BuildTarget, c: MakefileConfiguration) : TestResult
                     let envid = parseInt(result[2],36);
                     if(te.some(e => e.hashCode == envid && (!e.dirs || e.dirs.includes(b.builddir))))
                         testResult.results.set(envid, TRSLookup.get(result[1]) || TRS.NONE);
-                } else if (result.length == 2)
-                    testResult.untagged = TRSLookup.get(result[1]);
+                } else if (result.length == 2 && te.length == 1) {
+                    /* If test environements are not in use, use the untagged result
+                     * as the default environment's result
+                     */
+                    testResult.results.set(fc.currentTestEnvironment.hashCode, TRSLookup.get(result[1]) || TRS.NONE);
+                }
             } else if (line.startsWith(':global-test-result:')) {
                 testResult.global = TRSLookup.get(line.split(' ', 2)[1]) || TRS.NONE;
             }

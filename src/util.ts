@@ -4,6 +4,7 @@
 // Helper APIs used by this extension
 
 import * as configuration from './configuration';
+import { FolderConfig } from './configuration';
 import * as fs from 'fs';
 import * as child_process from 'child_process';
 import * as logger from './logger';
@@ -100,15 +101,15 @@ export function tmpDir(): string {
     }
 }
 
-let configScope : vscode.ConfigurationScope | null = null;
-export function setConfigScope() : void {
-    configScope = vscode.workspace.workspaceFolders ? vscode.workspace.workspaceFolders[0] : null;
-}
-export function getConfigScope() : vscode.ConfigurationScope | null { return configScope; }
+// let configScope : vscode.ConfigurationScope | null = null;
+// export function setConfigScope() : void {
+//     configScope = vscode.workspace.workspaceFolders ? vscode.workspace.workspaceFolders[0] : null;
+// }
+// export function getConfigScope() : vscode.ConfigurationScope | null { return configScope; }
 
-export function getWorkspaceRoot(): string {
-    return vscode.workspace.workspaceFolders ? vscode.workspace.workspaceFolders[0].uri.fsPath : "";
-}
+// export function getWorkspaceRoot(): string {
+//     return vscode.workspace.workspaceFolders ? vscode.workspace.workspaceFolders[0].uri.fsPath : "";
+// }
 
  // Evaluate whether a string looks like a path or not,
 // without using fs.stat, since dry-run may output tools
@@ -534,8 +535,8 @@ export function sortAndRemoveDuplicates(src: string[]) : string[] {
     return removeDuplicates(src.sort());
 }
 
-export async function reportDryRunError(dryrunOutputFile: string): Promise<void> {
-    var kbUrl = await extension.kbUrl();
+export async function reportDryRunError(fc: FolderConfig, dryrunOutputFile: string): Promise<void> {
+    var kbUrl = await fc.kbUrl();
     logger.message('Dry-running the project failed. Fix the errors and attempt again. Possibilities:');
     logger.message("  1. Corrupt Makefiles can be re-output with 'Update Makefiles and Headers'");
     logger.message("  2. ./configure can be re-run with the same configureArgs with 'Autotools: Configure'");
@@ -547,14 +548,14 @@ export async function reportDryRunError(dryrunOutputFile: string): Promise<void>
 }
 
 // Helper to make paths absolute until the extension handles variables expansion.
-export function resolvePathToRoot(relPath: string): string {
-    if (!path.isAbsolute(relPath)) {
-        return path.join(getWorkspaceRoot(), relPath);
-    }
-
-    return relPath;
-}
-
+// export function resolvePathToRoot(relPath: string): string {
+//     if (!path.isAbsolute(relPath)) {
+//         return path.join(getWorkspaceRoot(), relPath);
+//     }
+//
+//     return relPath;
+// }
+//
 // Return the string representing the user home location.
 // Inspired from CMake Tools. TODO: implement more such paths and refactor into a separate class.
 export function userHome(): string {
@@ -572,11 +573,11 @@ export function userHome(): string {
     return truthy.includes(value);
  }
 
-export function getSetting<T>(settingId: string) : T | undefined {
+export function getSetting<T>(configScope: vscode.WorkspaceFolder | null, settingId: string) : T | undefined {
     let workspaceConfiguration: vscode.WorkspaceConfiguration = vscode.workspace.getConfiguration("autotools", configScope);
     return workspaceConfiguration.get<T>(settingId);
 }
-export function getSettingOr<T>(settingId: string, defaultVal: T) : T {
+export function getSettingOr<T>(configScope: vscode.WorkspaceFolder | null, settingId: string, defaultVal: T) : T {
     let workspaceConfiguration: vscode.WorkspaceConfiguration = vscode.workspace.getConfiguration("autotools", configScope);
     return workspaceConfiguration.get<T>(settingId, defaultVal);
 }
@@ -584,8 +585,8 @@ export function getSettingOr<T>(settingId: string, defaultVal: T) : T {
 // Do this for the simple types (converting to boolean or numerals when the varexp syntax
 // is used on such types of settings) and for arrays or objects, expand recursively
 // until we reach the simple types for submembers. This handles any structure.
-export async function getExpandedSetting<T>(settingId: string, propSchema?: any): Promise<T | undefined> {
-    let workspaceConfiguration: vscode.WorkspaceConfiguration = vscode.workspace.getConfiguration("autotools", configScope);
+export async function getExpandedSetting<T>(fc: FolderConfig, settingId: string, propSchema?: any): Promise<T | undefined> {
+    let workspaceConfiguration: vscode.WorkspaceConfiguration = vscode.workspace.getConfiguration("autotools", fc.folder);
     let settingVal: any | undefined = workspaceConfiguration.get<T>(settingId);
 
     if (!propSchema) {
@@ -613,12 +614,12 @@ export async function getExpandedSetting<T>(settingId: string, propSchema?: any)
       copySettingVal = settingVal;
     }
 
-    return getExpandedSettingVal<T>(settingId, copySettingVal, propSchema);
+    return getExpandedSettingVal<T>(fc, settingId, copySettingVal, propSchema);
 }
 
 // Same as above but read from an object instead of the settings (as if we get<> before calling this).
 // Such approach was needed for tests.
-export async function getExpandedSettingVal<T>(settingId: string, settingVal: any, propSchema?: any): Promise<T | undefined> {
+export async function getExpandedSettingVal<T>(fc: FolderConfig, settingId: string, settingVal: any, propSchema?: any): Promise<T | undefined> {
     // Currently, we have no ${} variables in the default values of our settings.
     // Skip expanding defaults to keep things faster simpler and safer.
     // Change this when needed.
@@ -628,7 +629,7 @@ export async function getExpandedSettingVal<T>(settingId: string, settingVal: an
         !propSchema)) { // This OR is for variables not defined in the extension package.json
                         // but the user can define any variable in settings.json to reference later
         if (typeof(settingVal) === 'string') {
-            const expandedVal: string = await expandVariablesInSetting(settingId, settingVal);
+            const expandedVal: string = await expandVariablesInSetting(fc, settingId, settingVal);
             let result: T = expandedVal as T;
             if (typeJson === "boolean") {
                 result = booleanify(expandedVal) as T;
@@ -662,7 +663,7 @@ export async function getExpandedSettingVal<T>(settingId: string, settingVal: an
                         copySettingValProp = [].concat(settingVal[prop]);
                     }
 
-                    let expandedProp: T = await getExpandedSettingVal<typeof childPropSchema>(settingId + "." + prop, copySettingValProp, childPropSchema);
+                    let expandedProp: T = await getExpandedSettingVal<typeof childPropSchema>(fc, settingId + "." + prop, copySettingValProp, childPropSchema);
                     if (!areEqual(settingVal[prop], expandedProp)) {
                         settingVal[prop] = expandedProp;
                     }
@@ -704,7 +705,7 @@ export async function getExpandedSettingVal<T>(settingId: string, settingVal: an
 // TODO: Currently, after applying any expansion pattern, if the result is another expansion pattern
 // we log an error but in future let's handle the recursivity and complications of expanding anything
 // coming via this entrypoint.
-export async function expandVariablesInSetting(settingId: string, settingVal: string): Promise<string> {
+export async function expandVariablesInSetting(fc: FolderConfig, settingId: string, settingVal: string): Promise<string> {
     // Do some string preprocessing first, related to escaping.
     // Since we don't want to change the value persisted in settings but we need to lose the separator
     // (so that the final beneficiaries of these settings don't need to handle the separator character)
@@ -725,18 +726,18 @@ export async function expandVariablesInSetting(settingId: string, settingVal: st
     let result: RegExpExecArray | null = regexpVSCodeVar.exec(expandedSetting);
     while (result) {
         let toStr: string = "";
-        if (result[2] === "workspaceFolder" || result[2] === "workspaceRoot") {
-            toStr = getWorkspaceRoot();
+        if (result[2] === "workspaceFolder") {
+            toStr = fc.folder.uri.path;
         } else if (result[2] === "workspaceFolderBasename") {
-            toStr = path.basename(getWorkspaceRoot());
+            toStr = fc.folder.name;
         } else if (result[2] === "userHome") {
             toStr = userHome();
         } else if (result[2] === "configuration") {
-            toStr = configuration.getCurrentMakefileConfiguration().name;
+            toStr = fc.buildConfig.name;
         } else if (result[2] === "buildTargetName") {
-            toStr = (await configuration.getCurrentTarget()).goal;
+            toStr = (await fc.getCurrentTarget()).goal!;
         } else if (result[2] === "buildTargetDir") {
-            toStr = (await configuration.getCurrentTarget()).builddir;
+            toStr = (await fc.getCurrentTarget()).make.getDir();
         } else if (result[4] === "env" && result[5]) {
             toStr = process.env[result[5]] || "";
         } else if (result[4] === "command") {
@@ -752,14 +753,14 @@ export async function expandVariablesInSetting(settingId: string, settingVal: st
             const regexpCfg: RegExp = /(\w+)\.(.+)/mg;
             const res: RegExpExecArray | null = regexpCfg.exec(result[5]);
             if (res && res[1] && res[2]) {
-                let workspaceCfg: vscode.WorkspaceConfiguration = vscode.workspace.getConfiguration(res[1], configScope);
+                let workspaceCfg: vscode.WorkspaceConfiguration = vscode.workspace.getConfiguration(res[1], fc.folder);
                 toStr = (workspaceCfg.get(res[2]) as string);
 
                 // The setting is either undefined or maybe we encountered a case with multiple names separated by dot for a property:
                 // autotools.set1.set2.set3.set4... which cannot be seen if given the whole setting ID at once.
                 // Example:
                 // "autotools.set1.set2.set3": {
-                //     "set4.set5": "val" 
+                //     "set4.set5": "val"
                 //     "something.else": "other"
                 // }
                 // A get on the root workspace cannot see "autotools.set1.set2.set3.set4.set5", returns undefined.
@@ -877,6 +878,24 @@ export const slugify = (...args: (string | number)[]): string => {
         .trim()
         .replace(/[^a-z0-9\.\:_\- ]/g, ' ') // remove all chars not allowed in html identifiers (to be replaced)
         .replace(/\s+/g, '-') // separator
+}
+
+
+/**
+* Returns the index of the last element in the array where predicate is true, and -1
+* otherwise.
+* @param array The source array to search in
+* @param predicate find calls predicate once for each element of the array, in descending
+* order, until it finds one where predicate returns true. If such an element is found,
+* findLastIndex immediately returns that element index. Otherwise, findLastIndex returns -1.
+*/
+export function findLastIndex<T>(array: Array<T>, predicate: (value: T, index: number, obj: T[]) => boolean): number {
+    let l = array.length;
+    while (l--) {
+        if (predicate(array[l], l, array))
+            return l;
+    }
+    return -1;
 }
 
 export class MyFileWatcher implements Disposable {

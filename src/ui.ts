@@ -2,6 +2,7 @@
 // Licensed under the MIT license.
 
 import * as vscode from 'vscode';
+import { FolderConfig } from './configuration';
 
 import * as nls from 'vscode-nls';
 nls.config({ messageFormat: nls.MessageFormat.bundle, bundleFormat: nls.BundleFormat.standalone })();
@@ -50,15 +51,16 @@ export class UI {
     ];
 
     /* When a new configuration is set, it is shown as 'loading' */
-    public setConfiguration(configuration: string, top_builddir: string): void {
-        this.configuration = configuration + (!top_builddir ? " (in-tree)" : "");
-        this.intree = !top_builddir;
-        this.configurationButton.tooltip = !top_builddir ?
+    public setConfiguration(fc: FolderConfig): void {
+        this.intree = !fc.buildConfig.top_builddir;
+        this.configuration = fc.folder.name + ': ' + fc.buildConfig.name + (this.intree ? " (in-tree)" : "");
+        this.configurationButton.tooltip = this.intree ?
             localize("autotools.click.in-tree", "See docs for switching to out-of-tree") :
             localize("autotools.click.setconfig", "Click to select another build configuration")
     }
 
-    public setStatus(status: UIStatus): void {
+    public setStatus(status: UIStatus, fc: FolderConfig): void {
+        this.setConfiguration(fc);
         this.configurationButton.backgroundColor = UI.colors[status];
         this.configurationButton.color = UI.fgcolors[status];
         switch (status) {
@@ -84,7 +86,8 @@ export class UI {
         }
     }
 
-    public setLoading(loading: UIStatus): void {
+    public setLoading(loading: UIStatus, fc: FolderConfig): void {
+        this.setConfiguration(fc);
         switch (loading) {
             case UIStatus.NON_AUTOTOOLS:
                 this.configurationButton.text = '$(tools)';

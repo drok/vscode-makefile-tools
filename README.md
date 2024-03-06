@@ -14,7 +14,7 @@ This extension enables VS Code to interact with projects using the GNU Autotools
  * Testing-related functions:
     * [Import test suites](#importing-test-suites) into VS Code's **Testing UI**.
     * _Run_ single tests or full test suites using the Testing UI.
-    * Support all automake test results (`PASS` ✔️, `FAIL` ❌, `XPASS` ☑️, `XFAIL` 🏳️, `SKIP` 🔳, `ERROR` 💣️, and `n/a` ❔)
+    * Support all automake test results (`PASS` ✔️, `FAIL` ❌, `XPASS` ☑️, `XFAIL` 🏳️, `SKIP` ⤵️, `ERROR` 🔺, and `n/a` ❔)
     * Debug individual tests, [_auto-configuring_ the debugger](#debugging-tests-pro). ![pro](https://img.shields.io/badge/Pro-green?style=plastic&link=https://autotools.mergesium.com)
     * [_Live-testing_](#live-testing-pro) / Test-driven development. ![pro](https://img.shields.io/badge/Pro-green?style=plastic&link=https://autotools.mergesium.com)
     * Discover [_Generate a test task_](#generated-test-tasks) for every individual test.
@@ -55,17 +55,18 @@ An autotools project has the following basic stages: boostrapping, configuration
 
 Basic familiarity with autotools projects is implied. Often projects have pre-requisites, like installing dependencies, making configuration choices or running specific bootstrapping commands before the first build. For those cases, the various steps can be run or repeated manually, using palette commands.
 
-The primary pallette commands are:
+Commands available in the project context menu (right-click project/folder name in Autotools panel):
 
- 1. "Autotools: Bootstrap" - this is automatic when needed
- 2. "Autotools: Configure" - creates the Default configuration in the subdir `build/Default`
- 3. "Autotools: Build All" - runs `make all` in the build directory
- 4. "Autotools: Run all tests (make check)" - builds, then runs all default tests
+ 1. "Bootstrap" - this is automatic when needed, it can be repeated manually any time.
+ 2. "Configure" - Re-runs the `configure` script in the current build configuration directory.
+ 3. "Select build configuration" - switches or creates another build config/directory.
+ 4. "Edit configure.ac" - shortcut to open the autoconf configuration.
+ 5. "Edit Makefile.am" - shortcut to open any folder's `Makefile.am` file.
 
 <figure id="figure-3">
-    <img src="https://autotools.mergesium.com/s/autotools-palette.png"
-         alt="Sample command palette">
-    <figcaption>Figure 3 - Command palette</figcaption>
+    <img src="https://autotools.mergesium.com/s/autotools-proj-context-menu.png"
+         alt="Shows the main commands to interact with the project, accessible in the context menu">
+    <figcaption>Figure 3 - Main commands in context menu</figcaption>
 </figure>
 
 ### Bootstrapping, out-of-tree vs in-tree build configurations
@@ -426,6 +427,21 @@ Additionally, tests that rely on built shared libraries likely use [libtool](htt
 
 **Note** The extension currently supports only the Parallel Test Harness, but the "older (and discouraged)" harness will be supported in a future version, for compatibility with legacy autotools projects.
 
+### Test Framework debugging support
+
+The following test-framework-specific support is implemented, to make debugging more fluent:
+
+#### [Google Test](https://google.github.io/googletest/advanced.html)
+
+  * `GTEST_BREAK_ON_FAILURE=1`
+  * `GTEST_CATCH_EXCEPTIONS=0`
+
+#### [Check](https://libcheck.github.io/check/doc/check_html/check_7.html#Environment-Variable-Reference)
+
+  * `CK_FORK=no`
+
+Additional test suite support can be added by opening an issue.
+
 ### Live Testing ![pro](https://img.shields.io/badge/Pro-green?style=plastic&link=https://autotools.mergesium.com)
 
 You can select one test suite to be the "Live test suite" (⚡). This test suite will be **updated**, rather than run in full, whenever all editor tabs are saved. If you're editing multiple files, the update starts when the last unsaved file is saved, and the results are updated in both the Test Explorer and the Autotools Tests panel.
@@ -485,9 +501,8 @@ The KB is intended to be the front line of support if a project does not functio
 
 ## TODO list at this pre-release:
 
-* libtool support is incomplete
-* compatibility with multi-folder workspaces
 * more translations
+* more diagnostics
 * syntax highlight / completions for `configure.ac` and `Makefile.am` files (other extensions fill this gap for now)
 * `check-local` target not yet handled
 
