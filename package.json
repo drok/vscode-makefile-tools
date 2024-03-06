@@ -41,7 +41,7 @@
     "activationEvents": [
         "onStartupFinished"
     ],
-    "main": "./out/src/extension.js",
+    "main": "./out/main.js",
     "contributes": {
         "commands": [
             {
@@ -726,6 +726,11 @@
                 "view": "autotools.outline",
                 "contents": "%autotools.welcome.pre.expired.markdownDescription%",
                 "when": "autotools:expiresSoon == 3"
+            },
+            {
+                "view": "autotools.outline",
+                "contents": "%autotools.welcome.multiroot.markdownDescription%",
+                "when": "autotools:workspace == 3"
             },
             {
                 "view": "autotools.outline",

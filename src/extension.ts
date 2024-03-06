@@ -59,7 +59,8 @@ const rdepRevealOption : { select: boolean,
         focus: boolean } = {select: false, expand: 3, focus: false};
 export class Extension {
     static readonly whoami: string = "mergesium.autotools";
-    static readonly myVersion = 0;
+    static readonly expires: string = "2024-xx-xx"; // set the expiry date in pre/xx branch
+    static readonly myVersion = 5; // Incremenet myVersion in pre-release branch
 
     public readonly journey;
     public readonly _projectOutlineProvider;
@@ -838,7 +839,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         await configuration.setNewEnvironment(sub.make.ctx.fc);
     }));
 
-    logger.message(`${getStartTime(validact).toISOString()}: starting ${Extension.whoami} ${context.extension.packageJSON.version}/${buildinfo.platform}-${buildinfo.arch}`, 'Normal');
+    logger.message(`${getStartTime(validact).toISOString()}: starting ${Extension.whoami} ${context.extension.packageJSON.version}/${buildinfo.platform}-${buildinfo.arch} - pre-release expires ${Extension.expires}`, 'Normal');
     extension.registerTasks();
 
     if (buildinfo.arch != process.arch || buildinfo.platform != process.platform) {

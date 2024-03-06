@@ -7,11 +7,11 @@
   - Impelement debugging libtool'ed tests with one-click
   - Fix stack overflow when parsing make loops (https://github.com/Mergesium/autotools/issues/12)
 
-## Autotools Integration 0.1.3 - hotfix
+## Autotools Integration 0.1.4 - hotfix
 
   - Fix Dry-running seg-faults in some projects (https://github.com/Mergesium/autotools/issues/11)
 
-  Errata discovered after release will be posted [here](https://github.com/Mergesium/autotools/releases/tag/0.1.3).
+  Errata discovered after release will be posted [here](https://github.com/Mergesium/autotools/releases/tag/0.1.4).
 
 ## Autotools Integration 0.1.2 - hotfix
 
