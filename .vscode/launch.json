@@ -3,6 +3,41 @@
     "version": "0.1.0",
     "configurations": [
         {
+            "name": "Make bitcoin config.h.in",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/make/make",
+            "args": [
+                    "-C", "/home/radu/proj/bitcoin",
+                    "-j1", "--output-sync=none", "--print-directory",
+                    "--print-data-base",
+                    "V=1",
+                    "--trace",
+                    "--dry-run",
+                    "--keep-going",
+                    "GMOFILES=",
+                    "--always-make",
+                    "src/config/bitcoin-config.h.in"
+            ],
+            "stopAtEntry": false,
+            "cwd": "/home/radu/proj/bitcoin/build/Default",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Set Disassembly Flavor to Intel",
+                    "text": "-gdb-set disassembly-flavor intel",
+                    "ignoreFailures": true
+                }
+            ]
+        },
+        {
             "name": "Make bitcoin src segv",
             "type": "cppdbg",
             "request": "launch",
