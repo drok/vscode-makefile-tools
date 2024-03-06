@@ -258,6 +258,7 @@ export class FolderConfig implements vscode.Disposable {
     readonly config: MakefileConfiguration;
     readonly numConfigs: number;
     readonly disposables: Disposable[] = [];
+    readonly errorCodes: Set<string> = new Set(); // for telemetry
     public dispose() {
         this.disposables.forEach(d => d.dispose());
         this.targetDisposables.forEach((d) => d.dispose());
@@ -906,6 +907,7 @@ export class FolderConfig implements vscode.Disposable {
         this._build_tree.hasStats = false;
         this.targetDisposables.forEach(d => d.dispose());
         this.buildTargets.clear();
+        this.errorCodes.clear();
     }
     public updateWatchers() {
         // let c = fc.buildConfig;

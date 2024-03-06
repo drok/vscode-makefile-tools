@@ -753,6 +753,7 @@ export async function configure(parentSpan: Span, triggeredBy: TriggeredBy, fc: 
     if (fc.numConfigs > 1) attrs.numConfigs = fc.numConfigs;
     if (!ranConfigureInCodebaseLifetime) attrs.firstTime = !ranConfigureInCodebaseLifetime;
     if (readCache) attrs.readCache = readCache;
+    if (fc.errorCodes.size) attrs.errors = Array.from(fc.errorCodes.keys());
     telemetry.endSpanWithStatus(span,
         retc == ConfigureBuildReturnCodeTypes.success ?
             SpanStatusCode.OK : SpanStatusCode.ERROR, "confmsg", attrs);

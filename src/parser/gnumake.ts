@@ -330,6 +330,7 @@ export class Make implements Parser {
     }
     public addDiag(file: string, d: Diagnostic, code: string): void {
         let diagsForFile = this.ctx.diag.get(file);
+        this.ctx.fc.errorCodes.add(code);
         if (!diagsForFile) {
             diagsForFile = [];
             this.ctx.diag.set(file, diagsForFile);
