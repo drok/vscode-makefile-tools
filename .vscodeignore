@@ -31,7 +31,9 @@ vendor/
 # esbundler means these should not be packaged
 out/main.js.map
 node_modules/
-out/src
+# out/src should be commented in the main branch, so out/src/etension.js is found
+# but uncommented in pre/ or rel/ branches so out/src is not included
+# out/src
 .git
 .gitmodules
 # package.nls.*.json
