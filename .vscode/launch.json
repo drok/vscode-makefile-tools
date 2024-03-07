@@ -519,6 +519,21 @@
             "preLaunchTask": "compile",
         },
         {
+            "name": "Debug on 2-dir workspace",
+            "type": "extensionHost",
+            "request": "launch",
+            "runtimeExecutable": "${execPath}",
+            "args": [
+                "--extensionDevelopmentPath=${workspaceFolder}",
+                "/home/radu/proj/autotools.2-folders.bitcoin-ugrepcode-workspace.code-workspace"
+            ],
+            "sourceMaps": true,
+            "outFiles": [
+                "${workspaceFolder}/out/**/*.js"
+            ],
+            "preLaunchTask": "compile",
+        },
+        {
             "name": "Debug on 3-dir workspace",
             "type": "extensionHost",
             "request": "launch",
