@@ -157,8 +157,10 @@ export class Extension {
         /* TODO: Rework this command */
         extensionContext.subscriptions.push(vscode.commands.registerCommand('autotools.visit.packageBugs', async (sub: tree.SubNode) => {
             telemetry.logEvent(this.journey, "gpBugs");
-            if (sub.make.ctx.fc.pkginfo?.bugreport)
-                vscode.commands.executeCommand('vscode.open', sub.make.ctx.fc.pkginfo.bugreport);
+            if (sub.make.ctx.fc.pkginfo?.bugreport) {
+                let uri = vscode.Uri.parse(sub.make.ctx.fc.pkginfo.bugreport);
+                vscode.commands.executeCommand('vscode.open', uri);
+            }
         }));
 
         extensionContext.subscriptions.push(vscode.commands.registerCommand('autotools.command.openKnowledgeBase', async (sub: tree.SubNode) => {
