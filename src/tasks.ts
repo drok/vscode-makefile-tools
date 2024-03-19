@@ -503,18 +503,17 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
             this.reautomakeTask.presentationOptions = reuseSilent;
             this.reautomakeTask.detail = localize("autotools.makefilein.update", "$(sync) Regenerate Makefile.in templates. See [Updating Makefile.inS](https://www.gnu.org/software/automake/manual/html_node/automake-Invocation.html#index-_002d_002dno_002dforce)");
 
-            var autoreconf : string = configuration.autoreconfCmd(this.fc.wsConfig).join(' ');
+            var autoreconf : string[] = configuration.autoreconfCmd(this.fc.wsConfig);
 
             this.regenTask = new Task({type: this.myType, action: 'regen', folderIndex: this.fc.folder.index},
-                    this.fc.folder, "Update Makefiles and config headers",
+                    this.fc.folder, localize("autotools.update.tooling", "Update build tooling"),
                 localize("autotools.update.task", "Configuration output"),
-                new ShellExecution(
-                    (c.top_builddir ? `${autoreconf} -v && CDPATH= cd ${c.top_builddir} && ./config.status` :
-                        `${autoreconf} -v && ./config.status`), { env: { ACLOCAL_PATH: extension.m4Path }}),
-                            configureProblemMatchers);
+                new ProcessExecution(autoreconf[0], [...autoreconf.slice(1),'-v'],
+                    { env: { ACLOCAL_PATH: extension.m4Path }}),
+                    configureProblemMatchers);
             this.regenTask.group = TaskGroup.Build;
             this.regenTask.presentationOptions = reuseSilent;
-            this.regenTask.detail = localize("autotools.update", "$(sync) Regenerate Makefiles and headers. See [Autoconf output](https://www.gnu.org/software/autoconf/manual/autoconf-2.69/html_node/Output.html)");
+            this.regenTask.detail = localize("autotools.update", "$(sync) Regenerate build tooling (configure script and Makefile templates). See [Autoconf output](https://www.gnu.org/software/autoconf/manual/autoconf-2.69/html_node/autoreconf-Invocation.html#autoreconf-Invocation)");
 
             this.recheckTask = new Task({type: this.myType, action: 'recheck', folderIndex: this.fc.folder.index},
                 this.fc.folder, "Re-check configuration",
