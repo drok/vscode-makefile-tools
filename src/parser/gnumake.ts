@@ -991,7 +991,7 @@ export class Goal extends Node implements Parser {
     ruleLine?: number;
 }
 
-const LinkerRe = /\$\(\w*LINK\)\s/;
+const LinkerRe = /\$\(\w*LINK\)\s|\$\(\w*LDFLAGS\)/;
 const RanlibRe = /\$\(RANLIB\)\s/;
 const TestRe = /\$\(AM_TESTS_FD_REDIRECT\)\s/;
 const LogDriverRe = /\$\(SHELL\) \$\(top_srcdir\)\/(?:.*)?test-driver/;
