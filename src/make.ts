@@ -951,7 +951,8 @@ const noTRS : TestResult = { global: TRS.NONE, results: new Map<number, TRS>() }
 export function readTRS(b: BuildTarget, fc: FolderConfig) : TestResult
 {
     let te = fc.testEnvironments;
-    let trs = path.join(fc.abs_top_builddir, b.builddir, path.basename(b.goal, ".log") + ".trs");
+    let logfile = path.parse(path.join(fc.abs_top_builddir, b.builddir, b.goal));
+    let trs = path.format({...logfile, base: '', ext: '.trs'});
     let testResult: TestResult = { global: TRS.NONE, results: new Map<number, TRS>() };
     try {
         const fileContent = fs.readFileSync(trs, 'utf8');
