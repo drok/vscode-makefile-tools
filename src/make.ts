@@ -134,7 +134,7 @@ export async function getPackageJSON(fc: FolderConfig): Promise<pkgInfo | undefi
                     path.join(fc.abs_top_builddir, "config.status"), ["--file=-:-"],
                     fc.folder.uri.path,
                     true, true,
-                    '{ "name": "@PACKAGE@", "version": "@VERSION@", "tarname": "@PACKAGE_TARNAME@", "bugreport": "@PACKAGE_BUGREPORT@", "url": "@PACKAGE_URL@", "automake": "@AUTOMAKE@", "maint": "@MAINTAINER_MODE_FALSE@" }',
+                    '{ "name": "@PACKAGE_NAME@", "version": "@PACKAGE_VERSION@", "tarname": "@PACKAGE_TARNAME@", "bugreport": "@PACKAGE_BUGREPORT@", "url": "@PACKAGE_URL@", "automake": "@AUTOMAKE@", "maint": "@MAINTAINER_MODE_FALSE@" }',
                     (x) => {info = x}, undefined).catch<util.SpawnProcessResult>((r) => Promise.resolve({ returnCode: 33, signal: "ERR" }));
                 if (result.returnCode !== 0) return resolve(undefined);
                 if (info === undefined) return resolve(undefined);
