@@ -504,6 +504,21 @@
             "preLaunchTask": "compile",
         },
         {
+            "name": "Debug on pcre2",
+            "type": "extensionHost",
+            "request": "launch",
+            "runtimeExecutable": "${execPath}",
+            "args": [
+                "--extensionDevelopmentPath=${workspaceFolder}",
+                "/home/radu/proj/pcre2"
+            ],
+            "sourceMaps": true,
+            "outFiles": [
+                "${workspaceFolder}/out/**/*.js"
+            ],
+            "preLaunchTask": "compile",
+        },
+        {
             "name": "Debug on me-auth-backend",
             "type": "extensionHost",
             "request": "launch",
@@ -511,6 +526,21 @@
             "args": [
                 "--extensionDevelopmentPath=${workspaceFolder}",
                 "/home/radu/proj/me-auth-backend"
+            ],
+            "sourceMaps": true,
+            "outFiles": [
+                "${workspaceFolder}/out/**/*.js"
+            ],
+            "preLaunchTask": "compile",
+        },
+        {
+            "name": "Debug on git",
+            "type": "extensionHost",
+            "request": "launch",
+            "runtimeExecutable": "${execPath}",
+            "args": [
+                "--extensionDevelopmentPath=${workspaceFolder}",
+                "/home/radu/proj/git"
             ],
             "sourceMaps": true,
             "outFiles": [
