@@ -154,6 +154,18 @@ export class DebugNow implements vscode.DebugConfiguration {
 }
 
 class MyDebugProvider implements DebugConfigurationProvider {
+    constructor(context: vscode.ExtensionContext) {
+        context.subscriptions.push(vscode.debug.onDidReceiveDebugSessionCustomEvent(e => {
+            switch (e.event) {
+                case "exited":
+                    break;
+                default:
+                    break;
+            }
+//            let zz : vscode.DebugSessionCustomEvent = e;
+            console.debug(e);
+        }));
+    }
 
   provideDebugConfigurations(folder: WorkspaceFolder | undefined): ProviderResult<DebugConfiguration[]> {
     if (folder) {
@@ -232,7 +244,7 @@ class MyDebugProvider implements DebugConfigurationProvider {
 
 export function activate(context: vscode.ExtensionContext) {
   const providers = [
-    new MyDebugProvider()
+    new MyDebugProvider(context)
     // new MyDebugProvider()
   ];
 
