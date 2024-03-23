@@ -7,7 +7,7 @@ import { DebugConfigurationProvider, WorkspaceFolder, DebugConfiguration, Provid
 import { getSettingOr } from './util';
 import * as configuration from './configuration';
 import { Goal } from './parser/gnumake';
-import { extension } from './extension';
+import { Extension, extension } from './extension';
 
 let defaultSetupCommands = [{
     "description": "Set source directory",
@@ -36,7 +36,7 @@ const frameworks_support : { [key: string]: string } =
 }
 
 export function isDebuggable(goal: Goal) : boolean {
-    return !!(goal.flags & Goal.Flags.Linked_binary);
+    return true;
 }
 class MyConfiguration implements vscode.DebugConfiguration {
     constructor(goal: Goal) {
@@ -99,6 +99,11 @@ export class DebugNow implements vscode.DebugConfiguration {
             let libtool = path.join(goal.make.ctx.root, 'libtool');
             this.miDebuggerPath = extension.ltLauncher;
             this.miDebuggerArgs = `gdb ${libtool} ${this.program}`;
+            this.MIMode = 'gdb';
+            this.externalConsole = false;
+        } else {
+            this.miDebuggerPath = extension.integratedLauncher;
+            this.miDebuggerArgs = `gdb none ${this.program}`;
             this.MIMode = 'gdb';
             this.externalConsole = false;
         }

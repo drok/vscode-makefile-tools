@@ -23,6 +23,7 @@ import * as path from 'path';
 import {Parser, ParserDisp, EmptyLine } from '../parser';
 import { Executing } from './shell';
 import { Node, Scheme } from '../tree';
+import { isDebuggable } from '../debug';
 
 import * as nls from 'vscode-nls';
 import { Extension, extension, telemetry } from '../extension';
@@ -900,7 +901,7 @@ export class Goal extends Node implements Parser {
             return item;
 
         if (this.flags & Goal.Flags.Test_Log) {
-            item.contextValue = (this.depends && (this.depends[0].flags & Goal.Flags.Linked_binary)) ?
+            item.contextValue = (this.depends && isDebuggable(this.depends[0])) ?
                 'nodeType=task,nodeType=test,nodeType=bintest' :
                 'nodeType=task,nodeType=test';
             item.resourceUri = this.getURI();

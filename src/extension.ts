@@ -76,6 +76,7 @@ export class Extension {
     public readonly dryRunner : string;
     public readonly testRunner : string;
     public readonly ltLauncher : string;
+    public readonly integratedLauncher : string;
     public readonly rulesPath : string;
     public readonly m4Path : string;
     public readonly userEnvName : string = "<none>";
@@ -97,6 +98,7 @@ export class Extension {
         this.dryRunner = path.join(extensionContext.extensionPath, "bin/make" + (process.platform === 'win32' ? ".exe" : ""));
         this.testRunner = path.join(extensionContext.extensionPath, "bin/test-driver");
         this.ltLauncher = path.join(extensionContext.extensionPath, "bin/lt-debug.sh");
+        this.integratedLauncher = path.join(extensionContext.extensionPath, "bin/integrated-debug.sh");
         this.rulesPath = path.join(extensionContext.extensionPath, "include")
         this.m4Path = path.join(extensionContext.extensionPath, "m4")
 
