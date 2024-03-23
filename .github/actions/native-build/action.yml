@@ -1,0 +1,123 @@
+name: 'Build and Package for Arch'
+description: 'Builds the extension for a given arch'
+inputs:
+  cpu:  # id of input
+    description: 'CPU name (x64 or arm64)'
+    required: true
+    default: 'x64'
+  platform:
+    description: 'OS name (darwin or linux)'
+    required: true
+    default: 'linux'
+  host:
+    description: 'host triplet (x86_64-pc-linux-gnu or aarch64-apple-darwin21.6.0)'
+    required: true
+    default: 'x86_64-pc-linux-gnu'
+outputs:
+  vsixPath:
+    description: "packaged visx file"
+    value: ${{ steps.packageExtension.outputs.vsixPath }}
+runs:
+  using: "composite"
+  steps:
+    - name: Configure ${{ inputs.cpu }} binaries on ${{ inputs.host }}
+      shell: sh
+      run: mkdir -p build/make/${{ inputs.cpu }} && cd build/make/${{ inputs.cpu }} && [ -f config.status ] ||
+        make_cv_sys_gnu_glob=yes
+        ac_cv_func_gettimeofday=no
+        ac_cv_search_clock_gettime=no
+        ../../../vendor/gnumake/configure -C
+        --host=${{ inputs.host }}
+        --disable-dependency-tracking
+        --with-guile=no
+        --disable-job-server
+        --disable-load
+        "CFLAGS=-g0 -O2 -include $PWD/../../../vendor/gnumake-include.h"
+        LDFLAGS=-lrt
+        --disable-nls
+        --prefix=$PWD/../../..
+      if: runner.os == 'Linux'
+
+    - name: Configure ${{ inputs.cpu }} binaries on ${{ inputs.host }}
+      shell: sh
+      run: mkdir -p build/make/${{ inputs.cpu }} && cd build/make/${{ inputs.cpu }} && [ -f config.status ] ||
+        ../../../vendor/gnumake/configure -C
+        --host=${{ inputs.host }}
+        --disable-dependency-tracking
+        --with-guile=no
+        --disable-job-server
+        --disable-load
+        --disable-nls
+        --prefix=$PWD/../../..
+        CC=clang
+        CFLAGS='-g -O2 -target ${{ inputs.host }}'
+      if: runner.os == 'macOS'
+
+    - name: Compile and Install binaries
+      shell: sh
+      run: make -j -C build/make/${{ inputs.cpu }} install-strip && cp vendor/automake/lib/test-driver bin
+
+    - name: Check make binary architecture
+      shell: bash
+      run: |
+        set -x
+        set -o errexit
+        file build/make/${{ inputs.cpu }}/make
+        sig=$(file -b build/make/${{ inputs.cpu }}/make)
+        target=${{ inputs.platform }}-${{ inputs.cpu }}
+        case $target in
+          linux-x64)   [[ "$sig" =~ ^"ELF 64-bit LSB shared object, x86-64" ]]
+            ;;
+          linux-arm64) [[ "$sig" =~ ^"ELF 64-bit LSB shared object, ARM aarch64" ]]
+            ;;
+          darwin-x64)  [[ "$sig" == "Mach-O 64-bit executable x86_64" ]]
+            ;;
+          darwin-arm64)[[ "$sig" == "Mach-O 64-bit executable arm64" ]]
+            ;;
+          *) echo >&2 "signature for $target should be set"
+            ;;
+        esac
+
+    - name: Check make symbols
+      shell: sh
+      run: |
+        type ${{ inputs.host }}-objdump &&
+          ${{ inputs.host }}-objdump -T build/make/${{ inputs.cpu }}/make ||
+          objdump -T build/make/${{ inputs.cpu }}/make
+
+    - name: Build Extension
+      shell: sh
+      run: |
+        echo "export let buildinfo : { arch: string, platform: string} = {\"arch\":\"${{ inputs.cpu }}\",\"platform\":\"${{ inputs.platform }}\"};" > buildinfo.ts
+        yarn production-compile
+
+    - name: Generate Translations
+      shell: sh
+      run: yarn run translations-generate
+
+    - name: Package Extension for ${{ inputs.cpu }}
+      shell: sh
+      id: packageExtension
+      run: |
+          mkdir -p packaged
+          export TARGET=${{ inputs.platform }}-${{ inputs.cpu }}
+          npm run package
+          PACKAGE_STRING=$(jq -r '"\(.name)-\(.version)"' package.json)-pre
+          find packaged
+          echo "vsixPath=packaged/$(echo $PACKAGE_STRING-$TARGET.vsix)" > "$GITHUB_OUTPUT"
+
+    - name: Upload Extension Package as Artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: ${{ inputs.platform }}-${{ inputs.cpu }}
+        path: ${{ steps.packageExtension.outputs.vsixPath }}
+        if-no-files-found: error
+
+    - name: Build failure logs
+      uses: actions/upload-artifact@v3
+      if: ${{ failure() }}
+      with:
+        name: build-log
+        path: build
+        if-no-files-found: error
+        retention-days: 2

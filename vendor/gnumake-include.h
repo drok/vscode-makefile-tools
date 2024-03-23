@@ -5,7 +5,10 @@
  */
 
 #include <sys/stat.h>
+#include <glob.h>
 
+#if defined(__linux)
+#if defined(__x86_64)
 __asm__(".symver memcpy,memcpy@GLIBC_2.2.5");
 __asm__(".symver clock_gettime,clock_gettime@GLIBC_2.2.5");
 
@@ -23,5 +26,14 @@ __asm__(".symver __xstat,__xstat@GLIBC_2.2.5");
 
 __asm__(".symver __libc_start_main,__libc_start_main@GLIBC_2.2.5");
 
+#endif
+# if _GNU_GLOB_INTERFACE_VERSION == 2
+#if defined(__x86_64)
 /* also disable the local glob with make_cv_sys_gnu_glob=yes */
 __asm__(".symver glob,glob@GLIBC_2.2.5");
+#else
+/* the first available arm64 version is 2.17 - use that */
+__asm__(".symver glob,glob@GLIBC_2.17");
+#endif
+#endif
+#endif
