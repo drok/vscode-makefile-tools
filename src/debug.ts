@@ -90,7 +90,7 @@ export class DebugNow implements vscode.DebugConfiguration {
         this.name = "Debug '" + goal.goal + "'" +
             (goal.make.dir ? " in " + goal.make.dir : "") + ` @ ${env?.name ?? extension.userEnvName}`;
         this.request = "launch";
-        this.program = path.join(goal.make.getDir(), goal.goal!);
+        this.program = goal.getFilePath();
         this.environment = [{
             name: "srcdir",
             value: path.join(goal.make.ctx.fc.folder.uri.path, goal.make.dir)
@@ -126,7 +126,7 @@ export class DebugNow implements vscode.DebugConfiguration {
         this.stopAtEntry = goal ? getSettingOr<boolean>(goal.make.ctx.fc.folder, "stopAtEntry", false) : true;
         //this.preLaunchTask = buildit ? "autotools: build " + built.goal +
         //    (built.builddir ? (' in ' + built.builddir) : ' at the top') : undefined;
-        this.cwd = path.dirname(goal.getFilePath()); // path.resolve(goal.make.ctx.root, goal;
+        this.cwd = goal.make.getDir();
         this.setupCommands = defaultSetupCommands;
         // this.testId = log?.test?.id || 'unk';
         this.testUri = log?.test?.uri?.with({scheme: "test"}) ?? vscode.Uri.from({scheme: "debug", path: this.cwd});
