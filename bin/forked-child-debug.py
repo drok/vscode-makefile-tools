@@ -112,17 +112,17 @@ def stop_handler(event):
     print("STOP handler running.")
     if isinstance(event, gdb.BreakpointEvent):
       print("STOP handler: bp")
-      if (has_catchpoint_breakpoint(event.breakpoints)):
-        inferior_handler.breakpoint(event)
+      # if (has_catchpoint_breakpoint(event.breakpoints)):
+      #   inferior_handler.breakpoint(event)
     elif isinstance(event, gdb.SignalEvent):
       print("STOP handler: signal")
       # print("SignalEvent = {event.stop_signal} - capt {captureFirstStop}.")
-      if (event.stop_signal == "SIGSTOP"):
-         captureFirstStop = False
-         gdb.execute("cont")
+      # if (event.stop_signal == "SIGSTOP"):
+      #    captureFirstStop = False
+      #    gdb.execute("cont")
     elif isinstance(event, gdb.StopEvent):
       print("STOP handler: stop")
-      inferior_handler.stopped(event)
+      # inferior_handler.stopped(event)
 
 def stop_handler_no_catchpoints(event):
     global captureFirstStop
@@ -136,9 +136,9 @@ def stop_handler_no_catchpoints(event):
     elif isinstance(event, gdb.SignalEvent):
       print("STOP handler: signal")
       # print("SignalEvent = {event.stop_signal} - capt {captureFirstStop}.")
-      if (event.stop_signal == "SIGSTOP"):
-         captureFirstStop = False
-         gdb.execute("cont")
+      # if (event.stop_signal == "SIGSTOP"):
+      #    captureFirstStop = False
+      #    gdb.execute("cont")
     elif isinstance(event, gdb.StopEvent):
       print("STOP handler: stop")
       #pprint.pprint(event)
@@ -152,10 +152,10 @@ def stop_handler_no_catchpoints(event):
       # gdb.notify_mi("-ZZZZZZZZZZZZZZ", data)
       a = gdb.current_progspace()
       dump(a)
-      frame = gdb.newest_frame()
-      if frame.is_valid():
-        fn = frame.function()
-        if fn.is_valid() and fn.linkage_name == '__libc_fork':
+      #frame = gdb.newest_frame()
+      #if frame.is_valid():
+      #  fn = frame.function()
+      #  if fn.is_valid() and fn.linkage_name == '__libc_fork':
           # dump(frame)
           # dump(frame.function())
           # dump(frame.type())
@@ -167,8 +167,8 @@ def stop_handler_no_catchpoints(event):
 #      if event.inferior_thread is None:
           # gdb.execute("set schedule-multiple off")
           # gdb.execute("info inferiors")
-          inferior_handler.breakpoint(event)
-          inferior_handler.sub_gdb()
+          # inferior_handler.breakpoint(event)
+          # inferior_handler.sub_gdb()
           # gdb.execute("info inferiors")
           # gdb.execute("set schedule-multiple on")
 
@@ -186,12 +186,12 @@ def dump(obj):
 # gdb.execute("set dap-log-file /tmp/gdb.dap.log")
 # gdb.execute("set dap-log-level 2")
 # gdset schedule-multiple
-gdb.execute("set schedule-multiple on")
+gdb.execute("set schedule-multiple off")
 gdb.execute("set print inferior-events on")
 # gdb.set_parameter("print inferior-events", "on")
 gdb.execute("set detach-on-fork off")
 gdb.execute("set follow-fork-mode parent")
-gdb.execute("set trace-commands off")
+gdb.execute("set trace-commands on")
 
 # Debug GDB's inner workings - not supported GBD 8.2?
 # gdb.execute("set debug event on")
@@ -213,10 +213,10 @@ gdb.execute("set trace-commands off")
 # not needed??  # fork_catch = ForkCatch()
 # not needed??  
 # not needed??  # Register the fork_catch_handler to handle fork events
-# not needed??  if hasattr(gdb, 'BP_CATCHPOINT'):
-# not needed??      gdb.events.stop.connect(stop_handler)
-# not needed??  else:
-# not needed??      gdb.events.stop.connect(stop_handler_no_catchpoints)
+if hasattr(gdb, 'BP_CATCHPOINT'):
+    gdb.events.stop.connect(stop_handler)
+else:
+    gdb.events.stop.connect(stop_handler_no_catchpoints)
 # not needed??  
 # not needed??  # gdb.events.breakpoint_created.connect(breakpoint_created)
 # not needed??  gdb.execute("catch fork")
