@@ -132,9 +132,20 @@ export class AutoToolsBuildTaskProvider implements MyTaskProvider {
         const goal = this.fc.buildTargets
             .get(definition.target.builddir || '')
             ?.get(definition.target.goal);
-        if (goal) {
-            if (goal.task instanceof Task)
-                return goal.task;
+        if (goal instanceof Goal) {
+            if (goal.task instanceof Task) {
+                let c = this.fc.buildConfig;
+                let dir = goal.make.getDir();
+                let task = new Task(definition, this.fc.folder,
+                    _task.name, "autotools",
+                    new ProcessExecution(
+                        configuration.getMakePath(),
+                        (dir ? ['-C', dir] : [])
+                        .concat(c.makeArgs || [])
+                        .concat(goal.goal!)),
+                    buildProblemMatchers);
+                return task;
+            }
         }
         if (!definition.target.builddir === undefined)
             return undefined;
