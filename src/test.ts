@@ -84,7 +84,7 @@ export class MyTestController {
   private profiles: Disposable[] = [];
   // private runProfiles: vscode.TestRunProfile[];
   // private debugProfiles: vscode.TestRunProfile[];
-  private coverageProfile: vscode.TestRunProfile | undefined;
+  //private coverageProfile: vscode.TestRunProfile | undefined;
   private testGoals = new WeakMap<vscode.TestItem, Goal>();
   private testCompletedEvent: EventEmitter<void> = new EventEmitter<void>();
 
