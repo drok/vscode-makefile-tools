@@ -261,7 +261,26 @@ export class AutoToolsTestTaskProvider implements MyTaskProvider {
                 let env = definition.test.env ?
                     this.fc.getTestEnvironment(definition.test.env) :
                     this.fc.currentTestEnvironment;
-                return goal.task.get(env);
+                let dir = goal.make.getDir();
+                let c = this.fc.buildConfig;
+                let e = this.fc.testEnvironments;
+                let envs = FilterEnvsByDir(e, dir);
+                let ME_KEEP_ENV = KeepList(envs);
+                let task = new Task(definition, this.fc.folder,
+                    _task.name, "autotools",
+                    new ProcessExecution(
+                        configuration.getMakePath(),
+                        (dir ? ['-C', dir] : [])
+                        .concat(c.makeArgs || [])
+                        .concat(["-Res",
+                            "me-check",
+                            `ME_KEEP_ENV=${ME_KEEP_ENV}`,
+                            "--eval=include Mergesium.rules",
+                            "TEST_LOGS=" + test.goal
+                        ]), env.testExecOptions),
+                    testProblemMatchers);
+
+                return task;
             }
         }
         if (!definition.test.dir === undefined)
