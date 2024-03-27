@@ -948,10 +948,10 @@ const noTRS : TestResult = { global: TRS.NONE, results: new Map<number, TRS>() }
  * @param c Current build configuration.
  * @returns a {@linkcode make.TRS TRS enum value}
  */
-export function readTRS(b: BuildTarget, fc: FolderConfig) : TestResult
+export function readTRS(builddir: string, goal: string, fc: FolderConfig) : TestResult
 {
     let te = fc.testEnvironments;
-    let logfile = path.parse(path.join(fc.abs_top_builddir, b.builddir, b.goal));
+    let logfile = path.parse(path.join(fc.abs_top_builddir, builddir, goal));
     let trs = path.format({...logfile, base: '', ext: '.trs'});
     let testResult: TestResult = { global: TRS.NONE, results: new Map<number, TRS>() };
     try {
@@ -965,7 +965,7 @@ export function readTRS(b: BuildTarget, fc: FolderConfig) : TestResult
                 const result = line.split(' ', 4);
                 if (result.length >= 3) {
                     let envid = parseInt(result[2],36);
-                    if(te.some(e => e.hashCode == envid && (!e.dirs || e.dirs.includes(b.builddir))))
+                    if(te.some(e => e.hashCode == envid && (!e.dirs || e.dirs.includes(builddir))))
                         testResult.results.set(envid, TRSLookup.get(result[1]) || TRS.NONE);
                 } else if (result.length == 2 && te.length == 1) {
                     /* If test environements are not in use, use the untagged result

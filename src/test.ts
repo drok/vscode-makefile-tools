@@ -2,7 +2,7 @@ import * as path from 'path';
 import * as vscode from 'vscode';
 import { Goal } from './parser/gnumake';
 import { BuildTarget, TRS } from './make';
-import { TestTask } from './tasks';
+import { TestTarget, TestTask } from './tasks';
 import {
         EventEmitter,
         TestItem,
@@ -88,18 +88,18 @@ export class MyTestController {
   private testGoals = new WeakMap<vscode.TestItem, Goal>();
   private testCompletedEvent: EventEmitter<void> = new EventEmitter<void>();
 
-  public testCompleted(task: vscode.TaskExecution, goal: Goal, target: BuildTarget) : void {
+  public testCompleted(task: vscode.TaskExecution, goal: Goal, target: TestTarget) : void {
     let test : TestItem = goal.test!;
     if (this.activeRun) {
         if ((task.task.definition as TestTask).exitCode != undefined) {
             let old = goal.trs;
             // Test cancelled
-            goal.trs = readTRS(target, goal.make.ctx.fc);
-            this.updateGoalTRS(this.activeRun.run, test, goal.trs?.global, target.builddir);
+            goal.trs = readTRS(target.dir, target.goal, goal.make.ctx.fc);
+            this.updateGoalTRS(this.activeRun.run, test, goal.trs?.global, target.dir);
             if (this.activeRun.env == goal.make.ctx.fc.currentTestEnvironment)
-                goal.make.ctx.fc.updateTRSInPanel(old, goal, target.builddir) &&
+                goal.make.ctx.fc.updateTRSInPanel(old, goal, target.dir) &&
                     goal.make.ctx.fc.updateOutlineBadge();
-            this.updateTestDescription(goal, target.builddir);
+            this.updateTestDescription(goal, target.dir);
         }
         this.cancelDisposable.forEach(d => d.dispose);
         this.cancelDisposable = [];
@@ -117,9 +117,8 @@ export class MyTestController {
     let updateBadge : boolean = false;
     if (this.busyNonLiveTest)
         for (const d of goal.depends!) {
-            let bd : BuildTarget = new BuildTarget(dir, d.goal!);
             let old = d.trs;
-            d.trs = readTRS(bd, fc);
+            d.trs = readTRS(dir, d.goal!, fc);
             this.updateGoalTRS(this.activeRun!.run, d.test!, d.trs?.global, dir);
             if (updatePanel) {
                 updateBadge = fc.updateTRSInPanel(old, d, dir) || updateBadge;

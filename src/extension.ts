@@ -372,7 +372,7 @@ export class Extension {
         if (goal) {
             let old = goal.trs;
             let old_global = goal.trs?.global ?? TRS.NONE;
-            goal.trs = make.readTRS(new make.BuildTarget(dir, log), fc);
+            goal.trs = make.readTRS(dir, log, fc);
 
             if (fc.updateTRSInPanel(old, goal, dir))
                 fc.updateOutlineBadge();
@@ -401,7 +401,7 @@ export class Extension {
                 let fc = configuration.findFolderConfigByIndex(definition.folderIndex);
                 if (definition.type == "test" && definition.test) {
                     let suite = fc.buildTargets
-                        .get(definition.test.builddir)
+                        .get(definition.test.dir)
                         ?.get('test-suite.log');
                     if (suite) {
                         let goal = suite.depends?.find((d) => d.goal === definition.test?.goal);

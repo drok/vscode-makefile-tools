@@ -194,15 +194,15 @@ export class AutoToolsTestTaskProvider implements MyTaskProvider {
                             if(!d.goal)
                                 throw new Error("Invalid test.depends");
                             let dgoal : string = d.goal;
-                            let test = new BuildTarget(dir, dgoal);
-                            const kind: TestTask = {
-                                type: this.myType,
-                                folderIndex: this.fc.folder.index,
-                                test: test
-                            };
                             var newMap : Map<TestEnvironment, vscode.Task> = new Map();
                             d.task = newMap;
                             envs.forEach((env) => {
+                                let test = new TestTarget(dir, dgoal, env.name);
+                                const kind: TestTask = {
+                                    type: this.myType,
+                                    folderIndex: this.fc.folder.index,
+                                    test: test
+                                };
                                 var newTask = new Task(kind, this.fc.folder,
                                     "Run test \'" + dgoal + "\' " + ((dir ? ('in ' + dir) : 'at the top') + (' @ ' + env.name)),
                                 "autotools",
@@ -225,7 +225,7 @@ export class AutoToolsTestTaskProvider implements MyTaskProvider {
                             });
 
                             /* Read existing TRS file to show correct last known status in the outline */
-                            d.trs = readTRS(test, this.fc);
+                            d.trs = readTRS(dir, dgoal, this.fc);
                             //let current : TRS = d.trs.results.get(cte.hashCode) ?? TRS.NONE;
                             let results : number[] = emptyRunStats();
                             d.trs.results.forEach(v => results[v]++);
@@ -254,17 +254,17 @@ export class AutoToolsTestTaskProvider implements MyTaskProvider {
         if (!definition || !definition.test || !definition.test.goal)
             return undefined;
         const goal = this.fc.buildTargets
-            .get(definition.test.builddir || '')
+            .get(definition.test.dir || '')
             ?.get(definition.test.goal);
         if (goal) {
             if (goal.task instanceof Map) {
-                let env = definition.env ?
-                    this.fc.getTestEnvironment(definition.env) :
+                let env = definition.test.env ?
+                    this.fc.getTestEnvironment(definition.test.env) :
                     this.fc.currentTestEnvironment;
                 return goal.task.get(env);
             }
         }
-        if (!definition.test.builddir === undefined)
+        if (!definition.test.dir === undefined)
             return undefined;
         else
             return undefined;
@@ -726,11 +726,11 @@ export interface TestTask {
      * The test output log this task creates.
      */
     readonly type: string;
-    test?: BuildTarget;
+    test?: TestTarget;
     folderIndex: number;
 
     /* test environment name - if missing, use current env */
-    env?: string;
+    // env?: string;
     exitCode?: number | undefined;
 };
 
@@ -751,6 +751,10 @@ export interface CheckTask {
 export class CheckTarget {
     TESTS?: string[];
     TEST_SUITE_LOG?: string;
+}
+
+export class TestTarget {
+    constructor(public dir: string, public goal: string, public env?: string) {}
 }
 
 export interface AutotoolsTask {
