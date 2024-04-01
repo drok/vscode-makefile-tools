@@ -768,24 +768,7 @@
                             }
                         }
                     }
-                },
-                "configurationSnippets": [
-                    {
-                        "label": "Autotools: Launch a program",
-                        "description": "Hardcoded program path. Useful for debugging programs with different args or env",
-                        "body": {
-                            "type": "cppdbg",
-                            "request": "launch",
-                            "name": "${1:Launch myapp}",
-                            "program": "${workspaceFolder}/build/Default/src/myapp",
-                            "preLaunchTask": "autotools: build myapp in src",
-                            "cwd": "^\"\\${workspaceFolder}\"",
-                            "environment": [],
-                            "args": [],
-                            "stopAtEntry": false
-                        }
-                    }
-                ]
+                }
             }
         ],
         "viewsContainers": {
