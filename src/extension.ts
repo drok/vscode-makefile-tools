@@ -98,7 +98,7 @@ export class Extension {
         this.dryRunner = path.join(extensionContext.extensionPath, "bin/make" + (process.platform === 'win32' ? ".exe" : ""));
         this.testRunner = path.join(extensionContext.extensionPath, "bin/test-driver");
         this.ltLauncher = path.join(extensionContext.extensionPath, "bin/lt-debug.sh");
-        this.integratedLauncher = path.join(extensionContext.extensionPath, "bin/integrated-debug.sh");
+        this.integratedLauncher = path.join(extensionContext.extensionPath, "bin/ad7proxy");
         this.rulesPath = path.join(extensionContext.extensionPath, "include")
         this.m4Path = path.join(extensionContext.extensionPath, "m4")
 
