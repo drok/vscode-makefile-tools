@@ -944,7 +944,7 @@ export class FolderConfig implements vscode.Disposable {
     }
     private targetDisposables : vscode.Disposable[] = [];
 
-    /* Intellisense Data */
+    /* IntelliSense Data */
     private readonly _cppConfigurationProvider : CppConfigurationProvider;
     public get cppConfigurationProvider() : CppConfigurationProvider { return this._cppConfigurationProvider; }
 

@@ -34,7 +34,7 @@ const linkers: string[] = ["ccache", "ilink", "link", "ld", "ccld", "gcc", "clan
 // Language detection based on file extension (from GCC manpage)
 // https://gcc.gnu.org/onlinedocs/gcc/Overall-Options.html
 // Include only those extension which must be preprocessed. Those that should
-// not be processed must not have defines interpreted by Intellisense.
+// not be processed must not have defines interpreted by IntelliSense.
 const sourceFileExtensions_c: string[] = [".c", ".h"];
 const sourceFileExtensions_cpp: string[] = [".cc", ".cpp", ".cxx", ".cpp", ".CPP", ".c++", ".C",
             ".hh", ".H", ".hp", ".hxx", ".hpp", ".HPP", ".h++", ".tcc"];
@@ -109,7 +109,7 @@ export class Making implements Parser {
                         // FIXME: handleCompilerCommand is async ... can I call from here?
                         // on cygwin the paths are resolved asynchronously, but elsewhere, sync
                         // At the moment, I think 'makeFullPath' does not need to call cygpath to convert into a windows/driveletter path
-                        // for the purposes, I can pass a posix path to Intellisense and let it sort Out
+                        // for the purposes, I can pass a posix path to IntelliSense and let it sort Out
                         // cygwin paths
                         this.handleCompilerCommand(tool, caller);
                     } else {

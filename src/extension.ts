@@ -83,7 +83,7 @@ export class Extension {
     private _treeDisposables: vscode.Disposable[] = [];
     public running: WeakMap<vscode.TaskExecution, Span> = new WeakMap();
 
-    /* Intellisense Data */
+    /* IntelliSense Data */
     private readonly _cppConfigurationProvider : CppConfigurationProvider = new CppConfigurationProvider();
     public get cppConfigurationProvider() : CppConfigurationProvider { return this._cppConfigurationProvider; }
 
@@ -905,7 +905,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     util.scheduleAsyncTask<void>(async () => {
         await extension.registerCppTools();
         if (!extension.cppToolsAPI) {
-            logger.message('C/C++ Intellisense is not loaded. Install an extension to enable syntax highlighting and completions.', "Normal");
+            logger.message('C/C++ IntelliSense is not loaded. Install an extension to enable syntax highlighting and completions.', "Normal");
         }
 
         configuration.loadAllFolders();

@@ -3,7 +3,7 @@
 This extension enables VS Code to interact with projects using the GNU Autotools build system:
  * Manage multiple [build configurations](#build-configuration) per source-tree (out-of-tree builds)
  * Building-related functions:
-    * Import build configuration into [Intellisense](#importing-intellisense-config), enabling _accurate syntax highlighting and completions_.
+    * Import build configuration into [IntelliSense](#importing-intellisense-config), enabling _accurate syntax highlighting and completions_.
     * [_Generate a build task_](#generate-build-tasks) for every buildable program or library.
     * Build any single target (program, library), or all with _keybinds_.
     * [_Navigate build errors/warnings_](#navigating-compile-problems) using built-in problem matchers.
@@ -143,7 +143,7 @@ The palette command "Autotools: Update Makefiles and Headers" can be used to re-
 
 Building runs the command `make all` in the configuration's `top_builddir` directory. Typically this compiles all installable programs and shared libraries.
 
-It is possible to add extra arguments to the make command line using the `makeArgs` variable for the configuration. This should be used only for arguments that change how make behaves (eg, `--jobs=X`, `--load-average=Y` or `--silent`), but not for arguments that change what make does (eg, overriding the configuration or actions like `--touch` or `--question` or `--file=xxx`). Overriding the actions or configuration would cause the configuration imported to Intellisense to be different from that used to build; the syntax highlights and completions would not correspond to the build.
+It is possible to add extra arguments to the make command line using the `makeArgs` variable for the configuration. This should be used only for arguments that change how make behaves (eg, `--jobs=X`, `--load-average=Y` or `--silent`), but not for arguments that change what make does (eg, overriding the configuration or actions like `--touch` or `--question` or `--file=xxx`). Overriding the actions or configuration would cause the configuration imported to IntelliSense to be different from that used to build; the syntax highlights and completions would not correspond to the build.
 
 <figure id="figure-5">
     <img src="https://autotools.mergesium.com/s/autotools-run-tasks.png"
@@ -327,10 +327,10 @@ Contributed commands:
 
 ## Build-related features
 
-### Importing Intellisense config
-The extension extracts the exact compilation arguments for each source code file and relays these arguments to Intellisense. In turn, Intellisense builds and maintains a database of indentifiers which is used to drive syntax highlighting and also code completion.
+### Importing IntelliSense config
+The extension extracts the exact compilation arguments for each source code file and relays these arguments to IntelliSense. In turn, IntelliSense builds and maintains a database of indentifiers which is used to drive syntax highlighting and also code completion.
 
-When selecting a different build configuration, Intellisense is re-configured to reflect it, so that the syntax highlighting seen in the editor accurately corresponds to the `configureArgs` of the selected build configuration ("What You See Is What You Build"?)
+When selecting a different build configuration, IntelliSense is re-configured to reflect it, so that the syntax highlighting seen in the editor accurately corresponds to the `configureArgs` of the selected build configuration ("What You See Is What You Build"?)
 
 The extension eliminates the need to manually configure intellisense with include paths, compiler version/flavour, C/C++ standard applicable, or defines.
 
@@ -469,9 +469,9 @@ In this example:
   * the `tests.log` log file in the right-side tab is updated with the test's output, if any (both stdout and stderr are captured)
   * the "debug" icon is available, which will launch this failing test under the debugger, in the `modern` environment. No tinkering with `launch.json` needed.
 
-### Intellisense data providers
+### IntelliSense data providers
 
-Intellisense allows the data provider to be configured using the `C/C++: Change Configuration Provider...` command. If highlighting is not correct, run this command to ensure the Autotools Integration extension is selected as the data provider.
+IntelliSense allows the data provider to be configured using the `C/C++: Change Configuration Provider...` command. If highlighting is not correct, run this command to ensure the Autotools Integration extension is selected as the data provider.
 
 ## Telemetry and quality
 

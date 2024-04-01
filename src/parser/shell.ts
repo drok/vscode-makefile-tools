@@ -97,7 +97,7 @@ export class Tool implements ToolInvocation {
 
     filterArgsExcluding(unwanted: string[]): string[] {
         let removedOptArg : boolean = true;
-        // TODO: Avoid this song and dance with removing optargs by having Intellisense ignore the args it doesn't care about
+        // TODO: Avoid this song and dance with removing optargs by having IntelliSense ignore the args it doesn't care about
         return this.argv
             .filter(a => !unwanted.find(excluded => {
                 // Expect options with required parts have the optarg either attached to the opt

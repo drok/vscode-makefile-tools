@@ -540,7 +540,7 @@ export async function reportDryRunError(fc: FolderConfig, dryrunOutputFile: stri
     logger.message('Dry-running the project failed. Fix the errors and attempt again. Possibilities:');
     logger.message("  1. Corrupt Makefiles can be re-output with 'Update Makefiles and Headers'");
     logger.message("  2. ./configure can be re-run with the same configureArgs with 'Autotools: Configure'");
-    logger.message("  3. Once makefiles are valid, you can 'Export configuration to Intellisense'");
+    logger.message("  3. Once makefiles are valid, you can 'Export configuration to IntelliSense'");
     logger.message("It should be enough to correct the issue and save the offending file (configure.ac or Makefile.am)");
     logger.message("The extension will re-generate the Makefiles on save");
     logger.message("There may be a solution for this in the knowledge base at " + kbUrl.toString(true) + '#dry-run');
