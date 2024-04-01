@@ -310,11 +310,6 @@ export class AutoToolsCheckTaskProvider implements MyTaskProvider {
         let traceLiveTestRuns = this.fc.wsConfig.get<boolean>("traceLiveTestRuns", false);
         this.myTasks.splice(0);
         this.fc.buildTargets.forEach((goals, dir) => {
-            const kind: CheckTask = {
-                type: this.myType,
-                folderIndex: this.fc.folder.index,
-                builddir: dir
-            };
             if (!env.dirs || env.dirs.includes(dir))
             for (let g of goals.values()) {
                 if (g.flags & (Goal.Flags.Test_Suite)) {
@@ -326,6 +321,12 @@ export class AutoToolsCheckTaskProvider implements MyTaskProvider {
                 let ME_KEEP_ENV = KeepList(envs);
 
                 envs.forEach((env) => {
+                    const kind: CheckTask = {
+                        type: this.myType,
+                        folderIndex: this.fc.folder.index,
+                        dir: dir,
+                        env: env.name,
+                    };
                     var newTask = new Task(kind, this.fc.folder, 'Run test suite ' + (dir ? ('in ' + dir) : 'at the top') + (' @ ' + env.name),
                         "autotools",
                     new ProcessExecution(
@@ -366,7 +367,8 @@ export class AutoToolsCheckTaskProvider implements MyTaskProvider {
         let checkAllTaskDef : CheckTask = {
             type: this.myType,
             folderIndex: this.fc.folder.index,
-            builddir: ''
+            env: '',
+            dir: ''
         };
         this.checkAllTask = new Task(checkAllTaskDef, this.fc.folder, 'Run user test suite (make check)',
             "autotools",
@@ -396,17 +398,36 @@ export class AutoToolsCheckTaskProvider implements MyTaskProvider {
 
         // resolveTask requires that the same definition object be used.
         const definition: CheckTask = <any>_task.definition;
-        if (!definition || definition.builddir === undefined)
+        if (!definition || definition.dir === undefined)
             return undefined;
         const goal = this.fc.buildTargets
-            .get(definition.builddir)
+            .get(definition.dir)
             ?.get("test-suite.log");
         if (goal) {
             if (goal.task instanceof Map) {
                 let env = definition.env ?
                     this.fc.getTestEnvironment(definition.env) :
                     this.fc.currentTestEnvironment;
-                return goal.task.get(env);
+                let dir = goal.make.getDir();
+                let c = this.fc.buildConfig;
+                let e = this.fc.testEnvironments;
+                let envs = FilterEnvsByDir(e, dir);
+                let ME_KEEP_ENV = KeepList(envs);
+                let traceLiveTestRuns = this.fc.wsConfig.get<boolean>("traceLiveTestRuns", false);
+                let task = new Task(definition, this.fc.folder,
+                    _task.name, "autotools",
+                    new ProcessExecution(
+                        traceLiveTestRuns ? extension.dryRunner : configuration.getMakePath(),
+                        (dir ? ['-C', dir] : [])
+                        .concat(c.makeArgs || [])
+                        .concat(traceLiveTestRuns ? ["--trace", "--silent"] : [])
+                        .concat(["-Res",
+                            "test-suite.log",
+                            `ME_KEEP_ENV=${ME_KEEP_ENV}`
+                        ]),
+                        env.updateExecOptions),
+                    testProblemMatchers);
+                return task;
             }
         }
         return undefined;
@@ -758,19 +779,15 @@ export interface CheckTask {
      * Test suite arguments (default: none, ie, run 'make check' )
      */
     readonly type: string;
-    check?: CheckTarget;
     folderIndex: number;
-    builddir: string;
+    dir: string;
     /* test environment name - if missing, use current env */
     env?: string;
+    TESTS?: string[];
+    TEST_SUITE_LOG?: string;
 
     exitCode?: number | undefined;
 };
-
-export class CheckTarget {
-    TESTS?: string[];
-    TEST_SUITE_LOG?: string;
-}
 
 export class TestTarget {
     constructor(public dir: string, public goal: string, public env?: string) {}

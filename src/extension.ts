@@ -414,10 +414,10 @@ export class Extension {
                 } else if (definition.type == 'check') {
                     const def: CheckTask = task.definition as CheckTask;
                     let suite = fc.buildTargets
-                        .get(def.builddir)
+                        .get(def.dir)
                         ?.get('test-suite.log');
                     if (suite && suite.test) {
-                        fc.testController?.suiteCompleted(e.execution, suite, def.builddir);
+                        fc.testController?.suiteCompleted(e.execution, suite, def.dir);
                     }
                     fc.autotoolsTask.autotoolsDoneNoResult();
                     extension.updateAllGrids();

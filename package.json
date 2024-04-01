@@ -885,12 +885,18 @@
                         "default": "Run test-suite 'check'"
                     },
                     "check": {
-                        "description": "%autotools.taskDefinitions.task.check.description%",
+                        "required": ["dir"],
+                        "description": "%autotools.taskDefinitions.check.description%",
                         "properties": {
-                            "builddir": {
+                            "dir": {
                                 "type": "string",
                                 "description": "%autotools.taskDefinitions.check.builddir.description%",
                                 "examples": ["test/unit-tests", "test/integration-tests"]
+                            },
+                            "env": {
+                                "type": ["string", "null"],
+                                "description": "%autotools.taskDefinitions.task.check.env.description%",
+                                "examples": ["<no-env>", "Debug", "Release", "Legacy"]
                             },
                             "TESTS": {
                                 "type": "array",
