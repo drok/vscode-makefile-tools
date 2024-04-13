@@ -31,7 +31,6 @@
     "dependencies": {
         "@mergesium/shell-quote": "^2.0.1",
         "@types/glob": "^7.1.1",
-        "@vscode/extension-telemetry": "^0.6.2",
         "glob": "^7.1.6",
         "module-alias": "^2.2.2",
         "vscode-cpptools": "^6.1.0",
