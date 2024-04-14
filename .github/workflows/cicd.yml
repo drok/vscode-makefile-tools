@@ -7,6 +7,7 @@ on:
   push:
     branches:
       - "pre/*"
+      - wip/arm64-cross
   pull_request:
     branches:
       - master
@@ -23,9 +24,9 @@ jobs:
       fail-fast: false
       matrix:
         config:
-          - { os: ubuntu-20.04, name: linux-x64 }
+          - { os: ubuntu-20.04, name: linux }
           # See https://github.blog/2023-10-02-introducing-the-new-apple-silicon-powered-m1-macos-larger-runner-for-github-actions/
-          - { os: macos-latest, name: darwin-x64 }
+          - { os: macos-latest, name: darwin }
           # - { os: macos-12-large, name: darwin-x64 }
           # - { os: macos-13-xlarge, name: darwin-arm64 }
           # - { os: windows-latest, name: win32 }
@@ -35,11 +36,21 @@ jobs:
       vsixPath: ${{ steps.packageExtension.outputs.vsixPath }}
       target: ${{ matrix.config.name }}
     steps:
-      - uses: awalsh128/cache-apt-pkgs-action@latest
-        with:
-          packages: autopoint libbsd-resource-perl
-          version: 1.0      
+      - name: Enable arm64 architecture
+        run: |
+          sudo dpkg --add-architecture arm64
+          sudo apt-get reinstall pkg-config
+          # Ubuntu bug causes pkg-config be created as "gnu" instead of "gnueabi". Fix this up.
+          # sudo mv /usr/bin/arm-linux-gnu{,eabi}-pkg-config
         if: runner.os == 'Linux'
+
+      - name: Install cross compilers/tools
+        run: sudo apt-get install gcc-aarch64-linux-gnu
+          libc6-dev-arm64-cross
+          autopoint
+          libbsd-resource-perl
+        if: runner.os == 'Linux'
+
       - name: Update homebrew
         run: |
           brew install automake
@@ -80,35 +91,47 @@ jobs:
         run: yarn install
       # - name: Run Linter
       #   run: npm run lint
-      - name: Detect Binary Build Info
-        run: node  -e 'let e={arch:process.arch,platform:process.platform};console.log(`export let buildinfo:{arch:string,platform:string}=${JSON.stringify(e)};`);' > buildinfo.ts
-      - name: Generate Translations
-        run: yarn run translations-generate
       - name: Bootstrap external dependencies
-        run: yarn bootstrap
-      - name: Configure externals on !Linux
-        run: yarn configure
-        if: runner.os != 'Linux'
-      - name: Configure externals on Linux
-        run: mkdir -p build/make && cd build/make && [ -f config.status ] ||
-          make_cv_sys_gnu_glob=yes
-          ac_cv_func_gettimeofday=no
-          ac_cv_search_clock_gettime=no
-          ../../vendor/gnumake/configure -C
-          --disable-dependency-tracking
-          --with-guile=no
-          --disable-job-server
-          --disable-load
-          'INSTALL_PROGRAM=install -cs'
-          "CFLAGS=-g0 -O2 -include $PWD/../../vendor/gnumake-include.h"
-          LDFLAGS=-lrt
-          --disable-nls
-          --prefix=$PWD/../..
+        run: |
+            cd vendor/gnumake && [ -f configure ] || autoreconf -fvi
+
+
+      - id: package-linux-x64
+        name: Package for linux-x64
+        uses: ./.github/actions/native-build
+        with:
+          cpu: x64
+          platform: ${{ matrix.config.name }}
+          host: x86_64-pc-linux-gnu
         if: runner.os == 'Linux'
-      - name: Build Extension
-        run: yarn production-compile
-      - name: Check make symbols
-        run: objdump -T build/make/make
+
+      - id: package-linux-arm64
+        name: Package for linux-arm64
+        uses: ./.github/actions/native-build
+        with:
+          cpu: arm64
+          platform: ${{ matrix.config.name }}
+          host: aarch64-linux-gnu
+        if: runner.os == 'Linux'
+
+      - id: package-darwin-x64
+        name: Package for darwin-x64
+        uses: ./.github/actions/native-build
+        with:
+          cpu: x64
+          platform: ${{ matrix.config.name }}
+          host: x86_64-apple-darwin21.6.0
+        if: runner.os == 'macOS'
+
+      - id: package-darwin-arm64
+        name: Package for darwin-arm64
+        uses: ./.github/actions/native-build
+        with:
+          cpu: arm64
+          platform: ${{ matrix.config.name }}
+          host: aarch64-apple-darwin21.6.0
+        if: runner.os == 'macOS'
+
       # - name: Run Unit Tests on Windows or macOS
       #   run: npm run test
       #   if: runner.os != 'Linux'
@@ -121,17 +144,6 @@ jobs:
       #     github-token: ${{ secrets.GITHUB_TOKEN }}
       #     parallel: true
       #     flag-name: Test on ${{ matrix.config.os }}
-      - name: Package Extension
-        id: packageExtension
-        run: |
-          TARGET=${{ matrix.config.name }} npm run package
-          echo "vsixPath=$(echo *-${{ matrix.config.name }}.vsix)" > "$GITHUB_OUTPUT"
-
-      - name: Upload Extension Package as Artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: ${{ matrix.config.name }}
-          path: ${{ steps.packageExtension.outputs.vsixPath }}
 
   # coverage:
   #   name: Code Coverage
