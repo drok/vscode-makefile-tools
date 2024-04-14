@@ -5,6 +5,7 @@
 
 # ignore GitHub actions
 .github/**
+.circleci/**
 
 # ignore source files
 src/**
