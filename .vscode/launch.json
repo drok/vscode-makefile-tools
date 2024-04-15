@@ -444,6 +444,21 @@
             "preLaunchTask": "compile",
         },
         {
+            "name": "Debug on ad7proxy",
+            "type": "extensionHost",
+            "request": "launch",
+            "runtimeExecutable": "${execPath}",
+            "args": [
+                "--extensionDevelopmentPath=${workspaceFolder}",
+                "${workspaceFolder}/utils/ad7proxy"
+            ],
+            "sourceMaps": true,
+            "outFiles": [
+                "${workspaceFolder}/out/**/*.js"
+            ],
+            "preLaunchTask": "compile",
+        },
+        {
             "name": "Debug on proj/Bitcoin",
             "type": "extensionHost",
             "request": "launch",
