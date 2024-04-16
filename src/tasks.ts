@@ -53,8 +53,10 @@ const testProblemMatchers : string[] = [
 ];
 const buildProblemMatchers : string[] = testProblemMatchers;
 const configureProblemMatchers : string[] = [
-    "autotools_configureac",
-    "autotools_configure",
+    "$autotools.ac",
+    "$autotools.configure",
+    "$autotools.config.status",
+    "$autotools.automake",
 ];
 
 export class AutoToolsBuildTaskProvider implements MyTaskProvider {

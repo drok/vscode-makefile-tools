@@ -273,7 +273,7 @@
         ],
         "problemMatchers": [
             {
-                "name": "autotools_configure",
+                "name": "autotools.configure",
                 "label": "configure script errors",
                 "source": "autotools",
                 "owner": "external",
@@ -290,7 +290,7 @@
                 }
             },
             {
-                "name": "autotools_configureac",
+                "name": "autotool.ac",
                 "label": "configure.ac errors",
                 "source": "autotools",
                 "owner": "external",
@@ -305,6 +305,42 @@
                     "line": 2,
                     "severity": 3,
                     "message": 4
+                }
+            },
+            {
+                "name": "autotools.config.status",
+                "label": "config.status script errors",
+                "source": "autotools",
+                "owner": "external",
+                "fileLocation":[
+                    "absolute"
+                ],
+                "severity": "error",
+                "pattern": [{
+                    "regexp": "^(.*/configure): line (\\d+): (.*)$",
+                    "kind": "location",
+
+                    "file": 1,
+                    "line": 2,
+                    "message": 3
+                }]
+            },
+            {
+                "name": "autotools.automake",
+                "label": "automake errors",
+                "source": "autotools",
+                "owner": "external",
+                "fileLocation":[
+                    "relative",
+                    "${workspaceFolder}"
+                ],
+                "severity": "error",
+                "pattern": {
+                    "regexp": "^(automake): error: (.*)$",
+                    "kind": "file",
+
+                    "file": 1,
+                    "message": 2
                 }
             },
             {
