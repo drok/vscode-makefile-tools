@@ -148,9 +148,18 @@ export class Tool implements ToolInvocation {
     }
 
     getArg(wanted: string): string | undefined {
-        let index = this.argv.findIndex(arg => arg == ("-" + wanted) || arg == ("--" + wanted));
-        if (index >= 0 && this.argv.length > index + 1) {
-            return this.argv[index + 1];
+        let one_dash_neq = '-' + wanted;
+        let two_dash_neq = '--' + wanted;
+        let index = this.argv.findIndex(arg => arg.startsWith(one_dash_neq) || arg.startsWith(two_dash_neq));
+        if (index >= 0) {
+            let arg = this.argv[index];
+            let eq = arg.indexOf('=');
+            if (eq >= 0) {
+                return arg.substring(eq+1);
+            } else {
+                if (this.argv.length > index + 1)
+                    return this.argv[index + 1];
+            }
         }
         return undefined;
     }
