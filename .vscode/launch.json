@@ -344,6 +344,34 @@
             ]
         },
         {
+            "name": "Attach ad7proxy",
+            "type": "cppdbg",
+            "request": "attach",
+            "program": "${workspaceFolder}/build/ad7proy/ad7proxy",
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Set Disassembly Flavor to Intel",
+                    "text": "-gdb-set disassembly-flavor intel",
+                    "ignoreFailures": true
+                }
+            ]
+        },
+        {
+            "name": "Attach gdbserver: ad7proxy",
+            "type": "gdb",
+            "request": "attach",
+            "target": ":9997",
+            "cwd": "${workspaceRoot}/build/ad7proxy",
+            "remote": true,
+            "stopAtConnect": false,
+        },
+        {
             "name": "Launch Tests",
             "type": "extensionHost",
             "request": "launch",
@@ -436,6 +464,21 @@
             "args": [
                 "--extensionDevelopmentPath=${workspaceFolder}",
                 "/home/radu/proj/amhello"
+            ],
+            "sourceMaps": true,
+            "outFiles": [
+                "${workspaceFolder}/out/**/*.js"
+            ],
+            "preLaunchTask": "compile",
+        },
+        {
+            "name": "Debug on ad7proxy",
+            "type": "extensionHost",
+            "request": "launch",
+            "runtimeExecutable": "${execPath}",
+            "args": [
+                "--extensionDevelopmentPath=${workspaceFolder}",
+                "${workspaceFolder}/utils/ad7proxy"
             ],
             "sourceMaps": true,
             "outFiles": [

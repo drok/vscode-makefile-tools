@@ -95,15 +95,17 @@ export class DebugNow implements vscode.DebugConfiguration {
             name: "srcdir",
             value: path.join(goal.make.ctx.fc.folder.uri.path, goal.make.dir)
         }]
+        // let gdb='/home/radu/bin/gdb-9/bin/gdb';
+        let gdb='gdb';
         if (goal.flags & Goal.Flags.Libtool_Linked) {
             let libtool = path.join(goal.make.ctx.root, 'libtool');
             this.miDebuggerPath = extension.ltLauncher;
-            this.miDebuggerArgs = `gdb ${libtool} ${this.program}`;
+            this.miDebuggerArgs = `${gdb} ${libtool} ${this.program}`;
             this.MIMode = 'gdb';
             this.externalConsole = false;
         } else {
             this.miDebuggerPath = extension.integratedLauncher;
-            this.miDebuggerArgs = `gdb none ${this.program}`;
+            this.miDebuggerArgs = `${gdb} ${this.program}`;
             this.MIMode = 'gdb';
             this.externalConsole = false;
         }
