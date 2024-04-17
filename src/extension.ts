@@ -59,7 +59,7 @@ const rdepRevealOption : { select: boolean,
         focus: boolean } = {select: false, expand: 3, focus: false};
 export class Extension {
     static readonly whoami: string = "mergesium.autotools";
-    static readonly expires: string = "2024-xx-xx"; // set the expiry date in pre/xx branch
+    static readonly expires: string = "2024-05-15"; // set the expiry date in pre/xx branch
     static readonly myVersion = 6; // Incremenet myVersion in pre-release branch
 
     public readonly journey;
