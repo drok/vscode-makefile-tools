@@ -68,7 +68,7 @@ export class SuiteDecorations implements vscode.FileDecorationProvider {
             .map(f => f.getURI());
         irrelevantGoals.length && this._onDidChangeFileDecorations.fire(irrelevantGoals);
     }
-    public highlightRelevant(goals: Goal[] | undefined) {
+    public highlightRelevant(goals: Set<Goal> | undefined) {
         this.relevantFiles.clear();
         if (goals) this.updateDecorationsRecursive(goals);
         let irrelevant = Array.from(this.visibleFiles.keys())
@@ -80,7 +80,7 @@ export class SuiteDecorations implements vscode.FileDecorationProvider {
             .map( f=> vscode.Uri.file(f));
         this._onDidChangeFileDecorations.fire(relevant);
     }
-    updateDecorationsRecursive(goals: Goal[] | undefined) {
+    updateDecorationsRecursive(goals: Set<Goal>) {
         goals?.forEach(g => {
             this.relevantFiles.add(g.getFilePath());
             g.depends && this.updateDecorationsRecursive(g.depends);
@@ -93,17 +93,20 @@ export class SuiteDecorations implements vscode.FileDecorationProvider {
      * Returns a pair. the first item is the goal being satisfied,
      * the second is the dependency which is at the path
      */
-    goalOf(path: string, goals : Goal[]) : [Goal,Goal] | boolean {
+    goalOf(path: string, goals : Set<Goal>) : [Goal,Goal] | boolean {
         let leaf : [Goal,Goal] | boolean = false;
         let relevantDir : boolean = false;
-        let r = goals.find(g => {
-                let goalpath = g.getFilePath();
-                relevantDir = relevantDir || goalpath.startsWith(path);
-                let fin = (path == (goalpath) && (leaf=[g,g])) ||
-            (g.depends && Array.isArray((leaf=this.goalOf(path, g.depends))));
-                relevantDir = relevantDir || (!Array.isArray(leaf) && leaf);
-                return fin;
-        });
+        let goal_it = goals.values();
+        let r: Goal | undefined;
+        for (let it = goal_it.next(); !it.done && !r; it = goal_it.next()) {
+            let g = it.value;
+            let goalpath = g.getFilePath();
+            relevantDir = relevantDir || goalpath.startsWith(path);
+            let fin = (path == (goalpath) && (leaf=[g,g])) ||
+                (g.depends && Array.isArray((leaf=this.goalOf(path, g.depends))));
+            relevantDir = relevantDir || (!Array.isArray(leaf) && leaf);
+            r = fin ? g : undefined;
+        };
 
         if (r)
             return [r, Array.isArray(leaf) ? leaf[1] : r]
@@ -156,13 +159,13 @@ export class SuiteDecorations implements vscode.FileDecorationProvider {
             this.visibleFiles.add(uri.path);
             let selected = configuration.currentGoals;
             if (selected != undefined) {
-                let goal = this.goalOf(uri.path,selected);
+                let goal = this.goalOf(uri.path,new Set(selected));
                 if (Array.isArray(goal)) {
                     return { tooltip: `used for ${goal[0].goal}`, badge:
                         // A goal can be the final target, an intemediate puzzle piece,
                         // or the origin/bow
                         goal[0] == goal[1] ?'🎯' :
-                        goal[1].depends?.length ? '🧩' : '🏹', propagate: true}; //  ||  || '👁️‍🗨️', propagate: true};
+                        goal[1].depends?.size ? '🧩' : '🏹', propagate: true}; //  ||  || '👁️‍🗨️', propagate: true};
                 } else if (!goal)
                     return { color: unused };
             }

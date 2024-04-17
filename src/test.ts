@@ -170,9 +170,13 @@ export class MyTestController {
             goal.goal || "",
             vscode.Uri.file(path.join(goal.make.ctx.root, logpath, goal.goal || "")));
     this.testGoals.set(goal.test, goal);
-    if (goal.depends?.length && isDebuggable(goal.depends[0]))
-        goal.test.tags = tags_debuggable;
-    else
+    if (goal.depends?.size) {
+        let [first] = goal.depends;
+        if (isDebuggable(first))
+            goal.test.tags = tags_debuggable;
+        else
+            goal.test.tags = tags_none;
+    } else
         goal.test.tags = tags_none;
 
     suite.children.add(goal.test);

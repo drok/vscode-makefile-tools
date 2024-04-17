@@ -199,8 +199,8 @@ export class ProjectOutlineProvider implements vscode.TreeDataProvider<Node> {
 
         let fc = configuration.findFolderConfig(uri);
         if (fc) {
-            function dependsOnRecursive(path: string, goals: Goal[]) : boolean {
-                return goals.some( g => {
+            function dependsOnRecursive(path: string, goals: Set<Goal>) : boolean {
+                return [...goals].some( g => {
                     let goalpath = g.getFilePath();
                     return (goalpath == path || (g.depends && dependsOnRecursive(path, g.depends)));
                 });

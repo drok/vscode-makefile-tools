@@ -364,12 +364,11 @@ export class Extension {
         /* This is only used when the FS changes without a testRun in progress */
         let dir = path.relative(fc.abs_top_builddir, path.dirname(uri.path));
         let log = path.basename(uri.path, ".trs") + ".log";
-        let goal = fc.buildTargets
-            ?.get(dir)
-            ?.get('test-suite.log')
-            ?.depends?.find((d) => d.goal === log);
+        let dirGoals = fc.buildTargets?.get(dir);
+        let goal = dirGoals?.get(log);
+        let suiteGoal = dirGoals?.get('test-suite.log');
 
-        if (goal) {
+        if (goal && suiteGoal?.depends?.has(goal)) {
             let old = goal.trs;
             let old_global = goal.trs?.global ?? TRS.NONE;
             goal.trs = make.readTRS(dir, log, fc);
@@ -400,11 +399,10 @@ export class Extension {
                     return;
                 let fc = configuration.findFolderConfigByIndex(definition.folderIndex);
                 if (definition.type == "test" && definition.test) {
-                    let suite = fc.buildTargets
-                        .get(definition.test.dir)
-                        ?.get('test-suite.log');
+                    let dirGoals = fc.buildTargets?.get(definition.test.dir);
+                    let suite = dirGoals?.get('test-suite.log');
                     if (suite) {
-                        let goal = suite.depends?.find((d) => d.goal === definition.test?.goal);
+                        let goal = dirGoals?.get(definition.test.goal);
                         if (goal) {
                             definition.test && goal.test && fc.testController!.testCompleted(e.execution, goal, definition.test);
                         }
@@ -488,7 +486,8 @@ export class Extension {
 
     // goal is the *.log goal. The executable will be read from .depends[0]
     async debugGoal(goal: Goal, env: configuration.TestEnvironment) : Promise<void> {
-        if (goal?.depends?.length && goal.depends[0].goal) {
+        if (goal.depends?.size) {
+            let [target] = goal.depends;
             this.journey.addEvent("deb");
             let dopt : vscode.DebugSessionOptions = {
                 compact: true
@@ -496,7 +495,7 @@ export class Extension {
             try {
                 vscode.debug.startDebugging(
                     goal.make.ctx.fc.folder,
-                    new DebugNow(goal, goal.depends[0], env),
+                    new DebugNow(goal, target, env),
                     dopt)
                 .then((z) => {});
             } catch(e) {

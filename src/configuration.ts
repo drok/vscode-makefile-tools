@@ -1329,24 +1329,24 @@ function nullTestEnvironment() : TestEnvironment {
             hashCode: envHash('')}
 }
 
-export let currentGoals : Goal[] | undefined;
+export let currentGoals : Set<Goal> | undefined;
 export let currentGoalsBins : Goal[] | undefined;
 export let currentGoalsTests : Goal[] | undefined;
 export function setCurrentGoalBins(goals: Goal[] | undefined) {
     currentGoalsBins = goals;
     currentGoals =
         currentGoalsBins == undefined && currentGoalsTests == undefined ?
-        undefined : [...currentGoalsBins??[], ...currentGoalsTests??[]];
+        undefined : new Set([...currentGoalsBins??[], ...currentGoalsTests??[]]);
     vscode.commands.executeCommand('setContext', "autotools:filterByTarget",
-        (currentGoals && (currentGoals.length != 0)));
+        (currentGoals && currentGoals.size));
 }
 export function setCurrentGoalTests(goals: Goal[] | undefined) {
     currentGoalsTests = goals;
     currentGoals =
     currentGoalsBins == undefined && currentGoalsTests == undefined ?
-        undefined : [...currentGoalsBins??[], ...currentGoalsTests??[]];
+        undefined : new Set([...currentGoalsBins??[], ...currentGoalsTests??[]]);
     vscode.commands.executeCommand('setContext', "autotools:filterByTarget",
-        (currentGoals && (currentGoals.length != 0)));
+        (currentGoals && currentGoals.size));
 }
 
 
