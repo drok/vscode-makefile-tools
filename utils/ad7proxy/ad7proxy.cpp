@@ -890,18 +890,32 @@ int main(int argc, char **argv) {
             STDIN_FILENO, child_in[WRITE_END],
             write_fdset, read_fdset,
             nfd);
+        struct timeval wrapup_timeout = { .tv_sec = 1, .tv_usec = 0 };
+        xfer_state
+            parent_state = PASSTHROUGH,
+            child_state = PASSTHROUGH;
+
         do {
-            int res = select(nfd + 1, &read_fdset, &write_fdset, NULL, NULL);
+            int res = select(nfd + 1, &read_fdset, &write_fdset, NULL,
+                (parent_state != CLOSED) ? NULL : &wrapup_timeout);
             if (res < 0) {
-                char *z = strerror(errno);
-                perror("select");
+                if (errno != EINTR)
+                    break;
+                /* will continue on signals*/
+            } else if (!res) {
+                /* Timeout - gdb 8.2 hangs with 100% cpu sometimes */
+                kill(pid, SIGKILL);
                 break;
             } else {
-                opened_channels =
-                    parent_to_child.xfer() &&
-                    child_to_parent.xfer(parent_to_child);
+                    if (parent_state != CLOSED)
+                        parent_state = parent_to_child.xfer();
+                    if (child_state != CLOSED)
+                        child_state = child_to_parent.xfer(parent_to_child);
+                opened_channels = parent_state || child_state;
             }
         } while (opened_channels);
+        int pid_stat = 0;
+        waitpid(pid, &pid_stat, 0);
     }
 
     return 0;
