@@ -273,7 +273,7 @@
         ],
         "problemMatchers": [
             {
-                "name": "autotools_configure",
+                "name": "autotools.configure",
                 "label": "configure script errors",
                 "source": "autotools",
                 "owner": "external",
@@ -290,7 +290,7 @@
                 }
             },
             {
-                "name": "autotools_configureac",
+                "name": "autotool.ac",
                 "label": "configure.ac errors",
                 "source": "autotools",
                 "owner": "external",
@@ -305,6 +305,42 @@
                     "line": 2,
                     "severity": 3,
                     "message": 4
+                }
+            },
+            {
+                "name": "autotools.config.status",
+                "label": "config.status script errors",
+                "source": "autotools",
+                "owner": "external",
+                "fileLocation":[
+                    "absolute"
+                ],
+                "severity": "error",
+                "pattern": [{
+                    "regexp": "^(.*/configure): line (\\d+): (.*)$",
+                    "kind": "location",
+
+                    "file": 1,
+                    "line": 2,
+                    "message": 3
+                }]
+            },
+            {
+                "name": "autotools.automake",
+                "label": "automake errors",
+                "source": "autotools",
+                "owner": "external",
+                "fileLocation":[
+                    "relative",
+                    "${workspaceFolder}"
+                ],
+                "severity": "error",
+                "pattern": {
+                    "regexp": "^(automake): error: (.*)$",
+                    "kind": "file",
+
+                    "file": 1,
+                    "message": 2
                 }
             },
             {
@@ -793,24 +829,7 @@
                             }
                         }
                     }
-                },
-                "configurationSnippets": [
-                    {
-                        "label": "Autotools: Launch a program",
-                        "description": "Hardcoded program path. Useful for debugging programs with different args or env",
-                        "body": {
-                            "type": "cppdbg",
-                            "request": "launch",
-                            "name": "${1:Launch myapp}",
-                            "program": "src/myapp",
-                            "preLaunchTask": "autotools: build 'myapp' in src",
-                            "cwd": "^\"\\${workspaceFolder}\"",
-                            "environment": [],
-                            "args": [],
-                            "stopAtEntry": false
-                        }
-                    }
-                ]
+                }
             }
         ],
         "viewsContainers": {
@@ -880,15 +899,20 @@
                     "test": {
                         "description": "%autotools.taskDefinitions.test.description%",
                         "properties": {
-                            "builddir": {
+                            "dir": {
                                 "type": "string",
-                                "description": "%autotools.taskDefinitions.test.builddir.description%",
+                                "description": "%autotools.taskDefinitions.test.dir.description%",
                                 "examples": ["test/unit-tests", "test/integration-tests"]
                             },
                             "goal": {
                                 "type": "string",
                                 "description": "%autotools.taskDefinitions.test.goal.description%",
-                                "examples": ["unit-tests.log", "integration-tests.log"]
+                                "examples": ["unit-test-1.log", "integration-test-1.log"]
+                            },
+                            "env": {
+                                "type": ["string", "null"],
+                                "description": "%autotools.taskDefinitions.task.test.env.description%",
+                                "examples": ["<no-env>", "Debug", "Release", "Legacy"]
                             }
                         }
                     }
@@ -905,12 +929,18 @@
                         "default": "Run test-suite 'check'"
                     },
                     "check": {
-                        "description": "%autotools.taskDefinitions.task.check.description%",
+                        "required": ["dir"],
+                        "description": "%autotools.taskDefinitions.check.description%",
                         "properties": {
-                            "builddir": {
+                            "dir": {
                                 "type": "string",
                                 "description": "%autotools.taskDefinitions.check.builddir.description%",
                                 "examples": ["test/unit-tests", "test/integration-tests"]
+                            },
+                            "env": {
+                                "type": ["string", "null"],
+                                "description": "%autotools.taskDefinitions.task.check.env.description%",
+                                "examples": ["<no-env>", "Debug", "Release", "Legacy"]
                             },
                             "TESTS": {
                                 "type": "array",
@@ -1247,8 +1277,8 @@
         "vscode:prepublish": "yarn compile-production && npm run esbuild -- --minify",
         "production-compile": "yarn install && tsc -p ./",
         "compile": "yarn install && tsc -p ./",
-        "precompile-production": "yarn run production-compile",
-        "compile-production": "yarn install && yarn run translations-generate",
+        "precompile-production": "yarn install && tsc -p ./",
+        "compile-production": "yarn run translations-generate",
         "translations-export": "gulp translations-export",
         "translations-generate": "gulp translations-generate",
         "translations-import": "gulp translations-import",

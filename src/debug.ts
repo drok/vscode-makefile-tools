@@ -7,7 +7,7 @@ import { DebugConfigurationProvider, WorkspaceFolder, DebugConfiguration, Provid
 import { getSettingOr } from './util';
 import * as configuration from './configuration';
 import { Goal } from './parser/gnumake';
-import { extension } from './extension';
+import { Extension, extension } from './extension';
 
 let defaultSetupCommands = [{
     "description": "Set source directory",
@@ -36,7 +36,7 @@ const frameworks_support : { [key: string]: string } =
 }
 
 export function isDebuggable(goal: Goal) : boolean {
-    return !!(goal.flags & Goal.Flags.Linked_binary);
+    return true;
 }
 class MyConfiguration implements vscode.DebugConfiguration {
     constructor(goal: Goal) {
@@ -90,15 +90,22 @@ export class DebugNow implements vscode.DebugConfiguration {
         this.name = "Debug '" + goal.goal + "'" +
             (goal.make.dir ? " in " + goal.make.dir : "") + ` @ ${env?.name ?? extension.userEnvName}`;
         this.request = "launch";
-        this.program = path.join(goal.make.getDir(), goal.goal!);
+        this.program = goal.getFilePath();
         this.environment = [{
             name: "srcdir",
             value: path.join(goal.make.ctx.fc.folder.uri.path, goal.make.dir)
         }]
+        // let gdb='/home/radu/bin/gdb-9/bin/gdb';
+        let gdb='gdb';
         if (goal.flags & Goal.Flags.Libtool_Linked) {
             let libtool = path.join(goal.make.ctx.root, 'libtool');
             this.miDebuggerPath = extension.ltLauncher;
-            this.miDebuggerArgs = `gdb ${libtool} ${this.program}`;
+            this.miDebuggerArgs = `${gdb} ${libtool} ${this.program}`;
+            this.MIMode = 'gdb';
+            this.externalConsole = false;
+        } else {
+            this.miDebuggerPath = extension.integratedLauncher;
+            this.miDebuggerArgs = `${gdb} ${this.program}`;
             this.MIMode = 'gdb';
             this.externalConsole = false;
         }
@@ -121,7 +128,7 @@ export class DebugNow implements vscode.DebugConfiguration {
         this.stopAtEntry = goal ? getSettingOr<boolean>(goal.make.ctx.fc.folder, "stopAtEntry", false) : true;
         //this.preLaunchTask = buildit ? "autotools: build " + built.goal +
         //    (built.builddir ? (' in ' + built.builddir) : ' at the top') : undefined;
-        this.cwd = path.dirname(goal.getFilePath()); // path.resolve(goal.make.ctx.root, goal;
+        this.cwd = goal.make.getDir();
         this.setupCommands = defaultSetupCommands;
         // this.testId = log?.test?.id || 'unk';
         this.testUri = log?.test?.uri?.with({scheme: "test"}) ?? vscode.Uri.from({scheme: "debug", path: this.cwd});
@@ -149,6 +156,18 @@ export class DebugNow implements vscode.DebugConfiguration {
 }
 
 class MyDebugProvider implements DebugConfigurationProvider {
+    constructor(context: vscode.ExtensionContext) {
+        context.subscriptions.push(vscode.debug.onDidReceiveDebugSessionCustomEvent(e => {
+            switch (e.event) {
+                case "exited":
+                    break;
+                default:
+                    break;
+            }
+//            let zz : vscode.DebugSessionCustomEvent = e;
+            console.debug(e);
+        }));
+    }
 
   provideDebugConfigurations(folder: WorkspaceFolder | undefined): ProviderResult<DebugConfiguration[]> {
     if (folder) {
@@ -227,7 +246,7 @@ class MyDebugProvider implements DebugConfigurationProvider {
 
 export function activate(context: vscode.ExtensionContext) {
   const providers = [
-    new MyDebugProvider()
+    new MyDebugProvider(context)
     // new MyDebugProvider()
   ];
 

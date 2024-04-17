@@ -60,7 +60,7 @@ const rdepRevealOption : { select: boolean,
 export class Extension {
     static readonly whoami: string = "mergesium.autotools";
     static readonly expires: string = "2024-xx-xx"; // set the expiry date in pre/xx branch
-    static readonly myVersion = 5; // Incremenet myVersion in pre-release branch
+    static readonly myVersion = 6; // Incremenet myVersion in pre-release branch
 
     public readonly journey;
     public readonly _projectOutlineProvider;
@@ -77,13 +77,14 @@ export class Extension {
     public readonly dryRunner : string;
     public readonly testRunner : string;
     public readonly ltLauncher : string;
+    public readonly integratedLauncher : string;
     public readonly rulesPath : string;
     public readonly m4Path : string;
     public readonly userEnvName : string = "<none>";
     private _treeDisposables: vscode.Disposable[] = [];
     public running: WeakMap<vscode.TaskExecution, Span> = new WeakMap();
 
-    /* Intellisense Data */
+    /* IntelliSense Data */
     private readonly _cppConfigurationProvider : CppConfigurationProvider = new CppConfigurationProvider();
     public get cppConfigurationProvider() : CppConfigurationProvider { return this._cppConfigurationProvider; }
 
@@ -98,6 +99,7 @@ export class Extension {
         this.dryRunner = path.join(extensionContext.extensionPath, "bin/make" + (process.platform === 'win32' ? ".exe" : ""));
         this.testRunner = path.join(extensionContext.extensionPath, "bin/test-driver");
         this.ltLauncher = path.join(extensionContext.extensionPath, "bin/lt-debug.sh");
+        this.integratedLauncher = path.join(extensionContext.extensionPath, "bin/ad7proxy");
         this.rulesPath = path.join(extensionContext.extensionPath, "include")
         this.m4Path = path.join(extensionContext.extensionPath, "m4")
 
@@ -363,15 +365,14 @@ export class Extension {
         /* This is only used when the FS changes without a testRun in progress */
         let dir = path.relative(fc.abs_top_builddir, path.dirname(uri.path));
         let log = path.basename(uri.path, ".trs") + ".log";
-        let goal = fc.buildTargets
-            ?.get(dir)
-            ?.get('test-suite.log')
-            ?.depends?.find((d) => d.goal === log);
+        let dirGoals = fc.buildTargets?.get(dir);
+        let goal = dirGoals?.get(log);
+        let suiteGoal = dirGoals?.get('test-suite.log');
 
-        if (goal) {
+        if (goal && suiteGoal?.depends?.has(goal)) {
             let old = goal.trs;
             let old_global = goal.trs?.global ?? TRS.NONE;
-            goal.trs = make.readTRS(new make.BuildTarget(dir, log), fc);
+            goal.trs = make.readTRS(dir, log, fc);
 
             if (fc.updateTRSInPanel(old, goal, dir))
                 fc.updateOutlineBadge();
@@ -399,11 +400,10 @@ export class Extension {
                     return;
                 let fc = configuration.findFolderConfigByIndex(definition.folderIndex);
                 if (definition.type == "test" && definition.test) {
-                    let suite = fc.buildTargets
-                        .get(definition.test.builddir)
-                        ?.get('test-suite.log');
+                    let dirGoals = fc.buildTargets?.get(definition.test.dir);
+                    let suite = dirGoals?.get('test-suite.log');
                     if (suite) {
-                        let goal = suite.depends?.find((d) => d.goal === definition.test?.goal);
+                        let goal = dirGoals?.get(definition.test.goal);
                         if (goal) {
                             definition.test && goal.test && fc.testController!.testCompleted(e.execution, goal, definition.test);
                         }
@@ -413,10 +413,10 @@ export class Extension {
                 } else if (definition.type == 'check') {
                     const def: CheckTask = task.definition as CheckTask;
                     let suite = fc.buildTargets
-                        .get(def.builddir)
+                        .get(def.dir)
                         ?.get('test-suite.log');
                     if (suite && suite.test) {
-                        fc.testController?.suiteCompleted(e.execution, suite, def.builddir);
+                        fc.testController?.suiteCompleted(e.execution, suite, def.dir);
                     }
                     fc.autotoolsTask.autotoolsDoneNoResult();
                     extension.updateAllGrids();
@@ -487,7 +487,8 @@ export class Extension {
 
     // goal is the *.log goal. The executable will be read from .depends[0]
     async debugGoal(goal: Goal, env: configuration.TestEnvironment) : Promise<void> {
-        if (goal?.depends?.length && goal.depends[0].goal) {
+        if (goal.depends?.size) {
+            let [target] = goal.depends;
             this.journey.addEvent("deb");
             let dopt : vscode.DebugSessionOptions = {
                 compact: true
@@ -495,7 +496,7 @@ export class Extension {
             try {
                 vscode.debug.startDebugging(
                     goal.make.ctx.fc.folder,
-                    new DebugNow(goal, goal.depends[0], env),
+                    new DebugNow(goal, target, env),
                     dopt)
                 .then((z) => {});
             } catch(e) {
@@ -907,7 +908,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     util.scheduleAsyncTask<void>(async () => {
         await extension.registerCppTools();
         if (!extension.cppToolsAPI) {
-            logger.message('C/C++ Intellisense is not loaded. Install an extension to enable syntax highlighting and completions.', "Normal");
+            logger.message('C/C++ IntelliSense is not loaded. Install an extension to enable syntax highlighting and completions.', "Normal");
         }
 
         configuration.loadAllFolders();

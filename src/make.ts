@@ -134,7 +134,7 @@ export async function getPackageJSON(fc: FolderConfig): Promise<pkgInfo | undefi
                     path.join(fc.abs_top_builddir, "config.status"), ["--file=-:-"],
                     fc.folder.uri.path,
                     true, true,
-                    '{ "name": "@PACKAGE@", "version": "@VERSION@", "tarname": "@PACKAGE_TARNAME@", "bugreport": "@PACKAGE_BUGREPORT@", "url": "@PACKAGE_URL@", "automake": "@AUTOMAKE@", "maint": "@MAINTAINER_MODE_FALSE@" }',
+                    '{ "name": "@PACKAGE_NAME@", "version": "@PACKAGE_VERSION@", "tarname": "@PACKAGE_TARNAME@", "bugreport": "@PACKAGE_BUGREPORT@", "url": "@PACKAGE_URL@", "automake": "@AUTOMAKE@", "maint": "@MAINTAINER_MODE_FALSE@" }',
                     (x) => {info = x}, undefined).catch<util.SpawnProcessResult>((r) => Promise.resolve({ returnCode: 33, signal: "ERR" }));
                 if (result.returnCode !== 0) return resolve(undefined);
                 if (info === undefined) return resolve(undefined);
@@ -256,7 +256,7 @@ export async function generateParseContent(span: Span, fc: FolderConfig): Promis
     // FIXME: also assume-old the configuration files listed
     // ./config.status --help
 
-    logger.message(`Export Intellisense Info from: 'make ${makeArgs.join(" ")}'`, "Debug");
+    logger.message(`Export IntelliSense Info from: 'make ${makeArgs.join(" ")}'`, "Debug");
 
     try {
         // TODO: Use stream writes
@@ -278,7 +278,7 @@ export async function generateParseContent(span: Span, fc: FolderConfig): Promis
         let lineBuffer: string = "";
         let parseFailedAt: number = 0;
 
-        // Clear the existing Intellisense config from cache or previous parsing
+        // Clear the existing IntelliSense config from cache or previous parsing
         // fc.resetCppToolsProvider();
 
         let stdout: any = (result: string): void => {
@@ -463,7 +463,7 @@ export async function generateParseContent(span: Span, fc: FolderConfig): Promis
             } else
                 telemetry.setSpanStatus(span, SpanStatusCode.OK);
         }
-        /* Now decide whether to import (partial) data or reset Intellisense */
+        /* Now decide whether to import (partial) data or reset IntelliSense */
         if (result.returnCode !== ConfigureBuildReturnCodeTypes.success &&
             result.returnCode != ConfigureBuildReturnCodeTypes.outOfDate &&
             result.returnCode != ConfigureBuildReturnCodeTypes.describedError) {
@@ -677,11 +677,11 @@ export async function configure(parentSpan: Span, triggeredBy: TriggeredBy, fc: 
     // FIXME: not true. it gets here if --dry-run parsing throws
       if (extension.getCppToolsVersion()) {
         logger.message(localize("autotools.log.config.exported",
-            "Exported to Intellisense: build configuration for {0} source files like {1}",
+            "Exported to IntelliSense: build configuration for {0} source files like {1}",
                 fileIndex.size, sample.join(", ")));
       } else {
         logger.message(localize("autotools.log.config.available",
-            "Intellisense data available, but not used, for {0} source files like {1}",
+            "IntelliSense data available, but not used, for {0} source files like {1}",
                 fileIndex.size, sample.join(", ")));
       }
       let stats = fc.build_tree.stats;
@@ -689,10 +689,10 @@ export async function configure(parentSpan: Span, triggeredBy: TriggeredBy, fc: 
             "Generated tasks: {0} build tasks and {1} test tasks in {2} check suites (see Run Task... command)",
             stats.programs, stats.tests, stats.checks));
     } else {
-        if (retc == 1) {/* ie, Intellisense API not available */
+        if (retc == 1) {/* ie, IntelliSense API not available */
             var kbUrl : vscode.Uri = await fc.kbUrl();
-            logger.message('Export to Intellisense failed. Review the OUTPUT tab of C++ for cause.', "Normal");
-            logger.message('Exporting can be re-attempted with "Autotools: Export Configuration to Intellisense"', "Normal");
+            logger.message('Export to IntelliSense failed. Review the OUTPUT tab of C++ for cause.', "Normal");
+            logger.message('Exporting can be re-attempted with "Autotools: Export Configuration to IntelliSense"', "Normal");
             logger.message('KB: ' + kbUrl.toString(true) + '#intellisense-export-fail', "Normal");
         } else if (retc == 2) { /* Makefile is broken */
             if (triggeredBy == TriggeredBy.cleanConfigure) {
@@ -766,7 +766,7 @@ export async function configure(parentSpan: Span, triggeredBy: TriggeredBy, fc: 
 
 
 /**
- * Loads into Intellisense a previously calculated configuration.
+ * Loads into IntelliSense a previously calculated configuration.
  * This function should not be called if there is no cache to load.
  * @param cacheFile - the filename including path of the cache in json format
  */
@@ -948,10 +948,11 @@ const noTRS : TestResult = { global: TRS.NONE, results: new Map<number, TRS>() }
  * @param c Current build configuration.
  * @returns a {@linkcode make.TRS TRS enum value}
  */
-export function readTRS(b: BuildTarget, fc: FolderConfig) : TestResult
+export function readTRS(builddir: string, goal: string, fc: FolderConfig) : TestResult
 {
     let te = fc.testEnvironments;
-    let trs = path.join(fc.abs_top_builddir, b.builddir, path.basename(b.goal, ".log") + ".trs");
+    let logfile = path.parse(path.join(fc.abs_top_builddir, builddir, goal));
+    let trs = path.format({...logfile, base: '', ext: '.trs'});
     let testResult: TestResult = { global: TRS.NONE, results: new Map<number, TRS>() };
     try {
         const fileContent = fs.readFileSync(trs, 'utf8');
@@ -964,7 +965,7 @@ export function readTRS(b: BuildTarget, fc: FolderConfig) : TestResult
                 const result = line.split(' ', 4);
                 if (result.length >= 3) {
                     let envid = parseInt(result[2],36);
-                    if(te.some(e => e.hashCode == envid && (!e.dirs || e.dirs.includes(b.builddir))))
+                    if(te.some(e => e.hashCode == envid && (!e.dirs || e.dirs.includes(builddir))))
                         testResult.results.set(envid, TRSLookup.get(result[1]) || TRS.NONE);
                 } else if (result.length == 2 && te.length == 1) {
                     /* If test environements are not in use, use the untagged result

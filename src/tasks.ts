@@ -53,8 +53,10 @@ const testProblemMatchers : string[] = [
 ];
 const buildProblemMatchers : string[] = testProblemMatchers;
 const configureProblemMatchers : string[] = [
-    "autotools_configureac",
-    "autotools_configure",
+    "$autotools.ac",
+    "$autotools.configure",
+    "$autotools.config.status",
+    "$autotools.automake",
 ];
 
 export class AutoToolsBuildTaskProvider implements MyTaskProvider {
@@ -132,9 +134,20 @@ export class AutoToolsBuildTaskProvider implements MyTaskProvider {
         const goal = this.fc.buildTargets
             .get(definition.target.builddir || '')
             ?.get(definition.target.goal);
-        if (goal) {
-            if (goal.task instanceof Task)
-                return goal.task;
+        if (goal instanceof Goal) {
+            if (goal.task instanceof Task) {
+                let c = this.fc.buildConfig;
+                let dir = goal.make.getDir();
+                let task = new Task(definition, this.fc.folder,
+                    _task.name, "autotools",
+                    new ProcessExecution(
+                        configuration.getMakePath(),
+                        (dir ? ['-C', dir] : [])
+                        .concat(c.makeArgs || [])
+                        .concat(goal.goal!)),
+                    buildProblemMatchers);
+                return task;
+            }
         }
         if (!definition.target.builddir === undefined)
             return undefined;
@@ -183,15 +196,15 @@ export class AutoToolsTestTaskProvider implements MyTaskProvider {
                             if(!d.goal)
                                 throw new Error("Invalid test.depends");
                             let dgoal : string = d.goal;
-                            let test = new BuildTarget(dir, dgoal);
-                            const kind: TestTask = {
-                                type: this.myType,
-                                folderIndex: this.fc.folder.index,
-                                test: test
-                            };
                             var newMap : Map<TestEnvironment, vscode.Task> = new Map();
                             d.task = newMap;
                             envs.forEach((env) => {
+                                let test = new TestTarget(dir, dgoal, env.name);
+                                const kind: TestTask = {
+                                    type: this.myType,
+                                    folderIndex: this.fc.folder.index,
+                                    test: test
+                                };
                                 var newTask = new Task(kind, this.fc.folder,
                                     "Run test \'" + dgoal + "\' " + ((dir ? ('in ' + dir) : 'at the top') + (' @ ' + env.name)),
                                 "autotools",
@@ -214,7 +227,7 @@ export class AutoToolsTestTaskProvider implements MyTaskProvider {
                             });
 
                             /* Read existing TRS file to show correct last known status in the outline */
-                            d.trs = readTRS(test, this.fc);
+                            d.trs = readTRS(dir, dgoal, this.fc);
                             //let current : TRS = d.trs.results.get(cte.hashCode) ?? TRS.NONE;
                             let results : number[] = emptyRunStats();
                             d.trs.results.forEach(v => results[v]++);
@@ -243,17 +256,36 @@ export class AutoToolsTestTaskProvider implements MyTaskProvider {
         if (!definition || !definition.test || !definition.test.goal)
             return undefined;
         const goal = this.fc.buildTargets
-            .get(definition.test.builddir || '')
+            .get(definition.test.dir || '')
             ?.get(definition.test.goal);
         if (goal) {
             if (goal.task instanceof Map) {
-                let env = definition.env ?
-                    this.fc.getTestEnvironment(definition.env) :
+                let env = definition.test.env ?
+                    this.fc.getTestEnvironment(definition.test.env) :
                     this.fc.currentTestEnvironment;
-                return goal.task.get(env);
+                let dir = goal.make.getDir();
+                let c = this.fc.buildConfig;
+                let e = this.fc.testEnvironments;
+                let envs = FilterEnvsByDir(e, dir);
+                let ME_KEEP_ENV = KeepList(envs);
+                let task = new Task(definition, this.fc.folder,
+                    _task.name, "autotools",
+                    new ProcessExecution(
+                        configuration.getMakePath(),
+                        (dir ? ['-C', dir] : [])
+                        .concat(c.makeArgs || [])
+                        .concat(["-Res",
+                            "me-check",
+                            `ME_KEEP_ENV=${ME_KEEP_ENV}`,
+                            "--eval=include Mergesium.rules",
+                            "TEST_LOGS=" + test.goal
+                        ]), env.testExecOptions),
+                    testProblemMatchers);
+
+                return task;
             }
         }
-        if (!definition.test.builddir === undefined)
+        if (!definition.test.dir === undefined)
             return undefined;
         else
             return undefined;
@@ -280,11 +312,6 @@ export class AutoToolsCheckTaskProvider implements MyTaskProvider {
         let traceLiveTestRuns = this.fc.wsConfig.get<boolean>("traceLiveTestRuns", false);
         this.myTasks.splice(0);
         this.fc.buildTargets.forEach((goals, dir) => {
-            const kind: CheckTask = {
-                type: this.myType,
-                folderIndex: this.fc.folder.index,
-                builddir: dir
-            };
             if (!env.dirs || env.dirs.includes(dir))
             for (let g of goals.values()) {
                 if (g.flags & (Goal.Flags.Test_Suite)) {
@@ -296,6 +323,12 @@ export class AutoToolsCheckTaskProvider implements MyTaskProvider {
                 let ME_KEEP_ENV = KeepList(envs);
 
                 envs.forEach((env) => {
+                    const kind: CheckTask = {
+                        type: this.myType,
+                        folderIndex: this.fc.folder.index,
+                        dir: dir,
+                        env: env.name,
+                    };
                     var newTask = new Task(kind, this.fc.folder, 'Run test suite ' + (dir ? ('in ' + dir) : 'at the top') + (' @ ' + env.name),
                         "autotools",
                     new ProcessExecution(
@@ -336,7 +369,8 @@ export class AutoToolsCheckTaskProvider implements MyTaskProvider {
         let checkAllTaskDef : CheckTask = {
             type: this.myType,
             folderIndex: this.fc.folder.index,
-            builddir: ''
+            env: '',
+            dir: ''
         };
         this.checkAllTask = new Task(checkAllTaskDef, this.fc.folder, 'Run user test suite (make check)',
             "autotools",
@@ -366,17 +400,36 @@ export class AutoToolsCheckTaskProvider implements MyTaskProvider {
 
         // resolveTask requires that the same definition object be used.
         const definition: CheckTask = <any>_task.definition;
-        if (!definition || definition.builddir === undefined)
+        if (!definition || definition.dir === undefined)
             return undefined;
         const goal = this.fc.buildTargets
-            .get(definition.builddir)
+            .get(definition.dir)
             ?.get("test-suite.log");
         if (goal) {
             if (goal.task instanceof Map) {
                 let env = definition.env ?
                     this.fc.getTestEnvironment(definition.env) :
                     this.fc.currentTestEnvironment;
-                return goal.task.get(env);
+                let dir = goal.make.getDir();
+                let c = this.fc.buildConfig;
+                let e = this.fc.testEnvironments;
+                let envs = FilterEnvsByDir(e, dir);
+                let ME_KEEP_ENV = KeepList(envs);
+                let traceLiveTestRuns = this.fc.wsConfig.get<boolean>("traceLiveTestRuns", false);
+                let task = new Task(definition, this.fc.folder,
+                    _task.name, "autotools",
+                    new ProcessExecution(
+                        traceLiveTestRuns ? extension.dryRunner : configuration.getMakePath(),
+                        (dir ? ['-C', dir] : [])
+                        .concat(c.makeArgs || [])
+                        .concat(traceLiveTestRuns ? ["--trace", "--silent"] : [])
+                        .concat(["-Res",
+                            "test-suite.log",
+                            `ME_KEEP_ENV=${ME_KEEP_ENV}`
+                        ]),
+                        env.updateExecOptions),
+                    testProblemMatchers);
+                return task;
             }
         }
         return undefined;
@@ -503,18 +556,17 @@ export class AutoToolsBootstrapTaskProvider implements MyTaskProvider {
             this.reautomakeTask.presentationOptions = reuseSilent;
             this.reautomakeTask.detail = localize("autotools.makefilein.update", "$(sync) Regenerate Makefile.in templates. See [Updating Makefile.inS](https://www.gnu.org/software/automake/manual/html_node/automake-Invocation.html#index-_002d_002dno_002dforce)");
 
-            var autoreconf : string = configuration.autoreconfCmd(this.fc.wsConfig).join(' ');
+            var autoreconf : string[] = configuration.autoreconfCmd(this.fc.wsConfig);
 
             this.regenTask = new Task({type: this.myType, action: 'regen', folderIndex: this.fc.folder.index},
-                    this.fc.folder, "Update Makefiles and config headers",
+                    this.fc.folder, localize("autotools.update.tooling", "Update build tooling"),
                 localize("autotools.update.task", "Configuration output"),
-                new ShellExecution(
-                    (c.top_builddir ? `${autoreconf} -v && CDPATH= cd ${c.top_builddir} && ./config.status` :
-                        `${autoreconf} -v && ./config.status`), { env: { ACLOCAL_PATH: extension.m4Path }}),
-                            configureProblemMatchers);
+                new ProcessExecution(autoreconf[0], [...autoreconf.slice(1),'-v'],
+                    { env: { ACLOCAL_PATH: extension.m4Path }}),
+                    configureProblemMatchers);
             this.regenTask.group = TaskGroup.Build;
             this.regenTask.presentationOptions = reuseSilent;
-            this.regenTask.detail = localize("autotools.update", "$(sync) Regenerate Makefiles and headers. See [Autoconf output](https://www.gnu.org/software/autoconf/manual/autoconf-2.69/html_node/Output.html)");
+            this.regenTask.detail = localize("autotools.update", "$(sync) Regenerate build tooling (configure script and Makefile templates). See [Autoconf output](https://www.gnu.org/software/autoconf/manual/autoconf-2.69/html_node/autoreconf-Invocation.html#autoreconf-Invocation)");
 
             this.recheckTask = new Task({type: this.myType, action: 'recheck', folderIndex: this.fc.folder.index},
                 this.fc.folder, "Re-check configuration",
@@ -716,11 +768,11 @@ export interface TestTask {
      * The test output log this task creates.
      */
     readonly type: string;
-    test?: BuildTarget;
+    test?: TestTarget;
     folderIndex: number;
 
     /* test environment name - if missing, use current env */
-    env?: string;
+    // env?: string;
     exitCode?: number | undefined;
 };
 
@@ -729,18 +781,18 @@ export interface CheckTask {
      * Test suite arguments (default: none, ie, run 'make check' )
      */
     readonly type: string;
-    check?: CheckTarget;
     folderIndex: number;
-    builddir: string;
+    dir: string;
     /* test environment name - if missing, use current env */
     env?: string;
+    TESTS?: string[];
+    TEST_SUITE_LOG?: string;
 
     exitCode?: number | undefined;
 };
 
-export class CheckTarget {
-    TESTS?: string[];
-    TEST_SUITE_LOG?: string;
+export class TestTarget {
+    constructor(public dir: string, public goal: string, public env?: string) {}
 }
 
 export interface AutotoolsTask {

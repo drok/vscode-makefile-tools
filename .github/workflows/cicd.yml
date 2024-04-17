@@ -46,6 +46,7 @@ jobs:
 
       - name: Install cross compilers/tools
         run: sudo apt-get install gcc-aarch64-linux-gnu
+          g++-aarch64-linux-gnu
           libc6-dev-arm64-cross
           autopoint
           libbsd-resource-perl
@@ -93,7 +94,10 @@ jobs:
       #   run: npm run lint
       - name: Bootstrap external dependencies
         run: |
+            set -o errexit
             cd vendor/gnumake && [ -f configure ] || autoreconf -fvi
+            cd -
+            cd utils/ad7proxy && [ -f configure ] || autoreconf -fvi
 
 
       - id: package-linux-x64

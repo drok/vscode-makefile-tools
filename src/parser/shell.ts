@@ -97,7 +97,7 @@ export class Tool implements ToolInvocation {
 
     filterArgsExcluding(unwanted: string[]): string[] {
         let removedOptArg : boolean = true;
-        // TODO: Avoid this song and dance with removing optargs by having Intellisense ignore the args it doesn't care about
+        // TODO: Avoid this song and dance with removing optargs by having IntelliSense ignore the args it doesn't care about
         return this.argv
             .filter(a => !unwanted.find(excluded => {
                 // Expect options with required parts have the optarg either attached to the opt
@@ -148,9 +148,18 @@ export class Tool implements ToolInvocation {
     }
 
     getArg(wanted: string): string | undefined {
-        let index = this.argv.findIndex(arg => arg == ("-" + wanted) || arg == ("--" + wanted));
-        if (index >= 0 && this.argv.length > index + 1) {
-            return this.argv[index + 1];
+        let one_dash_neq = '-' + wanted;
+        let two_dash_neq = '--' + wanted;
+        let index = this.argv.findIndex(arg => arg.startsWith(one_dash_neq) || arg.startsWith(two_dash_neq));
+        if (index >= 0) {
+            let arg = this.argv[index];
+            let eq = arg.indexOf('=');
+            if (eq >= 0) {
+                return arg.substring(eq+1);
+            } else {
+                if (this.argv.length > index + 1)
+                    return this.argv[index + 1];
+            }
         }
         return undefined;
     }

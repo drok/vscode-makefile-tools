@@ -50,6 +50,7 @@ commands:
           name: Bootstrap external dependencies
           command: |
             cd vendor/gnumake && [ -f configure ] || autoreconf -fvi
+            cd utils/ad7proxy && [ -f configure ] || autoreconf -fvi
       - run:
           name: Configure make externals
           command: |
@@ -71,9 +72,22 @@ commands:
                 --prefix=$PWD/../..
             fi
       - run:
+          name: Configure ad7proxy externals
+          command: |
+            if [[ "$OSTYPE" != "linux-gnu" ]]; then
+              yarn configure
+            else
+              mkdir -p build/ad7proxy && cd build/ad7proxy && [ -f config.status ] ||
+              ../../vendor/gnumake/configure -C \
+                --disable-dependency-tracking \
+                "CFLAGS=-g0 -O2" \
+                --prefix=$PWD/../..
+            fi
+      - run:
           name: Build Binaries
           command: |
             make -C build/make install-strip
+            make -C build/ad7proxy install-strip
       - run:
           name: Build Extension
           command: yarn production-compile

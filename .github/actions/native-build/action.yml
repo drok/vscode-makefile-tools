@@ -20,7 +20,7 @@ outputs:
 runs:
   using: "composite"
   steps:
-    - name: Configure ${{ inputs.cpu }} binaries on ${{ inputs.host }}
+    - name: Configure ${{ inputs.cpu }} make binaries on ${{ inputs.host }}
       shell: sh
       run: mkdir -p build/make/${{ inputs.cpu }} && cd build/make/${{ inputs.cpu }} && [ -f config.status ] ||
         make_cv_sys_gnu_glob=yes
@@ -38,7 +38,7 @@ runs:
         --prefix=$PWD/../../..
       if: runner.os == 'Linux'
 
-    - name: Configure ${{ inputs.cpu }} binaries on ${{ inputs.host }}
+    - name: Configure ${{ inputs.cpu }} make binaries on ${{ inputs.host }}
       shell: sh
       run: mkdir -p build/make/${{ inputs.cpu }} && cd build/make/${{ inputs.cpu }} && [ -f config.status ] ||
         ../../../vendor/gnumake/configure -C
@@ -53,30 +53,56 @@ runs:
         CFLAGS='-g -O2 -target ${{ inputs.host }}'
       if: runner.os == 'macOS'
 
-    - name: Compile and Install binaries
+    - name: Configure ${{ inputs.cpu }} ad7proxy binaries on ${{ inputs.host }}
+      shell: sh
+      run: mkdir -p build/ad7proxy/${{ inputs.cpu }} && cd build/ad7proxy/${{ inputs.cpu }} && [ -f config.status ] ||
+        ../../../utils/ad7proxy/configure -C
+        --host=${{ inputs.host }}
+        --disable-dependency-tracking
+        "CFLAGS=-g0 -O2"
+        --prefix=$PWD/../../..
+      if: runner.os == 'Linux'
+
+    - name: Configure ${{ inputs.cpu }} ad7proxy binaries on ${{ inputs.host }}
+      shell: sh
+      run: mkdir -p build/ad7proxy/${{ inputs.cpu }} && cd build/ad7proxy/${{ inputs.cpu }} && [ -f config.status ] ||
+        ../../../utils/ad7proxy/configure -C
+        --host=${{ inputs.host }}
+        --disable-dependency-tracking
+        --prefix=$PWD/../../..
+        CC=clang
+        CXXFLAGS='-g -O2 -target ${{ inputs.host }}'
+      if: runner.os == 'macOS'
+
+    - name: Compile and Install make binaries
       shell: sh
       run: make -j -C build/make/${{ inputs.cpu }} install-strip && cp vendor/automake/lib/test-driver bin
 
-    - name: Check make binary architecture
+    - name: Compile and Install ad7proxy binaries
+      shell: sh
+      run: make -j -C build/ad7proxy/${{ inputs.cpu }} install-strip
+
+    - name: Check binaries architecture
       shell: bash
       run: |
         set -x
         set -o errexit
-        file build/make/${{ inputs.cpu }}/make
-        sig=$(file -b build/make/${{ inputs.cpu }}/make)
         target=${{ inputs.platform }}-${{ inputs.cpu }}
-        case $target in
-          linux-x64)   [[ "$sig" =~ ^"ELF 64-bit LSB shared object, x86-64" ]]
-            ;;
-          linux-arm64) [[ "$sig" =~ ^"ELF 64-bit LSB shared object, ARM aarch64" ]]
-            ;;
-          darwin-x64)  [[ "$sig" == "Mach-O 64-bit executable x86_64" ]]
-            ;;
-          darwin-arm64)[[ "$sig" == "Mach-O 64-bit executable arm64" ]]
-            ;;
-          *) echo >&2 "signature for $target should be set"
-            ;;
-        esac
+        for bin in make ad7proxy ; do
+          sig=$(file -b bin/$bin)
+          case $target in
+            linux-x64)   [[ "$sig" =~ ^"ELF 64-bit LSB shared object, x86-64" ]]
+              ;;
+            linux-arm64) [[ "$sig" =~ ^"ELF 64-bit LSB shared object, ARM aarch64" ]]
+              ;;
+            darwin-x64)  [[ "$sig" == "Mach-O 64-bit executable x86_64" ]]
+              ;;
+            darwin-arm64)[[ "$sig" == "Mach-O 64-bit executable arm64" ]]
+              ;;
+            *) echo >&2 "$bin signature for $target should be set"
+              ;;
+          esac
+        done
 
     - name: Check make symbols
       shell: sh

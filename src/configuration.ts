@@ -488,7 +488,7 @@ export class FolderConfig implements vscode.Disposable {
     // apply to the current makefile configuration.
     // private initialConfigurationAttempted : boolean = false;
 
-    public async analyzeConfigureParams(parentSpan: Span, reload: boolean, failIfUnconfigured : boolean): Promise<boolean> {
+    public async analyzeConfigureParams(parentSpan: Span, reload: boolean, failIfUnconfigured : boolean, doReconfigure: boolean): Promise<boolean> {
         let result : string;
         let hasMakefile : boolean = false;
         let span = telemetry.startSpan("an", parentSpan);
@@ -497,7 +497,7 @@ export class FolderConfig implements vscode.Disposable {
 
         let isAutotools = this.isAutotoolsProject;
         let bootstrapped = isAutotools && this.isBootstrapped;
-        let configured = bootstrapped && this.isConfigured;
+        let configured = bootstrapped && !doReconfigure && this.isConfigured;
         // If initially not configured, an attempt is made to bootstrap and configure.
         // This flag avoids the normal make.configure() call at the end of activate()
         // proj is configured already at activation
@@ -705,19 +705,17 @@ export class FolderConfig implements vscode.Disposable {
             (typeof e.exitCode == 'number') ? e.exitCode : (e.exitCode ? 1 : 0));
         if (!e.exitCode) {
             if (definition?.action == "bootstrap") {
-                let r = await this.analyzeConfigureParams(span, false, false) &&
+                let r = await this.analyzeConfigureParams(span, false, false, true) &&
                     !await make.configure(span, make.TriggeredBy.configureAfterConfigurationChange, this);
                 if (r) this.testController?.onSavedAll();
             } else if (definition?.action == "reautomake") {
-                if (!e.exitCode) {
-                    this.autotoolsTask.recheck(telemetry.startSpan('recheck', span));
-                }
+                this.autotoolsTask.recheck(telemetry.startSpan('recheck', span));
             } else if (definition?.action == "regen") {
-                if (!e.exitCode) {
-                    this.configure(telemetry.startSpan('config+', span));
-                }
+                let r = await this.analyzeConfigureParams(span, false, false, true) &&
+                    !await make.configure(span, make.TriggeredBy.configureAfterConfigurationChange, this);
+                if (r) this.testController?.onSavedAll();
             } else if (definition?.action == "recheck" || definition?.action == "configure") {
-                let r = await this.analyzeConfigureParams(span, false, true) &&
+                let r = await this.analyzeConfigureParams(span, false, true, false) &&
                     !await make.configure(span, make.TriggeredBy.configureAfterConfigurationChange, this);
                 if (r) this.testController?.onSavedAll();
             }
@@ -820,7 +818,7 @@ export class FolderConfig implements vscode.Disposable {
         if (this.isAutotoolsProject) {
             extension._projectOutlineProvider.updateTargets(this, false);
             extension._projectTestSuitesProvider.updateTargets(this, false);
-            await this.analyzeConfigureParams(span, false, false);
+            await this.analyzeConfigureParams(span, false, false, false);
             this.outputLogHeader();
             this.bootstrapWithPrompt(span);
         }
@@ -946,7 +944,7 @@ export class FolderConfig implements vscode.Disposable {
     }
     private targetDisposables : vscode.Disposable[] = [];
 
-    /* Intellisense Data */
+    /* IntelliSense Data */
     private readonly _cppConfigurationProvider : CppConfigurationProvider;
     public get cppConfigurationProvider() : CppConfigurationProvider { return this._cppConfigurationProvider; }
 
@@ -1331,24 +1329,24 @@ function nullTestEnvironment() : TestEnvironment {
             hashCode: envHash('')}
 }
 
-export let currentGoals : Goal[] | undefined;
+export let currentGoals : Set<Goal> | undefined;
 export let currentGoalsBins : Goal[] | undefined;
 export let currentGoalsTests : Goal[] | undefined;
 export function setCurrentGoalBins(goals: Goal[] | undefined) {
     currentGoalsBins = goals;
     currentGoals =
         currentGoalsBins == undefined && currentGoalsTests == undefined ?
-        undefined : [...currentGoalsBins??[], ...currentGoalsTests??[]];
+        undefined : new Set([...currentGoalsBins??[], ...currentGoalsTests??[]]);
     vscode.commands.executeCommand('setContext', "autotools:filterByTarget",
-        (currentGoals && (currentGoals.length != 0)));
+        (currentGoals && currentGoals.size));
 }
 export function setCurrentGoalTests(goals: Goal[] | undefined) {
     currentGoalsTests = goals;
     currentGoals =
     currentGoalsBins == undefined && currentGoalsTests == undefined ?
-        undefined : [...currentGoalsBins??[], ...currentGoalsTests??[]];
+        undefined : new Set([...currentGoalsBins??[], ...currentGoalsTests??[]]);
     vscode.commands.executeCommand('setContext', "autotools:filterByTarget",
-        (currentGoals && (currentGoals.length != 0)));
+        (currentGoals && currentGoals.size));
 }
 
 
@@ -1500,7 +1498,7 @@ export async function initFromSettings(activation: boolean = false, span: Span):
                     fc.resyncTasks();
                 }
             } else {
-                if (needConfigure || await fc.analyzeConfigureParams(span, true, false)) {
+                if (needConfigure || await fc.analyzeConfigureParams(span, true, false, true)) {
                     await make.configure(span, make.TriggeredBy.configureAfterConfigurationChange, fc);
                 }
             }
