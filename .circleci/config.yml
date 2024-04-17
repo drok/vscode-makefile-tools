@@ -48,9 +48,10 @@ commands:
           command: yarn run translations-generate
       - run:
           name: Bootstrap external dependencies
-          command: yarn bootstrap
+          command: |
+            cd vendor/gnumake && [ -f configure ] || autoreconf -fvi
       - run:
-          name: Configure externals
+          name: Configure make externals
           command: |
             if [[ "$OSTYPE" != "linux-gnu" ]]; then
               yarn configure
@@ -64,18 +65,21 @@ commands:
                 --with-guile=no \
                 --disable-job-server \
                 --disable-load \
-                'INSTALL_PROGRAM=install -cs' \
                 "CFLAGS=-g0 -O2 -include $PWD/../../vendor/gnumake-include.h" \
                 LDFLAGS=-lrt \
                 --disable-nls \
                 --prefix=$PWD/../..
             fi
       - run:
+          name: Build Binaries
+          command: |
+            make -C build/make install-strip
+      - run:
           name: Build Extension
           command: yarn production-compile
       - run:
           name: Check make symbols
-          command: objdump -T build/make/make
+          command: objdump -T bin/make
       - run:
           name: Package Extension
           command: |
