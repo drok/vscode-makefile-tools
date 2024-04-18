@@ -20,6 +20,14 @@ outputs:
 runs:
   using: "composite"
   steps:
+    - name: Check release expiry is set
+      shell: sh
+      run: |
+        if grep -qrw 2024-xx-xx *.md *.json src ; then
+          echo "Expiry date is not set"
+          exit 1
+        fi
+
     - name: Configure ${{ inputs.cpu }} make binaries on ${{ inputs.host }}
       shell: sh
       run: mkdir -p build/make/${{ inputs.cpu }} && cd build/make/${{ inputs.cpu }} && [ -f config.status ] ||
