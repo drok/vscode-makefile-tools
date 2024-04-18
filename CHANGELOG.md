@@ -1,5 +1,11 @@
 # What's New?
 
+## Autotools Integration 0.3.1 - hotfix
+
+  - Fix expiration date in README (was 2024-xx-xx, now 2024-05-15)
+
+  Errata discovered after release will be posted [here](https://github.com/Mergesium/autotools/releases/tag/0.3.1).
+
 ## Autotools Integration 0.3.0
 
   - Fix configuration regen after configure.ac update

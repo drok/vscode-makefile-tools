@@ -1,6 +1,6 @@
 # VS Code Autotools Integration
 
-**IMPORTANT**: This pre-release expires **`2024-xx-xx`** - update or switch to a non-expiring, general release before then.
+**IMPORTANT**: This pre-release expires **`2024-05-15`** - update or switch to a non-expiring, general release before then.
 
 This extension enables VS Code to interact with projects using the GNU Autotools build system:
  * Manage multiple [build configurations](#build-configuration) per source-tree (out-of-tree builds)
