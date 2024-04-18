@@ -142,14 +142,14 @@ runs:
           unzip -l packaged/$PACKAGE_STRING-$TARGET.vsix
 
     - name: Upload Extension Package as Artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: ${{ inputs.platform }}-${{ inputs.cpu }}
         path: ${{ steps.packageExtension.outputs.vsixPath }}
         if-no-files-found: error
 
     - name: Build failure logs
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       if: ${{ failure() }}
       with:
         name: build-log

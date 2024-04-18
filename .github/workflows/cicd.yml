@@ -180,7 +180,7 @@ jobs:
       #   run: npm ci
       - name: Download Build Artifact
         id: download
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
       - name: 'Echo download path'
         run:
           echo downloaded... ${{steps.download.outputs.download-path}}
