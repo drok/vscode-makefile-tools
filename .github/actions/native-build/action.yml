@@ -130,7 +130,8 @@ runs:
           npm run package
           PACKAGE_STRING=$(jq -r '"\(.name)-\(.version)"' package.json)-pre
           find packaged
-          echo "vsixPath=packaged/$(echo $PACKAGE_STRING-$TARGET.vsix)" > "$GITHUB_OUTPUT"
+          echo "vsixPath=packaged/$PACKAGE_STRING-$TARGET.vsix" > "$GITHUB_OUTPUT"
+          unzip -l packaged/$PACKAGE_STRING-$TARGET.vsix
 
     - name: Upload Extension Package as Artifact
       uses: actions/upload-artifact@v3
