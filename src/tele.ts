@@ -7,7 +7,8 @@ import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http'
 import { SemanticResourceAttributes } from '@opentelemetry/semantic-conventions'
 import { SpanProcessor, TraceIdRatioBasedSampler, ReadableSpan } from '@opentelemetry/sdk-trace-base';
 import { AsyncHooksContextManager } from '@opentelemetry/context-async-hooks';
-import { Resource } from '@opentelemetry/resources'
+import { emptyResource } from '@opentelemetry/resources';
+import { ExportResultCode } from '@opentelemetry/core';
 import { TraceState } from '@opentelemetry/api'
 import { env } from 'vscode';
 import { getSettingOr } from './util';
@@ -40,7 +41,7 @@ export class MyTelemetry implements Disposable {
                 // url: 'http://192.168.20.152:4318/v1/traces',
                 url: 'https://log.mergesium.com/v1/traces',
              });
-        const resource = Resource.empty();
+        const resource = emptyResource();
         resource.attributes[SemanticResourceAttributes.SERVICE_NAME] = extensionContext.extension.packageJSON.name;
         resource.attributes[SemanticResourceAttributes.SERVICE_VERSION] = extensionContext.extension.packageJSON.version;
         resource.attributes['buildinfo'] = `${buildinfo.platform}-${buildinfo.arch}`;
@@ -195,15 +196,17 @@ class TailSamplingProcessor implements SpanProcessor {
     if ((span.status.code == SpanStatusCode.ERROR && this.errorSampler.shouldSample(span.spanContext(), span.spanContext().traceId).decision == api.SamplingDecision.RECORD_AND_SAMPLED)||
         (traceState instanceof Wanted && traceState.get("unusual") && this.unusualSampler.shouldSample(span.spanContext(), span.spanContext().traceId).decision == api.SamplingDecision.RECORD_AND_SAMPLED) ||
         this.sampler.shouldSample(span.spanContext(), span.spanContext().traceId).decision == api.SamplingDecision.RECORD_AND_SAMPLED) {
-            this.delegate.send([span], () => {
-                // Success callback
-                 // console.log('Export successful');
-                }, (error: any) => {
-                // Error callback
-                // console.error('Export error:', error);
-
+            this.delegate.export([span], (result) => {
+                if (result.code === ExportResultCode.SUCCESS) {
+                    // Success callback logic goes here
+                    // console.log('Export successful');
+                } else {
+                    // Error callback logic goes here
+                    const error = result.error || new Error('Unknown export failure');
+                    // console.error('Export error:', error);
+                }
             });
-    }
+                }
   }
 
   shutdown(): Promise<void> {

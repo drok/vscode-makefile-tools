@@ -592,6 +592,21 @@
             "preLaunchTask": "compile",
         },
         {
+            "name": "Debug on git-debug",
+            "type": "extensionHost",
+            "request": "launch",
+            "runtimeExecutable": "${execPath}",
+            "args": [
+                "--extensionDevelopmentPath=${workspaceFolder}",
+                "/home/radu/proj/git-debug"
+            ],
+            "sourceMaps": true,
+            "outFiles": [
+                "${workspaceFolder}/out/**/*.js"
+            ],
+            "preLaunchTask": "compile",
+        },
+        {
             "name": "Debug on 2-dir workspace",
             "type": "extensionHost",
             "request": "launch",

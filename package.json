@@ -14,7 +14,9 @@
     "engines": {
         "vscode": "^1.74.0"
     },
-    "extensionKind": ["workspace"],
+    "extensionKind": [
+        "workspace"
+    ],
     "bugs": {
         "url": "https://github.com/Mergesium/autotools/issues",
         "email": "autotools-support@Mergesium.com"
@@ -66,18 +68,15 @@
                 "command": "autotools.outline.bootstrap",
                 "title": "%autotools.command.outline.bootstrap.title%"
             },
-
             {
                 "command": "autotools.buildAll",
                 "icon": "$(combine)",
                 "title": "%autotools.command.makefile.buildAll.title%"
-
             },
             {
                 "command": "autotools.outline.buildAll",
                 "icon": "$(combine)",
                 "title": "%autotools.buildAll.title%"
-
             },
             {
                 "command": "autotools.checkAll",
@@ -163,7 +162,6 @@
                 "command": "autotools.visit.knowledgeBase",
                 "icon": "$(comment)",
                 "title": "%autotools.command.visit.knowledgeBase.title%"
-
             },
             {
                 "command": "autotools.C_Cpp.ConfigurationProviderSelect",
@@ -173,13 +171,11 @@
                 "command": "autotools.visit.packageURL",
                 "icon": "$(comment)",
                 "title": "%autotools.command.visit.packageURL.title%"
-
             },
             {
                 "command": "autotools.visit.packageBugs",
                 "icon": "$(comment)",
                 "title": "%autotools.command.visit.packageBugs.title%"
-
             },
             {
                 "command": "autotools.gotoBuildDirectory",
@@ -244,13 +240,15 @@
             {
                 "id": "m4",
                 "aliases": [
-                    "Autoconf M4", "m4"
+                    "Autoconf M4",
+                    "m4"
                 ],
                 "extensions": [
                     ".ac"
                 ],
                 "filenames": [
-                    "configure.ac", "configure.in"
+                    "configure.ac",
+                    "configure.in"
                 ],
                 "icon": {
                     "dark": "res/icon/A-dark.svg",
@@ -277,7 +275,7 @@
                 "label": "configure script errors",
                 "source": "autotools",
                 "owner": "external",
-                "fileLocation":[
+                "fileLocation": [
                     "relative",
                     "${workspaceFolder}"
                 ],
@@ -294,7 +292,7 @@
                 "label": "configure.ac errors",
                 "source": "autotools",
                 "owner": "external",
-                "fileLocation":[
+                "fileLocation": [
                     "relative",
                     "${workspaceFolder}"
                 ],
@@ -312,25 +310,26 @@
                 "label": "config.status script errors",
                 "source": "autotools",
                 "owner": "external",
-                "fileLocation":[
+                "fileLocation": [
                     "absolute"
                 ],
                 "severity": "error",
-                "pattern": [{
-                    "regexp": "^(.*/configure): line (\\d+): (.*)$",
-                    "kind": "location",
-
-                    "file": 1,
-                    "line": 2,
-                    "message": 3
-                }]
+                "pattern": [
+                    {
+                        "regexp": "^(.*/configure): line (\\d+): (.*)$",
+                        "kind": "location",
+                        "file": 1,
+                        "line": 2,
+                        "message": 3
+                    }
+                ]
             },
             {
                 "name": "autotools.automake",
                 "label": "automake errors",
                 "source": "autotools",
                 "owner": "external",
-                "fileLocation":[
+                "fileLocation": [
                     "relative",
                     "${workspaceFolder}"
                 ],
@@ -338,7 +337,6 @@
                 "pattern": {
                     "regexp": "^(automake): error: (.*)$",
                     "kind": "file",
-
                     "file": 1,
                     "message": 2
                 }
@@ -348,32 +346,32 @@
                 "source": "GCC",
                 "owner": "autotools",
                 "fileLocation": [
-                        "autoDetect",
-                        "${workspaceFolder}"
+                    "autoDetect",
+                    "${workspaceFolder}"
                 ],
                 "pattern": {
-                        "regexp": "^(.*?):(\\d+):(\\d*):?\\s+(?:fatal\\s+)?(warning|error):\\s+(.*)(?:\\[(.*)\\])\\s*$",
-                        "file": 1,
-                        "line": 2,
-                        "column": 3,
-                        "severity": 4,
-                        "message": 5,
-                        "code": 6
-                      }
+                    "regexp": "^(.*?):(\\d+):(\\d*):?\\s+(?:fatal\\s+)?(warning|error):\\s+(.*)(?:\\[(.*)\\])\\s*$",
+                    "file": 1,
+                    "line": 2,
+                    "column": 3,
+                    "severity": 4,
+                    "message": 5,
+                    "code": 6
+                }
             },
             {
                 "name": "autotools.ld",
                 "source": "LD linker",
                 "owner": "autotools",
                 "fileLocation": [
-                        "autoDetect",
-                        "${workspaceFolder}"
+                    "autoDetect",
+                    "${workspaceFolder}"
                 ],
                 "pattern": {
-                        "regexp": "^(.*?):(\\d+):\\s+(undefined reference.*)$",
-                        "file": 1,
-                        "line": 2,
-                        "message": 3
+                    "regexp": "^(.*?):(\\d+):\\s+(undefined reference.*)$",
+                    "file": 1,
+                    "line": 2,
+                    "message": 3
                 }
             },
             {
@@ -381,15 +379,15 @@
                 "source": "GNU Make",
                 "owner": "autotools",
                 "fileLocation": [
-                        "relative",
-                        "${command:autotools.locateMakefile}"
+                    "relative",
+                    "${command:autotools.locateMakefile}"
                 ],
                 "base": "$autotools.ld",
                 "pattern": {
-                        "regexp": "^(Makefile.*?):(\\d+):\\s+(.*)$",
-                        "file": 1,
-                        "line": 2,
-                        "message": 3
+                    "regexp": "^(Makefile.*?):(\\d+):\\s+(.*)$",
+                    "file": 1,
+                    "line": 2,
+                    "message": 3
                 }
             },
             {
@@ -397,315 +395,341 @@
                 "source": "Tooling",
                 "owner": "autotools",
                 "fileLocation": [
-                        "autoDetect",
-                        "${workspaceFolder}"
+                    "autoDetect",
+                    "${workspaceFolder}"
                 ],
                 "base": "$autotools.ld",
                 "pattern": {
-                        "regexp": "^(.*?):(\\d+):\\s+(.*)$",
-                        "file": 1,
-                        "line": 2,
-                        "message": 3
+                    "regexp": "^(.*?):(\\d+):\\s+(.*)$",
+                    "file": 1,
+                    "line": 2,
+                    "message": 3
                 }
             }
-
-          ],
+        ],
         "configuration": [
-        {
-            "title": "Preferences",
-            "order": 1,
-            "properties": {
-
-                "autotools.loggingLevel": {
-                    "order": 1,
-                    "type": "string",
-                    "enum": [
-                        "Normal",
-                        "Verbose",
-                        "Debug"
-                    ],
-                    "default": "Normal",
-                    "description": "%autotools.configuration.makefile.loggingLevel.description%",
-                    "scope": "resource"
-                },
-                "autotools.autoBootstrap": {
-                    "order": 2,
-                    "type": "boolean",
-                    "markdownDescription": "%autotools.configuration.autoBootstrap.markdownDescription%",
-                    "default": true,
-                    "scope": "resource"
-                },
-                "autotools.traceLiveTestRuns": {
-                    "order": 3,
-                    "scope": "resource",
-                    "type": "boolean",
-                    "markdownDescription": "%autotools.configuration.traceLiveTestRuns.markdownDescription%",
-                    "default": false
-                },
-                "autotools.stopAtEntry": {
-                    "order": 2,
-                    "type": "boolean",
-                    "scope": "resource",
-                    "markdownDescription": "%autotools.configuration.stopAtEntry.markdownDescription%",
-                    "default": true
-                },
-                "autotools.promptClean": {
-                    "order": 2,
-                    "scope": "resource",
-                    "type": "boolean",
-                    "markdownDescription": "%autotools.configuration.promptClean.description%",
-                    "default": true
-                },
-                "autotools.telemetry": {
-                    "order": 4,
-                    "scope": "resource",
-                    "type": "boolean",
-                    "default": true,
-                    "markdownDescription": "%autotools.configuration.telemetry.markdownDescription%"
+            {
+                "title": "Preferences",
+                "order": 1,
+                "properties": {
+                    "autotools.loggingLevel": {
+                        "order": 1,
+                        "type": "string",
+                        "enum": [
+                            "Normal",
+                            "Verbose",
+                            "Debug"
+                        ],
+                        "default": "Normal",
+                        "description": "%autotools.configuration.makefile.loggingLevel.description%",
+                        "scope": "resource"
+                    },
+                    "autotools.autoBootstrap": {
+                        "order": 2,
+                        "type": "boolean",
+                        "markdownDescription": "%autotools.configuration.autoBootstrap.markdownDescription%",
+                        "default": true,
+                        "scope": "resource"
+                    },
+                    "autotools.traceLiveTestRuns": {
+                        "order": 3,
+                        "scope": "resource",
+                        "type": "boolean",
+                        "markdownDescription": "%autotools.configuration.traceLiveTestRuns.markdownDescription%",
+                        "default": false
+                    },
+                    "autotools.stopAtEntry": {
+                        "order": 2,
+                        "type": "boolean",
+                        "scope": "resource",
+                        "markdownDescription": "%autotools.configuration.stopAtEntry.markdownDescription%",
+                        "default": true
+                    },
+                    "autotools.promptClean": {
+                        "order": 2,
+                        "scope": "resource",
+                        "type": "boolean",
+                        "markdownDescription": "%autotools.configuration.promptClean.description%",
+                        "default": true
+                    },
+                    "autotools.telemetry": {
+                        "order": 4,
+                        "scope": "resource",
+                        "type": "boolean",
+                        "default": true,
+                        "markdownDescription": "%autotools.configuration.telemetry.markdownDescription%"
+                    }
                 }
-            }
-        },
-        {   "title": "Building Options (users)",
-            "order": 2,
-            "properties": {
-                "autotools.no-warn-local-rules": {
-                    "order": 2,
-                    "scope": "resource",
-                    "type": "boolean",
-                    "markdownDescription": "%autotools.configuration.no-warn-local-rules.description%",
-                    "default": false
-                },
-                "autotools.configurations": {
-                    "scope": "resource",
-                    "order": 1,
-                    "type": "array",
-                    "default": [],
-                    "description": "%autotools.configuration.makefile.configurations.description%",
-                    "items": {
-                        "type": "object",
-                        "required": ["name", "top_builddir"],
-                        "title": "%autotools.configurations.title%",
-                        "default":
-                            {
+            },
+            {
+                "title": "Building Options (users)",
+                "order": 2,
+                "properties": {
+                    "autotools.no-warn-local-rules": {
+                        "order": 2,
+                        "scope": "resource",
+                        "type": "boolean",
+                        "markdownDescription": "%autotools.configuration.no-warn-local-rules.description%",
+                        "default": false
+                    },
+                    "autotools.configurations": {
+                        "scope": "resource",
+                        "order": 1,
+                        "type": "array",
+                        "default": [],
+                        "description": "%autotools.configuration.makefile.configurations.description%",
+                        "items": {
+                            "type": "object",
+                            "required": [
+                                "name",
+                                "top_builddir"
+                            ],
+                            "title": "%autotools.configurations.title%",
+                            "default": {
                                 "name": "Default",
                                 "top_builddir": "build/Default",
                                 "configureArgs": [
                                     "--enable-option-checking"
                                 ]
                             },
-                        "$comment": "--enable-option-checking is to avoid silent ignoring arg mistakes. See  https://www.gnu.org/software/autoconf/manual/autoconf-2.67/html_node/Option-Checking.html",
-                        "examples": [
-                            {
-                                "name": "Defaults - in-tree",
-                                "top_builddir": "",
-                                "configureArgs": [
-                                    "--enable-option-checking"
-                                ]
-                            },
-                            {
-                                "name": "Debug",
-                                "top_builddir": "build/Debug",
-                                "configureArgs": [
-                                    "--enable-option-checking",
-                                    "CFLAGS=-ggdb3 -O0",
-                                    "CXXFLAGS=-ggdb3 -O0"
-                                ]
-                            },
-                            {
-                                "name": "Lunar Config - Debug",
-                                "top_builddir": "build/Lunar-Debug",
-                                "configureArgs": [
-                                    "--enable-option-checking",
-                                    "--enable-option1",
-                                    "--with-option2=something",
-                                    "CFLAGS=-ggdb3 -O0 -Wall -Werror -pg -fprofile-arcs --coverage -ftest-coverage -fstack-protector-strong"
-                                ]
-                            }
-                        ],
-                        "properties": {
-                            "name": {
-                                "type": "string",
-                                "description": "%autotools.configuration.makefile.configurations.name.description%"
-                            },
-                            "top_builddir": {
-                              "type": "string",
-                              "title": "%autotools.configurations.top_builddir.title%",
-                              "markdownDescription": "%autotools.configurations.top_builddir.markdownDescription%"
-                            },
-                            "configureArgs": {
-                                "type": "array",
-                                "markdownDescription": "%autotools.configurations.configureArgs.markdownDescription%",
-                                "title": "%autotools.configurations.configureArgs.title%",
-                                "examples": [
-                                    ["--prefix=$HOME/bin"],
-                                    ["--enable-debug"],
-                                    ["--with-package=something"],
-                                    ["CXX=g++-13"],
-                                    ["CC=gcc-13"],
-                                    ["RANLIB=gcc-ranlib-13"]
-                                ]
-                            },
-                            "makeArgs": {
-                                "type": "array",
-                                "markdownDescription": "%autotools.configurations.makeArgs.markdownDescription%",
-                                "items": {
-                                    "type": "string"
+                            "$comment": "--enable-option-checking is to avoid silent ignoring arg mistakes. See  https://www.gnu.org/software/autoconf/manual/autoconf-2.67/html_node/Option-Checking.html",
+                            "examples": [
+                                {
+                                    "name": "Defaults - in-tree",
+                                    "top_builddir": "",
+                                    "configureArgs": [
+                                        "--enable-option-checking"
+                                    ]
                                 },
-                                "default": []
+                                {
+                                    "name": "Debug",
+                                    "top_builddir": "build/Debug",
+                                    "configureArgs": [
+                                        "--enable-option-checking",
+                                        "CFLAGS=-ggdb3 -O0",
+                                        "CXXFLAGS=-ggdb3 -O0"
+                                    ]
+                                },
+                                {
+                                    "name": "Lunar Config - Debug",
+                                    "top_builddir": "build/Lunar-Debug",
+                                    "configureArgs": [
+                                        "--enable-option-checking",
+                                        "--enable-option1",
+                                        "--with-option2=something",
+                                        "CFLAGS=-ggdb3 -O0 -Wall -Werror -pg -fprofile-arcs --coverage -ftest-coverage -fstack-protector-strong"
+                                    ]
+                                }
+                            ],
+                            "properties": {
+                                "name": {
+                                    "type": "string",
+                                    "description": "%autotools.configuration.makefile.configurations.name.description%"
+                                },
+                                "top_builddir": {
+                                    "type": "string",
+                                    "title": "%autotools.configurations.top_builddir.title%",
+                                    "markdownDescription": "%autotools.configurations.top_builddir.markdownDescription%"
+                                },
+                                "configureArgs": {
+                                    "type": "array",
+                                    "markdownDescription": "%autotools.configurations.configureArgs.markdownDescription%",
+                                    "title": "%autotools.configurations.configureArgs.title%",
+                                    "examples": [
+                                        [
+                                            "--prefix=$HOME/bin"
+                                        ],
+                                        [
+                                            "--enable-debug"
+                                        ],
+                                        [
+                                            "--with-package=something"
+                                        ],
+                                        [
+                                            "CXX=g++-13"
+                                        ],
+                                        [
+                                            "CC=gcc-13"
+                                        ],
+                                        [
+                                            "RANLIB=gcc-ranlib-13"
+                                        ]
+                                    ]
+                                },
+                                "makeArgs": {
+                                    "type": "array",
+                                    "markdownDescription": "%autotools.configurations.makeArgs.markdownDescription%",
+                                    "items": {
+                                        "type": "string"
+                                    },
+                                    "default": []
+                                }
                             }
                         }
                     }
                 }
-            }
-        },
-        {   "title": "Advanced options (maintainers)",
-            "order": 4,
-            "properties": {
-                "autotools.keepDryRuns": {
-                    "order": 4,
-                    "scope": "resource",
-                    "type": "boolean",
-                    "markdownDescription": "%autotools.configuration.makefile.keepDryRuns.markdownDescription%",
-                    "default": false
-                },
-                "autotools.keepConfigurationCache": {
-                    "order": 4,
-                    "scope": "resource",
-                    "type": "boolean",
-                    "markdownDescription": "%autotools.configuration.makefile.keepConfigurationCache.markdownDescription%",
-                    "default": false
-                },
-                "autotools.autoreconfWarnCross": {
-                    "order": 2,
-                    "scope": "resource",
-                    "type": "boolean",
-                    "default": false,
-                    "markdownDescription": "%autotools.configuration.autoreconfWarnCross.markdownDescription%"
-                },
-                "autotools.autoreconfWarnPortability": {
-                    "order": 2,
-                    "scope": "resource",
-                    "type": "boolean",
-                    "default": false,
-                    "markdownDescription": "%autotools.configuration.autoreconfWarnPortability.markdownDescription%"
-                },
-                "autotools.autoreconfWarnObsolete": {
-                    "order": 2,
-                    "scope": "resource",
-                    "type": "boolean",
-                    "default": false,
-                    "markdownDescription": "%autotools.configuration.autoreconfWarnObsolete.markdownDescription%"
-                },
-                "autotools.autoreconfWarnOverride": {
-                    "order": 2,
-                    "scope": "resource",
-                    "type": "boolean",
-                    "default": false,
-                    "markdownDescription": "%autotools.configuration.autoreconfWarnOverride.markdownDescription%"
-                },
-                "autotools.autoreconfWarnGnu": {
-                    "order": 2,
-                    "scope": "resource",
-                    "type": "boolean",
-                    "default": false,
-                    "markdownDescription": "%autotools.configuration.autoreconfWarnGnu.markdownDescription%"
-                },
-                "autotools.autoreconfWarnUnsupported": {
-                    "order": 2,
-                    "scope": "resource",
-                    "type": "boolean",
-                    "default": true,
-                    "markdownDescription": "%autotools.configuration.autoreconfWarnUnsupported.markdownDescription%"
-                },
-                "autotools.autoreconfTool": {
-                    "order": 4,
-                    "scope": "resource",
-                    "type": "string",
-                    "default": "autoreconf",
-                    "markdownDescription": "%autotools.configuration.autoreconfTool.markdownDescription%"
-                },
-                "autotools.makePath": {
-                    "order": 3,
-                    "type": "string",
-                    "default": "make",
-                    "description": "%autotools.configuration.makefile.makePath.description%",
-                    "scope": "resource"
-                }
-            }
-        },
-        {   "title": "Testing",
-            "order": 3,
-            "properties": {
-                "autotools.TESTS_ENVIRONMENT" : {
-                    "order": 1,
-                    "scope": "resource",
-                    "type": "object",
-                    "default": {},
-                    "title": "%autotools.configuration.tests_environment.TESTS_ENVIRONMENT.global.title%",
-                    "markdownDescription": "%autotools.configuration.tests_environment.TESTS_ENVIRONMENT.global.markdownDescription%",
-                    "additionalProperties": { "type": "string" }
-                },
-                "autotools.XFAIL_TESTS" : {
-                    "order": 2,
-                    "scope": "resource",
-                    "type": "array",
-                    "default": [],
-                    "markdownDescription": "%autotools.configuration.tests_environment.XFAIL_TESTS.global.markdownDescription%",
-                    "items": {
-                      "type": "string"
+            },
+            {
+                "title": "Advanced options (maintainers)",
+                "order": 4,
+                "properties": {
+                    "autotools.keepDryRuns": {
+                        "order": 4,
+                        "scope": "resource",
+                        "type": "boolean",
+                        "markdownDescription": "%autotools.configuration.makefile.keepDryRuns.markdownDescription%",
+                        "default": false
+                    },
+                    "autotools.keepConfigurationCache": {
+                        "order": 4,
+                        "scope": "resource",
+                        "type": "boolean",
+                        "markdownDescription": "%autotools.configuration.makefile.keepConfigurationCache.markdownDescription%",
+                        "default": false
+                    },
+                    "autotools.autoreconfWarnCross": {
+                        "order": 2,
+                        "scope": "resource",
+                        "type": "boolean",
+                        "default": false,
+                        "markdownDescription": "%autotools.configuration.autoreconfWarnCross.markdownDescription%"
+                    },
+                    "autotools.autoreconfWarnPortability": {
+                        "order": 2,
+                        "scope": "resource",
+                        "type": "boolean",
+                        "default": false,
+                        "markdownDescription": "%autotools.configuration.autoreconfWarnPortability.markdownDescription%"
+                    },
+                    "autotools.autoreconfWarnObsolete": {
+                        "order": 2,
+                        "scope": "resource",
+                        "type": "boolean",
+                        "default": false,
+                        "markdownDescription": "%autotools.configuration.autoreconfWarnObsolete.markdownDescription%"
+                    },
+                    "autotools.autoreconfWarnOverride": {
+                        "order": 2,
+                        "scope": "resource",
+                        "type": "boolean",
+                        "default": false,
+                        "markdownDescription": "%autotools.configuration.autoreconfWarnOverride.markdownDescription%"
+                    },
+                    "autotools.autoreconfWarnGnu": {
+                        "order": 2,
+                        "scope": "resource",
+                        "type": "boolean",
+                        "default": false,
+                        "markdownDescription": "%autotools.configuration.autoreconfWarnGnu.markdownDescription%"
+                    },
+                    "autotools.autoreconfWarnUnsupported": {
+                        "order": 2,
+                        "scope": "resource",
+                        "type": "boolean",
+                        "default": true,
+                        "markdownDescription": "%autotools.configuration.autoreconfWarnUnsupported.markdownDescription%"
+                    },
+                    "autotools.autoreconfTool": {
+                        "order": 4,
+                        "scope": "resource",
+                        "type": "string",
+                        "default": "autoreconf",
+                        "markdownDescription": "%autotools.configuration.autoreconfTool.markdownDescription%"
+                    },
+                    "autotools.makePath": {
+                        "order": 3,
+                        "type": "string",
+                        "default": "make",
+                        "description": "%autotools.configuration.makefile.makePath.description%",
+                        "scope": "resource"
                     }
-                },
-
-                "autotools.test_environments": {
-                    "order": 3,
-                    "scope": "resource",
-                    "type": "array",
-                    "default": [],
-                    "description": "%autotools.configuration.test_environments.description%",
-                    "items" : {
+                }
+            },
+            {
+                "title": "Testing",
+                "order": 3,
+                "properties": {
+                    "autotools.TESTS_ENVIRONMENT": {
+                        "order": 1,
+                        "scope": "resource",
                         "type": "object",
-                        "properties": {
-                          "name": {
-                            "type": "string",
-                            "format": "/^[a-zA-Z0-9_-]+$/",
-                            "description": "%autotools.configuration.test_environments.name.description%",
-                            "examples": ["legacy", "modern", "future"]
-                          },
-                          "dirs" : {
-                            "type": "array",
-                            "default": [],
-                            "description": "%autotools.configuration.test_environments.dirs.markdownDescription%",
-                            "items": { "type": "string" },
-                            "minItems": 1
-                          },
-                          "TESTS_ENVIRONMENT" : {
+                        "default": {},
+                        "title": "%autotools.configuration.tests_environment.TESTS_ENVIRONMENT.global.title%",
+                        "markdownDescription": "%autotools.configuration.tests_environment.TESTS_ENVIRONMENT.global.markdownDescription%",
+                        "additionalProperties": {
+                            "type": "string"
+                        }
+                    },
+                    "autotools.XFAIL_TESTS": {
+                        "order": 2,
+                        "scope": "resource",
+                        "type": "array",
+                        "default": [],
+                        "markdownDescription": "%autotools.configuration.tests_environment.XFAIL_TESTS.global.markdownDescription%",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "autotools.test_environments": {
+                        "order": 3,
+                        "scope": "resource",
+                        "type": "array",
+                        "default": [],
+                        "description": "%autotools.configuration.test_environments.description%",
+                        "items": {
                             "type": "object",
-                            "default": {},
-                            "title": "%autotools.configuration.tests_environment.TESTS_ENVIRONMENT.sub.title%",
-                            "additionalProperties": { "type": "string" }
-                          },
-                          "XFAIL_TESTS" : {
-                            "type": "array",
-                            "default": [],
-                            "t": "%autotools.configuration.tests_environment.XFAIL_TESTS.sub.title%",
-                            "items": {
-                              "type": "string"
-                            }
-                          }
-                        },
-                        "required": ["name"],
-                        "title": "%autotools.configuration.tests_environment.title%",
-                        "default": {
-                            "name": "modern",
-                            "TESTS_ENVIRONMENT": {
-                                "VAR1": "modern-1",
-                                "VAR2": "mod2"
+                            "properties": {
+                                "name": {
+                                    "type": "string",
+                                    "format": "/^[a-zA-Z0-9_-]+$/",
+                                    "description": "%autotools.configuration.test_environments.name.description%",
+                                    "examples": [
+                                        "legacy",
+                                        "modern",
+                                        "future"
+                                    ]
+                                },
+                                "dirs": {
+                                    "type": "array",
+                                    "default": [],
+                                    "description": "%autotools.configuration.test_environments.dirs.markdownDescription%",
+                                    "items": {
+                                        "type": "string"
+                                    },
+                                    "minItems": 1
+                                },
+                                "TESTS_ENVIRONMENT": {
+                                    "type": "object",
+                                    "default": {},
+                                    "title": "%autotools.configuration.tests_environment.TESTS_ENVIRONMENT.sub.title%",
+                                    "additionalProperties": {
+                                        "type": "string"
+                                    }
+                                },
+                                "XFAIL_TESTS": {
+                                    "type": "array",
+                                    "default": [],
+                                    "t": "%autotools.configuration.tests_environment.XFAIL_TESTS.sub.title%",
+                                    "items": {
+                                        "type": "string"
+                                    }
+                                }
+                            },
+                            "required": [
+                                "name"
+                            ],
+                            "title": "%autotools.configuration.tests_environment.title%",
+                            "default": {
+                                "name": "modern",
+                                "TESTS_ENVIRONMENT": {
+                                    "VAR1": "modern-1",
+                                    "VAR2": "mod2"
+                                }
                             }
                         }
                     }
                 }
             }
-        }
         ],
         "viewsWelcome": [
             {
@@ -773,7 +797,13 @@
             {
                 "type": "autotools",
                 "label": "Autotools Debug",
-                "languages": ["c", "cpp", "am", "ac", "*"],
+                "languages": [
+                    "c",
+                    "cpp",
+                    "am",
+                    "ac",
+                    "*"
+                ],
                 "configurationAttributes": {
                     "launch": {
                         "properties": {
@@ -821,7 +851,6 @@
                 {
                     "id": "autotools.outline",
                     "icon": "res/viewcontainer.svg",
-
                     "name": "%autotools.configuration.views.makefile.outline.description%"
                 },
                 {
@@ -836,12 +865,20 @@
             {
                 "type": "build",
                 "when": "processExecutionSupported",
-                "required": ["label", "target"],
+                "required": [
+                    "label",
+                    "target"
+                ],
                 "properties": {
                     "label": {
                         "type": "string",
                         "description": "%autotools.taskDefinitions.label.description%",
-                        "examples": ["Build myprogram", "Build mylib", "Build Tarball", "Build docs"]
+                        "examples": [
+                            "Build myprogram",
+                            "Build mylib",
+                            "Build Tarball",
+                            "Build docs"
+                        ]
                     },
                     "target": {
                         "description": "%autotools.taskDefinitions.target.description%",
@@ -849,13 +886,21 @@
                             "builddir": {
                                 "type": "string",
                                 "description": "%autotools.taskDefinitions.target.builddir.description%",
-                                "examples": ["src", "src/lib", "lib"]
+                                "examples": [
+                                    "src",
+                                    "src/lib",
+                                    "lib"
+                                ]
                             },
                             "goal": {
                                 "type": "string",
                                 "description": "%autotools.taskDefinitions.target.goal.description%",
                                 "default": "all",
-                                "examples": ["all", "myprogram.exe", "library.a"]
+                                "examples": [
+                                    "all",
+                                    "myprogram.exe",
+                                    "library.a"
+                                ]
                             }
                         }
                     }
@@ -864,7 +909,10 @@
             {
                 "type": "test",
                 "when": "processExecutionSupported",
-                "required": ["label", "test"],
+                "required": [
+                    "label",
+                    "test"
+                ],
                 "properties": {
                     "label": {
                         "type": "string",
@@ -877,17 +925,31 @@
                             "dir": {
                                 "type": "string",
                                 "description": "%autotools.taskDefinitions.test.dir.description%",
-                                "examples": ["test/unit-tests", "test/integration-tests"]
+                                "examples": [
+                                    "test/unit-tests",
+                                    "test/integration-tests"
+                                ]
                             },
                             "goal": {
                                 "type": "string",
                                 "description": "%autotools.taskDefinitions.test.goal.description%",
-                                "examples": ["unit-test-1.log", "integration-test-1.log"]
+                                "examples": [
+                                    "unit-test-1.log",
+                                    "integration-test-1.log"
+                                ]
                             },
                             "env": {
-                                "type": ["string", "null"],
+                                "type": [
+                                    "string",
+                                    "null"
+                                ],
                                 "description": "%autotools.taskDefinitions.task.test.env.description%",
-                                "examples": ["<no-env>", "Debug", "Release", "Legacy"]
+                                "examples": [
+                                    "<no-env>",
+                                    "Debug",
+                                    "Release",
+                                    "Legacy"
+                                ]
                             }
                         }
                     }
@@ -896,7 +958,9 @@
             {
                 "type": "check",
                 "when": "processExecutionSupported",
-                "required": ["label"],
+                "required": [
+                    "label"
+                ],
                 "properties": {
                     "label": {
                         "type": "string",
@@ -904,18 +968,31 @@
                         "default": "Run test-suite 'check'"
                     },
                     "check": {
-                        "required": ["dir"],
+                        "required": [
+                            "dir"
+                        ],
                         "description": "%autotools.taskDefinitions.check.description%",
                         "properties": {
                             "dir": {
                                 "type": "string",
                                 "description": "%autotools.taskDefinitions.check.builddir.description%",
-                                "examples": ["test/unit-tests", "test/integration-tests"]
+                                "examples": [
+                                    "test/unit-tests",
+                                    "test/integration-tests"
+                                ]
                             },
                             "env": {
-                                "type": ["string", "null"],
+                                "type": [
+                                    "string",
+                                    "null"
+                                ],
                                 "description": "%autotools.taskDefinitions.task.check.env.description%",
-                                "examples": ["<no-env>", "Debug", "Release", "Legacy"]
+                                "examples": [
+                                    "<no-env>",
+                                    "Debug",
+                                    "Release",
+                                    "Legacy"
+                                ]
                             },
                             "TESTS": {
                                 "type": "array",
@@ -932,7 +1009,9 @@
             {
                 "type": "autotools",
                 "when": "processExecutionSupported",
-                "required": ["label"],
+                "required": [
+                    "label"
+                ],
                 "properties": {
                     "label": {
                         "type": "string",
@@ -941,7 +1020,10 @@
                     },
                     "action": {
                         "type": "string",
-                        "enum": ["bootstrap", "update"],
+                        "enum": [
+                            "bootstrap",
+                            "update"
+                        ],
                         "default": "update",
                         "description": "%autotools.taskDefinitions.action.description%"
                     }
@@ -950,15 +1032,16 @@
         ],
         "resourceLabelFormatters": [
             {
-              "scheme": "trs",
-              "formatting": {
-                "label": "${path}",
-                "stripPathStartingSeparator": true,
-                "tildify": true,
-                "separator": "/",
-                "workspaceSuffix": "SUFFIX-APPENDED-TO-WORKSPACE-LABEL"
-              }
-            }],
+                "scheme": "trs",
+                "formatting": {
+                    "label": "${path}",
+                    "stripPathStartingSeparator": true,
+                    "tildify": true,
+                    "separator": "/",
+                    "workspaceSuffix": "SUFFIX-APPENDED-TO-WORKSPACE-LABEL"
+                }
+            }
+        ],
         "menus": {
             "commandPalette": [
                 {
@@ -1090,7 +1173,7 @@
                     "group": "navigation@1"
                 }
             ],
-            "explorer/context" : [
+            "explorer/context": [
                 {
                     "command": "autotools.rdepends",
                     "when": "autotools:hasTargets == 1",
@@ -1265,11 +1348,9 @@
         "translations-export": "gulp translations-export",
         "translations-generate": "gulp translations-generate",
         "translations-import": "gulp translations-import",
-
         "esbuild-base": "esbuild ./src/extension.ts --bundle --outfile=$npm_package_main --external:vscode --platform=node --sourcemap",
         "esbuild": "npm run esbuild-base -- --sourcemap",
         "test-compile": "tsc --inlineSourceMap -p ./",
-
         "watch": "tsc -watch --inlineSourceMap -p ./",
         "package": "[ ! -z $TARGET ] && vsce package --pre-release --target $TARGET --yarn -o autotools.$npm_package_version-pre-$TARGET.vsix",
         "publish": "echo I WOULD vsce publish --pre-release --yarn -i autotools.vsix",
@@ -1278,13 +1359,14 @@
     },
     "devDependencies": {
         "@octokit/rest": "^18.1.1",
-        "@opentelemetry/api": "^1.7.0",
+        "@opentelemetry/api": "^1.9.1",
         "@types/chai": "^4.2.15",
         "@types/chai-as-promised": "^7.1.3",
         "@types/chai-string": "^1.4.2",
         "@types/mocha": "^9.0.0",
-        "@types/node": "^10.17.17",
+        "@types/node": "^26.6.3",
         "@types/vscode": "^1.74.0",
+        "@vscode/test-electron": "^3.1.0",
         "@vscode/vsce": "^2.21.1",
         "chai": "^4.3.0",
         "chai-as-promised": "^7.1.1",
@@ -1303,13 +1385,12 @@
         "tslint-no-unused-expression-chai": "^0.1.4",
         "typescript": "^5.0.2",
         "vrsource-tslint-rules": "^6.0.0",
-        "vscode-nls-dev": "^3.3.2",
-        "vscode-test": "^0.4.1"
+        "vscode-nls-dev": "^3.3.2"
     },
     "dependencies": {
         "@mergesium/shell-quote": "^2.0.3",
-        "@opentelemetry/exporter-trace-otlp-http": "^0.45.1",
-        "@opentelemetry/sdk-node": "^0.45.1",
+        "@opentelemetry/exporter-trace-otlp-http": "^0.222.0",
+        "@opentelemetry/sdk-node": "^0.222.0",
         "@types/glob": "^7.1.1",
         "glob": "^7.1.6",
         "module-alias": "^2.2.2",
@@ -1325,5 +1406,22 @@
         "nanoid": "^3.1.20",
         "minimatch": "^3.0.5",
         "xml2js": "^0.5.0"
+    },
+    "installConfig": {
+        "hoistingLimits": "workspaces",
+        "dependenciesMeta": {
+            "esbuild": {
+                "built": true
+            },
+            "keytar": {
+                "built": true
+            },
+            "@vscode/vsce-sign": {
+                "built": true
+            },
+            "protobufjs": {
+                "built": true
+            }
+        }
     }
 }

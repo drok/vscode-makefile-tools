@@ -14,6 +14,7 @@ import { extension, telemetry } from './extension';
 import { Attributes } from './tele';
 import * as vscode from 'vscode';
 import { Disposable } from 'vscode-jsonrpc';
+import { assert } from 'console';
 
 import * as nls from "vscode-nls";
 nls.config({ messageFormat: nls.MessageFormat.bundle, bundleFormat: nls.BundleFormat.standalone })();
@@ -238,34 +239,38 @@ export function spawnChildProcess(
 
         const child: child_process.ChildProcess = child_process.spawn(qProcessName, qArgs,
                                                                       { cwd: workingDirectory, shell: shellType || true, env: finalEnvironment });
-        make.setCurPID(child.pid);
-
-        if (stdoutCallback) {
-            child.stdout.on('data', (data) => {
-                stdoutCallback(`${data}`);
-            });
-        }
-
-        if (stderrCallback) {
-            child.stderr.on('data', (data) => {
-                stderrCallback(`${data}`);
-            });
-        }
-        if (input) {
-            child.stdin.write(input);
-        }
-        child.stdin.end();
-
-        child.on('close', (returnCode: number, signal: string) => {
-            resolve({returnCode, signal});
-        });
-
-        child.on('exit', (returnCode: number) => {
-            resolve({returnCode, signal: ""});
-        });
-
         if (child.pid === undefined) {
             reject(new Error(`Failed to spawn process: ${processName} ${args}`));
+        } else {
+            make.setCurPID(child.pid);
+
+            if (stdoutCallback) {
+                if (child.stdout)
+                    child.stdout.on('data', (data) => {
+                        stdoutCallback(`${data}`);
+                    });
+            }
+
+            if (stderrCallback) {
+                if (child.stderr)
+                    child.stderr.on('data', (data) => {
+                        stderrCallback(`${data}`);
+                    });
+            }
+            if (child.stdin) {
+                if (input) {
+                    child.stdin.write(input);
+                }
+                child.stdin.end();
+            }
+
+            child.on('close', (returnCode: number, signal: string) => {
+                resolve({returnCode, signal});
+            });
+
+            child.on('exit', (returnCode: number) => {
+                resolve({returnCode, signal: ""});
+            });
         }
     });
 }
@@ -900,14 +905,21 @@ export function findLastIndex<T>(array: Array<T>, predicate: (value: T, index: n
 
 export class MyFileWatcher implements Disposable {
     private disposables: Disposable[] = [];
-
     private watcher : fs.FSWatcher;
-    constructor(dir: string, fn: (e: string, f: string) => void) {
-        this.watcher = fs.watch(dir,  undefined, fn);
+
+    // 1. Change 'f: string' to 'f: string | null'
+    constructor(dir: string, fn: (e: string, f: string | null) => void) {
+        
+        // 2. Wrap the callback with a null guard before passing it to fs.watch
+        this.watcher = fs.watch(dir, {}, (e, f) => {
+            if (f !== null) {
+                fn(e, f);
+            }
+        });
     }
 
     dispose() {
         this.disposables.forEach(d => d.dispose());
         this.watcher.close();
     }
-};
+}

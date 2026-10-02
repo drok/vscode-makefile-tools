@@ -915,6 +915,8 @@ export class FolderConfig implements vscode.Disposable {
                 const builddir = path.resolve(this.abs_top_builddir, p);
                 if (!this.abs_top_builddir) // In-tree build, watch the same dir for both
                     return new util.MyFileWatcher(builddir, (e, f) => {
+                        if (!f)
+                            return;
                         if (f == 'Makefile.am' || (f.endsWith('.in') && f != 'Makefile.in')) {
                             /* Regen if config*.in files change, other than Makefile.in which is updated due to Makefile.am */
                             this.autotoolsTask.reautomake(telemetry.startSpan("upAM", extension.journey));
@@ -924,6 +926,8 @@ export class FolderConfig implements vscode.Disposable {
                     });
                 else
                     return new util.MyFileWatcher(builddir, (e, f) => {
+                        if (!f)
+                            return;
                         if (f.endsWith(".trs"))
                             extension.trsChange(this, vscode.Uri.file(path.resolve(builddir,f)));
                     });
@@ -934,6 +938,8 @@ export class FolderConfig implements vscode.Disposable {
                 .map( (p) => {
                     const srcdir = path.resolve(this.folder.uri.path, p);
                     return new util.MyFileWatcher(srcdir, (e, f) => {
+                        if (!f)
+                            return;
                         if (f == 'Makefile.am' || (f.endsWith('.in') && f != 'Makefile.in')) {
                             /* Regen if config*.in files change, other than Makefile.in which is updated due to Makefile.am */
                             this.autotoolsTask.reautomake(telemetry.startSpan("upAM", extension.journey));
@@ -1512,7 +1518,7 @@ export async function initFromSettings(activation: boolean = false, span: Span):
 
 export async function selectFolderConfig() : Promise<FolderConfig> {
     if (configs.size == 1) {
-        let [folder,fc] = configs.entries().next().value;
+        const [[folder, fc]] = Array.from(configs.entries());
         return fc;
     }
     if (configs.size == 0)
