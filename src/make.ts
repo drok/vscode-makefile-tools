@@ -246,6 +246,14 @@ export async function generateParseContent(span: Span, fc: FolderConfig): Promis
          */
         "--keep-going",
 
+        /* this prevents check-TESTS from running first,
+         * which causes tests where a .log already exists to not
+         * have their dependencies shown.
+         * Instead, it forces all logs to be evaluated when building
+         * the test-suite.log target
+         */
+        "am__set_TESTS_bases=\\$(MAKE) \\$(AM_MAKEFLAGS) \\$(TEST_LOGS) && exit 0",
+
         "GMOFILES=", // Avoid po and pot files being built with msgmerge
     // rejecting GNU make's builtin variables and rules because automake
     // generates implicit rules to cover all the targets. It does not rely
