@@ -21,7 +21,6 @@ import { trace,
     TraceFlags,
     Span, SpanStatusCode, SpanContext, Context } from '@opentelemetry/api'
 import { Disposable } from 'vscode-jsonrpc';
-import { setSpanContext } from '@opentelemetry/api/build/src/trace/context-utils';
 
 export { SpanStatusCode } from '@opentelemetry/api';
 // Example header, the content format can be `<trace-id>:<span-id>`
@@ -129,7 +128,7 @@ export class MyTelemetry implements Disposable {
     }
     public startSpan(name: string, span? : Span) : Span {
         return span ? this.tracer.startSpan(name, undefined, api.trace.setSpan(api.context.active(), span)) :
-            this.tracer.startSpan(name, undefined, setSpanContext(api.context.active(), this.myContext));
+            this.tracer.startSpan(name, undefined, trace.setSpanContext(api.context.active(), this.myContext));
     }
     public endSpanWithStatus(span: Span, status: SpanStatusCode, message?: string, attributes?: api.Attributes) {
 
