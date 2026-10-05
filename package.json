@@ -1337,7 +1337,7 @@
         "bootstrap-ad7proxy": "cd ../../utils/ad7proxy && { [ -f configure ] || autoreconf -fvi ; }",
         "preconfigure": "yarn run bootstrap-make && yarn run bootstrap-ad7proxy",
         "configure-make": "mkdir -p build/make && cd build/make && { [ -f config.status ] || ../../vendor/gnumake/configure --disable-dependency-tracking --with-guile=no --disable-job-server --disable-load 'CFLAGS=-g0 -O2' --disable-nls --prefix=$PWD/../.. ; }",
-        "configure-ad7proxy": "mkdir -p build/ad7proxy && cd build/ad7proxy && { [ -f config.status ] || ../../utils/ad7proxy/configure --disable-dependency-tracking --prefix=$PWD/../.. CXX=g++-9 ; }",
+        "configure-ad7proxy": "mkdir -p build/ad7proxy && cd build/ad7proxy && { [ -f config.status ] || ../../utils/ad7proxy/configure --disable-dependency-tracking --prefix=$PWD/../.. ; }",
         "preproduction-compile-make": "yarn run configure-make",
         "preproduction-compile-ad7proxy": "yarn run configure-ad7proxy",
         "production-compile-make": "make -j -C build/make install && cp vendor/automake/lib/test-driver bin",
