@@ -511,6 +511,8 @@ static const filter_edit GDB_THREAD_GROUP_STARTED
     { regex("=thread-group-started,id=\"i(\\d+)\",pid=\"(\\d+)\"\n", reopts), };
 static const filter_edit GDB_THREAD_GROUP_ADDED
     { regex("=thread-group-added,id=\"i(\\d+)\"\n", reopts), };
+static const filter_edit GDB_THREAD_GROUP_REMOVED
+    { regex("=thread-group-removed,id=\"i(\\d+)\"\n", reopts), };
 static const filter_edit GDB_THREAD_CREATED
     { regex("=thread-created,id=\"(\\d+)\",group-id=\"i(\\d+)\"\n", reopts), };
 static const filter_edit GDB_ERROR
@@ -580,7 +582,8 @@ OutFilter::onMatch(const string_view& in, const filter_it& match) {
             // buf_to_loopback.append("-target-detach\n");
 //            if (GDB_8_2_CRASH_ON_THREAD_INFO_AFTER_DETACH)
 //                buf_to_loopback.append("-thread-select 1\n");
-            if (remote_debugger.size()) {
+            if (remote_debugger == "debug") {
+            } else if (remote_debugger != "detach") {
                 remotes[group_id] = remote_debugger;
 #ifdef DEBUG
                     "shell echo i" + to_string(group_id) + " has remote " + remote_debugger + "\n"
@@ -634,6 +637,12 @@ OutFilter::onMatch(const string_view& in, const filter_it& match) {
         assert(m.size() == 2 && "Exactly 2 things is captured (full string, thread group number)");
         long id = stol(m[1]);
         groups.emplace(id, 0);
+    } else
+    if (&match.filter == &GDB_THREAD_GROUP_REMOVED) {
+        auto m = get_matches(in, match);
+        assert(m.size() == 2 && "Exactly 2 things is captured (full string, thread group number)");
+        long id = stol(m[1]);
+        groups.erase(id);
     } else
     if (&match.filter == &GDB_THREAD_GROUP_STARTED) {
         auto m = get_matches(in, match);
@@ -827,6 +836,7 @@ string_view OutFilter::filter(string_view input_buf)
         FILTER_INIT(input_buf, GDB_FIRST_THREAD_EXIT),
         FILTER_INIT(input_buf, GDB_INFERIOR_EXIT),
         FILTER_INIT(input_buf, GDB_THREAD_GROUP_ADDED),
+        FILTER_INIT(input_buf, GDB_THREAD_GROUP_REMOVED),
         FILTER_INIT(input_buf, GDB_THREAD_GROUP_STARTED),
         FILTER_INIT(input_buf, GDB_THREAD_CREATED),
         FILTER_INIT(input_buf, GDB_INFERIOR_EXEC),
