@@ -20,6 +20,8 @@ esac],
 [debug=false])
 AM_CONDITIONAL(DEBUG, test x"$debug" = x"true")
 
+PKG_CHECK_MODULES([URIPARSER], [liburiparser],,[have_liburiparser=no])
+
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_FILES([
  Makefile
