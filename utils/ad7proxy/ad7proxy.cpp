@@ -56,12 +56,14 @@ class select_channel {
         select_channel(int ifd, int ofd,
             fd_set &write_fdset,
             fd_set &read_fdset,
-            int &nfd) :
+            int &nfd,
+            const char *id) :
             ifd(ifd),
             ofd(ofd),
             write_fdset(write_fdset),
             read_fdset(read_fdset),
             nfd(nfd),
+            id(id),
             paused(false),
             initialized(false),
             identified(false),
@@ -95,6 +97,7 @@ class select_channel {
     private:
         string_view buf_to_send;
         char buf_to_parent[BUFSIZ];
+        const char *id;
 
     protected:
         /* Data to return to the parent*/
@@ -102,10 +105,12 @@ class select_channel {
         bool initialized;
         bool identified;
         DebuggerInfo debuggerInfo;
-        string buf_to_loopback;
         string_view view_to_loopback;
+        void sendTo(string_view v, string &console);
+        void sendToConsole(string_view v, string &console);
 
     private:
+        string buf_to_loopback;
         bool closing;
 };
 
@@ -119,6 +124,26 @@ void
 select_channel::IdentifyDebugger()
 {
     identified = true;
+}
+
+
+void
+select_channel::sendToConsole(string_view v, string &console)
+{
+    return;
+    console.append("~\" --- ");
+    console.append(id);
+    console.append(" --- ");
+    // console.append(v);
+    console.append("\\n\"\n");
+}
+
+void
+select_channel::sendTo(string_view v, string &console)
+{
+    sendToConsole(v, console);
+    buf_to_loopback.append(v);
+    buf_to_loopback.append("\n");
 }
 
 xfer_state
@@ -234,8 +259,11 @@ class CmdFilter : public select_channel {
         CmdFilter(int ifd, int ofd,
             fd_set &write_fdset,
             fd_set &read_fdset,
-            int &nfd) :
-            select_channel(ifd, ofd, write_fdset, read_fdset, nfd),
+            int &nfd,
+            string &console,
+            const char *id) :
+            console(console),
+            select_channel(ifd, ofd, write_fdset, read_fdset, nfd, id),
             schedule_multiple(false) {
 
             }
@@ -245,6 +273,7 @@ class CmdFilter : public select_channel {
         void onMatch(const string_view& in, const filter_it& match) override;
 
         string buf;
+        string &console;
         bool schedule_multiple;
 };
 
@@ -255,8 +284,11 @@ class OutFilter : public select_channel {
             int ifd, int ofd,
             fd_set &write_fdset,
             fd_set &read_fdset,
-            int &nfd) :
-            select_channel(ifd, ofd, write_fdset, read_fdset, nfd),
+            int &nfd,
+            string &buf,
+            const char *id) :
+            buf(buf),
+            select_channel(ifd, ofd, write_fdset, read_fdset, nfd, id),
             debugged_program(debugged_program),
             running(true) {}
         virtual string_view filter(string_view v) override;
@@ -279,7 +311,7 @@ class OutFilter : public select_channel {
         map<long /* group-id */, CreatedInferiorState> createdInferiors;
         void selectInferiorOnce(long exec_thread_group);
 #endif
-        string buf;
+        string& buf;
         const char *debugged_program;
         bool running;
         map<long /* group-id */, string> remotes;
@@ -331,6 +363,7 @@ static const string_view GDB_FILE_SH_EXEC_TAIL("\"\n");
 
 void
 CmdFilter::onMatch(const string_view& in, const filter_it& match) {
+    sendToConsole("sendToConsole() from CmdFilter.onMatch()", console);
     if (&match.filter == &GDB_EXEC_CONTINUE) {
         if (!schedule_multiple) {
             schedule_multiple = true;
@@ -396,7 +429,7 @@ string_view select_channel::filter_re(string_view input_buf, vector<filter_it> &
                 }
             }
         }
-        
+
         auto &match = (*min_it);
         if ((have_match = (match.it != reit_end))) {
             if (!paused && !have_any_match) buf.clear();
@@ -506,8 +539,22 @@ static const filter_edit GDB_INFERIOR_ADDED
     { regex("(\\d+)\\^done,inferior=\"i(\\d+)\",connection=\\{number=\"(\\d+)\",name=\"native\"\\}\n", reopts), };
     // { regex("9999925\n", reopts), };
 
+// void
+// OutFilter::onMatch(const string_view& in, const filter_it& match) {
+//     /* break up the in string into lines and pass them to onMatchLine one at a time */
+//     size_t start = 0, end;
+//     while ((end = in.find('\n', start)) != string_view::npos) {
+//         string_view line(in);
+//         line.remove_prefix(start);
+//         line.remove_suffix(in.size() - end);
+//         onMatch(line, match);
+//         start = end + 1;
+//     }
+// }
+
 void
 OutFilter::onMatch(const string_view& in, const filter_it& match) {
+    sendToConsole("sendToConsole() from OutFilter.onMatch()", buf);
     if (&match.filter == &GDB_INFERIOR_EXIT) {
         if (running) {
             buf.append(GDB_THREAD_EXITED);
@@ -523,8 +570,8 @@ OutFilter::onMatch(const string_view& in, const filter_it& match) {
         exec_threads[thread] = group_id;
         string remote_debugger;
         auto has_remote = getDebuggerVariable(pid, remote_debugger);
-        buf.append("~\"Executing " + m[1].str() + " as pid " + to_string(pid) + 
-        (has_remote ? 
+        buf.append("~\" ---ad7--- Executing " + m[1].str() + " as pid " + to_string(pid) +
+        (has_remote ?
             (remote_debugger.size() ? " to debug remotely via " + remote_debugger : " without debugging") :
             ""
         ) + "\\n\"\n");
@@ -535,17 +582,16 @@ OutFilter::onMatch(const string_view& in, const filter_it& match) {
 //                buf_to_loopback.append("-thread-select 1\n");
             if (remote_debugger.size()) {
                 remotes[group_id] = remote_debugger;
-                buf_to_loopback.append(
 #ifdef DEBUG
                     "shell echo i" + to_string(group_id) + " has remote " + remote_debugger + "\n"
+                sendToLoopback("shell echo i" + to_string(group_id) + " has remote " + remote_debugger, buf);
 #endif
                 /* remote_debugger is not sanitized - can lead to arbitrary execution
                  * but does it need to be sanitized? The user already has arbitrary execution priviledge
                  */
 #ifndef INCANTATION_NOT_NEEDED_TO_START_INFERIOR
-                        "9999901-gdb-set schedule-multiple on\n"
+                sendTo("9999901-gdb-set schedule-multiple on", buf);
 #endif
-                );
 #ifndef WAIT_FOR_LIBRARY_LOADING_DOESNT_NEED_WORKAROUND
                 auto created_it = createdInferiors.emplace(group_id, INFERIOR_STATE_INIT_NEW);
                 assert(created_it.second && "createdInferior should not yet exist");
@@ -554,17 +600,12 @@ OutFilter::onMatch(const string_view& in, const filter_it& match) {
 
             } else {
                 /* Empty DEBUGGER_URI means detach this process */
-                buf_to_loopback.append(
-                    "detach inferior " + to_string(group_id) + "\n"
-                );
+                sendTo("detach inferior " + to_string(group_id), buf);
             }
         }
-        buf_to_loopback.append(
-
-                    "inferior 1\n"
-                    + to_string(CMDBASE_CONTINUE_AFTER_EXEC + group_id) +
-                    "-exec-continue\n"
-        );
+        sendTo("inferior 1", buf);
+        sendTo("" + to_string(CMDBASE_CONTINUE_AFTER_EXEC + group_id) +
+                    "-exec-continue", buf);
         /* Remove stop notification; ad7 does not recognize stop on exec */
         // in.remove_prefix(match.it->length());
         return;
@@ -587,7 +628,7 @@ OutFilter::onMatch(const string_view& in, const filter_it& match) {
 ~"Thread 2.1 \"qemu-x86_64\" hit Catchpoint 2 (exec'd /usr/bin/qemu-x86_64), 0x00007ffff7c8cc30 in _start () from /lib64/ld-linux-x86-64.so.2\n"
 *stopped,reason="exec",disp="keep",bkptno="2",new-exec="/usr/bin/qemu-x86_64",frame={addr="0x00007ffff7c8cc30",func="_start",args=[],from="/lib64/ld-linux-x86-64.so.2"},
   thread-id="2",stopped-threads="all",core="3"
-*/    
+*/
     if (&match.filter == &GDB_THREAD_GROUP_ADDED) {
         auto m = get_matches(in, match);
         assert(m.size() == 2 && "Exactly 2 things is captured (full string, thread group number)");
@@ -608,7 +649,7 @@ OutFilter::onMatch(const string_view& in, const filter_it& match) {
         long group_id = stol(m[2]);
         auto pid = threads[id] = groups[group_id];
         group_ids[id] = group_id;
-        buf.append("~\"Thread " + to_string(id) + " is pid " + to_string(pid) + "\\n\"\n");
+        buf.append("~\" ---ad7--- Thread " + to_string(id) + " is pid " + to_string(pid) + "\\n\"\n");
     } else
     if (&match.filter == &GDB_REMOTE_CONNECTED) {
         if (paused)
@@ -678,13 +719,11 @@ OutFilter::onMatch(const string_view& in, const filter_it& match) {
             auto remote = remotes.find(exec_thread_group);
             assert(remote != remotes.end() && "inferior selected should correspond to a remote");
             assert(remote->second.size() && "should only store non-empty remotes");
-            buf_to_loopback.append(
-                    "shell sleep 0.2\n"
-                    "9999915-target-select extended-remote " + remote->second + "\n"
+            sendTo("shell sleep 0.2", buf);
+            sendTo("9999915-target-select extended-remote " + remote->second, buf);
 #ifdef SLOW_DOWN
-                    "shell sleep 5\n"
+            sendToLoopback("shell sleep 5", buf);
 #endif
-            );
             remotes.erase(remote);
         } else
         if ((cmdid & CMDBASE_MASK) == CMDBASE_ADD_INFERIOR) {
@@ -696,11 +735,10 @@ OutFilter::onMatch(const string_view& in, const filter_it& match) {
             assert(remote != remotes.end() && "inferior selected should correspond to a remote");
             buf_to_loopback.append(
 #ifndef INCANTATION_NOT_NEEDED_TO_START_INFERIOR_PART_3
-                "inferior i" + to_string(remote_it->second) + "\n"
-                "" + to_string(exec_thread_group + CMDBASE_SELECT_INFERIOR) + "-gdb-show annotate\n"
+            sendToLoopback("inferior i" + to_string(remote_it->second), buf);
+            sendToLoopback("" + to_string(exec_thread_group + CMDBASE_SELECT_INFERIOR) + "-gdb-show annotate", buf);
 #endif
-                "shell echo timing barrier\n"
-            );
+            sendToLoopback("shell echo timing barrier", buf);
 #else
             auto created_it = createdInferiors.find(exec_thread_group);
             if (created_it != createdInferiors.end()) {
@@ -746,19 +784,17 @@ OutFilter::selectInferiorOnce(long exec_thread_group)
     if (created_it != createdInferiors.end()) {
         auto &state = created_it->second;
         if (!state.added) {
-            buf_to_loopback.append(
 #ifndef INCANTATION_NOT_NEEDED_TO_START_INFERIOR_PART_2
 #ifdef SLOW_DOWN
-                    "shell sleep 5\n"
+            sendToLoopback("shell sleep 5", buf);
 #endif
-                    "shell sleep 0.2\n"
-                    "" + to_string(exec_thread_group + CMDBASE_ADD_INFERIOR) + "-add-inferior\n"
-                    "" + to_string(exec_thread_group + CMDBASE_ADD_INFERIOR) + "-gdb-show annotate\n"
+            sendTo("shell sleep 0.2", buf);
+            sendTo("" + to_string(exec_thread_group + CMDBASE_ADD_INFERIOR) + "-add-inferior", buf);
+            sendTo("" + to_string(exec_thread_group + CMDBASE_ADD_INFERIOR) + "-gdb-show annotate", buf);
 #ifdef SLOW_DOWN
-                    "shell sleep 5\n"
+            sendToLoopback("shell sleep 5", buf);
 #endif
 #endif
-            );
             state.added = 1;
         } else
         if (!state.selected && state.libloaded && state.created) {
@@ -769,20 +805,15 @@ OutFilter::selectInferiorOnce(long exec_thread_group)
                 // auto remote = remotes.find(exec_thread_group);
         // assert(0 && "Debugging");
                 // assert(remote != remotes.end() && "inferior selected should correspond to a remote");
-                buf_to_loopback.append(
 #ifndef INCANTATION_NOT_NEEDED_TO_START_INFERIOR_PART_3
-                    "inferior i" + to_string(remote_it->second) + "\n"
-                    "" + to_string(exec_thread_group + CMDBASE_SELECT_INFERIOR) + "-gdb-show annotate\n"
+                sendTo("inferior " + to_string(remote_it->second), buf);
+                sendTo("" + to_string(exec_thread_group + CMDBASE_SELECT_INFERIOR) + "-gdb-show annotate", buf);
 #endif
                     // "-gdb-show verbose\n"
                     // "info infe\n"
-                    "shell echo timing barrier\n"
-                );
+                sendTo("shell echo timing barrier", buf);
             } else {
-                buf_to_loopback.append(
-                    "shell echo lib loaded bug not for a remote group\n"
-                );
-
+                sendTo("shell echo lib loaded bug not for a remote group", buf);
             }
             state.selected = 1;
         }
@@ -879,17 +910,18 @@ int main(int argc, char **argv) {
         FD_SET(STDIN_FILENO, &read_fdset);
         FD_SET(child_out[READ_END], &read_fdset);
         int nfd = child_out[READ_END];
+        string buf_to_parent; /* debugger to IDE */
 
         int opened_channels = 0;
         struct OutFilter child_to_parent(
             argv[3],
             child_out[READ_END], STDOUT_FILENO,
             write_fdset, read_fdset,
-            nfd);
+            nfd, buf_to_parent, ">");
         struct CmdFilter parent_to_child(
             STDIN_FILENO, child_in[WRITE_END],
             write_fdset, read_fdset,
-            nfd);
+            nfd, buf_to_parent, "<");
         struct timeval wrapup_timeout = { .tv_sec = 1, .tv_usec = 0 };
         xfer_state
             parent_state = PASSTHROUGH,
