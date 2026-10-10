@@ -175,7 +175,7 @@ select_channel::xfer()
             closing = true;
         } else if (buf_to_parent_len < 0) {
             // interrupted ... continue
-            // FD_CLR(ifd, &read_fdset); 
+            // FD_CLR(ifd, &read_fdset);
             return CLOSED;
         } else {
             string_view data_in(buf_to_parent, buf_to_parent_len);
@@ -330,9 +330,24 @@ class OutFilter : public select_channel {
  * which means GBD will error on getting the thread info, and AD7 will exit the debugger.
  * -continue should be held until after AD7 is done querying the debugger
  */
+/*
+ * STOP_ON_FORK is neeeded otherwise a fork returning non-zero causes VSCODE to exit the debugger:
+ *
+ * !/bin/sh
+ * (exit 1)
+ * echo not done due to early debugger exit
+ *
+ * !/bin/sh
+ * (exit 0)
+ * echo Done because bug is not triggered
+ *
+ */
 // #define STOP_ON_FORK 1
+#define AUTO_SWITCH_THREAD_1_ON_EXEC_CATCH
+#define AUTO_SWITCH_THREAD_1_ON_THREAD_EXIT
 static const string_view GDB_INITIALIZATION(
 #ifdef STOP_ON_FORK
+     "set non-stop off\n"
      "catch fork\n"
 #endif
      "catch exec\n"
@@ -348,7 +363,9 @@ void CmdFilter::InitializeDebugger()
     buf.append(GDB_INITIALIZATION);
     select_channel::InitializeDebugger();
 }
+#if defined(SWITCH_TO_INFERIOR_1_BEFORE_CONTINUING)
 static const string_view GDB_SELECT_FIRST_THREAD("inferior 1\n");
+#endif
 static const string_view GDB_SCHEDULE_MULTIPLE_ON("-gdb-set schedule-multiple on\n");
 static const string_view GDB_SCHEDULE_MULTIPLE_OFF("-gdb-set schedule-multiple off\n");
 static const filter_edit GDB_EXEC_CONTINUE
@@ -369,7 +386,10 @@ CmdFilter::onMatch(const string_view& in, const filter_it& match) {
             schedule_multiple = true;
             buf.append(GDB_SCHEDULE_MULTIPLE_ON);
         }
+// force the debugger to 1st thread then user clicks "Continue"
+#if defined(SWITCH_TO_INFERIOR_1_BEFORE_CONTINUING)
         buf.append(GDB_SELECT_FIRST_THREAD);
+#endif
         // return; // forget the original --exec-continue without --thread-group
     } else if (&match.filter == &GDB_EXEC_STEPS) {
         if (schedule_multiple) {
@@ -495,11 +515,13 @@ getDebuggerVariable(long pid, std::string& debugger) {
  * thread group exits (thread-group-exited,id="i1")
  */
 // static const string_view GDB_STOP_AVOID_QUIT("-gdb-set schedule-multiple on\n");
-static const string_view GDB_THREAD_EXITED("*stopped,reason=\"subprocess-fin\"\n");
+static const string_view GDB_THREAD_EXITED("*stopped,reason=\"subprocess-fin\",stopped-threads=\"all\"\n");
 static const filter_edit GDB_FIRST_THREAD_EXIT
     { regex("=thread-group-exited,id=\"i1\"\n", reopts), };
 static const filter_edit GDB_INFERIOR_EXIT
     { regex("\\*stopped,reason=\"exited-normally\"[^\n]*\n", reopts), };
+static const filter_edit GDB_INFERIOR_EXIT_W_ERROR
+    { regex("\\*stopped,reason=\"exited\",exit-code=\"(\\d+)\"*\n", reopts), };
 static const filter_edit GDB_INFERIOR_EXEC
     { regex("\\*stopped,reason=\"exec\".*,new-exec=\"([^\"]*)\",[^\n]+,thread-id=\"(\\d+)\"[^\n]+\n", reopts), };
 #ifdef STOP_ON_FORK
@@ -528,6 +550,7 @@ static const filter_edit GDB_VERSION
     { regex("~\"GNU gdb \\(GDB\\) (\\d+)\\.(\\d+)\\.(\\d+)\\.(\\d+)[^\"]+\"\n", reopts), };
 
 #define CMDBASE_MASK 0xFFF000
+#define CMDBASE_CONTINUE_AFTER_THREAD_CREATED 0x995000
 #ifdef STOP_ON_FORK
 #define CMDBASE_CONTINUE_AFTER_FORK 0x996000
 #endif
@@ -559,9 +582,23 @@ OutFilter::onMatch(const string_view& in, const filter_it& match) {
     sendToConsole("sendToConsole() from OutFilter.onMatch()", buf);
     if (&match.filter == &GDB_INFERIOR_EXIT) {
         if (running) {
+            // buf.append(in, match.it->position(), match.it->length());
             buf.append(GDB_THREAD_EXITED);
+#ifdef AUTO_SWITCH_THREAD_1_ON_THREAD_EXIT
+            sendTo("inferior 1", buf);
+#endif
             return;
         }
+    } else
+    if (&match.filter == &GDB_INFERIOR_EXIT_W_ERROR) {
+        auto m = get_matches(in, match);
+        assert(m.size() == 2 && "Exactly 2 things captured (full string, exit-code)");
+        long exit_code = stol(m[1]);
+        buf.append(GDB_THREAD_EXITED);
+#ifdef AUTO_SWITCH_THREAD_1_ON_THREAD_EXIT
+        sendTo("inferior 1", buf);
+#endif
+        return;
     } else
     if (&match.filter == &GDB_INFERIOR_EXEC) {
         auto m = get_matches(in, match);
@@ -578,11 +615,14 @@ OutFilter::onMatch(const string_view& in, const filter_it& match) {
             ""
         ) + "\\n\"\n");
 
+        int do_continue = 1;
         if (has_remote) {
             // buf_to_loopback.append("-target-detach\n");
 //            if (GDB_8_2_CRASH_ON_THREAD_INFO_AFTER_DETACH)
 //                buf_to_loopback.append("-thread-select 1\n");
-            if (remote_debugger == "debug") {
+            if (remote_debugger == "debug") { // stop at entry
+                do_continue = true;
+            } else if (remote_debugger == "break") { // stop on breakpoints
             } else if (remote_debugger != "detach") {
                 remotes[group_id] = remote_debugger;
 #ifdef DEBUG
@@ -606,12 +646,23 @@ OutFilter::onMatch(const string_view& in, const filter_it& match) {
                 sendTo("detach inferior " + to_string(group_id), buf);
             }
         }
-        sendTo("inferior 1", buf);
-        sendTo("" + to_string(CMDBASE_CONTINUE_AFTER_EXEC + group_id) +
-                    "-exec-continue", buf);
+        if (do_continue) {
+#if !defined(STOP_AT_EXEC)
+            // sendTo("next", buf);
+#endif
+#if defined(AUTO_SWITCH_THREAD_1_ON_EXEC_CATCH)
+            sendTo("inferior 1", buf);
+#endif
+#if !defined(STOP_AT_EXEC)
+            sendTo("" + to_string(CMDBASE_CONTINUE_AFTER_EXEC + group_id) +
+                        "-exec-continue", buf);
+#else
+            buf.append(in, match.it->position(), match.it->length());
+#endif
+            return;
+        }
         /* Remove stop notification; ad7 does not recognize stop on exec */
         // in.remove_prefix(match.it->length());
-        return;
     }
     buf.append(in, match.it->position(), match.it->length());
     if (&match.filter == &GDB_FIRST_THREAD_EXIT) {
@@ -659,6 +710,9 @@ OutFilter::onMatch(const string_view& in, const filter_it& match) {
         auto pid = threads[id] = groups[group_id];
         group_ids[id] = group_id;
         buf.append("~\" ---ad7--- Thread " + to_string(id) + " is pid " + to_string(pid) + "\\n\"\n");
+        // sendTo("inferior 1", buf);
+        sendTo("" + to_string(CMDBASE_CONTINUE_AFTER_THREAD_CREATED + group_id) +
+                    "-exec-continue", buf);
     } else
     if (&match.filter == &GDB_REMOTE_CONNECTED) {
         if (paused)
@@ -705,11 +759,10 @@ OutFilter::onMatch(const string_view& in, const filter_it& match) {
         assert(m.size() == 3 && "Exactly 3 things is captured (full string, newpid, thread id)");
         long newpid = stol(m[1]);
         long thread = stol(m[2]);
-        buf_to_loopback.append(
-                    "inferior 1\n"
-                    + to_string(CMDBASE_CONTINUE_AFTER_FORK) +
-                    "-exec-continue\n"
-        );
+        // sendTo("inferior 1", buf);
+        //sendTo("next", buf);
+//c        sendTo("" + to_string(CMDBASE_CONTINUE_AFTER_FORK) +
+//c                    "-exec-continue", buf);
 #endif
     } else
     if (&match.filter == &GDB_INFERIOR_ADDED) {
@@ -835,6 +888,7 @@ string_view OutFilter::filter(string_view input_buf)
     vector<filter_it> re_its = {
         FILTER_INIT(input_buf, GDB_FIRST_THREAD_EXIT),
         FILTER_INIT(input_buf, GDB_INFERIOR_EXIT),
+        FILTER_INIT(input_buf, GDB_INFERIOR_EXIT_W_ERROR),
         FILTER_INIT(input_buf, GDB_THREAD_GROUP_ADDED),
         FILTER_INIT(input_buf, GDB_THREAD_GROUP_REMOVED),
         FILTER_INIT(input_buf, GDB_THREAD_GROUP_STARTED),
