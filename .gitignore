@@ -18,3 +18,4 @@ OneLocBuild
 /buildinfo.ts
 /buildinfo.js
 /.yarn/
+/utils/ad7proxy/.vscode/
