@@ -13,7 +13,7 @@ import * as path from 'path';
 import { extension, telemetry } from './extension';
 import { Attributes } from './tele';
 import * as vscode from 'vscode';
-import { Disposable } from 'vscode-jsonrpc';
+import { Disposable } from 'vscode';
 import { assert } from 'console';
 
 import * as nls from "vscode-nls";

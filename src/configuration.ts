@@ -34,7 +34,7 @@ import { AutoToolsBuildTaskProvider,
 import { assert } from 'console';
 import { quote } from '@mergesium/shell-quote';
 import { Span } from '@opentelemetry/api';
-import { Disposable } from 'vscode-jsonrpc';
+import { Disposable } from 'vscode';
 import { CppConfigurationProvider } from './cpptools';
 
 nls.config({ messageFormat: nls.MessageFormat.bundle, bundleFormat: nls.BundleFormat.standalone })();

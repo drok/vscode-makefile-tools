@@ -5,8 +5,8 @@ export { Attributes } from '@opentelemetry/api';
 // import { ConsoleSpanExporter } from '@opentelemetry/sdk-trace-node';
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http'
 import { SemanticResourceAttributes } from '@opentelemetry/semantic-conventions'
-import { SpanProcessor, TraceIdRatioBasedSampler, ReadableSpan } from '@opentelemetry/sdk-trace-base';
-import { AsyncHooksContextManager } from '@opentelemetry/context-async-hooks';
+import { SpanProcessor, TraceIdRatioBasedSampler, ReadableSpan } from '@opentelemetry/sdk-trace';
+import { AsyncLocalStorageContextManager } from '@opentelemetry/context-async-hooks';
 import { emptyResource } from '@opentelemetry/resources';
 import { ExportResultCode } from '@opentelemetry/core';
 import { TraceState } from '@opentelemetry/api'
@@ -20,7 +20,7 @@ import { buildinfo } from '../buildinfo';
 import { trace,
     TraceFlags,
     Span, SpanStatusCode, SpanContext, Context } from '@opentelemetry/api'
-import { Disposable } from 'vscode-jsonrpc';
+import { Disposable } from 'vscode';
 
 export { SpanStatusCode } from '@opentelemetry/api';
 // Example header, the content format can be `<trace-id>:<span-id>`
@@ -29,8 +29,8 @@ const MyHeader = 'my-header';
 // See https://github.com/open-telemetry/opentelemetry-js/blob/main/doc/propagation.md
 export class MyTelemetry implements Disposable {
     private sdk : optl.NodeSDK;
-    private tracer : optl.api.Tracer;
-    private myContext : SpanContext;
+    private tracer : api.Tracer;
+    private myContext!: SpanContext;
     private disposables: Disposable[] = [];
     public rootSpan: Span | undefined;
     static teleContextKey: string = 'tc';
@@ -51,17 +51,17 @@ export class MyTelemetry implements Disposable {
         this.sdk = new optl.NodeSDK({
             traceExporter,
 
-            spanProcessor: new TailSamplingProcessor(
-                    new optl.node.TraceIdRatioBasedSampler(params.s),
-                    new optl.node.TraceIdRatioBasedSampler(params.e),
-                    new optl.node.TraceIdRatioBasedSampler(params.u),
-                    traceExporter),
+            spanProcessors: [new TailSamplingProcessor(
+                    new TraceIdRatioBasedSampler(params.s),
+                    new TraceIdRatioBasedSampler(params.e),
+                    new TraceIdRatioBasedSampler(params.u),
+                    traceExporter)],
             instrumentations: [],
             resourceDetectors: [],
             autoDetectResources: false,
             resource: resource
         });
-        const contextManager = new AsyncHooksContextManager();
+        const contextManager = new AsyncLocalStorageContextManager();
         contextManager.enable();
         api.context.setGlobalContextManager(contextManager);
 
@@ -91,6 +91,7 @@ export class MyTelemetry implements Disposable {
         const isRemote : boolean = !!tele_context;
         if (!tele_context) {
             this.rootSpan = this.tracer.startSpan('install', undefined, undefined);
+            if (!this.rootSpan) return;
             this.myContext = this.rootSpan.spanContext();
             extensionContext.globalState.update(MyTelemetry.teleContextKey, `${this.myContext.traceId}:${this.myContext.spanId}`);
             this.logEvent(this.rootSpan, "installed", undefined, true);
@@ -162,11 +163,11 @@ class Wanted implements TraceState {
     get(key: string): string | undefined {
         return this.myKey == key ? this.myVal : "";
     }
-    set(key: string, value: string): optl.api.TraceState {
+    set(key: string, value: string): TraceState {
         if (key == this.myKey) this.myVal = value;
         return this;
     }
-    unset(key: string): optl.api.TraceState {
+    unset(key: string): TraceState {
         this.myVal = "";
         return this;
     }
