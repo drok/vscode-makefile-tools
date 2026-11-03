@@ -21,6 +21,7 @@ import { createHash } from 'crypto';
 import * as cpp from 'vscode-cpptools';
 import * as cpptools from './cpptools';
 import { MyTestController } from './test';
+import * as compilationDatabase from './compilationDatabase';
 
 import * as nls from 'vscode-nls';
 import { AutoToolsBuildTaskProvider,
@@ -906,6 +907,9 @@ export class FolderConfig implements vscode.Disposable {
         this.targetDisposables.forEach(d => d.dispose());
         this.buildTargets.clear();
         this.errorCodes.clear();
+
+        // Clear the compilation database for a fresh start
+        compilationDatabase.clearCompilationDatabase(this);
     }
     public updateWatchers() {
         // let c = fc.buildConfig;
@@ -971,7 +975,7 @@ export class FolderConfig implements vscode.Disposable {
     }
 
 
-    public buildCustomConfigurationProvider(item: toolParser.CustomConfigProviderItem): void {
+    public buildCustomConfigurationProvider(compile_argv: string[], target: string, item: toolParser.CustomConfigProviderItem): void {
         let provider: cpptools.CustomConfigurationProvider = this._cppConfigurationProvider.getCustomConfigurationProvider();
 
         const newSrc: cpp.SourceFileConfiguration = {
@@ -1023,6 +1027,9 @@ export class FolderConfig implements vscode.Disposable {
                 provider.workspaceBrowse.browsePath.push(fincl);
             }
         });
+
+        // Add compilation commands to the compile_commands.json database
+        compilationDatabase.addCompilationCommands(this, compile_argv, target, item);
     }
 
     /* Test Controller */

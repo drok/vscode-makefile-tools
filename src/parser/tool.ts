@@ -213,6 +213,8 @@ export class Making implements Parser {
             let standard: util.StandardVersion | undefined = parseStandard(ext.extension.getCppToolsVersion(), standardStr, language);
 
             caller.make.ctx.fc.buildCustomConfigurationProvider(
+                compilerTool.argv,
+                caller.currentTarget,
                 { defines, includes, forcedIncludes, standard,
                     intelliSenseMode, compilerFullPath, compilerArgs, files: [file], windowsSDKVersion, currentPath,
                     line: compilerTool.argv.join(" ") });

@@ -186,6 +186,10 @@
                 "title": "%autotools.exportToIntelisense.title%"
             },
             {
+                "command": "autotools.exportCompileCommands",
+                "title": "%autotools.exportCompileCommands.title%"
+            },
+            {
                 "command": "autotools.command.openKnowledgeBase",
                 "title": "%autotools.command.openKnowledgeBase.title%"
             },
@@ -1358,6 +1362,7 @@
         "test": "yarn run pretest && node ./out/src/test/runTest.js"
     },
     "devDependencies": {
+        "@clangd/vscode-clangd": "^0.0.0",
         "@octokit/rest": "^18.1.1",
         "@opentelemetry/api": "^1.10.0",
         "@types/chai": "^4.2.15",

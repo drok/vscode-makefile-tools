@@ -24,6 +24,7 @@ import { WorkspaceFolder } from 'vscode';
 import * as ui from './ui';
 import { quote } from '@mergesium/shell-quote';
 import * as diag from './diag';
+import * as compilationDatabase from './compilationDatabase';
 
 import * as nls from 'vscode-nls';
 import { log } from 'console';
@@ -696,6 +697,9 @@ export async function configure(parentSpan: Span, triggeredBy: TriggeredBy, fc: 
       logger.message(localize("autotools.log.config.exported2",
             "Generated tasks: {0} build tasks and {1} test tasks in {2} check suites (see Run Task... command)",
             stats.programs, stats.tests, stats.checks));
+
+      // Write compile_commands.json after successful configuration
+      await compilationDatabase.writeCompilationDatabase(fc, span);
     } else {
         if (retc == 1) {/* ie, IntelliSense API not available */
             var kbUrl : vscode.Uri = await fc.kbUrl();
