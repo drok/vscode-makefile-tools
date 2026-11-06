@@ -4,6 +4,7 @@ This extension enables VS Code to interact with projects using the GNU Autotools
  * Manage multiple [build configurations](#build-configuration) per source-tree (out-of-tree builds)
  * Building-related functions:
     * Import build configuration into [IntelliSense](#importing-intellisense-config), enabling _accurate syntax highlighting and completions_.
+    * Generate compilation database for clangd syntax highlighting
     * [_Generate a build task_](#generate-build-tasks) for every buildable program or library.
     * Build any single target (program, library), or all with _keybinds_.
     * [_Navigate build errors/warnings_](#navigating-compile-problems) using built-in problem matchers.
@@ -13,6 +14,7 @@ This extension enables VS Code to interact with projects using the GNU Autotools
     * [Import test suites](#importing-test-suites) into VS Code's **Testing UI**.
     * _Run_ single tests or full test suites using the Testing UI.
     * Support all automake test results (`PASS` ✔️, `FAIL` ❌, `XPASS` ☑️, `XFAIL` 🏳️, `SKIP` ⤵️, `ERROR` 🔺, and `n/a` ❔)
+    * Supports debugging tests via [penagos.vgdb](https://marketplace.visualstudio.com/items?itemName=penagos.vgdb) or Microsoft's ad7 debug adapter included in `ms-vscode.cpptools`
     * Debug individual tests, [_auto-configuring_ the debugger](#debugging-tests-pro). ![pro](https://img.shields.io/badge/Pro-green?style=plastic&link=https://autotools.mergesium.com)
     * [_Live-testing_](#live-testing-pro) / Test-driven development. ![pro](https://img.shields.io/badge/Pro-green?style=plastic&link=https://autotools.mergesium.com)
     * Discover [_Generate a test task_](#generated-test-tasks) for every individual test.

@@ -73,6 +73,9 @@ export interface MakefileConfiguration {
     // is this a default configuration?
     isDefault: boolean;
 
+    // debugger to use if a TEST_ENVIRONMENT does not override it
+    defaultDebugger: string | undefined;
+
     // unwriteable file used to block autmake TEST_SUITE outputting summaries for indiv. tests
     // One environment set for each TestEnvironment, indexed by name
     //nologs: Map<string,vscode.ProcessExecutionOptions>;
@@ -105,6 +108,9 @@ export interface TestEnvironment {
 
     // Testing UI debug profile
     debug?: vscode.TestRunProfile;
+
+    // Debugger name (cppdbg, lldb, etc)
+    debugger: string | undefined;
 
     // Environemnts for single tests and for check suites
     testExecOptions?: vscode.ProcessExecutionOptions;
@@ -195,24 +201,32 @@ export class FolderConfig implements vscode.Disposable {
         let allconfigs = c.get<MakefileConfiguration[]>("configurations");
         this.numConfigs = allconfigs?.length ?? 0;
         this.state = new State(folder);
+        this.defaultDebugger = c.get('defaultDebugger');
         this.config = allconfigs
             ?.find(c => c.name == this.state.buildConfiguration) ?? {
                 name: 'Default',
                 top_builddir: this.defaultBuildFolder(),
                 isDefault: true,
+                defaultDebugger: this.defaultDebugger,
             };
+        // const deb = this.defaultDebugger || this.config.defaultDebugger;
+        if (!this.config.defaultDebugger)
+            this.config.defaultDebugger = this.defaultDebugger;
         this.abs_top_builddir = this.config.top_builddir || this.folder.uri.fsPath;
         if (!path.isAbsolute(this.abs_top_builddir)) {
             this.abs_top_builddir = path.join(this.folder.uri.fsPath, this.abs_top_builddir);
         }
+        const te = c.get<EnvironmentSetting>("TESTS_ENVIRONMENT");
         this._gTestEnvironment = {
-            TESTS_ENVIRONMENT: c.get<EnvironmentSetting>("TESTS_ENVIRONMENT"),
+            TESTS_ENVIRONMENT: te,
             XFAIL_TESTS: c.get<string[]>("XFAIL_TESTS"),
+            debugger: undefined,
             name: 'g',
             hashCode: 0,
         }
 
         this.loadedTestEnvironments = c.get<TestEnvironment[]>("test_environments", []);
+        this._currentTestEnvironment = nullTestEnvironment();
         cleanupLoadedTestEnvironments(this.loadedTestEnvironments, this._testEnvironments);
         if (this.loadedTestEnvironments.length && loggingLevelApplies('Verbose')) {
             let tenames = this.loadedTestEnvironments
@@ -239,10 +253,6 @@ export class FolderConfig implements vscode.Disposable {
                 break;
             }
         this.tasks.forEach((provider) => provider.changeConfiguration());
-        this.disposables.push(vscode.workspace.onDidChangeConfiguration(async e => {
-            // console.log("config changed", e);
-        }));
-
         this.tasks.forEach((provider) => this.disposables.push(vscode.tasks.registerTaskProvider(provider.myType, provider)));
 
         let configureAc = vscode.workspace.createFileSystemWatcher(
@@ -254,6 +264,7 @@ export class FolderConfig implements vscode.Disposable {
     }
     readonly state: State;
     readonly abs_top_builddir: string;
+    readonly defaultDebugger: string | undefined;
     public lastTaskMakeDir: string | undefined; // for problem matching, autotools.locateMakefile
     _configureAc: string | undefined;
     readonly config: MakefileConfiguration;
@@ -300,7 +311,7 @@ export class FolderConfig implements vscode.Disposable {
     private _gTestEnvironment : TestEnvironment;
     public loadedTestEnvironments: TestEnvironment[];
     private _testEnvironments: TestEnvironment[] = [];
-    private _currentTestEnvironment : TestEnvironment = nullTestEnvironment();
+    private _currentTestEnvironment : TestEnvironment;
     public set currentTestEnvironmentName(name: string) {
         let newEnv = (name ? this._testEnvironments.find(e =>
                 e.name == name
@@ -346,6 +357,10 @@ export class FolderConfig implements vscode.Disposable {
         var vars : EnvironmentSetting = {};
         if (this.traits.overrides_TESTS_ENVIRONMENT)
             return vars;
+        //var d = env['debugger'] || this.defaultDebugger;
+        //if (d)
+        //    vars['debugger'] = d;
+
         if (this._gTestEnvironment.TESTS_ENVIRONMENT)
             Object.entries(this._gTestEnvironment.TESTS_ENVIRONMENT).forEach(([name,value]) => {
             name &&
@@ -359,12 +374,22 @@ export class FolderConfig implements vscode.Disposable {
         return vars;
     }
     reloadTestEnvironments(c: vscode.WorkspaceConfiguration) {
+        const te = c.get<EnvironmentSetting>("TESTS_ENVIRONMENT");
         this._gTestEnvironment = {
-            TESTS_ENVIRONMENT: c.get<EnvironmentSetting>("TESTS_ENVIRONMENT"),
+            TESTS_ENVIRONMENT: te,
             XFAIL_TESTS: c.get<string[]>("XFAIL_TESTS"),
             name: 'g',
+            debugger: undefined,
             hashCode: 0,
         }
+        //if (this.config.defaultDebugger) {
+        //    if (this._gTestEnvironment.TESTS_ENVIRONMENT) {
+        //        if (this._gTestEnvironment.TESTS_ENVIRONMENT["debugger"] === undefined)
+        //            this._gTestEnvironment.TESTS_ENVIRONMENT["debugger"] = this.config.defaultDebugger;
+        //    } else {
+        //        this._gTestEnvironment.TESTS_ENVIRONMENT = {"debugger": this.config.defaultDebugger};
+        //    }
+        //}
         this.loadedTestEnvironments = c.get<TestEnvironment[]>("test_environments", []);
         cleanupLoadedTestEnvironments(this.loadedTestEnvironments, this._testEnvironments);
         this.accountForTraits();
@@ -396,14 +421,16 @@ export class FolderConfig implements vscode.Disposable {
             var global_XFAIL_TESTS = this._gTestEnvironment.XFAIL_TESTS??[];
             this._testEnvironments = [];
             [nullTestEnvironment(),...this.loadedTestEnvironments].forEach(element => {
+                const peo = this.processExecutionOptions(element);
                 let e: TestEnvironment = {
                     name: element.name,
                     /* Need separate ExecOptions for test and check commands because test run with SUBDIRS env in updateEnvironmentsForCurrentMakefile() */
-                    testExecOptions:   this.processExecutionOptions(element),
-                    checkExecOptions:  this.processExecutionOptions(element),
-                    updateExecOptions: this.processExecutionOptions(element),
+                    testExecOptions:   peo,
+                    checkExecOptions:  peo,
+                    updateExecOptions: peo,
                     testDebugEnv:      this.processDebugEnvironment(element),
                     hashCode: 0,
+                    debugger: element.debugger,
                     XFAIL_TESTS: element.XFAIL_TESTS ? [...global_XFAIL_TESTS,...element.XFAIL_TESTS??[]] : global_XFAIL_TESTS};
                     if (element.dirs)
                         e.dirs = element.dirs;
@@ -1336,9 +1363,11 @@ export function cleanupLoadedTestEnvironments(loaded: TestEnvironment[], configu
 
 const defaultTestEnvName : string = "<no-env>";
 function nullTestEnvironment() : TestEnvironment {
+        // const defEnv : EnvironmentSetting = dbg ? { debugger: dbg } : {};
         return {
             name: defaultTestEnvName,
             TESTS_ENVIRONMENT: {},
+            debugger: undefined,
             hashCode: envHash('')}
 }
 
@@ -1393,10 +1422,13 @@ export async function initFromSettings(activation: boolean = false, span: Span):
                 continue;
             let fc = configs.get(folder);
             if (!fc) {
+                /* FIXME: When updating defaultDebugger, this logic ignores it. Need a way to update the config without restarting or rescanning */
                 fc = new FolderConfig(folder);
                 configs.set(folder, fc);
                 await startFolders(span, [fc]);
                 continue;
+//            } else {
+//                refreshConfiguration(span, fc);
             }
             let c = vscode.workspace.getConfiguration(keyRoot, folder);
             // We are interested in updating only some relevant properties.
@@ -1502,6 +1534,8 @@ export async function initFromSettings(activation: boolean = false, span: Span):
                 updatedSettingsSubkeys.push(`${folder.index}.${subKey}`);
             }
 
+            fc.config.defaultDebugger = updatedConfiguration?.defaultDebugger;
+
             // Final updates in some constructs that depend on more than one of the above settings.
             if (!fc.state.configureDirty) {
                 if (updatedTestEnvironments) {
@@ -1570,6 +1604,18 @@ export function prepareConfigurationsQuickPick(fc: FolderConfig): PickItem[] {
     return items;
 }
 
+/* Updates the FolderConfig without rescanning the project */
+async function refreshConfiguration(span: Span, fc: FolderConfig)
+{
+    let newConfig = new FolderConfig(fc.folder);
+    configs.set(fc.folder, newConfig);
+    fc.dispose();
+
+    await newConfig.start(span);
+    await newConfig.parseBuildConfig(span, make.TriggeredBy.configureAfterConfigurationChange);
+
+}
+
 // Fill a drop-down with all the configuration names defined by the user in autotools.configurations setting.
 // Triggers a cpptools configuration provider update after selection.
 export async function setNewConfiguration(span: Span, fc: FolderConfig): Promise<void> {
@@ -1593,12 +1639,7 @@ export async function setNewConfiguration(span: Span, fc: FolderConfig): Promise
         }
 
         fc.state.buildConfiguration = (chosen.item as MakefileConfiguration).name;
-        let newConfig = new FolderConfig(fc.folder);
-        configs.set(fc.folder, newConfig);
-        fc.dispose();
-
-        await newConfig.start(newC);
-        await newConfig.parseBuildConfig(newC, make.TriggeredBy.configureAfterConfigurationChange);
+        await refreshConfiguration(newC, fc);
         newC.end();
     }
 }

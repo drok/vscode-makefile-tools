@@ -560,6 +560,15 @@
                                         ]
                                     ]
                                 },
+                                "defaultDebugger": {
+                                    "type": "string",
+                                    "markdownDescription": "%autotools.configurations.defaultDebugger.markdownDescription%",
+                                    "examples": [
+                                        "vdbg",
+                                        "lldb",
+                                        "cppdbg"
+                                    ]
+                                },
                                 "makeArgs": {
                                     "type": "array",
                                     "markdownDescription": "%autotools.configurations.makeArgs.markdownDescription%",

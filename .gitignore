@@ -8,7 +8,6 @@ vscode-translations-import/
 jobs/loc/LCL
 OneLocBuild
 **/nls.*.json
-**/*.nls.json
 **/package.nls.*.json
 /build
 /bin

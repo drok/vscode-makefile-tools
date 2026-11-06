@@ -8,6 +8,7 @@ import { getSettingOr } from './util';
 import * as configuration from './configuration';
 import { Goal } from './parser/gnumake';
 import { Extension, extension } from './extension';
+import { env } from 'process';
 
 let defaultSetupCommands = [{
     "description": "Set source directory",
@@ -55,6 +56,7 @@ class MyConfiguration implements vscode.DebugConfiguration {
         this.environment = [];
         this.args = [];
         this.stopAtEntry = true;
+        // this.debugger = "lldb";
         // cpptools understands tasks to be those it can provide itself.
         // this.preLaunchTask = "autotools: build " + built.goal + "" +
         //     (built.builddir ? (' in ' + built.builddir) : ' at the top');
@@ -73,66 +75,139 @@ class MyConfiguration implements vscode.DebugConfiguration {
     goal: Goal | undefined;
     // preLaunchTask: string;
     cwd: string;
+    // debugger: string | undefined;
     setupCommands: { description: string, text: string, ignoreFailures: boolean }[];
+}
+
+function findDebugger(lang: string) : string | undefined {
+    // 1. Check if specific C++ extensions are installed
+    //const cppExt = vscode.extensions.getExtension('ms-vscode.cpptools');
+    //const lldbExt = vscode.extensions.getExtension('vadimcn.vscode-lldb');
+//
+    //console.log("Microsoft C/C++ extension installed:", !!cppExt);
+    //console.log("CodeLLDB extension installed:", !!lldbExt);
+
+    // 2. You can iterate through all active extensions to find any contributing debuggers
+    // Debuggers register themselves via 'debuggers' contribution points in package.json
+    for (const ext of vscode.extensions.all) {
+        const packageJSON = ext.packageJSON;
+        if (packageJSON && packageJSON.contributes && packageJSON.contributes.debuggers) {
+            const debuggers = packageJSON.contributes.debuggers;
+            // Each debugger defines a 'type' (e.g., 'cppdbg', 'cppvsdbg', 'lldb')
+            for (const dbg of debuggers) {
+                console.log(`${packageJSON.name}: Type: ${dbg.type}, Label: ${dbg.label}, Languages: ${dbg.languages}`);
+                if (dbg.type == 'lldb')
+                    continue;
+                if (dbg.type != 'vgdb')
+                    continue;
+                //if (dbg.languages/* && dbg.languages.includes(lang)*/)
+                    return dbg.type; // Return the type of the first debugger found
+            }
+        }
+    }
+    return undefined; // No debuggers found
 }
 
 /* this configuration is used when "Run and Debug" is clicked.
  * the builddir is pre-populated
  */
 export class DebugNow implements vscode.DebugConfiguration {
-    constructor(log: Goal | undefined, goal: Goal, public env?: configuration.TestEnvironment) {
+    constructor(log: Goal | undefined, goal: Goal, public testEnv?: configuration.TestEnvironment) {
         this.$comment = [
             "Debug a hardcoded target in any build configuration; customize environment and args as needed",
             "The 'cwd' is set automatically to demonstrate how",
             "This is a (carefully designed) template, but it can be editted as needed"
         ];
-        this.type = "autotools";
+        this.type = testEnv?.debugger || findDebugger("cpp") || "cppdbg";
+        // this.type = "autotools";
         this.name = "Debug '" + goal.goal + "'" +
-            (goal.make.dir ? " in " + goal.make.dir : "") + ` @ ${env?.name ?? extension.userEnvName}`;
+            (goal.make.dir ? " in " + goal.make.dir : "") + ` @ ${testEnv?.name ?? extension.userEnvName}`;
         this.request = "launch";
-        this.program = goal.getFilePath();
         this.environment = [{
             name: "srcdir",
             value: path.join(goal.make.ctx.fc.folder.uri.path, goal.make.dir)
         }]
+        this.env = {
+            srcdir: path.join(goal.make.ctx.fc.folder.uri.path, goal.make.dir)
+        };
         // let gdb='/home/radu/bin/gdb-9/bin/gdb';
         let gdb='gdb';
-        if (goal.flags & Goal.Flags.Libtool_Linked) {
-            let libtool = path.join(goal.make.ctx.root, 'libtool');
-            this.miDebuggerPath = extension.ltLauncher;
-            this.miDebuggerArgs = `${gdb} ${libtool} ${this.program}`;
-            this.MIMode = 'gdb';
-            this.externalConsole = false;
-        } else {
-            this.miDebuggerPath = extension.integratedLauncher;
-            this.miDebuggerArgs = `${gdb} ${this.program}`;
-            this.MIMode = 'gdb';
-            this.externalConsole = false;
-        }
-        if (env) {
-            if (env.testDebugEnv)
-                Object.entries(env.testDebugEnv).forEach(([k,v]) => {
+        switch (this.type) {
+            case "cppdbg": // Environment set is called .environment and uses the name: ... value: ... format
+                this.program = goal.getFilePath();
+                this.args = [];
+                if (goal.flags & Goal.Flags.Libtool_Linked) {
+                    let libtool = path.join(goal.make.ctx.root, 'libtool');
+                    this.miDebuggerPath = extension.ltLauncher;
+                    this.miDebuggerArgs = `${gdb} ${libtool} ${this.program}`;
+                    this.MIMode = 'gdb';
+                    this.externalConsole = false;
+                } else {
+                    this.miDebuggerPath = extension.integratedLauncher;
+                    this.miDebuggerArgs = `${gdb} ${this.program}`;
+                    this.MIMode = 'gdb';
+                    this.externalConsole = false;
+                }
+
+                if (testEnv) {
+                    if (testEnv.testDebugEnv)
+                        Object.entries(testEnv.testDebugEnv).forEach(([k,v]) => {
+                            this.environment.push({
+                                name: k,
+                                value: v
+                            });
+                        });
+                }
+                Object.entries(frameworks_support).forEach(([k,v]) => {
                     this.environment.push({
                         name: k,
                         value: v
                     });
                 });
+                break;
+            // Default:
+            default:
+                this.program = 'sh';
+                this.debugger = extension.integratedLauncher;
+                this.debuggerArgs = [gdb, goal.getFilePath()];
+                this.args = [ goal.getFilePath() ];
+                if (goal.flags & Goal.Flags.Libtool_Linked) {
+                    let libtool = path.join(goal.make.ctx.root, 'libtool');
+                    this.MIMode = 'gdb';
+                    this.externalConsole = false;
+                } else {
+                    this.MIMode = 'gdb';
+                    this.externalConsole = false;
+                }
+                if (testEnv) {
+                    if (testEnv.testDebugEnv)
+                        Object.entries(testEnv.testDebugEnv).forEach(([k,v]) => {
+                            this.env[k] = v;
+                        });
+                }
+                Object.entries(frameworks_support).forEach(([k,v]) => {
+                            this.env[k] = v;
+                });
+                break;
         }
-        Object.entries(frameworks_support).forEach(([k,v]) => {
-            this.environment.push({
-                name: k,
-                value: v
-            });
-        });
-        this.args = [];
+        /* enable the debugging extension's debug trace */
+        if (true) {
+            switch (this.type) {
+                case 'vgdb': this.debug = 'verbose';
+                            break;
+            }
+        }
         this.stopAtEntry = goal ? getSettingOr<boolean>(goal.make.ctx.fc.folder, "stopAtEntry", false) : true;
         //this.preLaunchTask = buildit ? "autotools: build " + built.goal +
         //    (built.builddir ? (' in ' + built.builddir) : ' at the top') : undefined;
         this.cwd = goal.make.getDir();
         this.setupCommands = defaultSetupCommands;
         // this.testId = log?.test?.id || 'unk';
+        // this.debugger = env?.debugger;
         this.testUri = log?.test?.uri?.with({scheme: "test"}) ?? vscode.Uri.from({scheme: "debug", path: this.cwd});
+        // this.env = env;
     }
+    // env: configuration.TestEnvironment;
     // testId: string;
     testUri: vscode.Uri;
     $comment: string[];
@@ -141,12 +216,21 @@ export class DebugNow implements vscode.DebugConfiguration {
     request: string;
     program: string;
     environment: { name: string, value: string }[];
+    env: { [key: string]: string };
     args: string[];
     stopAtEntry: boolean;
     //preLaunchTask: string | undefined;
     cwd: string;
     setupCommands: { description: string, text: string, ignoreFailures: boolean }[];
 
+    /* controls for particular debuggers */
+    /* vgdb: */
+    debug?: string;
+    debugger?: string;
+    debuggerArgs?: string[];
+
+
+    /* cppdbg */
     /* mi params used for debugging Libtool bins */
     miDebuggerPath?: string;
     miDebuggerArgs?: string;
@@ -216,6 +300,7 @@ class MyDebugProvider implements DebugConfigurationProvider {
 //    ];
   }
 
+
   resolveDebugConfiguration(folder: WorkspaceFolder | undefined, config: DebugConfiguration): ProviderResult<DebugConfiguration> {
     // If needed, modify the debug configuration before launching the debug session
     if (config.type === undefined) {
@@ -230,7 +315,14 @@ class MyDebugProvider implements DebugConfigurationProvider {
     }
     if (config.type != "autotools")
         return undefined;
-    config.type = "cppdbg";
+
+    let folderDebugger : string | undefined;
+    if (folder) {
+        let fc = configuration.getFolderConfig(folder);
+        folderDebugger = fc.config.defaultDebugger || fc.defaultDebugger;
+    }
+
+    config.type = config.env.testDebugEnv.debugger || folderDebugger || findDebugger("cpp") || "cppdbg";
     return config;
   }
 

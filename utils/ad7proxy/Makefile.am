@@ -4,6 +4,10 @@ EXTRA_FILES = debug.sh
 
 ad7proxy_SOURCES = \
     Debuggers.cpp \
+    filters.cpp \
+    gdb.cpp \
+    ad7.cpp \
+    vgdb.cpp \
     ad7proxy.cpp
 ad7proxy_CPPFLAGS =
 ad7proxy_CXXFLAGS = \
@@ -12,6 +16,7 @@ ad7proxy_LDADD = \
     @URIPARSER_LIBS@
 
 noinst_HEADERS = \
+    filters.h \
     Debuggers.h
 
 if DEBUG
