@@ -166,6 +166,30 @@ export class DebugNow implements vscode.DebugConfiguration {
                 });
                 break;
             // Default:
+            case 'vgdb':
+                this.program = 'sh';
+                this.debugger = extension.integratedLauncher;
+                this.debuggerArgs = ['--mode-vgdb', '--debugger', gdb, '--'];
+                this.debuggerLaunchArguments = ['--zzz'];
+                this.args = [ goal.getFilePath() ];
+                if (goal.flags & Goal.Flags.Libtool_Linked) {
+                    let libtool = path.join(goal.make.ctx.root, 'libtool');
+                    this.MIMode = 'gdb';
+                    this.externalConsole = false;
+                } else {
+                    this.MIMode = 'gdb';
+                    this.externalConsole = false;
+                }
+                if (testEnv) {
+                    if (testEnv.testDebugEnv)
+                        Object.entries(testEnv.testDebugEnv).forEach(([k,v]) => {
+                            this.env[k] = v;
+                        });
+                }
+                Object.entries(frameworks_support).forEach(([k,v]) => {
+                            this.env[k] = v;
+                });
+                break;
             default:
                 this.program = 'sh';
                 this.debugger = extension.integratedLauncher;
@@ -228,6 +252,7 @@ export class DebugNow implements vscode.DebugConfiguration {
     debug?: string;
     debugger?: string;
     debuggerArgs?: string[];
+    debuggerLaunchArguments?: string[];
 
 
     /* cppdbg */
