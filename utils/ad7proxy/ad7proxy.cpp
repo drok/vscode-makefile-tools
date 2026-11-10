@@ -17,6 +17,8 @@
 #include <cassert>
 #include <map>
 #include "gdb.h"
+#include "ad7.h"
+#include "vgdb.h"
 
 /* TODO : Detect GDB version and only do this when needed
  * harmless to do it unnecessarily
@@ -108,7 +110,9 @@ static void print_usage(const char *progname) {
     , progname);
 };
 
-static int proxy_loop_ad7(CmdFilterAd7 &parent_to_child, OutFilterAd7 &child_to_parent)
+
+template <typename CmdFilter, typename OutFilter>
+static int proxy_loop(CmdFilter &parent_to_child, OutFilter &child_to_parent)
 {
     int opened_channels = 0;
     struct timeval wrapup_timeout = { .tv_sec = 1, .tv_usec = 0 };
@@ -286,18 +290,41 @@ int main(int argc, char **argv) {
         int nfd = child_out[READ_END];
         string buf_to_parent; /* debugger to IDE */
 
-        struct OutFilterAd7 child_to_parent(
-            argv[3],
-            child_out[READ_END], STDOUT_FILENO,
-            write_fdset, read_fdset,
-            nfd, buf_to_parent, ">");
-        struct CmdFilterAd7 parent_to_child(
-            STDIN_FILENO, child_in[WRITE_END],
-            write_fdset, read_fdset,
-            nfd, buf_to_parent, "<");
-        if (!proxy_loop_ad7(parent_to_child, child_to_parent)) {
-            /* Timeout - gdb 8.2 hangs with 100% cpu sometimes */
-            kill(pid, SIGKILL);            
+        switch (opt.mode) {
+            case ProxyOptions::PROXY_MODE_AD7:
+            {
+                struct OutFilterAd7 child_to_parent(
+                    argv[3],
+                    child_out[READ_END], STDOUT_FILENO,
+                    write_fdset, read_fdset,
+                    nfd, buf_to_parent, ">");
+                struct CmdFilterAd7 parent_to_child(
+                    STDIN_FILENO, child_in[WRITE_END],
+                    write_fdset, read_fdset,
+                    nfd, buf_to_parent, "<");
+                if (!proxy_loop(parent_to_child, child_to_parent)) {
+                    /* Timeout - gdb 8.2 hangs with 100% cpu sometimes */
+                    kill(pid, SIGKILL);            
+                }
+            }
+            break;
+            case ProxyOptions::PROXY_MODE_VGDB:
+            {
+                struct OutFilterVgdb child_to_parent(
+                    argv[3],
+                    child_out[READ_END], STDOUT_FILENO,
+                    write_fdset, read_fdset,
+                    nfd, buf_to_parent, ">");
+                struct CmdFilterVgdb parent_to_child(
+                    STDIN_FILENO, child_in[WRITE_END],
+                    write_fdset, read_fdset,
+                    nfd, buf_to_parent, "<");
+                if (!proxy_loop(parent_to_child, child_to_parent)) {
+                    /* Timeout - gdb 8.2 hangs with 100% cpu sometimes */
+                    kill(pid, SIGKILL);            
+                }
+            }
+            break;
         }
         if (!debugger_exited) {
             int pid_stat = 0;

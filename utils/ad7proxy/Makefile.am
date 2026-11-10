@@ -17,6 +17,9 @@ ad7proxy_LDADD = \
 
 noinst_HEADERS = \
     filters.h \
+    ad7.h \
+    vgdb.h \
+    gdb.h \
     Debuggers.h
 
 if DEBUG
