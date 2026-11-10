@@ -77,6 +77,15 @@ select_channel::xfer(select_channel& loopback)
 }
 
 xfer_state
+select_channel::end()
+{
+    close(ifd);
+    close(ofd);
+    closing = true;
+    return CLOSED;
+}
+
+xfer_state
 select_channel::xfer()
 {
     ssize_t buf_to_parent_len;
@@ -129,6 +138,8 @@ select_channel::xfer()
                     close(ofd);
                 }
     //            FD_SET(ifd, &read_fdset);
+            } else if (r == 0) {
+                closing = true;
             }
         }
     } else if (!closing) {

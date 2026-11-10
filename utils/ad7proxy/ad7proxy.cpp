@@ -111,6 +111,41 @@ static void print_usage(const char *progname) {
 };
 
 
+static void ignore_sigpipe() {
+    struct sigaction sa = {};
+    sa.sa_handler = SIG_IGN; // Ignore SIGPIPE
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = 0;
+
+    if (sigaction(SIGPIPE, &sa, nullptr) == -1) {
+        std::cerr << "Failed to set SIGPIPE handler: " << std::strerror(errno) << '\n';
+    }
+}
+
+bool debugger_exited = false;
+static void handle_sigchld(int sig) {
+    int saved_errno = errno; // Preserve errno
+
+    // Loop with WNOHANG to reap ALL terminated children non-blockingly
+    // -1 means wait for any child process
+    pid_t pid;
+    int status;
+
+    while ((pid = waitpid(-1, &status, WNOHANG)) > 0) {
+        if (WIFEXITED(status)) {
+            // int exit_code = WEXITSTATUS(status);
+            debugger_exited = true;
+            // Safe to log simple things, but keep it minimal inside handlers
+        } else if (WIFSIGNALED(status)) {
+            // int term_sig = WTERMSIG(status);
+            debugger_exited = true;
+            // Child was killed by a signal
+        }
+    }
+
+    errno = saved_errno;
+}
+
 template <typename CmdFilter, typename OutFilter>
 static int proxy_loop(CmdFilter &parent_to_child, OutFilter &child_to_parent)
 {
@@ -121,26 +156,48 @@ static int proxy_loop(CmdFilter &parent_to_child, OutFilter &child_to_parent)
         child_state = PASSTHROUGH;
     int res;
 
+    ignore_sigpipe();
+
     do {
         res = select(parent_to_child.nfd + 1, &parent_to_child.read_fdset, &parent_to_child.write_fdset, NULL,
             (parent_state != CLOSED) ? NULL : &wrapup_timeout);
         if (res < 0) {
             if (errno != EINTR)
                 break;
+            else
+                if (debugger_exited)
+                    break;
             /* will continue on signals*/
         } else if (!res) {
             break;
         } else {
                 if (parent_state != CLOSED)
                     parent_state = parent_to_child.xfer();
-                if (child_state != CLOSED)
+                if (child_state != CLOSED) {
                     child_state = child_to_parent.xfer(parent_to_child);
+                    if (child_state == CLOSED && parent_state != CLOSED)
+                        parent_state = parent_to_child.end();
+                }
             opened_channels = parent_state || child_state;
         }
     } while (opened_channels);
     return res;
 }
 
+static void setup_sigchld_handler() {
+    struct sigaction sa;
+    std::memset(&sa, 0, sizeof(sa));
+    sa.sa_handler = handle_sigchld;
+    sigemptyset(&sa.sa_mask);
+
+    // SA_RESTART ensures that interrupted system calls (like read/write on pipes)
+    // automatically restart instead of failing with EINTR.
+    sa.sa_flags = SA_RESTART;
+
+    if (sigaction(SIGCHLD, &sa, nullptr) == -1) {
+        std::cerr << "Failed to set SIGCHLD handler\n";
+    }
+}
 int main(int argc, char **argv) {
 
     struct ProxyOptions {
@@ -281,6 +338,8 @@ int main(int argc, char **argv) {
         // fcntl(child_in[WRITE_END], O_NONBLOCK);
         fcntl(child_out[READ_END], O_NONBLOCK);
 
+        setup_sigchld_handler();
+
         fd_set write_fdset;
         fd_set read_fdset;
         FD_ZERO(&write_fdset);
@@ -304,7 +363,7 @@ int main(int argc, char **argv) {
                     nfd, buf_to_parent, "<");
                 if (!proxy_loop(parent_to_child, child_to_parent)) {
                     /* Timeout - gdb 8.2 hangs with 100% cpu sometimes */
-                    kill(pid, SIGKILL);            
+                    kill(pid, SIGKILL);
                 }
             }
             break;
@@ -321,7 +380,7 @@ int main(int argc, char **argv) {
                     nfd, buf_to_parent, "<");
                 if (!proxy_loop(parent_to_child, child_to_parent)) {
                     /* Timeout - gdb 8.2 hangs with 100% cpu sometimes */
-                    kill(pid, SIGKILL);            
+                    kill(pid, SIGKILL);
                 }
             }
             break;

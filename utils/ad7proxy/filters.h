@@ -73,6 +73,7 @@ class select_channel {
          * 2 if there is data to be sent back to the child (loopback)
          */
         xfer_state xfer();
+        xfer_state end();
         /*
          * Tranfer from in to out. If there is data to be looped back,
          * send it to the loopback channel
