@@ -329,6 +329,8 @@ int main(int argc, char **argv) {
         debugger_args.push_back(NULL);
         execvp(opt.debugger, debugger_args.data());
         perror("execvp");
+        perror(opt.debugger);
+        fprintf(stderr, "execvp('%s') failed: %s\n", opt.debugger, strerror(errno));
         return 1;
     } else { // Parent process
         close(child_in[READ_END]);

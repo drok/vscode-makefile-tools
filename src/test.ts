@@ -23,7 +23,7 @@ import * as nls from 'vscode-nls';
 import { assert } from 'console';
 import { Span } from '@opentelemetry/api';
 import { Disposable } from 'vscode';
-import { DebugNow } from './debug';
+
 nls.config({ messageFormat: nls.MessageFormat.bundle, bundleFormat: nls.BundleFormat.standalone })();
 const localize: nls.LocalizeFunc = nls.loadMessageBundle();
 

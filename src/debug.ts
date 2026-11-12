@@ -4,42 +4,17 @@ import {
         MakefileConfiguration } from './configuration';
 import { BuildTarget } from './make';
 import { DebugConfigurationProvider, WorkspaceFolder, DebugConfiguration, ProviderResult } from 'vscode';
-import { getSettingOr } from './util';
 import * as configuration from './configuration';
 import { Goal } from './parser/gnumake';
-import { Extension, extension } from './extension';
 import { env } from 'process';
-
-let defaultSetupCommands = [{
-    "description": "Set source directory",
-    "text": "-environment-directory ${workspaceFolder}",
-    "ignoreFailures": false
-},
-{
-    "description": "Enable pretty-printing for gdb",
-    "text": "-enable-pretty-printing",
-    "ignoreFailures": true
-}
-];
-
-const frameworks_support : { [key: string]: string } =
-{
-    /* Google Test
-     * https://google.github.io/googletest/advanced.html#turning-assertion-failures-into-break-points
-     */
-    GTEST_BREAK_ON_FAILURE: "1",
-    GTEST_CATCH_EXCEPTIONS: "0",
-
-    /* Check
-     * https://libcheck.github.io/check/doc/check_html/check_7.html#Environment-Variable-Reference
-     */
-    CK_FORK: "no",
-}
+import { CppDbg } from './cppdbg';
+import { VGdb } from './vgdb';
+import { DebugNow, defaultSetupCommands } from './debugnow';
 
 export function isDebuggable(goal: Goal) : boolean {
     return true;
 }
-class MyConfiguration implements vscode.DebugConfiguration {
+export class MyConfiguration implements vscode.DebugConfiguration {
     constructor(goal: Goal) {
         this.$comment = [
             "Debug a hardcoded target in any build configuration; customize environment and args as needed",
@@ -53,7 +28,6 @@ class MyConfiguration implements vscode.DebugConfiguration {
         this.program = "$(command:autotools.builddir)/" +
             (goal.make.dir ? path.join(goal.make.dir, goal.goal!) :
             goal.goal);
-        this.environment = [];
         this.args = [];
         this.stopAtEntry = true;
         // this.debugger = "lldb";
@@ -69,7 +43,6 @@ class MyConfiguration implements vscode.DebugConfiguration {
     type: string;
     request: string;
     program: string;
-    environment: { name: string, value: string }[];
     args: string[];
     stopAtEntry: boolean;
     goal: Goal | undefined;
@@ -79,7 +52,7 @@ class MyConfiguration implements vscode.DebugConfiguration {
     setupCommands: { description: string, text: string, ignoreFailures: boolean }[];
 }
 
-function findDebugger(lang: string) : string | undefined {
+export function findDebugger(lang: string) : string | undefined {
     // 1. Check if specific C++ extensions are installed
     //const cppExt = vscode.extensions.getExtension('ms-vscode.cpptools');
     //const lldbExt = vscode.extensions.getExtension('vadimcn.vscode-lldb');
@@ -108,160 +81,14 @@ function findDebugger(lang: string) : string | undefined {
     return undefined; // No debuggers found
 }
 
-/* this configuration is used when "Run and Debug" is clicked.
- * the builddir is pre-populated
- */
-export class DebugNow implements vscode.DebugConfiguration {
-    constructor(log: Goal | undefined, goal: Goal, public testEnv?: configuration.TestEnvironment) {
-        this.$comment = [
-            "Debug a hardcoded target in any build configuration; customize environment and args as needed",
-            "The 'cwd' is set automatically to demonstrate how",
-            "This is a (carefully designed) template, but it can be editted as needed"
-        ];
-        this.type = testEnv?.debugger || findDebugger("cpp") || "cppdbg";
-        // this.type = "autotools";
-        this.name = "Debug '" + goal.goal + "'" +
-            (goal.make.dir ? " in " + goal.make.dir : "") + ` @ ${testEnv?.name ?? extension.userEnvName}`;
-        this.request = "launch";
-        this.environment = [{
-            name: "srcdir",
-            value: path.join(goal.make.ctx.fc.folder.uri.path, goal.make.dir)
-        }]
-        this.env = {
-            srcdir: path.join(goal.make.ctx.fc.folder.uri.path, goal.make.dir)
-        };
-        // let gdb='/home/radu/bin/gdb-9/bin/gdb';
-        let gdb='gdb';
-        switch (this.type) {
-            case "cppdbg": // Environment set is called .environment and uses the name: ... value: ... format
-                this.program = goal.getFilePath();
-                this.args = [];
-                if (goal.flags & Goal.Flags.Libtool_Linked) {
-                    let libtool = path.join(goal.make.ctx.root, 'libtool');
-                    this.miDebuggerPath = extension.ltLauncher;
-                    this.miDebuggerArgs = `${gdb} ${libtool} ${this.program}`;
-                    this.MIMode = 'gdb';
-                    this.externalConsole = false;
-                } else {
-                    this.miDebuggerPath = extension.integratedLauncher;
-                    this.miDebuggerArgs = `${gdb} ${this.program}`;
-                    this.MIMode = 'gdb';
-                    this.externalConsole = false;
-                }
-
-                if (testEnv) {
-                    if (testEnv.testDebugEnv)
-                        Object.entries(testEnv.testDebugEnv).forEach(([k,v]) => {
-                            this.environment.push({
-                                name: k,
-                                value: v
-                            });
-                        });
-                }
-                Object.entries(frameworks_support).forEach(([k,v]) => {
-                    this.environment.push({
-                        name: k,
-                        value: v
-                    });
-                });
-                break;
-            // Default:
-            case 'vgdb':
-                this.program = 'sh';
-                this.debugger = extension.integratedLauncher;
-                this.debuggerArgs = ['--mode-vgdb', '--debugger', gdb, '--'];
-                this.debuggerLaunchArguments = ['--zzz'];
-                this.args = [ goal.getFilePath() ];
-                if (goal.flags & Goal.Flags.Libtool_Linked) {
-                    let libtool = path.join(goal.make.ctx.root, 'libtool');
-                    this.MIMode = 'gdb';
-                    this.externalConsole = false;
-                } else {
-                    this.MIMode = 'gdb';
-                    this.externalConsole = false;
-                }
-                if (testEnv) {
-                    if (testEnv.testDebugEnv)
-                        Object.entries(testEnv.testDebugEnv).forEach(([k,v]) => {
-                            this.env[k] = v;
-                        });
-                }
-                Object.entries(frameworks_support).forEach(([k,v]) => {
-                            this.env[k] = v;
-                });
-                break;
-            default:
-                this.program = 'sh';
-                this.debugger = extension.integratedLauncher;
-                this.debuggerArgs = [gdb, goal.getFilePath()];
-                this.args = [ goal.getFilePath() ];
-                if (goal.flags & Goal.Flags.Libtool_Linked) {
-                    let libtool = path.join(goal.make.ctx.root, 'libtool');
-                    this.MIMode = 'gdb';
-                    this.externalConsole = false;
-                } else {
-                    this.MIMode = 'gdb';
-                    this.externalConsole = false;
-                }
-                if (testEnv) {
-                    if (testEnv.testDebugEnv)
-                        Object.entries(testEnv.testDebugEnv).forEach(([k,v]) => {
-                            this.env[k] = v;
-                        });
-                }
-                Object.entries(frameworks_support).forEach(([k,v]) => {
-                            this.env[k] = v;
-                });
-                break;
-        }
-        /* enable the debugging extension's debug trace */
-        if (true) {
-            switch (this.type) {
-                case 'vgdb': this.debug = 'verbose';
-                            break;
-            }
-        }
-        this.stopAtEntry = goal ? getSettingOr<boolean>(goal.make.ctx.fc.folder, "stopAtEntry", false) : true;
-        //this.preLaunchTask = buildit ? "autotools: build " + built.goal +
-        //    (built.builddir ? (' in ' + built.builddir) : ' at the top') : undefined;
-        this.cwd = goal.make.getDir();
-        this.setupCommands = defaultSetupCommands;
-        // this.testId = log?.test?.id || 'unk';
-        // this.debugger = env?.debugger;
-        this.testUri = log?.test?.uri?.with({scheme: "test"}) ?? vscode.Uri.from({scheme: "debug", path: this.cwd});
-        // this.env = env;
+export function debugGoal(log: Goal | undefined, goal: Goal, testEnv?: configuration.TestEnvironment) : vscode.DebugConfiguration
+{
+    const type = testEnv?.debugger || goal.make.ctx.fc.config.defaultDebugger || goal.make.ctx.fc.defaultDebugger || findDebugger("cpp") || "cppdbg";
+    switch (type) {
+        case 'cppdbg': return new CppDbg(log, goal, testEnv);
+        case 'vgdb': return new VGdb(log, goal, testEnv);
+        default: return new DebugNow(log, goal, testEnv);
     }
-    // env: configuration.TestEnvironment;
-    // testId: string;
-    testUri: vscode.Uri;
-    $comment: string[];
-    name: string;
-    type: string;
-    request: string;
-    program: string;
-    environment: { name: string, value: string }[];
-    env: { [key: string]: string };
-    args: string[];
-    stopAtEntry: boolean;
-    //preLaunchTask: string | undefined;
-    cwd: string;
-    setupCommands: { description: string, text: string, ignoreFailures: boolean }[];
-
-    /* controls for particular debuggers */
-    /* vgdb: */
-    debug?: string;
-    debugger?: string;
-    debuggerArgs?: string[];
-    debuggerLaunchArguments?: string[];
-
-
-    /* cppdbg */
-    /* mi params used for debugging Libtool bins */
-    miDebuggerPath?: string;
-    miDebuggerArgs?: string;
-    MIMode?: string;
-    additionalSOLibSearchPath?: string;
-    externalConsole?: boolean;
 }
 
 class MyDebugProvider implements DebugConfigurationProvider {

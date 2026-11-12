@@ -26,7 +26,7 @@ import { TestItem } from 'vscode';
 import * as cpp from 'vscode-cpptools';
 import { CppConfigurationProvider } from './cpptools';
 import * as debugProvider from './debug';
-import { DebugNow } from './debug';
+import { debugGoal } from './debug';
 import * as compilationDatabase from './compilationDatabase';
 import {
         AutotoolsTask,
@@ -497,7 +497,7 @@ export class Extension {
             try {
                 vscode.debug.startDebugging(
                     goal.make.ctx.fc.folder,
-                    new DebugNow(goal, target, env),
+                    debugGoal(goal, target, env),
                     dopt)
                 .then((z) => {});
             } catch(e) {
