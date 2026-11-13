@@ -1,12 +1,8 @@
 import * as path from 'path';
 import * as vscode from 'vscode';
-import {
-        MakefileConfiguration } from './configuration';
-import { BuildTarget } from './make';
 import { DebugConfigurationProvider, WorkspaceFolder, DebugConfiguration, ProviderResult } from 'vscode';
 import * as configuration from './configuration';
 import { Goal } from './parser/gnumake';
-import { env } from 'process';
 import { CppDbg } from './cppdbg';
 import { VGdb } from './vgdb';
 import { DebugNow, defaultSetupCommands } from './debugnow';
@@ -30,10 +26,6 @@ export class MyConfiguration implements vscode.DebugConfiguration {
             goal.goal);
         this.args = [];
         this.stopAtEntry = true;
-        // this.debugger = "lldb";
-        // cpptools understands tasks to be those it can provide itself.
-        // this.preLaunchTask = "autotools: build " + built.goal + "" +
-        //     (built.builddir ? (' in ' + built.builddir) : ' at the top');
 
         this.cwd = "$(command:autotools.builddir)";
         this.setupCommands = defaultSetupCommands;
@@ -46,21 +38,12 @@ export class MyConfiguration implements vscode.DebugConfiguration {
     args: string[];
     stopAtEntry: boolean;
     goal: Goal | undefined;
-    // preLaunchTask: string;
     cwd: string;
-    // debugger: string | undefined;
     setupCommands: { description: string, text: string, ignoreFailures: boolean }[];
 }
 
 export function findDebugger(lang: string) : string | undefined {
-    // 1. Check if specific C++ extensions are installed
-    //const cppExt = vscode.extensions.getExtension('ms-vscode.cpptools');
-    //const lldbExt = vscode.extensions.getExtension('vadimcn.vscode-lldb');
-//
-    //console.log("Microsoft C/C++ extension installed:", !!cppExt);
-    //console.log("CodeLLDB extension installed:", !!lldbExt);
-
-    // 2. You can iterate through all active extensions to find any contributing debuggers
+    // Iterate through all active extensions to find any contributing debuggers
     // Debuggers register themselves via 'debuggers' contribution points in package.json
     for (const ext of vscode.extensions.all) {
         const packageJSON = ext.packageJSON;
@@ -73,7 +56,6 @@ export function findDebugger(lang: string) : string | undefined {
                     continue;
                 if (dbg.type != 'vgdb')
                     continue;
-                //if (dbg.languages/* && dbg.languages.includes(lang)*/)
                     return dbg.type; // Return the type of the first debugger found
             }
         }
@@ -100,7 +82,6 @@ class MyDebugProvider implements DebugConfigurationProvider {
                 default:
                     break;
             }
-//            let zz : vscode.DebugSessionCustomEvent = e;
             console.debug(e);
         }));
     }
@@ -130,26 +111,6 @@ class MyDebugProvider implements DebugConfigurationProvider {
     } else {
         return [];
     }
-//    let r : DebugConfiguration;
-//    r = Promise.resolve(t.then(goal =>
-//        r = new MyConfiguration(goal.builddir, goal.goal)));
-    //return[new MyConfiguration(t.builddir, t.goal)];
-//    return [
-//        {
-//            type: 'autotools',
-//            name: 'Autotool Test Debug 2',
-//            request: 'launch',
-//            program: "zzz-2", // configuration.getDebugProgram(), // Get the program to be debugged
-//            // Additional configuration properties specific to cppdbg debugger
-//        },
-//        {
-//        type: 'autotools',
-//        name: 'Autotool Test Debug',
-//        request: 'launch',
-//        program: "zzz", // configuration.getDebugProgram(), // Get the program to be debugged
-//        // Additional configuration properties specific to cppdbg debugger
-//      }
-//    ];
   }
 
 
@@ -162,8 +123,6 @@ class MyDebugProvider implements DebugConfigurationProvider {
                 .then(goal => new DebugNow(undefined, goal, fc.currentTestEnvironment));
             return conf;
         }
-        //return null;
-        // return new MyConfiguration("dir-name", "test-name");
     }
     if (config.type != "autotools")
         return undefined;
@@ -180,7 +139,6 @@ class MyDebugProvider implements DebugConfigurationProvider {
 
   resolveDebugConfigurationWithSubstitutedVariables?(folder: WorkspaceFolder | undefined,
         debugConfiguration: DebugConfiguration, token?: vscode.CancellationToken): ProviderResult<DebugConfiguration> {
-    // return this.resolveDebugConfiguration(folder, debugConfiguration);
     if (debugConfiguration.type == "autotools")
         debugConfiguration.type = "cppdbg";
     return debugConfiguration;
@@ -191,10 +149,8 @@ class MyDebugProvider implements DebugConfigurationProvider {
 export function activate(context: vscode.ExtensionContext) {
   const providers = [
     new MyDebugProvider(context)
-    // new MyDebugProvider()
   ];
 
-//  const provider = new MyDebugProvider();
   // Register the debug configuration provider
   providers.forEach((provider) =>
   context.subscriptions.push(

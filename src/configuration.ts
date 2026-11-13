@@ -41,8 +41,6 @@ import { CppConfigurationProvider } from './cpptools';
 nls.config({ messageFormat: nls.MessageFormat.bundle, bundleFormat: nls.BundleFormat.standalone })();
 const localize: nls.LocalizeFunc = nls.loadMessageBundle();
 
-// let statusBar: ui.UI = ui.getUI();
-
 // Each different scenario of building the same makefile, in the same environment, represents a configuration.
 // Example: "make BUILD_TYPE=Debug" and "make BUILD_TYPE=Release" can be the debug and release configurations.
 // The user can save several different such configurations in autotools.configurations setting,
@@ -75,10 +73,6 @@ export interface MakefileConfiguration {
 
     // debugger to use if a TEST_ENVIRONMENT does not override it
     defaultDebugger: string | undefined;
-
-    // unwriteable file used to block autmake TEST_SUITE outputting summaries for indiv. tests
-    // One environment set for each TestEnvironment, indexed by name
-    //nologs: Map<string,vscode.ProcessExecutionOptions>;
 
     // TODO: investigate how flexible this is to integrate with other build systems than the MAKE family
     // (basically anything that can produce a dry-run output is sufficient)
@@ -209,7 +203,6 @@ export class FolderConfig implements vscode.Disposable {
                 isDefault: true,
                 defaultDebugger: this.defaultDebugger,
             };
-        // const deb = this.defaultDebugger || this.config.defaultDebugger;
         if (!this.config.defaultDebugger)
             this.config.defaultDebugger = this.defaultDebugger;
         this.abs_top_builddir = this.config.top_builddir || this.folder.uri.fsPath;
@@ -246,7 +239,6 @@ export class FolderConfig implements vscode.Disposable {
             makefiles: new Map()
         }, undefined);
         statusBar.setConfiguration(this);
-        //extension.onConfigurationSelect(this.config);
         for (const ac of AutoToolsBootstrapTaskProvider.manifests)
             if (util.checkFileExistsSync(path.join(this.folder.uri.path, ac))) {
                 this._configureAc = ac;
@@ -357,9 +349,6 @@ export class FolderConfig implements vscode.Disposable {
         var vars : EnvironmentSetting = {};
         if (this.traits.overrides_TESTS_ENVIRONMENT)
             return vars;
-        //var d = env['debugger'] || this.defaultDebugger;
-        //if (d)
-        //    vars['debugger'] = d;
 
         if (this._gTestEnvironment.TESTS_ENVIRONMENT)
             Object.entries(this._gTestEnvironment.TESTS_ENVIRONMENT).forEach(([name,value]) => {
@@ -382,14 +371,6 @@ export class FolderConfig implements vscode.Disposable {
             debugger: undefined,
             hashCode: 0,
         }
-        //if (this.config.defaultDebugger) {
-        //    if (this._gTestEnvironment.TESTS_ENVIRONMENT) {
-        //        if (this._gTestEnvironment.TESTS_ENVIRONMENT["debugger"] === undefined)
-        //            this._gTestEnvironment.TESTS_ENVIRONMENT["debugger"] = this.config.defaultDebugger;
-        //    } else {
-        //        this._gTestEnvironment.TESTS_ENVIRONMENT = {"debugger": this.config.defaultDebugger};
-        //    }
-        //}
         this.loadedTestEnvironments = c.get<TestEnvironment[]>("test_environments", []);
         cleanupLoadedTestEnvironments(this.loadedTestEnvironments, this._testEnvironments);
         this.accountForTraits();
@@ -457,11 +438,8 @@ export class FolderConfig implements vscode.Disposable {
                 e.updateExecOptions!.env![d + '_FLAGS'] = driver_flags;
             })
         });
-        // this.currentTestEnvironmentName =
-        // let newName = setCurrentTestEnvironment(currentTestEnvironmentName);
         this.currentTestEnvironmentName = this.state.testEnvironment; // re-link to the updated env
         this.setBuildEnvPath();
-        // extension.setTestEnvironmentName(newName);
     }
     public accountForTraits(): void {
         this.updateEnvironmentsForTraits();
@@ -690,9 +668,6 @@ export class FolderConfig implements vscode.Disposable {
             }
         } else
         if (old === undefined || (current ?? TRS.NONE) != oldTRS) {
-//                {authority: Extension.whoami, scheme: 'test', path: '/' + dir, query: goal.goal}));
-            //this.suiteDecorator.update(vscode.Uri.from(
-            //    {authority: Extension.whoami, scheme: 'check', path: '/' + dir, query: 'test-suite.log'}));
             if (old !== undefined) {// Don't update when TRS's are initially read from disk
                 extension.suiteDecorator.update(goal.getURI());
                 this.failStatUpdate(oldTRS, current ?? TRS.NONE);
@@ -856,7 +831,6 @@ export class FolderConfig implements vscode.Disposable {
     public get buildTargets() : Map<string, Map<string,Goal>> { return this._buildTargets; }
 
     public updateOutlineBadge() : void {
-        // updateOutlineStats(numFails, numSuspect, numTests, numUnknown);
         updateWelcomeContexts();
 
         /* Todo - update the badge */
@@ -997,8 +971,6 @@ export class FolderConfig implements vscode.Disposable {
             windowsSdkVersion: undefined
         };
         this._cppConfigurationProvider.setCustomConfigurationProvider(cache);
-        // workspaceBrowseConfiguration
-        // this.updateCppToolsProvider();
     }
 
 
@@ -1074,12 +1046,10 @@ export class FolderConfig implements vscode.Disposable {
                     added = suiteparent != submake.test_suite.test &&
                         this.testController!.addSubTest(suiteparent, submake.test_suite.test);
             }
-            //if (submake.test_suite?.test)
             if (added)
                 this.updateTestSuite(submake, sub.test_suite ? sub : parent, top && !sub.test_suite);
         }
         if (sub.test_suite && sub.test_suite.test) {
-            //let logpath = path.join(c.top_builddir, sub.dir);
             sub.test_suite.depends?.forEach((test) => {
                 sub.test_suite?.test && this.testController!.addTest(this.buildConfig, sub.dir, sub.test_suite.test, test)});
         }
@@ -1105,12 +1075,6 @@ export async function onWorkspaceChange(e: vscode.WorkspaceFoldersChangeEvent, s
     });
     updateWelcomeContexts();
 }
-
-// export async function parseAllFolders(span: Span) : Promise<void> {
-//     for (const [k,v] of configs) {
-//         await v.parse(span);
-//     }
-// }
 
 export async function startAllFolders(span: Span) : Promise<void> {
     return startFolders(span, Array.from(configs.values()));
@@ -1293,11 +1257,6 @@ export function autoreconfCmd(c: vscode.WorkspaceConfiguration): string[] {
     return cmd;
 }
 
-// function defaultBuildFolder(): string {
-//     let config_status = util.resolvePathToRoot("config.status");
-//     return util.checkFileExistsSync(config_status) ? '' : 'build/Default';
-// }
-
 function findMakefile(abs_top_builddir: string): string | undefined {
     // top_builddir is resolved to either a subdirectory of the workspace or an absolute path.
 
@@ -1327,8 +1286,6 @@ function findMakefile(abs_top_builddir: string): string | undefined {
         relativeMakefile = topMakefile;
     return relativeMakefile;
 }
-
-//export function setMakefileConfigurations(configurations: MakefileConfiguration[]): void { makefileConfigurations = configurations; }
 
 // Assign names to any unnamed environments
 export function cleanupLoadedTestEnvironments(loaded: TestEnvironment[], configured: TestEnvironment[]) : void {
@@ -1363,7 +1320,6 @@ export function cleanupLoadedTestEnvironments(loaded: TestEnvironment[], configu
 
 const defaultTestEnvName : string = "<no-env>";
 function nullTestEnvironment() : TestEnvironment {
-        // const defEnv : EnvironmentSetting = dbg ? { debugger: dbg } : {};
         return {
             name: defaultTestEnvName,
             TESTS_ENVIRONMENT: {},
@@ -1402,8 +1358,6 @@ export async function initFromSettings(activation: boolean = false, span: Span):
     readtraceLiveTestRuns();
     readCppProvider();
 
-    // await setCurrentMakefileConfiguration(currentMakefileConfigurationName);
-
     // FIXME: seems wrong to do || make.t_all; this fn should probably be called
     // config arg after config is fully loaded.
     // await extension._projectOutlineProvider.update(extension.getState().buildConfiguration); // FIXME: update with real target
@@ -1427,8 +1381,6 @@ export async function initFromSettings(activation: boolean = false, span: Span):
                 configs.set(folder, fc);
                 await startFolders(span, [fc]);
                 continue;
-//            } else {
-//                refreshConfiguration(span, fc);
             }
             let c = vscode.workspace.getConfiguration(keyRoot, folder);
             // We are interested in updating only some relevant properties.

@@ -1,12 +1,4 @@
-#include <cstdio>
-#include <cstdlib>
-#include <unistd.h>
-#include <fcntl.h>
-#include <getopt.h>
-
 #include "config.h"
-#include <sys/wait.h>
-#include <signal.h>
 
 #include <string>
 #include <string_view>
@@ -112,7 +104,6 @@ OutFilterAd7::onMatch(const string_view& in, const filter_it& match) {
     sendToConsole("sendToConsole() from OutFilter.onMatch()", buf);
     if (&match.filter == &GDB::INFERIOR_EXIT) {
         if (running) {
-            // buf.append(in, match.it->position(), match.it->length());
             buf.append(GDB::THREAD_EXITED);
 #ifdef AUTO_SWITCH_THREAD_1_ON_THREAD_EXIT
             sendTo("inferior 1", buf);
@@ -123,7 +114,6 @@ OutFilterAd7::onMatch(const string_view& in, const filter_it& match) {
     if (&match.filter == &GDB::INFERIOR_EXIT_W_ERROR) {
         auto m = get_matches(in, match);
         assert(m.size() == 2 && "Exactly 2 things captured (full string, exit-code)");
-        // long exit_code = stol(m[1]);
         buf.append(GDB::THREAD_EXITED);
 #ifdef AUTO_SWITCH_THREAD_1_ON_THREAD_EXIT
         sendTo("inferior 1", buf);

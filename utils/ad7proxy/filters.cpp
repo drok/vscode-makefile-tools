@@ -1,13 +1,9 @@
 #include <cstdio>
 #include <cstdlib>
 #include <unistd.h>
-#include <fcntl.h>
-#include <getopt.h>
 #include <utility>
 
 #include "config.h"
-#include <sys/wait.h>
-#include <signal.h>
 
 #include <string>
 #include <string_view>
@@ -94,13 +90,11 @@ select_channel::xfer()
         if (!buf_to_parent_len) {
             /* Closed */
             FD_CLR(ifd, &read_fdset);
-//            FD_CLR(ofd, &write_fdset);
             close(ifd);
             close(ofd);
             closing = true;
         } else if (buf_to_parent_len < 0) {
             // interrupted ... continue
-            // FD_CLR(ifd, &read_fdset);
             return CLOSED;
         } else {
             string_view data_in(buf_to_parent, buf_to_parent_len);
@@ -109,13 +103,10 @@ select_channel::xfer()
                 ssize_t r = write(ofd, buf_to_send.data(), buf_to_send.size());
                 if (r < 0) {
                     close(ifd);
-    //                FD_CLR(ifd, &read_fdset);
                     closing = true;
                 } else {
                     if (cmp_not_equal(r, buf_to_send.size())) {
                         fsync(ofd);
-    //                FD_CLR(ifd, &read_fdset);
-    //                FD_SET(ofd, &write_fdset);
                     }
                     buf_to_send.remove_prefix(r);
                 }
@@ -124,8 +115,6 @@ select_channel::xfer()
     } else if (FD_ISSET(ofd, &write_fdset)) { /* continue writing to parent */
         ssize_t r = write(ofd, buf_to_send.data(), buf_to_send.size());
         if (r < 0) {
-//            FD_CLR(ofd, &write_fdset);
-//            FD_CLR(ifd, &read_fdset);
             close(ifd);
             close(ofd);
             closing = true;
@@ -137,7 +126,6 @@ select_channel::xfer()
                     FD_CLR(ofd, &write_fdset);
                     close(ofd);
                 }
-    //            FD_SET(ifd, &read_fdset);
             } else if (r == 0) {
                 closing = true;
             }

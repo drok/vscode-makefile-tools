@@ -1,12 +1,4 @@
-#include <cstdio>
-#include <cstdlib>
-#include <unistd.h>
-#include <fcntl.h>
-#include <getopt.h>
-
 #include "config.h"
-#include <sys/wait.h>
-#include <signal.h>
 
 #include <string>
 #include <string_view>
