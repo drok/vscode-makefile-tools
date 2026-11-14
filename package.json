@@ -292,7 +292,7 @@
                 }
             },
             {
-                "name": "autotool.ac",
+                "name": "autotools.ac",
                 "label": "configure.ac errors",
                 "source": "autotools",
                 "owner": "external",
