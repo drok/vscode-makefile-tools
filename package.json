@@ -945,7 +945,7 @@
                             },
                             "goal": {
                                 "type": "string",
-                                "description": "%autotools.taskDefinitions.test.goal.description%",
+                                "description": "%autotools.taskDefinitions.task.test.goal.description%",
                                 "examples": [
                                     "unit-test-1.log",
                                     "integration-test-1.log"
