@@ -988,7 +988,7 @@
                         "properties": {
                             "dir": {
                                 "type": "string",
-                                "description": "%autotools.taskDefinitions.check.builddir.description%",
+                                "description": "%autotools.taskDefinitions.task.check.builddir.description%",
                                 "examples": [
                                     "test/unit-tests",
                                     "test/integration-tests"
