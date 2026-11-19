@@ -96,7 +96,7 @@ OutFilterVgdb::onMatch(const string_view& in, const filter_it& match) {
         long group_id = group_ids[thread];
         auto pid = threads[thread];
         exec_threads[thread] = group_id;
-        string remote_debugger;
+        string remote_debugger("debug");
         auto has_remote = getDebuggerVariable(pid, remote_debugger);
         buf.append("~\" ---ad7--- Executing " + m[1].str() + " as pid " + to_string(pid) +
         (has_remote ?
@@ -105,15 +105,20 @@ OutFilterVgdb::onMatch(const string_view& in, const filter_it& match) {
         ) + "\\n\"\n");
 
         int do_continue = 1;
+        if (remote_debugger == "detach") {
+            /* Empty DEBUGGER_URI means detach this process */
+            sendTo("detach inferior " + to_string(group_id), buf);
+        } else {
+                if (!breakpoints_enabled) enableBreakpoints();
+        }
         if (has_remote) {
             // buf_to_loopback.append("-target-detach\n");
 //            if (GDB_8_2_CRASH_ON_THREAD_INFO_AFTER_DETACH)
 //                buf_to_loopback.append("-thread-select 1\n");
             if (remote_debugger == "debug") { // stop at entry
                 do_continue = true;
-                if (!breakpoints_enabled) enableBreakpoints();
-            } else if (remote_debugger == "break") { // stop on breakpoints
-                if (!breakpoints_enabled) enableBreakpoints();
+            } else if (remote_debugger == "nobreak") { // stop on breakpoints
+                if (breakpoints_enabled) disableBreakpoints();
             } else if (remote_debugger != "detach") {
                 remotes[group_id] = remote_debugger;
 #ifdef DEBUG
@@ -131,14 +136,7 @@ OutFilterVgdb::onMatch(const string_view& in, const filter_it& match) {
                 assert(created_it.second && "createdInferior should not yet exist");
 #endif
                 paused = true;
-
-            } else {
-                /* Empty DEBUGGER_URI means detach this process */
-                sendTo("detach inferior " + to_string(group_id), buf);
             }
-        }
-        else if (breakpoints_enabled) {
-            disableBreakpoints();
         }
         if (do_continue) {
 #if !defined(STOP_AT_EXEC)
@@ -211,7 +209,6 @@ OutFilterVgdb::onMatch(const string_view& in, const filter_it& match) {
         group_ids[id] = group_id;
         buf.append("~\" ---ad7--- Thread " + to_string(id) + " is pid " + to_string(pid) + "\\n\"\n");
         // sendTo("inferior 1", buf);
-        sendTo(GDB::EXEC_CONTINUE, buf);
     } else
     if (&match.filter == &GDB::REMOTE_CONNECTED) {
         if (paused)
@@ -280,7 +277,6 @@ OutFilterVgdb::onMatch(const string_view& in, const filter_it& match) {
             auto remote = remotes.find(exec_thread_group);
             assert(remote != remotes.end() && "inferior selected should correspond to a remote");
             assert(remote->second.size() && "should only store non-empty remotes");
-            sendTo("shell sleep 0.2", buf);
             sendTo("9999915-target-select extended-remote " + remote->second, buf);
 #ifdef SLOW_DOWN
             sendToLoopback("shell sleep 5", buf);
