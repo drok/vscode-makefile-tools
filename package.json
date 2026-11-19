@@ -565,7 +565,6 @@
                                     "markdownDescription": "%autotools.configurations.defaultDebugger.markdownDescription%",
                                     "examples": [
                                         "vdbg",
-                                        "lldb",
                                         "cppdbg"
                                     ]
                                 },
