@@ -24,6 +24,7 @@ import { WorkspaceFolder } from 'vscode';
 import * as ui from './ui';
 import { quote } from '@mergesium/shell-quote';
 import * as diag from './diag';
+import * as compilationDatabase from './compilationDatabase';
 
 import * as nls from 'vscode-nls';
 import { log } from 'console';
@@ -245,6 +246,14 @@ export async function generateParseContent(span: Span, fc: FolderConfig): Promis
          * what can be done. Dry running is concerned with what *should* be done.
          */
         "--keep-going",
+
+        /* this prevents check-TESTS from running first,
+         * which causes tests where a .log already exists to not
+         * have their dependencies shown.
+         * Instead, it forces all logs to be evaluated when building
+         * the test-suite.log target
+         */
+        "am__set_TESTS_bases=\\$(MAKE) \\$(AM_MAKEFLAGS) \\$(TEST_LOGS) && exit 0",
 
         "GMOFILES=", // Avoid po and pot files being built with msgmerge
     // rejecting GNU make's builtin variables and rules because automake
@@ -688,6 +697,9 @@ export async function configure(parentSpan: Span, triggeredBy: TriggeredBy, fc: 
       logger.message(localize("autotools.log.config.exported2",
             "Generated tasks: {0} build tasks and {1} test tasks in {2} check suites (see Run Task... command)",
             stats.programs, stats.tests, stats.checks));
+
+      // Write compile_commands.json after successful configuration
+      await compilationDatabase.writeCompilationDatabase(fc, span);
     } else {
         if (retc == 1) {/* ie, IntelliSense API not available */
             var kbUrl : vscode.Uri = await fc.kbUrl();

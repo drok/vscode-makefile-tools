@@ -1,9 +1,26 @@
 bin_PROGRAMS = ad7proxy
 
-ad7proxy_SOURCES = ad7proxy.cpp
+EXTRA_FILES = debug.sh
+
+ad7proxy_SOURCES = \
+    Debuggers.cpp \
+    filters.cpp \
+    gdb.cpp \
+    ad7.cpp \
+    vgdb.cpp \
+    ad7proxy.cpp
 ad7proxy_CPPFLAGS =
-ad7proxy_CXXFLAGS =
-ad7proxy_LDADD =
+ad7proxy_CXXFLAGS = \
+    @URIPARSER_CFLAGS@
+ad7proxy_LDADD = \
+    @URIPARSER_LIBS@
+
+noinst_HEADERS = \
+    filters.h \
+    ad7.h \
+    vgdb.h \
+    gdb.h \
+    Debuggers.h
 
 if DEBUG
     ad7proxy_CPPFLAGS += -DDEBUG

@@ -1,6 +1,6 @@
 
 import { Disposable, TextDocumentContentProvider, Uri, Event, EventEmitter, window, workspace, TextDocumentShowOptions } from 'vscode';
-import { CancellationToken } from 'vscode-jsonrpc';
+import { CancellationToken } from 'vscode';
 import { Goal } from './parser/gnumake';
 import { TestEnvironment,
     FolderConfig,

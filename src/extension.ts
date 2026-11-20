@@ -26,7 +26,8 @@ import { TestItem } from 'vscode';
 import * as cpp from 'vscode-cpptools';
 import { CppConfigurationProvider } from './cpptools';
 import * as debugProvider from './debug';
-import { DebugNow } from './debug';
+import { debugGoal } from './debug';
+import * as compilationDatabase from './compilationDatabase';
 import {
         AutotoolsTask,
         TestTask,
@@ -43,6 +44,7 @@ import { installAutotools } from './install';
 import { Span } from '@opentelemetry/api';
 import { buildinfo } from '../buildinfo';
 
+const CPPTOOLS_EXTENSION = 'ms-vscode.cpptools';
 nls.config({ messageFormat: nls.MessageFormat.bundle, bundleFormat: nls.BundleFormat.standalone })();
 const localize: nls.LocalizeFunc = nls.loadMessageBundle();
 
@@ -496,7 +498,7 @@ export class Extension {
             try {
                 vscode.debug.startDebugging(
                     goal.make.ctx.fc.folder,
-                    new DebugNow(goal, target, env),
+                    debugGoal(goal, target, env),
                     dopt)
                 .then((z) => {});
             } catch(e) {
@@ -555,6 +557,10 @@ export class Extension {
     }
 
     public async registerCppTools(): Promise<void> {
+        const cpptools = vscode.extensions.getExtension(CPPTOOLS_EXTENSION);
+
+        if (!cpptools || !cpptools.isActive)
+            return;
         this.cppToolsAPI = await cpp.getCppToolsApi(cpp.Version.v6);
     // Register this folder as a new provider or request an update
         if (this.cppToolsAPI) {
@@ -686,6 +692,17 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         telemetry.logEvent(extension.journey, "exp");
         if (sub instanceof tree.SubNode)
             await make.configure(extension.journey, make.TriggeredBy.configure, sub.make.ctx.fc);
+    }));
+
+    context.subscriptions.push(vscode.commands.registerCommand('autotools.exportCompileCommands', async (sub: tree.SubNode) => {
+        telemetry.logEvent(extension.journey, "expCC");
+        if (sub instanceof tree.SubNode) {
+            const fc = sub.make.ctx.fc;
+            await compilationDatabase.writeCompilationDatabase(fc, extension.journey);
+            vscode.window.showInformationMessage(
+                `Exported compile_commands.json to ${compilationDatabase.getCompilationDatabasePath(fc)}`
+            );
+        }
     }));
 
     context.subscriptions.push(vscode.commands.registerCommand('autotools.outline.recheck', (sub: tree.SubNode) => {

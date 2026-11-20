@@ -1,44 +1,16 @@
 import * as path from 'path';
 import * as vscode from 'vscode';
-import {
-        MakefileConfiguration } from './configuration';
-import { BuildTarget } from './make';
 import { DebugConfigurationProvider, WorkspaceFolder, DebugConfiguration, ProviderResult } from 'vscode';
-import { getSettingOr } from './util';
 import * as configuration from './configuration';
 import { Goal } from './parser/gnumake';
-import { Extension, extension } from './extension';
-
-let defaultSetupCommands = [{
-    "description": "Set source directory",
-    "text": "-environment-directory ${workspaceFolder}",
-    "ignoreFailures": false
-},
-{
-    "description": "Enable pretty-printing for gdb",
-    "text": "-enable-pretty-printing",
-    "ignoreFailures": true
-}
-];
-
-const frameworks_support : { [key: string]: string } =
-{
-    /* Google Test
-     * https://google.github.io/googletest/advanced.html#turning-assertion-failures-into-break-points
-     */
-    GTEST_BREAK_ON_FAILURE: "1",
-    GTEST_CATCH_EXCEPTIONS: "0",
-
-    /* Check
-     * https://libcheck.github.io/check/doc/check_html/check_7.html#Environment-Variable-Reference
-     */
-    CK_FORK: "no",
-}
+import { CppDbg } from './cppdbg';
+import { VGdb } from './vgdb';
+import { DebugNow, defaultSetupCommands } from './debugnow';
 
 export function isDebuggable(goal: Goal) : boolean {
     return true;
 }
-class MyConfiguration implements vscode.DebugConfiguration {
+export class MyConfiguration implements vscode.DebugConfiguration {
     constructor(goal: Goal) {
         this.$comment = [
             "Debug a hardcoded target in any build configuration; customize environment and args as needed",
@@ -52,12 +24,8 @@ class MyConfiguration implements vscode.DebugConfiguration {
         this.program = "$(command:autotools.builddir)/" +
             (goal.make.dir ? path.join(goal.make.dir, goal.goal!) :
             goal.goal);
-        this.environment = [];
         this.args = [];
         this.stopAtEntry = true;
-        // cpptools understands tasks to be those it can provide itself.
-        // this.preLaunchTask = "autotools: build " + built.goal + "" +
-        //     (built.builddir ? (' in ' + built.builddir) : ' at the top');
 
         this.cwd = "$(command:autotools.builddir)";
         this.setupCommands = defaultSetupCommands;
@@ -67,92 +35,42 @@ class MyConfiguration implements vscode.DebugConfiguration {
     type: string;
     request: string;
     program: string;
-    environment: { name: string, value: string }[];
     args: string[];
     stopAtEntry: boolean;
     goal: Goal | undefined;
-    // preLaunchTask: string;
     cwd: string;
     setupCommands: { description: string, text: string, ignoreFailures: boolean }[];
 }
 
-/* this configuration is used when "Run and Debug" is clicked.
- * the builddir is pre-populated
- */
-export class DebugNow implements vscode.DebugConfiguration {
-    constructor(log: Goal | undefined, goal: Goal, public env?: configuration.TestEnvironment) {
-        this.$comment = [
-            "Debug a hardcoded target in any build configuration; customize environment and args as needed",
-            "The 'cwd' is set automatically to demonstrate how",
-            "This is a (carefully designed) template, but it can be editted as needed"
-        ];
-        this.type = "autotools";
-        this.name = "Debug '" + goal.goal + "'" +
-            (goal.make.dir ? " in " + goal.make.dir : "") + ` @ ${env?.name ?? extension.userEnvName}`;
-        this.request = "launch";
-        this.program = goal.getFilePath();
-        this.environment = [{
-            name: "srcdir",
-            value: path.join(goal.make.ctx.fc.folder.uri.path, goal.make.dir)
-        }]
-        // let gdb='/home/radu/bin/gdb-9/bin/gdb';
-        let gdb='gdb';
-        if (goal.flags & Goal.Flags.Libtool_Linked) {
-            let libtool = path.join(goal.make.ctx.root, 'libtool');
-            this.miDebuggerPath = extension.ltLauncher;
-            this.miDebuggerArgs = `${gdb} ${libtool} ${this.program}`;
-            this.MIMode = 'gdb';
-            this.externalConsole = false;
-        } else {
-            this.miDebuggerPath = extension.integratedLauncher;
-            this.miDebuggerArgs = `${gdb} ${this.program}`;
-            this.MIMode = 'gdb';
-            this.externalConsole = false;
+export function findDebugger(lang: string) : string | undefined {
+    // Iterate through all active extensions to find any contributing debuggers
+    // Debuggers register themselves via 'debuggers' contribution points in package.json
+    for (const ext of vscode.extensions.all) {
+        const packageJSON = ext.packageJSON;
+        if (packageJSON && packageJSON.contributes && packageJSON.contributes.debuggers) {
+            const debuggers = packageJSON.contributes.debuggers;
+            // Each debugger defines a 'type' (e.g., 'cppdbg', 'cppvsdbg', 'lldb')
+            for (const dbg of debuggers) {
+                console.log(`${packageJSON.name}: Type: ${dbg.type}, Label: ${dbg.label}, Languages: ${dbg.languages}`);
+                if (dbg.type == 'lldb')
+                    continue;
+                if (dbg.type != 'vgdb')
+                    continue;
+                    return dbg.type; // Return the type of the first debugger found
+            }
         }
-        if (env) {
-            if (env.testDebugEnv)
-                Object.entries(env.testDebugEnv).forEach(([k,v]) => {
-                    this.environment.push({
-                        name: k,
-                        value: v
-                    });
-                });
-        }
-        Object.entries(frameworks_support).forEach(([k,v]) => {
-            this.environment.push({
-                name: k,
-                value: v
-            });
-        });
-        this.args = [];
-        this.stopAtEntry = goal ? getSettingOr<boolean>(goal.make.ctx.fc.folder, "stopAtEntry", false) : true;
-        //this.preLaunchTask = buildit ? "autotools: build " + built.goal +
-        //    (built.builddir ? (' in ' + built.builddir) : ' at the top') : undefined;
-        this.cwd = goal.make.getDir();
-        this.setupCommands = defaultSetupCommands;
-        // this.testId = log?.test?.id || 'unk';
-        this.testUri = log?.test?.uri?.with({scheme: "test"}) ?? vscode.Uri.from({scheme: "debug", path: this.cwd});
     }
-    // testId: string;
-    testUri: vscode.Uri;
-    $comment: string[];
-    name: string;
-    type: string;
-    request: string;
-    program: string;
-    environment: { name: string, value: string }[];
-    args: string[];
-    stopAtEntry: boolean;
-    //preLaunchTask: string | undefined;
-    cwd: string;
-    setupCommands: { description: string, text: string, ignoreFailures: boolean }[];
+    return undefined; // No debuggers found
+}
 
-    /* mi params used for debugging Libtool bins */
-    miDebuggerPath?: string;
-    miDebuggerArgs?: string;
-    MIMode?: string;
-    additionalSOLibSearchPath?: string;
-    externalConsole?: boolean;
+export function debugGoal(log: Goal | undefined, goal: Goal, testEnv?: configuration.TestEnvironment) : vscode.DebugConfiguration
+{
+    const type = testEnv?.debugger || goal.make.ctx.fc.config.defaultDebugger || goal.make.ctx.fc.defaultDebugger || findDebugger("cpp") || "cppdbg";
+    switch (type) {
+        case 'cppdbg': return new CppDbg(log, goal, testEnv);
+        case 'vgdb': return new VGdb(log, goal, testEnv);
+        default: return new DebugNow(log, goal, testEnv);
+    }
 }
 
 class MyDebugProvider implements DebugConfigurationProvider {
@@ -164,7 +82,6 @@ class MyDebugProvider implements DebugConfigurationProvider {
                 default:
                     break;
             }
-//            let zz : vscode.DebugSessionCustomEvent = e;
             console.debug(e);
         }));
     }
@@ -194,27 +111,8 @@ class MyDebugProvider implements DebugConfigurationProvider {
     } else {
         return [];
     }
-//    let r : DebugConfiguration;
-//    r = Promise.resolve(t.then(goal =>
-//        r = new MyConfiguration(goal.builddir, goal.goal)));
-    //return[new MyConfiguration(t.builddir, t.goal)];
-//    return [
-//        {
-//            type: 'autotools',
-//            name: 'Autotool Test Debug 2',
-//            request: 'launch',
-//            program: "zzz-2", // configuration.getDebugProgram(), // Get the program to be debugged
-//            // Additional configuration properties specific to cppdbg debugger
-//        },
-//        {
-//        type: 'autotools',
-//        name: 'Autotool Test Debug',
-//        request: 'launch',
-//        program: "zzz", // configuration.getDebugProgram(), // Get the program to be debugged
-//        // Additional configuration properties specific to cppdbg debugger
-//      }
-//    ];
   }
+
 
   resolveDebugConfiguration(folder: WorkspaceFolder | undefined, config: DebugConfiguration): ProviderResult<DebugConfiguration> {
     // If needed, modify the debug configuration before launching the debug session
@@ -225,18 +123,22 @@ class MyDebugProvider implements DebugConfigurationProvider {
                 .then(goal => new DebugNow(undefined, goal, fc.currentTestEnvironment));
             return conf;
         }
-        //return null;
-        // return new MyConfiguration("dir-name", "test-name");
     }
     if (config.type != "autotools")
         return undefined;
-    config.type = "cppdbg";
+
+    let folderDebugger : string | undefined;
+    if (folder) {
+        let fc = configuration.getFolderConfig(folder);
+        folderDebugger = fc.config.defaultDebugger || fc.defaultDebugger;
+    }
+
+    config.type = config.env.testDebugEnv.debugger || folderDebugger || findDebugger("cpp") || "cppdbg";
     return config;
   }
 
   resolveDebugConfigurationWithSubstitutedVariables?(folder: WorkspaceFolder | undefined,
         debugConfiguration: DebugConfiguration, token?: vscode.CancellationToken): ProviderResult<DebugConfiguration> {
-    // return this.resolveDebugConfiguration(folder, debugConfiguration);
     if (debugConfiguration.type == "autotools")
         debugConfiguration.type = "cppdbg";
     return debugConfiguration;
@@ -247,10 +149,8 @@ class MyDebugProvider implements DebugConfigurationProvider {
 export function activate(context: vscode.ExtensionContext) {
   const providers = [
     new MyDebugProvider(context)
-    // new MyDebugProvider()
   ];
 
-//  const provider = new MyDebugProvider();
   // Register the debug configuration provider
   providers.forEach((provider) =>
   context.subscriptions.push(

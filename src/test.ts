@@ -20,10 +20,10 @@ import { isDebuggable } from './debug';
 import * as logger from './logger';
 
 import * as nls from 'vscode-nls';
-import { assert, markTimeline } from 'console';
+import { assert } from 'console';
 import { Span } from '@opentelemetry/api';
-import { Disposable } from 'vscode-jsonrpc';
-import { DebugNow } from './debug';
+import { Disposable } from 'vscode';
+
 nls.config({ messageFormat: nls.MessageFormat.bundle, bundleFormat: nls.BundleFormat.standalone })();
 const localize: nls.LocalizeFunc = nls.loadMessageBundle();
 
