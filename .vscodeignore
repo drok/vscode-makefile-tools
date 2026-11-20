@@ -29,7 +29,7 @@ docs/
 scripts/
 vendor/
 utils/
-extension/gdb-remote-assert-fail-workaround.sh
+gdb-remote-assert-fail-workaround.sh
 
 # esbundler means these should not be packaged
 out/main.js.map

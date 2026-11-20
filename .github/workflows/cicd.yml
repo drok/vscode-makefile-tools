@@ -180,28 +180,33 @@ jobs:
       #   run: npm ci
       - name: Download Build Artifact
         id: download
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
       - name: 'Echo download path'
         run:
           echo downloaded... ${{steps.download.outputs.download-path}}
-          echo expected... ${{ needs.build-lint-test.outputs.target }}/${{ needs.build-lint-test.outputs.vsixPath }}
+          # echo expected... ${{ needs.build-lint-test.outputs.target }}/${{ needs.build-lint-test.outputs.vsixPath }}
+
       - name: GitHub Release
         uses: softprops/action-gh-release@v1
         with:
-          generate_release_notes: false
+          generate_release_notes: true
           body: |
             # Summary
             See [changelog](https://github.com/...path.to.changelog#changelog)
           name: ${{ github.ref_name }}
           fail_on_unmatched_files: true
-          files: ${{ needs.build-lint-test.outputs.target }}/${{ needs.build-lint-test.outputs.vsixPath }}
+          files:  ${{ steps.download.outputs.download-path }}
+
       - name: Publish to Visual Studio Marketplace
-        uses: HaaLeo/publish-vscode-extension@v1
-        with:
-          pat: ${{ secrets.VS_MARKETPLACE_TOKEN }}
-          extensionFile: ${{ needs.build-lint-test.outputs.target }}/${{ needs.build-lint-test.outputs.vsixPath }}
-          registryUrl: https://marketplace.visualstudio.com
-          target: ${{ needs.build-lint-test.outputs.target }}
+      #   uses: HaaLeo/publish-vscode-extension@v1
+      #   with:
+      #     pat: ${{ secrets.VS_MARKETPLACE_TOKEN }}
+      #     extensionFile: ${{ steps.download.outputs.download-path }}
+      #     registryUrl: https://marketplace.visualstudio.com
+      #     target: ${{ needs.build-lint-test.outputs.target }}
+        run: |
+          vsce publish --pre-release --yarn -i ${{steps.download.outputs.download-path}}
+
       #- name: Publish to Open VSX Registry
       #  uses: HaaLeo/publish-vscode-extension@v1
       #  with:
