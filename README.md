@@ -324,13 +324,13 @@ A build configuration is the set of arguments given to the autotools `configure`
 A project can have one or more build configurations, each in a separate directory. The built-in capability of autotools to configure a project out-of-tree is leveraged.
 
 Contributed commands:
- * `autotools.buildAllConfigurations` ("Autotools: Build all configurations" in the palette) can be used to launch multiple builds with one configuratble keyboard shortcut.
+ * `autotools.buildAllConfigurations` ("Autotools: Build all configurations" in the palette) can be used to launch multiple builds with one configurable keyboard shortcut.
  * `autotools.buildAll` ("Autotools: Build all" in the palette) can be used to "make all" for one selected configuration.
 
 ## Build-related features
 
 ### Importing IntelliSense config
-The extension extracts the exact compilation arguments for each source code file and relays these arguments to IntelliSense. In turn, IntelliSense builds and maintains a database of indentifiers which is used to drive syntax highlighting and also code completion.
+The extension extracts the exact compilation arguments for each source code file and relays these arguments to IntelliSense. In turn, IntelliSense builds and maintains a database of identifiers which is used to drive syntax highlighting and also code completion.
 
 When selecting a different build configuration, IntelliSense is re-configured to reflect it, so that the syntax highlighting seen in the editor accurately corresponds to the `configureArgs` of the selected build configuration ("What You See Is What You Build"?)
 
