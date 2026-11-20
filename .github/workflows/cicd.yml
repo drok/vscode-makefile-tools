@@ -24,14 +24,14 @@ jobs:
       fail-fast: false
       matrix:
         config:
-          - { os: ubuntu-20.04, name: linux }
+          - { os: ubuntu-26.04, name: linux }
           # See https://github.blog/2023-10-02-introducing-the-new-apple-silicon-powered-m1-macos-larger-runner-for-github-actions/
           - { os: macos-latest, name: darwin }
           # - { os: macos-12-large, name: darwin-x64 }
           # - { os: macos-13-xlarge, name: darwin-arm64 }
           # - { os: windows-latest, name: win32 }
         node:
-          - 18
+          - lts/lithium
     outputs:
       vsixPath: ${{ steps.packageExtension.outputs.vsixPath }}
       target: ${{ matrix.config.name }}
